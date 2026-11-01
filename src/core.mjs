@@ -7,6 +7,7 @@ const priorities=new Set(["low","normal","high","critical"]);
 const kinds=new Set(["github","gitlab","forgejo","gitea","obsidian","anytype","jira","file","other"]);
 const uid=()=>crypto.randomUUID();
 const nonempty=(x,label)=>{if(typeof x!=="string"||!x.trim())throw Error(label+" required");return x.trim()};
+const validDate=value=>{if(value==null||value==="")return true;if(typeof value!=="string"||!/^\d{4}-\d{2}-\d{2}$/.test(value))return false;const d=new Date(value+"T00:00:00Z");return Number.isFinite(d.valueOf())&&d.toISOString().slice(0,10)===value};
 export const empty=()=>({schema:SCHEMA,revision:0,projects:[]});
 export function validate(s){
  if(s?.schema!==SCHEMA||!Number.isSafeInteger(s.revision)||s.revision<0||!Array.isArray(s.projects))throw Error("Invalid Atlas snapshot");
@@ -15,6 +16,8 @@ export function validate(s){
   if(!p.id||ids.has(p.id)||!types.has(p.type)||!statuses.has(p.status))throw Error("Invalid project");
   ids.add(p.id);
   for(const k of ["stages","items","dependencies","sources","risks","decisions"])if(!Array.isArray(p[k]))throw Error("Invalid "+k);
+  if(!validDate(p.startDate)||!validDate(p.dueDate)||p.startDate&&p.dueDate&&p.startDate>p.dueDate)throw Error("Invalid project dates");
+  for(const stage of p.stages)if(!validDate(stage.dueDate))throw Error("Invalid stage date");
   const itemIds=new Set(p.items.map(x=>x.id)),stageIds=new Set(p.stages.map(x=>x.id)),sourceIds=new Set(p.sources.map(x=>x.id));
   if(itemIds.size!==p.items.length||stageIds.size!==p.stages.length||sourceIds.size!==p.sources.length)throw Error("Duplicate ID");
   for(const x of p.items){if(!workStates.has(x.state)||!priorities.has(x.priority)||x.stageId&&!stageIds.has(x.stageId)||x.sourceId&&!sourceIds.has(x.sourceId))throw Error("Invalid work item");if(x.estimateDays!==undefined&&(!Number.isSafeInteger(x.estimateDays)||x.estimateDays<0||x.estimateDays>36500))throw Error("Invalid work estimateDays");}
