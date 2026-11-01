@@ -2,7 +2,7 @@ import {empty,validate,createProject,editProject,createStage,createItem,editItem
 import {observePublicRepo} from "./github-public.mjs";
 const key="iwxa-atlas-public/1",root=document.querySelector("#app"),msg=document.querySelector("#message"),esc=x=>String(x??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 let data;try{data=deserialize(localStorage.getItem(key)||JSON.stringify(empty()))}catch{data=empty()}let active=null;
-function save(next){localStorage.setItem(key,serialize(next));data=next;render()}function safe(fn){try{fn();msg.textContent=""}catch(e){msg.textContent=e.message}}
+function save(next){localStorage.setItem(key,serialize(next));data=next;render()}async function safe(fn){try{await fn();msg.textContent=""}catch(e){msg.textContent=e.message}}
 const input=(text,value="")=>prompt(text,value);
 const button=(label,action,css="")=>'<button data-action="'+action+'" class="'+css+'">'+label+'</button>';
 function render(){const p=data.projects.find(x=>x.id===active),stateCounts={active:data.projects.filter(x=>x.status==="active").length,blocked:data.projects.reduce((n,p)=>n+summary(p).blocked,0)};
