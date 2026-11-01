@@ -18,3 +18,6 @@ test("mutations do not alter previous state",()=>{const p=make();const q=createS
 test("duplicate IDs rejected",()=>{const p=make(),q=structuredClone(p.state);q.projects.push(q.projects[0]);assert.throws(()=>validate(q))});
 test("unknown stage rejected",()=>{const p=make();assert.throws(()=>createItem(p.state,p.id,{title:"a",stageId:"unknown"}))});
 test("repeated work state changes",()=>{const p=make(),a=createItem(p.state,p.id,{title:"A"});const b=editItem(a.state,p.id,a.id,{state:"blocked"}),c=editItem(b,p.id,a.id,{state:"done"});assert.equal(summary(c.projects[0]).blocked,0)});
+
+test("project date edits reject impossible calendar dates before persistence",()=>{const p=make();assert.throws(()=>editProject(p.state,p.id,{startDate:"2026-02-31"}),/Invalid project dates/);assert.throws(()=>editProject(p.state,p.id,{startDate:"2026/11/01"}),/Invalid project dates/);assert.equal(editProject(p.state,p.id,{startDate:"2026-11-01"}).projects[0].startDate,"2026-11-01");});
+test("invalid imported date cannot crash schedule display after accepted import",()=>{const p=make();const snapshot=structuredClone(p.state);snapshot.projects[0].startDate="not-a-date";assert.throws(()=>validate(snapshot),/Invalid project dates/);});
