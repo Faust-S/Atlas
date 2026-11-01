@@ -1,0 +1,105 @@
+{
+  "fixture": "atlas-public-portfolio/1",
+  "capturedOn": "2026-11-02",
+  "metadataSource": "GitHub public REST /repos/{owner}/{repo} and /branches/{default}",
+  "completeness": "default branch heads only; NOT a full branch enumeration",
+  "sensitivity": "Public upstream metadata only; no user or IWXA private data",
+  "repositories": [
+    {
+      "fullName": "xyflow/xyflow",
+      "id": 197018189,
+      "defaultBranch": "main",
+      "defaultSha": "d4bc936edad07aba995dbdb8e2c63af8cdd631c9",
+      "metadataUrl": "https://api.github.com/repos/xyflow/xyflow",
+      "branchUrl": "https://api.github.com/repos/xyflow/xyflow/branches/main"
+    },
+    {
+      "fullName": "cytoscape/cytoscape.js",
+      "id": 2255947,
+      "defaultBranch": "unstable",
+      "defaultSha": "acaa3ad9a1288a8242948fe3d9f1c674c25adea9",
+      "metadataUrl": "https://api.github.com/repos/cytoscape/cytoscape.js",
+      "branchUrl": "https://api.github.com/repos/cytoscape/cytoscape.js/branches/unstable"
+    },
+    {
+      "fullName": "dexie/Dexie.js",
+      "id": 17203748,
+      "defaultBranch": "master",
+      "defaultSha": "45aade72aa19a601e6a13aa877beb7389e15b5d2",
+      "metadataUrl": "https://api.github.com/repos/dexie/Dexie.js",
+      "branchUrl": "https://api.github.com/repos/dexie/Dexie.js/branches/master"
+    },
+    {
+      "fullName": "frappe/gantt",
+      "id": 66645293,
+      "defaultBranch": "master",
+      "defaultSha": "5c83708d300a99d9142edea0d4d52f421e3a2e68",
+      "metadataUrl": "https://api.github.com/repos/frappe/gantt",
+      "branchUrl": "https://api.github.com/repos/frappe/gantt/branches/master"
+    },
+    {
+      "fullName": "vitejs/vite",
+      "id": 257485422,
+      "defaultBranch": "main",
+      "defaultSha": "90bc034a97e7eccd0f3cbc69904fffa625a4c34d",
+      "metadataUrl": "https://api.github.com/repos/vitejs/vite",
+      "branchUrl": "https://api.github.com/repos/vitejs/vite/branches/main"
+    },
+    {
+      "fullName": "vitest-dev/vitest",
+      "id": 434708679,
+      "defaultBranch": "main",
+      "defaultSha": "2debb4e514f74d53ad85eabe47782e799e66b6c7",
+      "metadataUrl": "https://api.github.com/repos/vitest-dev/vitest",
+      "branchUrl": "https://api.github.com/repos/vitest-dev/vitest/branches/main"
+    },
+    {
+      "fullName": "microsoft/playwright",
+      "id": 221981891,
+      "defaultBranch": "main",
+      "defaultSha": "deb7e86201e26cb4a8e25191fce5ef2f7a28aa87",
+      "metadataUrl": "https://api.github.com/repos/microsoft/playwright",
+      "branchUrl": "https://api.github.com/repos/microsoft/playwright/branches/main"
+    },
+    {
+      "fullName": "microsoft/TypeScript",
+      "id": 20929025,
+      "defaultBranch": "main",
+      "defaultSha": "6161772c1370bdd4a82f808e6823bd755eb1870d",
+      "metadataUrl": "https://api.github.com/repos/microsoft/TypeScript",
+      "branchUrl": "https://api.github.com/repos/microsoft/TypeScript/branches/main"
+    },
+    {
+      "fullName": "mermaid-js/mermaid",
+      "id": 26066727,
+      "defaultBranch": "develop",
+      "defaultSha": "370c4af57f43cb0bda05f4a9fe2d99c912ba16dd",
+      "metadataUrl": "https://api.github.com/repos/mermaid-js/mermaid",
+      "branchUrl": "https://api.github.com/repos/mermaid-js/mermaid/branches/develop"
+    },
+    {
+      "fullName": "nodejs/node",
+      "id": 27193779,
+      "defaultBranch": "main",
+      "defaultSha": "2758c59105a4d4cffacf7ffde734379d8af1565a",
+      "metadataUrl": "https://api.github.com/repos/nodejs/node",
+      "branchUrl": "https://api.github.com/repos/nodejs/node/branches/main"
+    },
+    {
+      "fullName": "python/cpython",
+      "id": 81598961,
+      "defaultBranch": "main",
+      "defaultSha": "4b21d154b4864531641f90e1b87108575e673d75",
+      "metadataUrl": "https://api.github.com/repos/python/cpython",
+      "branchUrl": "https://api.github.com/repos/python/cpython/branches/main"
+    },
+    {
+      "fullName": "apache/airflow",
+      "id": 33884891,
+      "defaultBranch": "main",
+      "defaultSha": "7bfc8d32dbb73087cf2b8c4f1f3c81375928dedb",
+      "metadataUrl": "https://api.github.com/repos/apache/airflow",
+      "branchUrl": "https://api.github.com/repos/apache/airflow/branches/main"
+    }
+  ]
+}
