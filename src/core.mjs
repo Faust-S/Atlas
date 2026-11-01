@@ -19,6 +19,14 @@ export function validate(s){
   if(itemIds.size!==p.items.length||stageIds.size!==p.stages.length||sourceIds.size!==p.sources.length)throw Error("Duplicate ID");
   for(const x of p.items){if(!workStates.has(x.state)||!priorities.has(x.priority)||x.stageId&&!stageIds.has(x.stageId)||x.sourceId&&!sourceIds.has(x.sourceId))throw Error("Invalid work item");if(x.estimateDays!==undefined&&(!Number.isSafeInteger(x.estimateDays)||x.estimateDays<0||x.estimateDays>36500))throw Error("Invalid work estimateDays");}
   for(const x of p.sources)if(!kinds.has(x.kind)||!x.locator)throw Error("Invalid source");
+  for(const k of ["targets","findings","changes"])if(p[k]!==undefined&&!Array.isArray(p[k]))throw Error("Invalid "+k);
+  const targets=p.targets||[],findings=p.findings||[],changes=p.changes||[];
+  const targetIds=new Set(targets.map(x=>x.id)),findingIds=new Set(findings.map(x=>x.id)),changeIds=new Set(changes.map(x=>x.id));
+  if(targetIds.size!==targets.length||findingIds.size!==findings.length||changeIds.size!==changes.length)throw Error("Duplicate trace record");
+  for(const t of targets)if(typeof t.title!=="string"||!t.title||typeof t.desired!=="string"||!t.desired||!["committed","candidate"].includes(t.intent))throw Error("Invalid target record");
+  for(const e of findings)if(!targetIds.has(e.targetId)||!["present","partial","absent"].includes(e.result)||!["implementation","test","acceptance"].includes(e.level)||e.sourceId&&!sourceIds.has(e.sourceId)||!Number.isFinite(Date.parse(e.observedAt||"")))throw Error("Invalid finding record");
+  for(const c of changes)if(!Array.isArray(c.targetIds)||!c.targetIds.every(id=>targetIds.has(id))||!["proposed","approved","in_progress","implemented","deferred","rejected"].includes(c.status)||typeof c.title!=="string"||!c.title)throw Error("Invalid change record");
+
   const edges=new Set();
   for(const x of p.dependencies){const key=x.from+"|"+x.to;if(!itemIds.has(x.from)||!itemIds.has(x.to)||edges.has(key)||x.from===x.to)throw Error("Invalid dependency");edges.add(key);}
   const walk=(id,seen)=>{if(seen.has(id))throw Error("Dependency cycle");seen.add(id);for(const e of p.dependencies)if(e.from===id)walk(e.to,new Set(seen));};
