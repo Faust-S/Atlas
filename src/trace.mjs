@@ -2,6 +2,7 @@
 // The evidence ledger records *claims with provenance*, not trusted verdicts.
 // No external source writes or task execution are performed here.
 import {validate} from "./core.mjs";
+import {validCauseKey} from "./response.mjs";
 
 const TARGET_INTENT = new Set(["committed","candidate"]);
 const EVIDENCE_RESULT = new Set(["present","partial","absent"]);
@@ -41,12 +42,13 @@ export function recordFinding(snapshot,projectId,{targetId,result,level="impleme
   p.findings.push(e);return e.id;
  });
 }
-export function planChange(snapshot,projectId,{title,description="",targetIds=[],status="proposed",reference=null}){
+export function planChange(snapshot,projectId,{title,description="",targetIds=[],status="proposed",reference=null,causeKey=null}){
  if(!CHANGE_STATUS.has(status))throw Error("Invalid change status");
  if(!Array.isArray(targetIds)||new Set(targetIds).size!==targetIds.length)throw Error("Invalid affected targets");
  return mutate(snapshot,projectId,p=>{
   if(targetIds.some(t=>!p.targets.some(x=>x.id===t)))throw Error("Unknown target");
-  const c={id:id(),title:text(title,"Change title"),description:String(description),targetIds:[...targetIds],status,reference:optional(reference),createdAt:new Date().toISOString()};
+  if(causeKey!=null&&!validCauseKey(p,causeKey))throw Error("Unknown response cause");
+  const c={id:id(),title:text(title,"Change title"),description:String(description),targetIds:[...targetIds],status,reference:optional(reference),createdAt:new Date().toISOString(),...(causeKey?{causeKey}:{})};
   p.changes.push(c);return c.id;
  });
 }
@@ -56,6 +58,26 @@ export function updateChange(snapshot,projectId,changeId,status) {
   const change=p.changes.find(x=>x.id===changeId);
   if(!change)throw Error("Unknown change");
   change.status=status;return changeId;
+ });
+}
+
+export function decideChange(snapshot,projectId,changeId,{status,rationale}){
+ if(!["approved","rejected","deferred","in_progress","implemented"].includes(status))throw Error("Invalid decision status");
+ const reason=text(rationale,"Decision rationale");
+ return mutate(snapshot,projectId,p=>{
+  const change=p.changes.find(x=>x.id===changeId);
+  if(!change)throw Error("Unknown change");
+  const allowed={
+   proposed:["approved","rejected","deferred"],
+   deferred:["approved","rejected"],
+   approved:["in_progress","deferred"],
+   in_progress:["implemented","deferred"]
+  };
+  if(!allowed[change.status]?.includes(status))throw Error("Invalid change status transition");
+  const previous=change.status;
+  change.status=status;
+  p.decisions.push({id:id(),changeId,status,text:reason,previousStatus:previous,at:new Date().toISOString()});
+  return changeId;
  });
 }
 

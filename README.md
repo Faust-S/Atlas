@@ -1,5 +1,13 @@
 # Atlas — universal project workspace (public foundation)
 
+## Response and decision route — 2026-11-01
+
+Atlas now turns observed causes (blocked work, stale or missing evidence, source errors, project pauses and undefined expected outcomes) into **linked proposals**, not automatic instructions. From a signal, a user can record a proposed change, make an explicit status decision with mandatory rationale, and create work only after approval. The existing project `changes`, `decisions` and `items` remain the sole authoritative records. New optional `causeKey`, `changeId` and decision-history fields are validated against the actual project objects and persist through the same IndexedDB/JSON snapshot; older snapshots remain readable.
+
+The response panel shows unplanned causes, proposals awaiting a decision, approved changes without work, and the exact linked decisions and work. Repeated active proposals for the same cause are refused. When a cause is no longer observed, the historical change stays in the audit trail. None of these statuses independently certify delivery, and no agent/tool is executed. The branch change preserves existing `atlas.project/1` schema and requires no new dependencies or data store.
+
+Verification: Node targeted response checks pass locally, plus an integrated V8 roundtrip using the exact staged GitHub blobs for core/trace/editor/response. Full `npm test`, GitHub CI and actual Chromium remain separate acceptance gates.
+
 ## Portfolio dependency impact — 2026-11-01
 
 The public Atlas portfolio now includes a **read-only cascading-impact view** powered by `src/portfolio-cascade.mjs`, reusing the existing project impact model instead of adding a second readiness engine. Explicit paused/cancelled projects and blocked work are distinguished from uncertain evidence, incomplete source observations, pending upstream deliveries, and manually claimed completions. Impacts propagate through all declared project dependencies, with shortest causal paths and deduplicated downstream counts even for diamond-shaped graphs. The overview includes an attention filter; each project shows the projects and mandatory criteria downstream of it.

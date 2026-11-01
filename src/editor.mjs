@@ -1,6 +1,8 @@
 // Named, accessible in-page editors. Never expose internal IDs as editable text.
 import {createProject,editProject,createStage,createItem,editItem,connect,createRisk,createDecision,attach} from "./core.mjs";
-import {addTarget,recordFinding,planChange,updateChange} from "./trace.mjs";
+import {addTarget,recordFinding,planChange,updateChange,decideChange} from "./trace.mjs";
+import {projectSignals,validCauseKey} from "./response.mjs";
+import {projectImpact} from "./impact.mjs";
 import {addPortfolioLink} from "./portfolio.mjs";
 
 const option=(value,label)=>({value:String(value),label});
@@ -52,8 +54,36 @@ export function editorSpec(project,action,snapshot=null){
  if(action==="dep")return {title:"Добавить зависимость",hint:"Следующая работа начнётся после предыдущей. Циклы запрещены.",fields:[choice("from","Предшествующая работа",workItems(project)),choice("to","Зависимая работа",workItems(project))]};
  if(action==="target")return {title:"Ожидаемый результат",fields:[field("title","Название требования"),field("desired","Критерий выполнения","textarea"),choice("intent","Статус цели",[option("committed","Обязательно (принято в план)"),option("candidate","Предложение")],"committed")]};
  if(action==="finding"||action.startsWith("finding-target:"))return {title:"Фактическое состояние — заявление",hint:"Это запись сведений, а не независимая приёмка. Для подтверждения выберите источник и версию.",fields:[choice("targetId","К какому требованию относится",targetOptions(project),action.startsWith("finding-target:")?action.slice("finding-target:".length):targetOptions(project)[0]?.value),choice("result","Что известно",[option("present","Реализовано (заявлено)"),option("partial","Частично"),option("absent","Отсутствует")],"partial"),choice("level","Уровень заявления",[option("implementation","Реализация"),option("test","Тестирование"),option("acceptance","Приёмка")],"implementation"),choice("sourceRef","Внешний источник и ветка",sourceOptions(project),"",false),field("reference","Ссылка на документ или проверку","text","",false),field("note","Что именно наблюдалось","textarea","",false)]};
+ if(action.startsWith("respond:")){
+  const key=decodeURIComponent(action.slice(8));
+  const signal=projectSignals(project,projectImpact(project)).find(s=>s.key===key);
+  if(!signal)throw Error("Причина больше не наблюдается");
+  return {title:"Изменение для устранения: "+signal.title,fields:[
+   field("title","Что предлагается изменить?","text","Устранить: "+signal.title),
+   field("description","Обоснование и ожидаемый результат","textarea",signal.detail,true)
+  ]};
+ }
+ if(action.startsWith("work-change:")){
+  const id=action.slice(12),change=(project.changes||[]).find(c=>c.id===id);
+  if(!change||!["approved","in_progress"].includes(change.status))throw Error("Изменение не утверждено");
+  return {title:"Работа по утверждённому изменению",fields:[
+   field("title","Конкретная работа","text",change.title),
+   choice("stageId","Этап",stageOptions(project),"",false),
+   field("assignee","Ответственный","text","",false),
+   field("estimateDays","Оценка, дней","number","1")
+  ]};
+ }
  if(action==="proposal")return {title:"Предложить изменение",fields:[field("title","Название изменения"),field("description","Суть и причина","textarea","",false),choice("targetId","На что влияет",optionalTargets(project),"",false)]};
- if(action.startsWith("change:")){const c=(project.changes||[]).find(x=>x.id===action.slice(7));if(!c)throw Error("Изменение не найдено");return {title:"Статус изменения: "+c.title,fields:[choice("status","Решение",changeOptions,c.status)]}}
+ if(action.startsWith("change:")){
+  const c=(project.changes||[]).find(x=>x.id===action.slice(7));if(!c)throw Error("Изменение не найдено");
+  const choices={proposed:["approved","rejected","deferred"],deferred:["approved","rejected"],approved:["in_progress","deferred"],in_progress:["implemented","deferred"]};
+  const allowed=choices[c.status]||[];
+  if(!allowed.length)throw Error("Изменение завершено или отклонено");
+  return {title:"Решение: "+c.title,hint:"Решение и обоснование останутся в истории. Изменения сами по себе не запускают исполнителей.",fields:[
+   choice("status","Новый статус",changeOptions.filter(o=>allowed.includes(o.value)),allowed[0]),
+   field("rationale","Почему принято это решение?","textarea")
+  ]};
+ }
  if(action==="status")return {title:"Статус проекта",fields:[choice("status","Текущий статус",statusOptions,project.status)]};
  if(action==="start")return {title:"Дата начала планирования",fields:[field("startDate","Дата начала","date",project.startDate||"",false)]};
  if(action.startsWith("duration:")){const item=project.items.find(x=>x.id===action.slice(9));if(!item)throw Error("Работа не найдена");return {title:"Продолжительность: "+item.title,fields:[field("estimateDays","Календарных дней (0–36500)","number",String(item.estimateDays??1))]}};
@@ -96,8 +126,21 @@ export function applyEditor(snapshot,projectId,action,input){
   const revision=source&&source.status==="ok"&&ref?source.summary?.branchHeads?.[ref]||null:null;
   return {state:recordFinding(snapshot,projectId,{targetId:get("targetId"),result:get("result"),level:get("level"),sourceId,ref,revision,reference:get("reference"),note:get("note")}).state};
  }
+ if(action.startsWith("respond:")){
+  const key=decodeURIComponent(action.slice(8));
+  const signal=projectSignals(p,projectImpact(p)).find(s=>s.key===key);
+  if(!signal||!validCauseKey(p,key))throw Error("Причина больше не наблюдается");
+  if((p.changes||[]).some(c=>c.causeKey===key&&["proposed","approved","in_progress"].includes(c.status)))throw Error("Активное изменение для причины уже существует");
+  return {state:planChange(snapshot,projectId,{title:get("title"),description:get("description"),targetIds:signal.targetIds,causeKey:key}).state};
+ }
+ if(action.startsWith("work-change:")){
+  const changeId=action.slice(12),change=(p.changes||[]).find(c=>c.id===changeId);
+  if(!change||!["approved","in_progress"].includes(change.status))throw Error("Изменение не утверждено");
+  const created=createItem(snapshot,projectId,{title:get("title"),stageId:get("stageId"),assignee:get("assignee"),targetIds:change.targetIds,changeId});
+  return {state:editItem(created.state,projectId,created.id,{estimateDays:integer("estimateDays")})};
+ }
  if(action==="proposal")return {state:planChange(snapshot,projectId,{title:get("title"),description:get("description"),targetIds:get("targetId")?[get("targetId")]:[]}).state};
- if(action.startsWith("change:"))return {state:updateChange(snapshot,projectId,action.slice(7),get("status")).state};
+ if(action.startsWith("change:"))return {state:decideChange(snapshot,projectId,action.slice(7),{status:get("status"),rationale:get("rationale")}).state};
  if(action==="status")return {state:editProject(snapshot,projectId,{status:get("status")})};
  if(action==="start")return {state:editProject(snapshot,projectId,{startDate:get("startDate")||null})};
  if(action.startsWith("duration:"))return {state:editItem(snapshot,projectId,action.slice(9),{estimateDays:integer("estimateDays")})};

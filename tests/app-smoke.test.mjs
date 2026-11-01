@@ -40,7 +40,7 @@ test("UI survives IndexedDB persistence and completes project → evidence → a
   snapshot=await persisted();
   const changeId=snapshot.projects[0].changes[0].id;
   click("change:"+changeId);await settle();
-  submit({status:"approved"});await settle();
+  submit({status:"approved",rationale:"Plan reviewed and approved by owner"});await settle();
   snapshot=await persisted();
   assert.equal(snapshot.projects[0].changes[0].status,"approved");
   click("back");await settle();

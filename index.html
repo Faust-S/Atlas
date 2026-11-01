@@ -43,5 +43,11 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .atlas-impact-row .muted{margin:5px 0;font-size:12px}
 .atlas-impact-state{font-size:12px;color:#805d41;font-weight:650}
 @media(max-width:800px){.atlas-impact-row{grid-template-columns:1fr 1fr}.atlas-impact-row>div:first-child{grid-column:span 2}}
+.atlas-response-list{display:grid;gap:12px}
+.atlas-response-row{display:grid;grid-template-columns:minmax(160px,1fr) minmax(220px,1.25fr);gap:14px;padding:14px 0;border-top:1px solid #e2e9ee}
+.atlas-response-row p{margin:6px 0}
+.atlas-response-plan{margin:0 0 8px;padding:10px;border-radius:8px;background:#f4f8fa}
+.atlas-response-plan .muted{margin-top:6px}
+@media(max-width:700px){.atlas-response-row{grid-template-columns:1fr}}
 </style></head><body>
 <header><div><h1>IWXA Atlas</h1><small>Управление проектами, связями и источниками · локальная версия</small></div><div class="row"><button id="export">Экспорт JSON</button><button id="import">Импорт JSON</button><input id="file" type="file" hidden accept=".json"></div></header><main><div id="storage-status" role="status" aria-live="polite"></div><div id="message" role="alert"></div><div id="app"></div></main><footer>Atlas public foundation · Без сторонних секретов и принудительного агента</footer><script type="module" src="./src/app.mjs"></script></body></html>
