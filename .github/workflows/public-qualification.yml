@@ -1,4 +1,4 @@
-name: Atlas public branch qualification (fast push / manual browser)
+name: Atlas public branch qualification (fast push / gated cross-OS browser)
 
 on:
   push:
@@ -22,7 +22,7 @@ concurrency:
 jobs:
   qualify:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     steps:
       - name: Checkout exact branch revision
         uses: actions/checkout@v4
@@ -31,22 +31,66 @@ jobs:
         with:
           node-version: '22'
       - name: Run actual Node tests and syntax checks
+        shell: bash
         run: |
           npm test
           for source in src/*.mjs; do node --check "$source"; done
-      - name: Install temporary CI-only Chromium driver
-        if: github.event_name == 'workflow_dispatch'
-        run: |
-          npm install --no-save --package-lock=false playwright@1.56.1
-          npx playwright install --with-deps chromium
-      - name: Test real Chromium, IndexedDB and user journey
-        if: github.event_name == 'workflow_dispatch'
+          node --check tests/ci-browser.mjs
+
+  browser-linux:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[browser-accept]')
+    needs: qualify
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - name: Checkout exact branch revision
+        uses: actions/checkout@v4
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install browser driver for CI only
+        run: npm install --no-save --package-lock=false playwright@1.56.1
+      - name: Install Chromium with Linux dependencies
+        run: npx playwright install --with-deps chromium
+      - name: Run Linux real-browser acceptance
         run: node tests/ci-browser.mjs
-      - name: Keep screenshot only on browser failure
-        if: failure() && github.event_name == 'workflow_dispatch'
+      - name: Store only failure screenshot
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: atlas-browser-failure
-          path: atlas-ci-screenshot.png
+          name: atlas-browser-linux-failure
+          path: atlas-ci-*-failure.png
+          if-no-files-found: ignore
+          retention-days: 3
+
+  browser-cross-os:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[browser-accept]')
+    needs: browser-linux
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 18
+    steps:
+      - name: Checkout exact branch revision
+        uses: actions/checkout@v4
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install browser driver for CI only
+        run: npm install --no-save --package-lock=false playwright@1.56.1
+      - name: Install Chromium
+        run: npx playwright install chromium
+      - name: Run cross-OS real-browser acceptance
+        run: node tests/ci-browser.mjs
+      - name: Store only failure screenshot
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas-browser-${{ matrix.os }}-failure
+          path: atlas-ci-*-failure.png
           if-no-files-found: ignore
           retention-days: 3
