@@ -1,5 +1,13 @@
 # Atlas — universal project workspace (public foundation)
 
+## Public GitHub owner and branch observation — 2026-11-01
+
+The standalone app supports `github_owner` bindings (a public GitHub user or organization). Once explicitly attached, Atlas discovers public repositories with bounded REST pagination; the user can choose which discovered repositories receive a `github` binding for branch/SHA observation. Refresh uses one lightweight standalone poller, at most three due bindings per pass and a 15-minute minimum retry interval; manual refresh is available on each source. The Agent-hosted edition must use its host-owned synchronization authority instead.
+
+The source contract records object IDs, branches, SHAs, observation time, public API provenance and enumeration completeness. When two **complete** snapshots exist, it displays new, removed, renamed (stable repository ID) and updated entries. Partial enumerations and failures do not prove deletions. Existing claims remain claims even when the linked branch SHA matches; an outdated or missing ref becomes stale in trace views. No private repository data, credentials, task execution or external writes are part of the public implementation.
+
+Automatic changes require a linked source; Atlas does not scan arbitrary organizations and does not automatically enroll every discovered repository. A local-only branch on another machine cannot be observed by GitHub. The public unauthenticated GitHub API enforces its own rate limits.
+
 ## Standalone persistence — 2026-11-01
 
 The standalone UI now uses **native IndexedDB** (no extra runtime dependency) through `src/storage.mjs`. A transactional current/previous snapshot pair carries the existing `atlas.project/1` model unchanged, with SHA-256 integrity checking, explicit rollback from the last good snapshot, quarantine of a damaged head, and optimistic stale-tab write rejection. Existing `iwxa-atlas-public/1` localStorage JSON is migrated only after validation and is **not deleted**.

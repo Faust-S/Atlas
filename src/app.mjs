@@ -1,5 +1,6 @@
 import {empty,validate,createProject,editProject,createStage,createItem,editItem,connect,createRisk,createDecision,attach,observe,summary,serialize,deserialize} from "./core.mjs";
-import {observePublicRepo} from "./github-public.mjs";
+import {observePublicRepo,observePublicOwner} from "./github-public.mjs";
+import {applySourceObservation,attachDiscoveredRepo} from "./source-observation.mjs";
 import {scheduleProject} from "./planning.mjs";
 import {addTarget,recordFinding,planChange,updateChange,compareProject} from "./trace.mjs";
 import {renderPortfolioInsight,statusBand,filterTraceRows} from "./visual.mjs";
@@ -35,6 +36,65 @@ async function boot(){
   data=result.state;storageStatus=result.status;storageWarning=result.warning||"";ready=true;storageError=null;
  }catch(e){storageError=e;storageStatus="unavailable"}
  render();
+ if(ready)queueMicrotask(()=>refreshDueSources());
+}
+const SOURCE_REFRESH_MS=15*60*1000;
+let autoRefreshing=false;
+async function refreshSource(projectId,sourceId){
+ const p=data.projects.find(x=>x.id===projectId),src=p?.sources.find(s=>s.id===sourceId);
+ if(!src||!["github","github_owner"].includes(src.kind))return;
+ let observation;
+ try{
+  observation=src.kind==="github_owner"?
+   await observePublicOwner(src.locator):await observePublicRepo(src.locator);
+ }catch(e){
+  // Preserve cached objects and provenance on source or transport errors.
+  await save(observe(data,projectId,sourceId,"error",null,e.message));
+  throw e;
+ }
+ const result=applySourceObservation(data,projectId,sourceId,observation);
+ await save(result.state);
+}
+async function refreshDueSources(){
+ if(!ready||storageStatus==="recovery"||autoRefreshing||busy||document.visibilityState==="hidden")return;
+ autoRefreshing=true;
+ try{
+  const due=data.projects.flatMap(p=>p.sources.filter(s=>["github","github_owner"].includes(s.kind)&&
+   (!s.observedAt||Date.now()-Date.parse(s.observedAt)>=SOURCE_REFRESH_MS)).map(s=>[p.id,s.id]));
+  // Cap automatic work; next timer/focus reconciles remaining bindings.
+  for(const [pid,sid] of due.slice(0,3)){
+   try{await refreshSource(pid,sid)}catch(e){msg.textContent="Источник недоступен: "+e.message}
+  }
+ }finally{autoRefreshing=false}
+}
+function sourceCard(source){
+ const repo=source.kind==="github",owner=source.kind==="github_owner",summary=source.summary;
+ let content='<div class="item"><div class="row"><strong>'+esc(source.kind)+'</strong><span>'+esc(source.locator)+'</span><span class="tag">'+esc(source.status)+'</span>';
+ if(repo||owner)content+=button("Сверить сейчас","sync:"+esc(source.id));
+ content+='</div><small>Последнее наблюдение: '+esc(source.observedAt||"ещё не выполнялось")+'</small>';
+ if(source.error)content+='<p class="atlas-source-error">Ошибка: '+esc(source.error)+' · сохранённый снимок может устареть</p>';
+ if(summary){
+  content+='<p class="muted">Полнота: '+(summary.complete?"подтверждена":"неполная — удаления не устанавливаются")+' · происхождение: публичный GitHub REST · готовность не оценивалась</p>';
+  const changes=summary.changes;
+  if(changes?.comparable){
+   content+='<p class="muted">Изменения: добавлено '+changes.added.length+', удалено '+changes.removed.length+', обновлено '+changes.changed.length+', переименовано '+changes.renamed.length+'</p>';
+   if(changes.added.length)content+='<p class="muted">Новые: '+esc(changes.added.join(", "))+'</p>';
+   if(changes.removed.length)content+='<p class="atlas-source-error">Больше не обнаружено: '+esc(changes.removed.join(", "))+'</p>';
+   if(changes.renamed.length)content+='<p class="muted">Переименовано: '+esc(changes.renamed.map(x=>x.from+" → "+x.to).join(", "))+'</p>';
+  }
+  if(repo)content+='<p class="muted">Ветки: '+esc((summary.branches||[]).join(", "))+'</p>';
+  if(owner){
+   const repositories=summary.repositories||[];
+   const p=data.projects.find(x=>x.id===active);
+   content+='<p>Найдено публичных репозиториев: '+repositories.length+'</p><div class="atlas-discovered">';
+   for(const r of repositories){
+    const attached=p?.sources.some(s=>s.kind==="github"&&s.locator.toLowerCase()===r.name.toLowerCase());
+    content+='<div class="row"><span>'+esc(r.name)+'</span><small>'+esc(r.pushedAt||"нет даты")+'</small> '+(attached?'<span class="tag">Подключён</span>':button("Наблюдать ветки","adopt:"+esc(source.id)+":"+encodeURIComponent(r.name)))+'</div>';
+   }
+   content+='</div>';
+  }
+ }
+ return content+'</div>';
 }
 const button=(label,action,css="")=>'<button data-action="'+action+'" class="'+css+'">'+label+'</button>';
 function render(){if(storageMount)storageMount.innerHTML=storageBanner();if(!ready){root.innerHTML='<section class="card"><h2>Проекты не загружены</h2><p>Atlas не создаёт пустой портфель вместо повреждённых или недоступных данных. Восстановите доступ к IndexedDB либо импортируйте корректную резервную копию.</p></section>';return;}const p=data.projects.find(x=>x.id===active),stateCounts={active:data.projects.filter(x=>x.status==="active").length,blocked:data.projects.reduce((n,p)=>n+summary(p).blocked,0)};
@@ -56,7 +116,7 @@ function renderTrace(p){
  mount.innerHTML='<section class="card"><h2>Что должно быть / что есть / что изменим</h2><p class="muted">Ниже перечислены требования, утверждения с происхождением и запросы изменений. Эти записи не заменяют независимую квалификацию результата.</p><div class="row">'+button("＋ Требование","target")+button("＋ Факт","finding")+button("＋ Изменение","proposal")+'</div><p>'+labels+'</p>'+statusBand(view.counts,esc)+'<div class="row"><label for="trace-filter">Показать:</label><select id="trace-filter"><option value="all"'+(traceMode==="all"?" selected":"")+'>Все требования</option><option value="needs_attention"'+(traceMode==="needs_attention"?" selected":"")+'>Есть вопросы</option><option value="unconfirmed"'+(traceMode==="unconfirmed"?" selected":"")+'>Нет подтверждений / устарело</option><option value="reported"'+(traceMode==="reported"?" selected":"")+'>Заявлена реализация или проверка</option><option value="candidate"'+(traceMode==="candidate"?" selected":"")+'>Предлагаемые возможности</option></select></div><div style="overflow:auto"><table style="width:100%;text-align:left"><thead><tr><th>Ожидается</th><th>Статус плана</th><th>Фактически</th><th>Источник</th><th>Версия</th><th>Дата</th></tr></thead><tbody>'+rows+'</tbody></table></div><h3>Изменения и предложения</h3>'+proposed+'</section>';
 }
 function projectView(p){const s=summary(p), cols=[["todo","Запланировано"],["in_progress","В работе"],["blocked","Блокировано"],["done","Готово"]];
-return '<div class="row">'+button("← Все проекты","back")+'<span class="tag">'+esc(p.status)+'</span>'+button("Изменить статус","status")+'</div><h1>'+esc(p.name)+'</h1><p class="muted">'+esc(p.goal)+'</p><div class="grid"><div class="card"><small>Выполнено работ</small><div class="metric">'+(s.progress===null?"—":s.progress+"%")+'</div><small>Не является подтверждением готовности релиза</small></div><div class="card"><small>Блокеры</small><div class="metric">'+s.blocked+'</div></div><div class="card"><small>Связанных источников</small><div class="metric">'+s.sourceCount+'</div></div></div><div class="row">'+button("＋ Этап","stage")+button("＋ Работа","item","primary")+button("＋ Зависимость","dep")+button("Дата старта","start")+button("＋ Риск","risk")+button("＋ Решение","decision")+'</div><section class="card"><h2>Этапы</h2>'+p.stages.map(x=>'<p>◈ '+esc(x.name)+' <small>('+p.items.filter(y=>y.stageId===x.id).length+' работ)</small></p>').join("")+'</section><h2>План-график</h2><div id="atlas-schedule"></div><div id="atlas-relations"></div><div id="atlas-trace"></div><h2>Работы</h2><div class="board">'+cols.map(([st,title])=>'<section class="column"><strong>'+title+'</strong>'+p.items.filter(x=>x.state===st).map(x=>'<div class="item"><strong>'+esc(x.title)+'</strong><small>'+esc(x.assignee||"Не назначено")+'</small><div class="row">'+button("Редактировать · "+(x.estimateDays??1)+" дн.","work:"+esc(x.id))+'</div><select data-work="'+esc(x.id)+'">'+cols.map(([v,t])=>'<option value="'+v+'" '+(x.state===v?"selected":"")+'>'+t+'</option>').join("")+'</select></div>').join("")+'</section>').join("")+'</div><section class="card"><h2>Зависимости</h2>'+p.dependencies.map(x=>'<p>'+esc(p.items.find(t=>t.id===x.from)?.title)+' → '+esc(p.items.find(t=>t.id===x.to)?.title)+'</p>').join("")+'</section><section class="card"><h2>Риски и решения</h2>'+p.risks.map(r=>'<p>⚠ '+esc(r.title)+'</p>').join("")+p.decisions.map(d=>'<p>✓ '+esc(d.text)+'</p>').join("")+'</section><section class="card"><div class="row"><h2>Источники</h2>'+button("＋ Источник","source")+'</div><p class="muted">Автоматический вход в приватные аккаунты пока отсутствует. Публичные репозитории GitHub можно сверять вручную.</p>'+p.sources.map(x=>'<p><strong>'+esc(x.kind)+'</strong> '+esc(x.locator)+' <small>'+esc(x.status)+(x.observedAt?" · "+esc(x.observedAt):"")+'</small> '+(x.kind==="github"?button("Сверить","sync:"+esc(x.id)):"")+(x.summary?'<p class="muted">Ветки: '+esc((x.summary.branches||[]).join(", "))+' · Готовность не оценивалась</p>':"")+'</p>').join("")+'</section>';
+return '<div class="row">'+button("← Все проекты","back")+'<span class="tag">'+esc(p.status)+'</span>'+button("Изменить статус","status")+'</div><h1>'+esc(p.name)+'</h1><p class="muted">'+esc(p.goal)+'</p><div class="grid"><div class="card"><small>Выполнено работ</small><div class="metric">'+(s.progress===null?"—":s.progress+"%")+'</div><small>Не является подтверждением готовности релиза</small></div><div class="card"><small>Блокеры</small><div class="metric">'+s.blocked+'</div></div><div class="card"><small>Связанных источников</small><div class="metric">'+s.sourceCount+'</div></div></div><div class="row">'+button("＋ Этап","stage")+button("＋ Работа","item","primary")+button("＋ Зависимость","dep")+button("Дата старта","start")+button("＋ Риск","risk")+button("＋ Решение","decision")+'</div><section class="card"><h2>Этапы</h2>'+p.stages.map(x=>'<p>◈ '+esc(x.name)+' <small>('+p.items.filter(y=>y.stageId===x.id).length+' работ)</small></p>').join("")+'</section><h2>План-график</h2><div id="atlas-schedule"></div><div id="atlas-relations"></div><div id="atlas-trace"></div><h2>Работы</h2><div class="board">'+cols.map(([st,title])=>'<section class="column"><strong>'+title+'</strong>'+p.items.filter(x=>x.state===st).map(x=>'<div class="item"><strong>'+esc(x.title)+'</strong><small>'+esc(x.assignee||"Не назначено")+'</small><div class="row">'+button("Редактировать · "+(x.estimateDays??1)+" дн.","work:"+esc(x.id))+'</div><select data-work="'+esc(x.id)+'">'+cols.map(([v,t])=>'<option value="'+v+'" '+(x.state===v?"selected":"")+'>'+t+'</option>').join("")+'</select></div>').join("")+'</section>').join("")+'</div><section class="card"><h2>Зависимости</h2>'+p.dependencies.map(x=>'<p>'+esc(p.items.find(t=>t.id===x.from)?.title)+' → '+esc(p.items.find(t=>t.id===x.to)?.title)+'</p>').join("")+'</section><section class="card"><h2>Риски и решения</h2>'+p.risks.map(r=>'<p>⚠ '+esc(r.title)+'</p>').join("")+p.decisions.map(d=>'<p>✓ '+esc(d.text)+'</p>').join("")+'</section><section class="card"><div class="row"><h2>Источники</h2>'+button("＋ Источник","source")+'</div><p class="muted">Публичный владелец GitHub обнаруживает новые репозитории, выбранный репозиторий — ветки и SHA. Изменения источников не подтверждают готовность продукта.</p>'+p.sources.map(sourceCard).join("")+'</section>';
 }
 root.addEventListener("click",event=>{
  const b=event.target.closest("[data-action]");if(!b)return;
@@ -74,13 +134,16 @@ root.addEventListener("click",event=>{
   const p=data.projects.find(x=>x.id===active);
   if(action.startsWith("sync:")){
    if(!p)return;
-   const source=p.sources.find(x=>x.id===action.slice(5));
-   if(!source||source.kind!=="github")return;
-   let observed;
-   try{observed=await observePublicRepo(source.locator)}
-   catch(e){await save(observe(data,p.id,source.id,"error",null,e.message));throw e}
-   await save(observe(data,p.id,source.id,"ok",observed));
+   await refreshSource(p.id,action.slice(5));
    return;
+  }
+  if(action.startsWith("adopt:")){
+   if(!p)return;
+   const marker=action.indexOf(":",6);
+   if(marker===-1)throw Error("Неверная ссылка на репозиторий");
+   const sourceId=action.slice(6,marker),name=decodeURIComponent(action.slice(marker+1));
+   const result=attachDiscoveredRepo(data,p.id,sourceId,name);
+   await save(result.state);return;
   }
   editorAction=action;editorSpec(p,action);render();
  });
@@ -128,3 +191,7 @@ document.querySelector("#file").onchange=async event=>{
 };
 render();
 boot();
+if(typeof window!=="undefined"&&typeof window.setInterval==="function"){
+ window.setInterval(()=>{refreshDueSources().catch(e=>{msg.textContent=e.message})},SOURCE_REFRESH_MS);
+ window.addEventListener?.("focus",()=>{refreshDueSources().catch(e=>{msg.textContent=e.message})});
+}

@@ -4,7 +4,7 @@ const types=new Set(["personal","team","business","engineering","research","care
 const statuses=new Set(["planned","active","paused","completed","cancelled"]);
 const workStates=new Set(["todo","in_progress","blocked","done"]);
 const priorities=new Set(["low","normal","high","critical"]);
-const kinds=new Set(["github","gitlab","forgejo","gitea","obsidian","anytype","jira","file","other"]);
+const kinds=new Set(["github","github_owner","gitlab","forgejo","gitea","obsidian","anytype","jira","file","other"]);
 const uid=()=>crypto.randomUUID();
 const nonempty=(x,label)=>{if(typeof x!=="string"||!x.trim())throw Error(label+" required");return x.trim()};
 const validDate=value=>{if(value==null||value==="")return true;if(typeof value!=="string"||!/^\d{4}-\d{2}-\d{2}$/.test(value))return false;const d=new Date(value+"T00:00:00Z");return Number.isFinite(d.valueOf())&&d.toISOString().slice(0,10)===value};
