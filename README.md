@@ -1,5 +1,11 @@
 # Atlas — universal project workspace (public foundation)
 
+## Impact-to-action traceability — 2026-11-01
+
+The project view now joins **accepted/candidate targets → observed claims at exact source refs → source revision/freshness → related change requests → linked work items**. When a source branch changes, previous test/implementation/acceptance claims bound to that SHA become stale; Atlas presents the affected requirement, the reason, an explicit new-finding/review action, and existing follow-up work. Missing or partial outcomes offer a direct action to create work already linked to the target. The portfolio overview aggregates action attention without manufacturing a readiness percentage.
+
+Existing `atlas.project/1` snapshots remain readable. Work items may optionally contain `targetIds`; links are validated on import and editing, and old work items without them are still valid. The model, planner, external task execution boundaries and IndexedDB authority are unchanged. Neither a changed commit nor user-declared acceptance qualifies a release.
+
 ## Public GitHub owner and branch observation — 2026-11-01
 
 The standalone app supports `github_owner` bindings (a public GitHub user or organization). Once explicitly attached, Atlas discovers public repositories with bounded REST pagination; the user can choose which discovered repositories receive a `github` binding for branch/SHA observation. Refresh uses one lightweight standalone poller, at most three due bindings per pass and a 15-minute minimum retry interval; manual refresh is available on each source. The Agent-hosted edition must use its host-owned synchronization authority instead.

@@ -15,6 +15,7 @@ const optionalTargets=p=>[option("","Весь проект"),...targetOptions(p)
 const sourceOptions=p=>{
  const all=[option("","Заявление без внешней привязки")];
  for(const source of p.sources){
+  if(source.kind==="github_owner")continue; // Catalog discovery does not attest a revision.
   const branches=source.summary?.branches?.length?source.summary.branches:[source.summary?.defaultBranch||""];
   for(const branch of branches)all.push(option(source.id+"::"+branch,source.kind+" · "+source.locator+(branch?" / "+branch:"")+" ("+source.status+")"));
  }
@@ -28,16 +29,27 @@ export function editorSpec(project,action){
  ]};
  if(!project)throw Error("Сначала выберите проект");
  if(action==="stage")return {title:"Новый этап",fields:[field("name","Название этапа")]};
- if(action==="item")return {title:"Новая работа",fields:[field("title","Что нужно сделать?"),choice("stageId","Этап",stageOptions(project),"",false),field("assignee","Ответственный (имя или роль)","text","",false),field("estimateDays","Оценка длительности, календарных дней","number","1")]};
+ if(action==="item"||action.startsWith("item-target:")){
+  const targetId=action.startsWith("item-target:")?action.slice("item-target:".length):"";
+  const target=(project.targets||[]).find(t=>t.id===targetId);
+  if(targetId&&!target)throw Error("Связанное требование не найдено");
+  return {title:target?"Работа по требованию: "+target.title:"Новая работа",fields:[
+   field("title","Что нужно сделать?", "text",target?"Проверить: "+target.title:""),
+   choice("targetId","Связать с ожидаемым результатом",optionalTargets(project),targetId,false),
+   choice("stageId","Этап",stageOptions(project),"",false),
+   field("assignee","Ответственный (имя или роль)","text","",false),
+   field("estimateDays","Оценка длительности, календарных дней","number","1")
+  ]};
+ }
  if(action==="dep")return {title:"Добавить зависимость",hint:"Следующая работа начнётся после предыдущей. Циклы запрещены.",fields:[choice("from","Предшествующая работа",workItems(project)),choice("to","Зависимая работа",workItems(project))]};
  if(action==="target")return {title:"Ожидаемый результат",fields:[field("title","Название требования"),field("desired","Критерий выполнения","textarea"),choice("intent","Статус цели",[option("committed","Обязательно (принято в план)"),option("candidate","Предложение")],"committed")]};
- if(action==="finding")return {title:"Фактическое состояние — заявление",hint:"Это запись сведений, а не независимая приёмка. Для подтверждения выберите источник и версию.",fields:[choice("targetId","К какому требованию относится",targetOptions(project)),choice("result","Что известно",[option("present","Реализовано (заявлено)"),option("partial","Частично"),option("absent","Отсутствует")],"partial"),choice("level","Уровень заявления",[option("implementation","Реализация"),option("test","Тестирование"),option("acceptance","Приёмка")],"implementation"),choice("sourceRef","Внешний источник и ветка",sourceOptions(project),"",false),field("reference","Ссылка на документ или проверку","text","",false),field("note","Что именно наблюдалось","textarea","",false)]};
+ if(action==="finding"||action.startsWith("finding-target:"))return {title:"Фактическое состояние — заявление",hint:"Это запись сведений, а не независимая приёмка. Для подтверждения выберите источник и версию.",fields:[choice("targetId","К какому требованию относится",targetOptions(project),action.startsWith("finding-target:")?action.slice("finding-target:".length):targetOptions(project)[0]?.value),choice("result","Что известно",[option("present","Реализовано (заявлено)"),option("partial","Частично"),option("absent","Отсутствует")],"partial"),choice("level","Уровень заявления",[option("implementation","Реализация"),option("test","Тестирование"),option("acceptance","Приёмка")],"implementation"),choice("sourceRef","Внешний источник и ветка",sourceOptions(project),"",false),field("reference","Ссылка на документ или проверку","text","",false),field("note","Что именно наблюдалось","textarea","",false)]};
  if(action==="proposal")return {title:"Предложить изменение",fields:[field("title","Название изменения"),field("description","Суть и причина","textarea","",false),choice("targetId","На что влияет",optionalTargets(project),"",false)]};
  if(action.startsWith("change:")){const c=(project.changes||[]).find(x=>x.id===action.slice(7));if(!c)throw Error("Изменение не найдено");return {title:"Статус изменения: "+c.title,fields:[choice("status","Решение",changeOptions,c.status)]}}
  if(action==="status")return {title:"Статус проекта",fields:[choice("status","Текущий статус",statusOptions,project.status)]};
  if(action==="start")return {title:"Дата начала планирования",fields:[field("startDate","Дата начала","date",project.startDate||"",false)]};
  if(action.startsWith("duration:")){const item=project.items.find(x=>x.id===action.slice(9));if(!item)throw Error("Работа не найдена");return {title:"Продолжительность: "+item.title,fields:[field("estimateDays","Календарных дней (0–36500)","number",String(item.estimateDays??1))]}};
- if(action.startsWith("work:")){const item=project.items.find(x=>x.id===action.slice(5));if(!item)throw Error("Работа не найдена");return {title:"Работа: "+item.title,fields:[choice("state","Состояние",workOptions,item.state),choice("priority","Приоритет",[option("low","Низкий"),option("normal","Обычный"),option("high","Высокий"),option("critical","Критический")],item.priority),field("assignee","Ответственный","text",item.assignee,false),field("estimateDays","Плановая длительность, дней","number",String(item.estimateDays??1))]}};
+ if(action.startsWith("work:")){const item=project.items.find(x=>x.id===action.slice(5));if(!item)throw Error("Работа не найдена");return {title:"Работа: "+item.title,fields:[choice("state","Состояние",workOptions,item.state),choice("priority","Приоритет",[option("low","Низкий"),option("normal","Обычный"),option("high","Высокий"),option("critical","Критический")],item.priority),field("assignee","Ответственный","text",item.assignee,false),field("estimateDays","Плановая длительность, дней","number",String(item.estimateDays??1)),choice("targetId","Связать с ожидаемым результатом",optionalTargets(project),item.targetIds?.[0]||"",false)]}};
  if(action==="risk")return {title:"Новый риск",fields:[field("text","Что может помешать?","textarea")]};
  if(action==="decision")return {title:"Зафиксировать решение",fields:[field("text","Решение и основание","textarea")]};
  if(action==="source")return {title:"Подключить ссылку на источник",hint:"github_owner — публичный владелец GitHub (имя пользователя или организации); github — отдельный публичный owner/repository. Остальные источники пока только ссылки. Приватные данные не запрашиваются.",fields:[choice("kind","Тип источника",["github","github_owner","gitlab","forgejo","gitea","obsidian","anytype","jira","file","other"].map(x=>option(x,x)),"github"),field("locator","Ссылка или идентификатор источника")]};
@@ -62,10 +74,10 @@ export function applyEditor(snapshot,projectId,action,input){
  const p=snapshot.projects.find(x=>x.id===projectId);
  if(!p)throw Error("Проект не найден");
  if(action==="stage")return {state:createStage(snapshot,projectId,get("name")).state};
- if(action==="item"){const r=createItem(snapshot,projectId,{title:get("title"),stageId:get("stageId"),assignee:get("assignee")});return {state:editItem(r.state,projectId,r.id,{estimateDays:integer("estimateDays")})}};
+ if(action==="item"||action.startsWith("item-target:")){const r=createItem(snapshot,projectId,{title:get("title"),stageId:get("stageId"),assignee:get("assignee"),targetIds:get("targetId")?[get("targetId")]:[]});return {state:editItem(r.state,projectId,r.id,{estimateDays:integer("estimateDays")})}};
  if(action==="dep")return {state:connect(snapshot,projectId,get("from"),get("to"))};
  if(action==="target")return {state:addTarget(snapshot,projectId,{title:get("title"),desired:get("desired"),intent:get("intent")}).state};
- if(action==="finding"){
+ if(action==="finding"||action.startsWith("finding-target:")){
   const sourceRef=get("sourceRef");
   const marker=sourceRef.indexOf("::");
   const sourceId=marker>=0?sourceRef.slice(0,marker):null;
@@ -80,7 +92,7 @@ export function applyEditor(snapshot,projectId,action,input){
  if(action==="status")return {state:editProject(snapshot,projectId,{status:get("status")})};
  if(action==="start")return {state:editProject(snapshot,projectId,{startDate:get("startDate")||null})};
  if(action.startsWith("duration:"))return {state:editItem(snapshot,projectId,action.slice(9),{estimateDays:integer("estimateDays")})};
- if(action.startsWith("work:"))return {state:editItem(snapshot,projectId,action.slice(5),{state:get("state"),priority:get("priority"),assignee:get("assignee"),estimateDays:integer("estimateDays")})};
+ if(action.startsWith("work:"))return {state:editItem(snapshot,projectId,action.slice(5),{state:get("state"),priority:get("priority"),assignee:get("assignee"),estimateDays:integer("estimateDays"),targetIds:get("targetId")?[get("targetId")]:[]})};
  if(action==="risk")return {state:createRisk(snapshot,projectId,get("text"))};
  if(action==="decision")return {state:createDecision(snapshot,projectId,get("text"))};
  if(action==="source")return {state:attach(snapshot,projectId,get("kind"),get("locator")).state};

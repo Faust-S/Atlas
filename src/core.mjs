@@ -18,13 +18,13 @@ export function validate(s){
   for(const k of ["stages","items","dependencies","sources","risks","decisions"])if(!Array.isArray(p[k]))throw Error("Invalid "+k);
   if(!validDate(p.startDate)||!validDate(p.dueDate)||p.startDate&&p.dueDate&&p.startDate>p.dueDate)throw Error("Invalid project dates");
   for(const stage of p.stages)if(!validDate(stage.dueDate))throw Error("Invalid stage date");
-  const itemIds=new Set(p.items.map(x=>x.id)),stageIds=new Set(p.stages.map(x=>x.id)),sourceIds=new Set(p.sources.map(x=>x.id));
+  const itemIds=new Set(p.items.map(x=>x.id)),stageIds=new Set(p.stages.map(x=>x.id)),sourceIds=new Set(p.sources.map(x=>x.id)),targetIds=new Set((p.targets||[]).map(x=>x.id));
   if(itemIds.size!==p.items.length||stageIds.size!==p.stages.length||sourceIds.size!==p.sources.length)throw Error("Duplicate ID");
-  for(const x of p.items){if(!workStates.has(x.state)||!priorities.has(x.priority)||x.stageId&&!stageIds.has(x.stageId)||x.sourceId&&!sourceIds.has(x.sourceId))throw Error("Invalid work item");if(x.estimateDays!==undefined&&(!Number.isSafeInteger(x.estimateDays)||x.estimateDays<0||x.estimateDays>36500))throw Error("Invalid work estimateDays");}
+  for(const x of p.items){if(!workStates.has(x.state)||!priorities.has(x.priority)||x.stageId&&!stageIds.has(x.stageId)||x.sourceId&&!sourceIds.has(x.sourceId))throw Error("Invalid work item");if(x.estimateDays!==undefined&&(!Number.isSafeInteger(x.estimateDays)||x.estimateDays<0||x.estimateDays>36500))throw Error("Invalid work estimateDays");if(x.targetIds!==undefined&&(!Array.isArray(x.targetIds)||new Set(x.targetIds).size!==x.targetIds.length||x.targetIds.some(id=>!targetIds.has(id))))throw Error("Invalid work targetIds");}
   for(const x of p.sources)if(!kinds.has(x.kind)||!x.locator)throw Error("Invalid source");
   for(const k of ["targets","findings","changes"])if(p[k]!==undefined&&!Array.isArray(p[k]))throw Error("Invalid "+k);
   const targets=p.targets||[],findings=p.findings||[],changes=p.changes||[];
-  const targetIds=new Set(targets.map(x=>x.id)),findingIds=new Set(findings.map(x=>x.id)),changeIds=new Set(changes.map(x=>x.id));
+  const findingIds=new Set(findings.map(x=>x.id)),changeIds=new Set(changes.map(x=>x.id));
   if(targetIds.size!==targets.length||findingIds.size!==findings.length||changeIds.size!==changes.length)throw Error("Duplicate trace record");
   for(const t of targets)if(typeof t.title!=="string"||!t.title||typeof t.desired!=="string"||!t.desired||!["committed","candidate"].includes(t.intent))throw Error("Invalid target record");
   for(const e of findings)if(!targetIds.has(e.targetId)||!["present","partial","absent"].includes(e.result)||!["implementation","test","acceptance"].includes(e.level)||e.sourceId&&!sourceIds.has(e.sourceId)||!Number.isFinite(Date.parse(e.observedAt||"")))throw Error("Invalid finding record");
@@ -55,13 +55,14 @@ export function editProject(s,id,patch){return change(s,x=>{const p=project(x,id
 export function createStage(s,pid,name){const id=uid();return {id,state:change(s,x=>project(x,pid).stages.push({id,name:nonempty(name,"Stage name"),status:"planned",dueDate:null}))}}
 export function createItem(s,pid,data){const id=uid();return{id,state:change(s,x=>{const p=project(x,pid);
  if(data.stageId&&!p.stages.some(st=>st.id===data.stageId))throw Error("Unknown stage");
- p.items.push({id,title:nonempty(data.title,"Work title"),state:"todo",stageId:data.stageId||null,priority:"normal",assignee:String(data.assignee||""),dueDate:data.dueDate||null,executor:null,sourceId:null,estimateDays:1});
+ p.items.push({id,title:nonempty(data.title,"Work title"),state:"todo",stageId:data.stageId||null,priority:"normal",assignee:String(data.assignee||""),dueDate:data.dueDate||null,executor:null,sourceId:null,estimateDays:1,targetIds:data.targetIds===undefined?[]:Array.isArray(data.targetIds)?[...data.targetIds]:data.targetIds});
 })}}
 export function editItem(s,pid,id,patch){return change(s,x=>{const item=project(x,pid).items.find(t=>t.id===id);if(!item)throw Error("Unknown item");
  if("state" in patch){if(!workStates.has(patch.state))throw Error("Invalid work state");item.state=patch.state;}
  if("priority" in patch){if(!priorities.has(patch.priority))throw Error("Invalid priority");item.priority=patch.priority;}
  if("assignee" in patch)item.assignee=String(patch.assignee);
  if("estimateDays" in patch){if(!Number.isSafeInteger(patch.estimateDays)||patch.estimateDays<0||patch.estimateDays>36500)throw Error("Invalid work estimateDays");item.estimateDays=patch.estimateDays;}
+ if("targetIds" in patch){if(!Array.isArray(patch.targetIds))throw Error("Invalid work targetIds");item.targetIds=[...patch.targetIds];}
  if("executor" in patch){const e=patch.executor;if(e&&(!["human","external-agent","iwxa-agent"].includes(e.kind)||!e.ref))throw Error("Invalid executor");item.executor=e;}
 })}
 export function connect(s,pid,from,to){return change(s,x=>{const p=project(x,pid);if(!p.items.some(t=>t.id===from)||!p.items.some(t=>t.id===to))throw Error("Unknown work item");p.dependencies.push({from,to})})}
