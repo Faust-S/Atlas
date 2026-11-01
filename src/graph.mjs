@@ -7,6 +7,7 @@ export function renderDependencyGraph(project,{mode="all"}={}){
  const rows=plan.rows;
  if(!rows.length)return '<p class="muted">Добавьте работы, чтобы увидеть граф зависимостей.</p>';
  const relevant=rows.filter(r=>mode==="all"||mode==="critical"&&r.critical||mode==="blocked"&&(r.blockedBy.length>0||r.state==="blocked"));
+ if(!relevant.length)return '<p class="muted">'+(mode==="blocked"?"Нет заблокированных работ.":"Нет работ по выбранному фильтру.")+'</p>';
  const selected=new Set(relevant.map(r=>r.id)),labels=new Map(project.items.map(x=>[x.id,x.title]));
  const edges=project.dependencies.filter(e=>selected.has(e.from)&&selected.has(e.to));
  const outgoing=new Map(rows.map(r=>[r.id,[]])),incoming=new Map(rows.map(r=>[r.id,[]]));

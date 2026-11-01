@@ -38,6 +38,14 @@ A single Atlas portfolio can now define *declared project-level blocking depende
 
 Earlier snapshots with no `portfolioLinks` remain valid. A manually completed predecessor is **not** treated as accepted delivery: it prompts an explicit review instead. This planning graph is not an execution engine and does not access private IWXA repositories.
 
+## CI failure remediation — 2026-11-02
+
+The first six automatic public-branch qualification runs failed, so previous V8-only checks must **not** be treated as a passing integrated test suite. The latest inspected run is [#41350903605](https://github.com/Faust-S/Atlas/actions/runs/41350903605): 90/92 Node tests passed, with two failures in the asynchronous application smoke route and the blocked-graph expectation.
+
+The event handlers now return their asynchronous completion promises so the Node smoke driver can await actual IndexedDB write/commit and UI rendering. This does not change browser event dispatch semantics. The smoke driver explicitly checks application errors after each submitted operation instead of relying on a one-tick delay. In the graph, an empty blocked-only filter shows an informative empty state. The graph regression now covers both a dependency that is no longer blocked after completion and an explicitly blocked work item.
+
+A fresh passing `npm test` and a separate real Chromium run must be observed before declaring the product qualified. No new test infrastructure or extra store has been introduced.
+
 ## Verification on the public working branch
 
 A branch-scoped workflow (`.github/workflows/public-qualification.yml`) performs **real `npm test`** and syntax checks on code/test changes in `work/2026-11-01-atlas-foundation`. The heavier Playwright/Chromium browser test is **manual-only** (`workflow_dispatch`), to conserve GitHub resources. Browser QA covers native IndexedDB migration/recovery and project → requirement → linked work → dependency graph → finding → reload. The browser driver is not shipped with Atlas.

@@ -149,7 +149,7 @@ return '<div class="row">'+button("← Все проекты","back")+'<span cla
 root.addEventListener("click",event=>{
  const b=event.target.closest("[data-action]");if(!b)return;
  const action=b.dataset.action;
- safe(async()=>{
+ return safe(async()=>{
   if(action==="cancel-editor"){editorAction=null;render();return}
   if(action==="restore-storage"){
    if(storageStatus!=="recovery")return;
@@ -205,7 +205,7 @@ root.addEventListener("click",event=>{
 root.addEventListener("submit",event=>{
  if(event.target.id!=="atlas-editor-form")return;
  event.preventDefault();
- safe(async()=>{
+ return safe(async()=>{
   if(!editorAction)return;
   const values=new FormData(event.target);
   if(!ready)throw Error("Хранилище не готово");
@@ -231,7 +231,7 @@ root.addEventListener("change",e=>{
  if(e.target.id==="atlas-graph-mode"){graphMode=e.target.value;render();return}
  if(e.target.id==="atlas-cascade-mode"){cascadeMode=e.target.value;render();return}
  const id=e.target.dataset.work;if(!id)return;
- safe(()=>save(editItem(data,active,id,{state:e.target.value})));
+ return safe(()=>save(editItem(data,active,id,{state:e.target.value})));
 });
 document.querySelector("#export").onclick=()=>{
  safe(async()=>{

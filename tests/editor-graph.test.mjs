@@ -35,7 +35,9 @@ test("graph modes never promote a task completion to certified readiness",()=>{
  const d=connect(b.state,s.id,a.id,b.id),done=editItem(d,s.id,a.id,{state:"done"});
  p=done.projects[0];
  assert.match(renderDependencyGraph(p,{mode:"critical"}),/Критический путь/);
- assert.match(renderDependencyGraph(p,{mode:"blocked"}),/Есть блокировка/);
+ assert.match(renderDependencyGraph(p,{mode:"blocked"}),/Нет заблокированных работ/);
+ const blocked=editItem(done,s.id,b.id,{state:"blocked"});
+ assert.match(renderDependencyGraph(blocked.projects[0],{mode:"blocked"}),/Есть блокировка/);
  assert.doesNotMatch(renderDependencyGraph(p),/сертифицирован/);
  assert.throws(()=>renderDependencyGraph(p,{mode:"oops"}),/filter/);
 });
