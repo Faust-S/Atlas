@@ -1,0 +1,59 @@
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Atlas IndexedDB browser qualification</title></head>
+<body><h1>Atlas IndexedDB browser qualification (isolated test database)</h1>
+<pre id="results">RUNNING</pre>
+<script type="module">
+import {createStandaloneStore} from "../src/storage.mjs";
+import {empty,createProject,serialize} from "../src/core.mjs";
+const out=document.querySelector("#results");
+const name="atlas-qa-"+crypto.randomUUID();
+const legacyKey="atlas-qa-legacy-"+crypto.randomUUID();
+const passed=[],stores=[];
+const newStore=options=>{const instance=createStandaloneStore(options);stores.push(instance);return instance};
+function check(value,label){if(!value)throw Error("FAIL: "+label);passed.push(label)}
+function req(request){return new Promise((resolve,reject)=>{request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error)})}
+async function corrupt(){const db=await req(indexedDB.open(name,1));await new Promise((resolve,reject)=>{
+ const tx=db.transaction("snapshots","readwrite");
+ const store=tx.objectStore("snapshots"),r=store.get("head");
+ r.onsuccess=()=>store.put({...r.result,json:r.result.json.slice(0,-1)+"x"});
+ tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);
+});db.close()}
+async function run(){
+ const fixture=createProject(empty(),{name:"IndexedDB QA",type:"research",goal:"Persistence without silent data loss"}).state;
+ localStorage.setItem(legacyKey,serialize(fixture));
+ const params={dbName:name,legacyKey};
+ const store=newStore(params);
+ const first=await store.load();
+ check(first.status==="migrated"&&first.state.projects[0].name==="IndexedDB QA","legacy localStorage migrated without dropping projects");
+ check(localStorage.getItem(legacyKey)===serialize(fixture),"legacy source not deleted");
+ const next=createProject(first.state,{name:"Second project",type:"personal"}).state;
+ await store.save(next);
+ check((await newStore(params).load()).state.projects.length===2,"data survives new store instance");
+ const stale=newStore(params);await stale.load();
+ const newest=createProject(next,{name:"Third project",type:"team"}).state;
+ await store.save(newest);
+ let conflict=false;
+ try{await stale.save(createProject(next,{name:"Stale change",type:"team"}).state)}catch(e){conflict=/другой вкладке/.test(e.message)}
+ check(conflict,"stale-tab write rejected");
+ await corrupt();
+ const repair=newStore(params),candidate=await repair.load();
+ check(candidate.status==="recovery"&&candidate.state.projects.length===2,"corrupt head detected and previous valid snapshot returned");
+ await repair.restorePrevious();
+ const verified=await newStore(params).load();
+ check(verified.status==="ready"&&verified.state.projects.length===2,"explicit previous snapshot restoration survives reopening");
+ const replaced=createProject(empty(),{name:"Imported portfolio",type:"business"}).state;
+ await repair.replace(replaced);
+ check((await newStore(params).load()).state.projects[0].name==="Imported portfolio","validated replacement persisted");
+}
+try{
+ await run();
+ out.textContent="PASS "+passed.length+"/"+passed.length+"\n"+passed.map(x=>"PASS "+x).join("\n");
+ document.documentElement.dataset.status="PASS";
+}catch(e){
+ out.textContent="FAIL "+passed.length+" passed\n"+passed.map(x=>"PASS "+x).join("\n")+"\n"+(e.stack||e);
+ document.documentElement.dataset.status="FAIL";
+}finally{
+ stores.forEach(store=>store.close());
+ localStorage.removeItem(legacyKey);
+ indexedDB.deleteDatabase(name);
+}
+</script></body></html>

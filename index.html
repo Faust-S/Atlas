@@ -33,5 +33,7 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .atlas-bar{position:absolute;height:100%;border-radius:4px;background:#468f8b;min-width:2px}
 .atlas-bar.critical{background:#bb6858}
 @media(max-width:680px){.atlas-timeline-row{grid-template-columns:120px minmax(160px,1fr) 52px}}
+.atlas-storage-notice{margin:0 0 14px;color:#526e79;font-size:12px}
+.atlas-storage-warning{padding:13px 16px;margin:0 0 16px;border:1px solid #e2b677;border-radius:10px;background:#fff8e9;color:#75501f;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 </style></head><body>
-<header><div><h1>IWXA Atlas</h1><small>Управление проектами, связями и источниками · локальная версия</small></div><div class="row"><button id="export">Экспорт JSON</button><button id="import">Импорт JSON</button><input id="file" type="file" hidden accept=".json"></div></header><main><div id="message" role="alert"></div><div id="app"></div></main><footer>Atlas public foundation · Без сторонних секретов и принудительного агента</footer><script type="module" src="./src/app.mjs"></script></body></html>
+<header><div><h1>IWXA Atlas</h1><small>Управление проектами, связями и источниками · локальная версия</small></div><div class="row"><button id="export">Экспорт JSON</button><button id="import">Импорт JSON</button><input id="file" type="file" hidden accept=".json"></div></header><main><div id="storage-status" role="status" aria-live="polite"></div><div id="message" role="alert"></div><div id="app"></div></main><footer>Atlas public foundation · Без сторонних секретов и принудительного агента</footer><script type="module" src="./src/app.mjs"></script></body></html>

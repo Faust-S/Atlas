@@ -5,12 +5,39 @@ import {addTarget,recordFinding,planChange,updateChange,compareProject} from "./
 import {renderPortfolioInsight,statusBand,filterTraceRows} from "./visual.mjs";
 import {editorSpec,renderEditor,applyEditor} from "./editor.mjs";
 import {renderDependencyGraph,renderTimeline} from "./graph.mjs";
-const key="iwxa-atlas-public/1",root=document.querySelector("#app"),msg=document.querySelector("#message"),esc=x=>String(x??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-let data;try{data=deserialize(localStorage.getItem(key)||JSON.stringify(empty()))}catch{data=empty()}let active=null,traceMode="all",editorAction=null,graphMode="all";
-function save(next){localStorage.setItem(key,serialize(next));data=next;render()}async function safe(fn){try{await fn();msg.textContent=""}catch(e){msg.textContent=e.message}}
-
+import {createStandaloneStore} from "./storage.mjs";
+const root=document.querySelector("#app"),msg=document.querySelector("#message"),storageMount=document.querySelector("#storage-status");
+const esc=x=>String(x??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const store=createStandaloneStore();
+let data=empty(),active=null,traceMode="all",editorAction=null,graphMode="all";
+let ready=false,storageStatus="loading",storageWarning="",storageError=null,busy=false;
+async function save(next){await store.save(next);data=next;storageStatus="ready";storageWarning="";render()}
+async function safe(fn){
+ if(busy)return;
+ busy=true;
+ try{await fn();msg.textContent=""}
+ catch(e){msg.textContent=e instanceof Error?e.message:String(e)}
+ finally{busy=false}
+}
+function storageBanner(){
+ if(!ready){
+  return '<div class="atlas-storage-warning"><strong>Хранилище не открыто.</strong> '+esc(storageError?.message||"Загрузка IndexedDB…")+' <span>Импорт исправной копии возможен после восстановления доступа к хранилищу.</span></div>';
+ }
+ if(storageStatus==="recovery"){
+  return '<div class="atlas-storage-warning"><strong>Требуется восстановление:</strong> '+esc(storageWarning)+' '+button("Восстановить предыдущую версию","restore-storage","primary")+'</div>';
+ }
+ if(storageStatus==="migrated")return '<p class="atlas-storage-notice">'+esc(storageWarning)+'</p>';
+ return '<p class="atlas-storage-notice">Локальные данные: IndexedDB · контроль целостности SHA-256 · резервная версия. Хранение не зашифровано — не вводите конфиденциальные записи.</p>';
+}
+async function boot(){
+ try{
+  const result=await store.load();
+  data=result.state;storageStatus=result.status;storageWarning=result.warning||"";ready=true;storageError=null;
+ }catch(e){storageError=e;storageStatus="unavailable"}
+ render();
+}
 const button=(label,action,css="")=>'<button data-action="'+action+'" class="'+css+'">'+label+'</button>';
-function render(){const p=data.projects.find(x=>x.id===active),stateCounts={active:data.projects.filter(x=>x.status==="active").length,blocked:data.projects.reduce((n,p)=>n+summary(p).blocked,0)};
+function render(){if(storageMount)storageMount.innerHTML=storageBanner();if(!ready){root.innerHTML='<section class="card"><h2>Проекты не загружены</h2><p>Atlas не создаёт пустой портфель вместо повреждённых или недоступных данных. Восстановите доступ к IndexedDB либо импортируйте корректную резервную копию.</p></section>';return;}const p=data.projects.find(x=>x.id===active),stateCounts={active:data.projects.filter(x=>x.status==="active").length,blocked:data.projects.reduce((n,p)=>n+summary(p).blocked,0)};
 root.innerHTML='<div id="atlas-editor-slot"></div>'+(p?projectView(p):'<h2>Портфель проектов</h2><p class="muted">Проекты человека и организации. Связи с внешними системами не дублируют их данные.</p><div class="grid"><div class="card"><small>Всего проектов</small><div class="metric">'+data.projects.length+'</div></div><div class="card"><small>Активные</small><div class="metric">'+stateCounts.active+'</div></div><div class="card"><small>Заблокированные работы</small><div class="metric">'+stateCounts.blocked+'</div></div></div><div class="row">'+button("＋ Создать проект","new","primary")+'</div>'+renderPortfolioInsight(data.projects,esc)+'<div class="grid">'+data.projects.map(p=>'<article class="card"><span class="tag">'+esc(p.type)+'</span><h2>'+esc(p.name)+'</h2><p>'+esc(p.goal||"Без описания цели")+'</p><p class="muted">'+summary(p).total+' работ · '+p.sources.length+' источников</p><p class="muted">Требований: '+compareProject(p).committed+' · Без подтверждений: '+compareProject(p).counts.unknown+' · Несоответствия: '+(compareProject(p).counts.gap_reported+compareProject(p).counts.partial_reported)+' · Устарело / конфликтует: '+(compareProject(p).counts.stale+compareProject(p).counts.conflict)+'</p>'+button("Открыть","open:"+esc(p.id))+'</article>').join("")+'</div>');if(p){renderSchedule(p);renderTrace(p);renderGraph(p);}renderActiveEditor(p);}
 function renderSchedule(p){
  const target=document.querySelector("#atlas-schedule");if(!target||!p)return;
@@ -36,15 +63,23 @@ root.addEventListener("click",event=>{
  const action=b.dataset.action;
  safe(async()=>{
   if(action==="cancel-editor"){editorAction=null;render();return}
+  if(action==="restore-storage"){
+   if(storageStatus!=="recovery")return;
+   if(!confirm("Восстановить предыдущую исправную версию? Повреждённый снимок будет сохранён в карантине."))return;
+   data=await store.restorePrevious();storageStatus="ready";storageWarning="";editorAction=null;render();return;
+  }
   if(action==="back"){active=null;editorAction=null;render();return}
   if(action.startsWith("open:")){active=action.slice(5);editorAction=null;traceMode="all";graphMode="all";render();return}
+  if(!ready)throw Error("Локальное хранилище не готово");
   const p=data.projects.find(x=>x.id===active);
   if(action.startsWith("sync:")){
    if(!p)return;
    const source=p.sources.find(x=>x.id===action.slice(5));
    if(!source||source.kind!=="github")return;
-   try{const observation=await observePublicRepo(source.locator);save(observe(data,p.id,source.id,"ok",observation))}
-   catch(e){save(observe(data,p.id,source.id,"error",null,e.message));throw e}
+   let observed;
+   try{observed=await observePublicRepo(source.locator)}
+   catch(e){await save(observe(data,p.id,source.id,"error",null,e.message));throw e}
+   await save(observe(data,p.id,source.id,"ok",observed));
    return;
   }
   editorAction=action;editorSpec(p,action);render();
@@ -56,10 +91,12 @@ root.addEventListener("submit",event=>{
  safe(async()=>{
   if(!editorAction)return;
   const values=new FormData(event.target);
+  if(!ready)throw Error("Хранилище не готово");
   const result=applyEditor(data,active,editorAction,values);
+  await save(result.state);
   if(result.projectId)active=result.projectId;
   editorAction=null;
-  save(result.state);
+  render();
  });
 });
 root.addEventListener("change",e=>{
@@ -68,7 +105,26 @@ root.addEventListener("change",e=>{
  const id=e.target.dataset.work;if(!id)return;
  safe(()=>save(editItem(data,active,id,{state:e.target.value})));
 });
-document.querySelector("#export").onclick=()=>{const u=URL.createObjectURL(new Blob([serialize(data)],{type:"application/json"}));const a=document.createElement("a");a.href=u;a.download="atlas-backup.json";a.click();setTimeout(()=>URL.revokeObjectURL(u),2000)};
+document.querySelector("#export").onclick=()=>{
+ safe(async()=>{
+  if(!ready)throw Error("Нет достоверного снимка для экспорта");
+  const url=URL.createObjectURL(new Blob([serialize(data)],{type:"application/json"}));
+  const a=document.createElement("a");a.href=url;a.download="atlas-backup.json";a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),2000);
+ });
+};
 document.querySelector("#import").onclick=()=>document.querySelector("#file").click();
-document.querySelector("#file").onchange=async e=>{const file=e.target.files?.[0];if(!file)return;safe(async()=>{if(file.size>5000000)throw Error("Import limit 5 MB");const s=deserialize(await file.text());if(confirm("Заменить текущие проекты загруженным архивом?")){save(s);active=null;render()}});e.target.value=""};
+document.querySelector("#file").onchange=async event=>{
+ const file=event.target.files?.[0];if(!file)return;
+ await safe(async()=>{
+  if(file.size>100000000)throw Error("Размер резервной копии превышает 100 МБ");
+  const snapshot=deserialize(await file.text());
+  if(!confirm("Заменить текущий портфель загруженным архивом? Предыдущий снимок будет сохранён для восстановления."))return;
+  await store.replace(snapshot);
+  data=snapshot;ready=true;storageStatus="ready";storageWarning="";storageError=null;
+  active=null;editorAction=null;render();
+ });
+ event.target.value="";
+};
 render();
+boot();

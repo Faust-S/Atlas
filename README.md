@@ -1,5 +1,13 @@
 # Atlas — universal project workspace (public foundation)
 
+## Standalone persistence — 2026-11-01
+
+The standalone UI now uses **native IndexedDB** (no extra runtime dependency) through `src/storage.mjs`. A transactional current/previous snapshot pair carries the existing `atlas.project/1` model unchanged, with SHA-256 integrity checking, explicit rollback from the last good snapshot, quarantine of a damaged head, and optimistic stale-tab write rejection. Existing `iwxa-atlas-public/1` localStorage JSON is migrated only after validation and is **not deleted**.
+
+An unreadable snapshot is **not** silently replaced by an empty portfolio; write failures do not update the in-memory project. The UI exposes a visible recovery action. JSON export/import remains supported; a confirmed import atomically replaces the active portfolio. Storage is **not encrypted**, does not provide cloud backups or multi-device sync, and cannot guarantee persistence against browser profile deletion or physical disk loss. Keep an external JSON backup.
+
+For isolated real-browser checks, open `tests/storage-browser.html` under a local HTTP server. Node tests use `tests/fake-idb.mjs` only as a deterministic transaction test double; it is not a substitute for native-browser acceptance. Dexie remains an optional candidate for future complex querying/migrations; do not install a second competing store.
+
 ## Current handoff and user-facing portfolio UI — 2026-11-01
 
 [**Russian development handoff / prompt for next chat**](docs/HANDOFF_2026-11-01_RU.md). Read it before changing repository architecture.
@@ -53,7 +61,7 @@ A lightweight **local-first project and multi-source overview** for personal and
 - Local project portfolio with types `personal/team/business/engineering/research/care/other`, goals, owner, status, dates, and optional budget.
 - Project stages and work items, assignees, priorities, due dates, blocking states, acyclic dependencies, risks, immutable-style recorded decisions, and reference-only external executor assignments.
 - Overview dashboard, project summary, work board, timeline by stage, dependency graph, and linked source panel.
-- JSON export/import, revisioned snapshot schema and local persistence (`localStorage`). No hidden network sync.
+- JSON export/import, revisioned snapshot schema, and transactional IndexedDB local persistence with one-time legacy `localStorage` migration. No hidden network sync.
 - **Explicitly read-only public GitHub repository observation**: fetch current branch list, main branch, pushed date and source freshness by pressing **Сверить**. This intentionally does not access private repositories or accept tokens. Source observation does not claim release readiness.
 - Domain model tests using Node built-in test runner (no downloaded package dependencies).
 
@@ -65,7 +73,7 @@ A lightweight **local-first project and multi-source overview** for personal and
 - Verified evidence/resolver for accepted product releases. Manual item completion is *not* product qualification.
 - Drag/drop Gantt and advanced graph interaction: timeline and graph are functional read-only visualizations for the local project model.
 
-**Sensitive data:** current browser `localStorage` is not encrypted and is unsuitable for patient records, secrets, sensitive corporate data or regulated information. `care` is just a *project category*, not a medical records feature. Production requires the respective IWXA protected data/rights boundary.
+**Sensitive data:** current browser IndexedDB storage is not encrypted and is unsuitable for patient records, secrets, sensitive corporate data or regulated information. `care` is just a *project category*, not a medical records feature. Production requires the respective IWXA protected data/rights boundary.
 
 ## Two environments, one codebase
 
