@@ -1,10 +1,16 @@
 # Atlas — universal project workspace (public foundation)
 
+## Project portfolio dependency graph — 2026-11-01
+
+A single Atlas portfolio can now define *declared project-level blocking dependencies* within the existing `atlas.project/1` snapshot. The new overview contains a directed graph, a named-project dependency editor, a dependency table with removal actions, and per-project incoming/outgoing navigation. Links reject cycles, self-references, duplicate IDs and missing projects; the same JSON export and IndexedDB snapshot persist the relationships without another data store.
+
+Earlier snapshots with no `portfolioLinks` remain valid. A manually completed predecessor is **not** treated as accepted delivery: it prompts an explicit review instead. This planning graph is not an execution engine and does not access private IWXA repositories.
+
 ## Verification on the public working branch
 
-A branch-scoped workflow (`.github/workflows/public-qualification.yml`) checks each source/test change in `work/2026-11-01-atlas-foundation`. The single standard `ubuntu-latest` job executes **real `npm test`**, syntax checks, and a temporary CI-only Playwright/Chromium browser test. Browser QA covers native IndexedDB migration/recovery and project → requirement → linked work → dependency graph → finding → reload. The browser driver is not shipped with Atlas.
+A branch-scoped workflow (`.github/workflows/public-qualification.yml`) performs **real `npm test`** and syntax checks on code/test changes in `work/2026-11-01-atlas-foundation`. The heavier Playwright/Chromium browser test is **manual-only** (`workflow_dispatch`), to conserve GitHub resources. Browser QA covers native IndexedDB migration/recovery and project → requirement → linked work → dependency graph → finding → reload. The browser driver is not shipped with Atlas.
 
-The workflow has a 15-minute limit, cancels superseded runs and retains a failure screenshot for three days only when a browser test fails. Never equate a passing CI run with independent product/release acceptance. The `main` branch and private IWXA-Atlas are not modified by this workflow.
+The workflow has a 15-minute limit, cancels superseded runs and retains a failure screenshot for three days only when a manually requested browser test fails. Never equate a passing CI run with independent product/release acceptance. The `main` branch and private IWXA-Atlas are not modified by this workflow.
 
 ## Impact-to-action traceability — 2026-11-01
 

@@ -1,6 +1,7 @@
 // Named, accessible in-page editors. Never expose internal IDs as editable text.
 import {createProject,editProject,createStage,createItem,editItem,connect,createRisk,createDecision,attach} from "./core.mjs";
 import {addTarget,recordFinding,planChange,updateChange} from "./trace.mjs";
+import {addPortfolioLink} from "./portfolio.mjs";
 
 const option=(value,label)=>({value:String(value),label});
 const choice=(name,label,items,value="",required=true)=>({name,label,type:"select",options:items,value,required});
@@ -21,7 +22,14 @@ const sourceOptions=p=>{
  }
  return all;
 };
-export function editorSpec(project,action){
+export function editorSpec(project,action,snapshot=null){
+ if(action==="portfolio-link"){
+  const projects=snapshot?.projects||[];
+  if(projects.length<2)throw Error("Для связи нужны минимум два проекта");
+  const options=projects.map(p=>option(p.id,p.name));
+  return {title:"Межпроектная зависимость",hint:"Первый проект предоставляет результат, необходимый второму. Связь плановая, а не подтверждение релиза.",fields:[choice("from","Предшествующий проект",options),choice("to","Зависимый проект",options,projects[1].id),field("note","Условие или результат зависимости","textarea","",false)]};
+ }
+
  if(action==="new")return {title:"Новый проект",fields:[
   field("name","Название проекта"),
   choice("type","Тип проекта",["personal:Личный","team:Команда","business:Бизнес","engineering:Разработка","research:Исследование","care:Здоровье (без медицинских записей)","other:Другое"].map(s=>option(...s.split(":"))),"personal"),
@@ -71,6 +79,7 @@ export function applyEditor(snapshot,projectId,action,input){
  const get=k=>String(input.get(k)??"").trim();
  const integer=k=>{const raw=get(k);if(!/^\d+$/.test(raw))throw Error("Введите неотрицательное целое число");return Number(raw)};
  if(action==="new"){const r=createProject(snapshot,{name:get("name"),type:get("type"),goal:get("goal")});return {state:r.state,projectId:r.id}}
+ if(action==="portfolio-link")return {state:addPortfolioLink(snapshot,{from:get("from"),to:get("to"),note:get("note")})};
  const p=snapshot.projects.find(x=>x.id===projectId);
  if(!p)throw Error("Проект не найден");
  if(action==="stage")return {state:createStage(snapshot,projectId,get("name")).state};

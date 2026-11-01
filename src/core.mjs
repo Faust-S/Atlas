@@ -1,4 +1,5 @@
 // Atlas v0.1 project domain; never executes agent tasks or writes to external sources.
+import {validatePortfolioLinks} from "./portfolio.mjs";
 export const SCHEMA="atlas.project/1";
 const types=new Set(["personal","team","business","engineering","research","care","other"]);
 const statuses=new Set(["planned","active","paused","completed","cancelled"]);
@@ -35,6 +36,7 @@ export function validate(s){
   const walk=(id,seen)=>{if(seen.has(id))throw Error("Dependency cycle");seen.add(id);for(const e of p.dependencies)if(e.from===id)walk(e.to,new Set(seen));};
   for(const id of itemIds)walk(id,new Set());
  }
+ validatePortfolioLinks(s);
  return true;
 }
 function change(s,fn){validate(s);const next=structuredClone(s);fn(next);next.revision++;validate(next);return next}

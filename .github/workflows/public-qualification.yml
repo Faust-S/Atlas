@@ -1,4 +1,4 @@
-name: Atlas public branch qualification
+name: Atlas public branch qualification (fast push / manual browser)
 
 on:
   push:
@@ -35,13 +35,15 @@ jobs:
           npm test
           for source in src/*.mjs; do node --check "$source"; done
       - name: Install temporary CI-only Chromium driver
+        if: github.event_name == 'workflow_dispatch'
         run: |
           npm install --no-save --package-lock=false playwright@1.56.1
           npx playwright install --with-deps chromium
       - name: Test real Chromium, IndexedDB and user journey
+        if: github.event_name == 'workflow_dispatch'
         run: node tests/ci-browser.mjs
       - name: Keep screenshot only on browser failure
-        if: failure()
+        if: failure() && github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
           name: atlas-browser-failure

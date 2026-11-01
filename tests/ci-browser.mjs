@@ -101,7 +101,36 @@ async function userJourney(){
   assert.match(await page.locator("#atlas-trace").innerText(),/Реализовано частично/);
   assert.match(await page.locator("#app").innerText(),/Implement → Validate/);
   assert.equal(await page.locator("#atlas-relations svg").count(),1);
-  console.log("REAL_BROWSER_USER_JOURNEY PASS: project → target → 2 linked tasks → dependency graph → finding → IndexedDB restart");
+  await page.locator('[data-action="back"]').click();
+  await page.locator('[data-action="new"]').click();
+  await page.locator('#atlas-editor-form [name="name"]').fill("Consumer project");
+  await page.locator('#atlas-editor-form button[type="submit"]').click();
+  await page.locator('[data-action="back"]').click();
+  await page.locator('[data-action="portfolio-link"]').click();
+  await page.locator('#atlas-editor-form [name="from"]').selectOption({label:"Chromium qualification"});
+  await page.locator('#atlas-editor-form [name="to"]').selectOption({label:"Consumer project"});
+  await page.locator('#atlas-editor-form [name="note"]').fill("Requires validated offline result");
+  await page.locator('#atlas-editor-form button[type="submit"]').click();
+  await page.getByRole("heading",{name:"Зависимости между проектами"}).waitFor();
+  await page.locator('svg[aria-label="Граф зависимостей портфеля"]').waitFor();
+  const portfolio = await page.evaluate(async()=>{
+   return new Promise((resolve,reject)=>{
+    const request=indexedDB.open("iwxa-atlas-standalone",1);
+    request.onerror=()=>reject(request.error);
+    request.onsuccess=()=>{
+     const db=request.result,tx=db.transaction("snapshots","readonly"),get=tx.objectStore("snapshots").get("head");
+     get.onsuccess=()=>resolve(JSON.parse(get.result.json));
+     get.onerror=()=>reject(get.error);
+     tx.oncomplete=()=>db.close();
+    };
+   });
+  });
+  assert.equal(portfolio.projects.length,2);
+  assert.equal(portfolio.portfolioLinks.length,1);
+  await page.reload({waitUntil:"load"});
+  await page.locator('[data-action="portfolio-link"]').waitFor();
+  assert.match(await page.locator("#app").innerText(),/Requires validated offline result/);
+  console.log("REAL_BROWSER_USER_JOURNEY PASS: project → target → linked tasks → dependency graph → finding → IndexedDB restart → portfolio dependency → restart");
   if(events.length)throw Error(events.join("\n"));
  }catch(error){
   await page.screenshot({path:"atlas-ci-screenshot.png",fullPage:true}).catch(()=>{});
