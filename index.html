@@ -1,4 +1,23 @@
 <!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Atlas — проекты</title><style>
 :root{font:14px system-ui,sans-serif;color:#203044;background:#f5f7fa}*{box-sizing:border-box}body{margin:0}header{background:#182c42;color:white;padding:22px 32px;display:flex;align-items:center;justify-content:space-between;gap:16px}h1{margin:0;font-size:23px}small{color:#8192a4}header small{color:#9db7c7}main{max-width:1200px;margin:0 auto;padding:30px}.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}button,input,select,textarea{font:inherit}button{border:1px solid #cbd7e0;background:white;color:#184b62;padding:10px 14px;border-radius:8px;cursor:pointer}button.primary{background:#137d7e;color:white;border-color:#137d7e}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}.card{background:white;border:1px solid #e0e8ef;border-radius:12px;padding:20px;margin:14px 0}.card h2{margin:0 0 6px;font-size:17px}.muted{color:#8293a7}.metric{font-size:28px;font-weight:750}.board{display:grid;grid-template-columns:repeat(4,minmax(170px,1fr));gap:10px;overflow:auto}.column{background:#edf2f5;border-radius:10px;padding:12px}.item{border:1px solid #dfe7ea;padding:12px;background:white;margin:8px 0;border-radius:8px}.item strong{display:block;margin-bottom:7px}.item select{width:100%;padding:6px}label{display:block;margin:12px 0}input,textarea,select{padding:9px 10px;border:1px solid #cad7df;border-radius:7px;max-width:100%}form{display:flex;gap:8px;flex-wrap:wrap;align-items:end}.tag{padding:5px 9px;border-radius:30px;background:#e2f4ed;color:#29695b;font-size:11px}.link{color:#166b89;word-break:break-all}#message{color:#9b403e}footer{padding:25px 32px;color:#8998a9;text-align:center}@media(max-width:680px){header{flex-direction:column;align-items:flex-start}.board{grid-template-columns:repeat(4,200px)}}
+
+.atlas-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:16px 0}
+.atlas-kpis>div{background:#f2f6f8;border:1px solid #e0e8ee;border-radius:10px;padding:14px;display:grid;gap:5px}
+.atlas-kpis strong{font-size:25px;color:#1c3a54}
+.atlas-status-band{display:flex;width:100%;height:18px;overflow:hidden;border-radius:7px;background:#e7edf2;margin:12px 0}
+.atlas-band-part{height:100%;display:block;min-width:1px;border-right:1px solid #fff}
+.atlas-band-unknown{background:#97a4b4}.atlas-band-missing{background:#c65c55}
+.atlas-band-partial{background:#dc974c}.atlas-band-stale{background:#8767a3}
+.atlas-band-conflict{background:#bc5074}.atlas-band-reported{background:#408c79}
+.atlas-legend{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0 18px}
+.atlas-key{display:inline-flex;gap:6px;align-items:center;font-size:12px;color:#526579}
+.atlas-dot{display:inline-block;width:10px;height:10px;border-radius:50%}
+.atlas-table-scroll{overflow-x:auto}.atlas-table{border-collapse:collapse;width:100%;min-width:680px}
+.atlas-table td,.atlas-table th{padding:10px 8px;border-bottom:1px solid #e2e9ef;text-align:left;font-size:12px}
+.atlas-table th{color:#526579;background:#f3f6f9;font-weight:650}
+.atlas-plain-button{border:0;padding:0;color:#176b80;text-align:left;font-weight:650;text-decoration:underline;background:none}
+.atlas-overview h3{font-size:15px}#trace-filter{max-width:230px}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid #137d7e;outline-offset:2px}
+@media(max-width:680px){.atlas-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style></head><body>
 <header><div><h1>IWXA Atlas</h1><small>Управление проектами, связями и источниками · локальная версия</small></div><div class="row"><button id="export">Экспорт JSON</button><button id="import">Импорт JSON</button><input id="file" type="file" hidden accept=".json"></div></header><main><div id="message" role="alert"></div><div id="app"></div></main><footer>Atlas public foundation · Без сторонних секретов и принудительного агента</footer><script type="module" src="./src/app.mjs"></script></body></html>
