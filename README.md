@@ -1,5 +1,13 @@
 # Atlas — universal project workspace (public foundation)
 
+## Portfolio dependency impact — 2026-11-01
+
+The public Atlas portfolio now includes a **read-only cascading-impact view** powered by `src/portfolio-cascade.mjs`, reusing the existing project impact model instead of adding a second readiness engine. Explicit paused/cancelled projects and blocked work are distinguished from uncertain evidence, incomplete source observations, pending upstream deliveries, and manually claimed completions. Impacts propagate through all declared project dependencies, with shortest causal paths and deduplicated downstream counts even for diamond-shaped graphs. The overview includes an attention filter; each project shows the projects and mandatory criteria downstream of it.
+
+These are **potential areas of impact**, not independently verified outages, hard blockers or qualified release statuses. Missing goals are recorded as an assessment gap, never as successful readiness. No new store, executor, agent permission, private data, or extra GitHub action is introduced.
+
+Local validation: targeted Node 22 tests for portfolio and cascade passed 8/8. Full test suite and browser qualification remain to be confirmed on the integrated branch.
+
 ## Project portfolio dependency graph — 2026-11-01
 
 A single Atlas portfolio can now define *declared project-level blocking dependencies* within the existing `atlas.project/1` snapshot. The new overview contains a directed graph, a named-project dependency editor, a dependency table with removal actions, and per-project incoming/outgoing navigation. Links reject cycles, self-references, duplicate IDs and missing projects; the same JSON export and IndexedDB snapshot persist the relationships without another data store.
