@@ -64,7 +64,9 @@ async function testTier(browser,origin,n){
   const saved=JSON.parse(stored);
   assert.equal(saved.projects.length,n);
   assert.equal(saved.portfolioLinks.length,n-1);
-  assert.deepEqual(saved.projects[0].sources[0].summary?.readiness,"not_assessed");
+  assert.equal(saved.projects[0].sources[0].status,"never");
+  assert.equal(saved.projects[0].sources[0].summary,null);
+  assert.equal(saved.projects[1].sources[0].summary?.readiness,"not_assessed");
   assert.equal(saved.projects[0].targets.length,4);
   assert.equal(saved.projects[0].items.length,12);
   stage="search and filtering";
