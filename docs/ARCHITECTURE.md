@@ -40,7 +40,7 @@ A shared project model must work across personal planning, engineering, enterpri
 ## Operational safety
 
 - No source credentials in public code, logs or synthetic test fixtures.
-- Private IWXA project mappings and development evidence remain in `Faust-S/IWXA-Atlas` or other private authoritative sources.
+- Private IWXA project mappings and development evidence remain in `private IWXA integration repository` or other private authoritative sources.
 - Agents never receive execution authority just because they appear in an Atlas work-item assignment.
 - Source outages and partial pagination are visible; cached information must not be mislabeled as current.
 - Avoid a second Task Engine, duplicate host, or all-in-one fork of project-management monoliths.
