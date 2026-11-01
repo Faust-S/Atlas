@@ -1,5 +1,18 @@
 # Atlas — universal project workspace (public foundation)
 
+## Planning core update — 2026-11-01
+
+**Implemented on this working branch:** reusable, permissively licensed Marcel Klehr `toposort` (MIT; attribution in `src/vendor/LICENSE-toposort.txt`), a calendar-day critical-path calculation in `src/planning.mjs`, editable work duration estimates, project start date, and a read-only schedule table with float/critical-work indicators.
+
+**Evidence:** 13 standalone planning scenarios passed locally; 10 additional direct checks against the exact GitHub-published modules passed (core, backward compatibility, scheduler, JavaScript UI syntax). Unit and browser end-to-end checks in the actual published deployment remain pending. GitHub Actions were **not** invoked.
+
+**Important limitations:** planning uses elapsed calendar days; there is no resource leveling, working-day calendar, leads/lags, budget forecasting or automatic release acceptance. A calculation is not a task execution. Existing snapshots lacking `estimateDays` default to one day, and data remains local in the initial standalone UI.
+
+[Core selection and license review](docs/OPEN_SOURCE_CORES_2026-11-01.md) · [Planning engine](src/planning.mjs) · [Planning integration tests](tests/planning-integration.test.mjs)
+
+---
+
+
 A lightweight **local-first project and multi-source overview** for personal and business work. The architecture deliberately does **not** implement an AI agent, a task execution engine, a secrets manager, or a second tool/program registry. The same project presentation can later be hosted inside IWXA Personal Agent.
 
 **Status: public foundation v0.1 — a working local UI and project model; NOT a production/medical release.** All public example data is synthetic. The public repository contains no private IWXA bindings, credentials, nonpublic architecture, or data from other repositories.
