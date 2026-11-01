@@ -19,5 +19,19 @@
 .atlas-overview h3{font-size:15px}#trace-filter{max-width:230px}
 button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid #137d7e;outline-offset:2px}
 @media(max-width:680px){.atlas-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+.atlas-editor{border-color:#87b8bd;background:#faffff}
+.atlas-form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:8px 18px;margin-bottom:18px}
+.atlas-field{display:grid;gap:7px;margin:5px 0;font-weight:600;color:#35536a}
+.atlas-field input,.atlas-field select,.atlas-field textarea{width:100%;max-width:none;font-weight:400;background:white}
+.atlas-graph-scroll{max-width:100%;overflow:auto;background:#f5f8fa;border:1px solid #dfebed;border-radius:10px;margin:14px 0}
+.atlas-graph-scroll svg{display:block;max-width:none}
+.atlas-timeline{display:grid;gap:8px;overflow:auto}
+.atlas-timeline-row{display:grid;grid-template-columns:minmax(120px,220px) minmax(180px,1fr) 64px;gap:12px;align-items:center}
+.atlas-timeline-row>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.atlas-track{position:relative;height:18px;border-radius:5px;background:#eaf0f3}
+.atlas-bar{position:absolute;height:100%;border-radius:4px;background:#468f8b;min-width:2px}
+.atlas-bar.critical{background:#bb6858}
+@media(max-width:680px){.atlas-timeline-row{grid-template-columns:120px minmax(160px,1fr) 52px}}
 </style></head><body>
 <header><div><h1>IWXA Atlas</h1><small>Управление проектами, связями и источниками · локальная версия</small></div><div class="row"><button id="export">Экспорт JSON</button><button id="import">Импорт JSON</button><input id="file" type="file" hidden accept=".json"></div></header><main><div id="message" role="alert"></div><div id="app"></div></main><footer>Atlas public foundation · Без сторонних секретов и принудительного агента</footer><script type="module" src="./src/app.mjs"></script></body></html>
