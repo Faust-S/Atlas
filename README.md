@@ -134,7 +134,7 @@ A lightweight **local-first project and multi-source overview** for personal and
 ### Not implemented yet — do not infer from the UI
 
 - Actual private GitHub/GitLab/Forgejo/Jira/Anytype/Obsidian data access, provider authentication, automatic discovery, webhooks, and real-time refresh.
-- Multi-user collaboration, role-based access control, enterprise audit controls, legal/medical protections, encrypted data at rest, cloud backup, or sync across devices.
+- **Standalone** multi-user collaboration, organisation RBAC, enterprise audit controls, encrypted storage, cloud backup and sync are not implemented. In **hosted IWXA mode**, these capabilities must reuse Admin Center (organisational memberships/rights), shared T3 reconciliation and Personal Agent/Programs Center; Atlas must not duplicate these services. The Atlas host integration is not yet implemented or qualified.
 - Agent execution or side effects: Hermes, Goose, Task Engine, and other workers are *references* only here; actual delegation is exclusively a host responsibility.
 - Verified evidence/resolver for accepted product releases. Manual item completion is *not* product qualification.
 - Drag/drop Gantt and advanced graph interaction: timeline and graph are functional read-only visualizations for the local project model.

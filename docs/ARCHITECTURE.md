@@ -11,6 +11,19 @@ A project can have a goal, owner, milestones/stages, scheduled work, dependencie
 - Standalone Atlas: local-first project planning and authorized read-only source integration.
 - Atlas inside Personal Agent: identical view/model through the **existing** Agent Project/Workspace, ToolRuntime, Programs Center and permissions. Never run two simultaneous independent connector registries for one source.
 
+## IWXA organisational host: reuse Admin Center and T3
+
+**Do not implement an Atlas-specific identity provider, organisation membership registry, corporate credential issuer, grants evaluator, or multi-device reconciliation service.** The intended IWXA integration reuses the existing product boundaries:
+
+- **Admin Center** owns organisation/workspace membership, organisational credentials and grants, delegation, organisational acceptance and audit under its own authority profile. It does not own employees' private keys or personal workspace data.
+- **Shared T3 contracts** own rights/authority verification, package revision and lineage, offline exchange, conflict/revocation handling, and eventual source reconciliation. Network/multi-device live synchronisation is a separately qualified transport/capability, not an automatic Admin Center feature.
+- **Personal Agent / Programs Center** owns personal workspace, programs, tool permissions and executor delegation.
+- **Atlas** owns the generic plan/requirements/dependencies/portfolio projections; in a hosted organisation workspace it reads/writes through an explicitly authorised host port and never mirrors its own independent grants or synchroniser.
+
+The public standalone application remains offline-first and locally scoped without organisation RBAC or sync. Its UI must not imply that Admin/T3 functionality has been delivered or that access is allowed without the host's current authorisation decision. Missing/stale revocation state must be handled by host policy, never silently treated as active. Cross-organisational data must not be joined merely because a user belongs to multiple organisations.
+
+**Implementation status:** product responsibility agreed; no Atlas ↔ Admin Center host integration qualified on this branch. The source documentation in `Faust-S/iwxa` (`architecture/IWXA_ADMIN_CENTER_PRODUCT_SPEC_RU.md`, `architecture/IWXA_T3_CONTROL_ADMIN_PUBLISHER_PRODUCT_BOUNDARIES_2026-10-08_RU.md`) explicitly distinguishes target architecture from release-ready runtime. No new security or network authority is created here.
+
 ## Authority boundaries
 
 | Object | Owner |
