@@ -39,7 +39,7 @@ Project-owned records belong to one authoritative store at a time. Every externa
 
 ## Public development vs private deployment
 
-The generic code is designed for the public `Faust-S/Atlas` repository. Actual IWXA project mappings, nonpublic source metadata, credentials and private deployment configuration belong only to the private `Faust-S/IWXA-Atlas` deployment or other authorized private repositories. They must never be added to public Git history, PRs, CI artifacts, screenshots or fixtures.
+The generic code is designed for the public `Faust-S/Atlas` repository. Actual IWXA project mappings, nonpublic source metadata, credentials and private deployment configuration belong only to the private `private IWXA integration repository` deployment or other authorized private repositories. They must never be added to public Git history, PRs, CI artifacts, screenshots or fixtures.
 
 ## Research and provenance
 
