@@ -1,0 +1,10 @@
+node_modules/
+*.log
+.env
+.env.*
+*.pem
+*.token
+private/
+local-data/
+real-projects/
+*.private.json
