@@ -1,0 +1,18 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { scheduleProject } from '../src/planning.mjs';
+import toposort from '../src/vendor/toposort.mjs';
+const project=(items,dependencies=[],startDate='2026-11-01')=>({items:items.map(([id,estimateDays=1,state='todo'])=>({id,title:id,estimateDays,state})),dependencies:dependencies.map(([from,to])=>({from,to})),startDate});
+test('upstream topological core orders dependencies including isolated items',()=>{const order=toposort.array(['a','b','c','d'],[['a','b'],['b','c']]);assert(order.indexOf('a')<order.indexOf('b'));assert(order.indexOf('b')<order.indexOf('c'));assert(order.includes('d'));});
+test('upstream core refuses cycles and unknown nodes',()=>{assert.throws(()=>toposort.array(['a','b'],[['a','b'],['b','a']]),/Cyclic/);assert.throws(()=>toposort.array(['a'],[['a','z']]),/Unknown/)});
+test('linear critical path',()=>{const r=scheduleProject(project([['a',3],['b',2],['c',1]],[['a','b'],['b','c']]));assert.equal(r.durationDays,6);assert.deepEqual(r.criticalIds,['a','b','c']);assert.equal(r.estimatedFinish,'2026-11-07');});
+test('parallel paths and float',()=>{const r=scheduleProject(project([['a',3],['b',1],['c',4],['d',2]],[['a','c'],['b','c'],['c','d']]));assert.equal(r.durationDays,9);assert.equal(r.rows.find(x=>x.id==='b').floatDays,2);assert.deepEqual(r.criticalIds,['a','c','d']);});
+test('independent branch float',()=>{const r=scheduleProject(project([['a',5],['b',2],['c',1]],[['b','c']]));assert.equal(r.durationDays,5);assert.equal(r.rows.find(x=>x.id==='b').floatDays,2)});
+test('empty project',()=>{const r=scheduleProject(project([]));assert.equal(r.durationDays,0);assert.equal(r.rows.length,0)});
+test('zero-day milestone',()=>{const r=scheduleProject(project([['a',2],['m',0]],[['a','m']]));assert.deepEqual(r.criticalIds,['a','m'])});
+test('blocked predecessors do not certify acceptance',()=>{const r=scheduleProject(project([['a',1,'todo'],['b',2,'todo']],[['a','b']]));assert.deepEqual(r.rows.find(x=>x.id==='b').blockedBy,['a']);assert.match(r.warning,/not release acceptance/)});
+test('completed predecessor unblocks',()=>{const r=scheduleProject(project([['a',1,'done'],['b',2,'todo']],[['a','b']]));assert.deepEqual(r.rows.find(x=>x.id==='b').blockedBy,[])});
+test('invalid estimates',()=>{for(const n of [-1,1.5,36600,NaN])assert.throws(()=>scheduleProject(project([['a',n]])),/estimateDays/)});
+test('cycle and missing endpoint',()=>{assert.throws(()=>scheduleProject(project([['a'],['b']],[['a','b'],['b','a']])),/Cyclic/);assert.throws(()=>scheduleProject(project([['a']],[['a','unknown']])),/missing item/)});
+test('invalid starting date',()=>{assert.throws(()=>scheduleProject(project([['a',1]],[],'2026-02-31')),/Invalid project start date/)});
+test('compatible dependency edge shapes',()=>{const p=project([['a',2],['b',3]]);p.dependencies=[{fromId:'a',toId:'b'}];assert.equal(scheduleProject(p).durationDays,5)});
