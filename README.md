@@ -1,5 +1,13 @@
 # Atlas — universal project workspace (public foundation)
 
+## Public portfolio source reconciliation — 2026-11-02
+
+The portfolio home view now offers **«Сверить публичные источники»**, a bounded batch refresh of public GitHub repository and owner bindings. It groups equivalent case-insensitive references across projects and retrieves each unique source once per batch, applies the same source freshness/diff logic to each attached project, and writes the resulting snapshot through the existing IndexedDB store. Per-source refresh shares the same path. Automatic refresh checks due sources on focus/timer and is capped at **3 unique public API bindings per pass**; the explicit user action allows at most **4 unique bindings / 30 attached references per pass**. Remaining references are shown as deferred instead of silently implying completeness.
+
+Partial observations do not infer deleted branches, 403/429 rate limiting stops the current batch, unavailable sources retain previous evidence and show an error, and no GitHub metadata grants a qualified result. No tokens, private host connections, new storage, independent executor or separate synchroniser. A repeat action handles the deferred queue, using the latest persisted revision. The standalone application still requires public REST access; protected corporate integrations remain deliberately deferred.
+
+The 12/60/120-project Chromium scale acceptance passed on Linux [Actions #41353651130](https://github.com/Faust-S/Atlas/actions/runs/41353651130). At 120 projects (1,440 work items, 480 requirements, 119 cross-project links) import-and-render took 242 ms, detailed view 221 ms and worst reload 134 ms, including six full reloads with IndexedDB readback. Measurements on hosted CI are not end-user latency guarantees. Live metadata for all 12 real public GitHub repositories matched the captured IDs and default-branch SHAs. These figures precede the batch source-refresh change; only the existing Node CI is automatically run on routine source commits.
+
 ## Unified portfolio attention workspace — 2026-11-02
 
 The standalone overview now opens with **one prioritized attention queue**, not several stacked technical reports. It reuses the existing dependency cascade, source/claim impact, human decision ledger and CPM scheduling as read-only projections. Rows expose the most actionable signal first, a compact calculation of deadline risk, and drill-down actions to a project, an individual requirement, a cause in the human-decision queue, or source/schedule/dependency details. Filters cover blockers, dates, evidence, decisions and source freshness, plus a local text search. The original graphs, tables and detailed portfolio reports remain available under "Показать подробные графы и отчёты".

@@ -1,6 +1,7 @@
 import {empty,validate,createProject,editProject,createStage,createItem,editItem,connect,createRisk,createDecision,attach,observe,summary,serialize,deserialize} from "./core.mjs";
 import {observePublicRepo,observePublicOwner} from "./github-public.mjs";
-import {applySourceObservation,attachDiscoveredRepo} from "./source-observation.mjs";
+import {attachDiscoveredRepo} from "./source-observation.mjs";
+import {planPublicRefresh,reconcilePublicSources} from "./public-refresh.mjs";
 import {scheduleProject} from "./planning.mjs";
 import {addTarget,recordFinding,planChange,updateChange,compareProject} from "./trace.mjs";
 import {renderPortfolioInsight,statusBand,filterTraceRows} from "./visual.mjs";
@@ -17,7 +18,7 @@ const root=document.querySelector("#app"),msg=document.querySelector("#message")
 const esc=x=>String(x??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const store=createStandaloneStore();
 let data=empty(),active=null,traceMode="all",editorAction=null,graphMode="all",cascadeMode="attention",portfolioView="focus",commandFilter="all",commandSearch="";
-let ready=false,storageStatus="loading",storageWarning="",storageError=null,busy=false;
+let ready=false,storageStatus="loading",storageWarning="",storageError=null,busy=false,lastRefresh=null;
 async function save(next){await store.save(next);data=next;storageStatus="ready";storageWarning="";render()}
 async function safe(fn){
  if(busy)return;
@@ -46,32 +47,19 @@ async function boot(){
 }
 const SOURCE_REFRESH_MS=15*60*1000;
 let autoRefreshing=false;
-async function refreshSource(projectId,sourceId){
- const p=data.projects.find(x=>x.id===projectId),src=p?.sources.find(s=>s.id===sourceId);
- if(!src||!["github","github_owner"].includes(src.kind))return;
- let observation;
- try{
-  observation=src.kind==="github_owner"?
-   await observePublicOwner(src.locator):await observePublicRepo(src.locator);
- }catch(e){
-  // Preserve cached objects and provenance on source or transport errors.
-  await save(observe(data,projectId,sourceId,"error",null,e.message));
-  throw e;
- }
- const result=applySourceObservation(data,projectId,sourceId,observation);
- await save(result.state);
+async function runRefresh({only=null,manual=false}={}){
+ const plan=planPublicRefresh(data,{maxAgeMs:manual?0:SOURCE_REFRESH_MS,
+  limit:30,maxRequests:manual?4:3,only});
+ if(!plan.groups.length){lastRefresh={due:0,selected:0,requests:0,updated:0,failed:0,remaining:0};render();return}
+ const {state,report}=await reconcilePublicSources(data,{plan});
+ if(state!==data)await save(state);
+ lastRefresh=report;render();
 }
 async function refreshDueSources(){
  if(!ready||storageStatus==="recovery"||autoRefreshing||busy||document.visibilityState==="hidden")return;
  autoRefreshing=true;
- try{
-  const due=data.projects.flatMap(p=>p.sources.filter(s=>["github","github_owner"].includes(s.kind)&&
-   (!s.observedAt||Date.now()-Date.parse(s.observedAt)>=SOURCE_REFRESH_MS)).map(s=>[p.id,s.id]));
-  // Cap automatic work; next timer/focus reconciles remaining bindings.
-  for(const [pid,sid] of due.slice(0,3)){
-   try{await refreshSource(pid,sid)}catch(e){msg.textContent="Источник недоступен: "+e.message}
-  }
- }finally{autoRefreshing=false}
+ try{await safe(()=>runRefresh())}
+ finally{autoRefreshing=false}
 }
 function sourceCard(source){
  const repo=source.kind==="github",owner=source.kind==="github_owner",summary=source.summary;
@@ -117,7 +105,9 @@ function renderImpact(p){
  mount.innerHTML='<section class="card"><h2>Цель → факты → действия</h2><p class="muted">Изменение Git-ревизии может потребовать пересмотра ранее заявленного результата. Завершённые работы и CI сами по себе не означают приёмку.</p>'+summary+(records.length?'<div class="atlas-impact-list">'+rows+'</div>':'<p class="muted">Добавьте обязательные требования, чтобы начать оценку разрывов.</p>')+'</section>';
 }
 function render(){if(storageMount)storageMount.innerHTML=storageBanner();if(!ready){root.innerHTML='<section class="card"><h2>Проекты не загружены</h2><p>Atlas не создаёт пустой портфель вместо повреждённых или недоступных данных. Восстановите доступ к IndexedDB либо импортируйте корректную резервную копию.</p></section>';return;}const p=data.projects.find(x=>x.id===active),stateCounts={active:data.projects.filter(x=>x.status==="active").length,blocked:data.projects.reduce((n,p)=>n+summary(p).blocked,0)};
-root.innerHTML='<div id="atlas-editor-slot"></div>'+(p?projectView(p):'<h2>Портфель проектов</h2><p class="muted">Проекты человека и организации. Связи с внешними системами не дублируют их данные.</p><div class="grid"><div class="card"><small>Всего проектов</small><div class="metric">'+data.projects.length+'</div></div><div class="card"><small>Активные</small><div class="metric">'+stateCounts.active+'</div></div><div class="card"><small>Заблокированные работы</small><div class="metric">'+stateCounts.blocked+'</div></div></div><div class="row">'+button("＋ Создать проект","new","primary")+'</div>'+renderPortfolioCommand(buildPortfolioCommand(data),{filter:commandFilter,search:commandSearch,escape:esc})+
+root.innerHTML='<div id="atlas-editor-slot"></div>'+(p?projectView(p):'<h2>Портфель проектов</h2><p class="muted">Проекты человека и организации. Связи с внешними системами не дублируют их данные.</p><div class="grid"><div class="card"><small>Всего проектов</small><div class="metric">'+data.projects.length+'</div></div><div class="card"><small>Активные</small><div class="metric">'+stateCounts.active+'</div></div><div class="card"><small>Заблокированные работы</small><div class="metric">'+stateCounts.blocked+'</div></div></div><div class="row">'+button("＋ Создать проект","new","primary")+button("Сверить публичные источники","refresh-portfolio")+'</div>'+
+(lastRefresh?'<p class="muted" role="status">Сверка: '+lastRefresh.updated+' обновлено, '+lastRefresh.failed+' ошибок, '+lastRefresh.requests+' обращений к GitHub, '+lastRefresh.remaining+' отложено'+(lastRefresh.rateLimited?' · лимит GitHub API':'')+'</p>':"")+
+renderPortfolioCommand(buildPortfolioCommand(data),{filter:commandFilter,search:commandSearch,escape:esc})+
 '<div class="row atlas-portfolio-switch">'+button(portfolioView==="focus"?"Показать подробные графы и отчёты":"Скрыть подробные отчёты","portfolio-view:"+(portfolioView==="focus"?"details":"focus"))+'</div>'+
 (portfolioView==="details"?renderPortfolioInsight(data.projects,esc)+renderPortfolioImpact()+renderPortfolioResponses(data,projectImpact,esc)+renderPortfolioSchedule(data,esc)+renderPortfolioCascade(data,projectImpact,{mode:cascadeMode,escape:esc})+renderPortfolioNetwork(data,esc):"")+'<div class="grid">'+data.projects.map(p=>'<article class="card"><span class="tag">'+esc(p.type)+'</span><h2>'+esc(p.name)+'</h2><p>'+esc(p.goal||"Без описания цели")+'</p><p class="muted">'+summary(p).total+' работ · '+p.sources.length+' источников</p><p class="muted">Требований: '+compareProject(p).committed+' · Без подтверждений: '+compareProject(p).counts.unknown+' · Несоответствия: '+(compareProject(p).counts.gap_reported+compareProject(p).counts.partial_reported)+' · Устарело / конфликтует: '+(compareProject(p).counts.stale+compareProject(p).counts.conflict)+'</p>'+button("Открыть","open:"+esc(p.id))+'</article>').join("")+'</div>');if(p){renderSchedule(p);renderTrace(p);renderGraph(p);renderImpact(p);}renderActiveEditor(p);}
 function renderPortfolioImpact(){
@@ -157,6 +147,10 @@ root.addEventListener("click",event=>{
    data=await store.restorePrevious();storageStatus="ready";storageWarning="";editorAction=null;render();return;
   }
   if(action==="back"){active=null;editorAction=null;render();return}
+  if(action==="refresh-portfolio"){
+   if(!ready||storageStatus==="recovery")throw Error("Хранилище не готово");
+   await runRefresh({manual:true});return;
+  }
   if(action.startsWith("portfolio-view:")){
    const mode=action.slice("portfolio-view:".length);
    if(!["focus","details"].includes(mode))throw Error("Неизвестный режим портфеля");
@@ -188,7 +182,7 @@ root.addEventListener("click",event=>{
   const p=data.projects.find(x=>x.id===active);
   if(action.startsWith("sync:")){
    if(!p)return;
-   await refreshSource(p.id,action.slice(5));
+   await runRefresh({manual:true,only:[{projectId:p.id,sourceId:action.slice(5)}]});
    return;
   }
   if(action.startsWith("adopt:")){
