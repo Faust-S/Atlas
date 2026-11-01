@@ -1,5 +1,13 @@
 # Atlas — universal project workspace (public foundation)
 
+## Cross-project schedule consequence forecast — 2026-11-01
+
+The portfolio now has a **read-only calendar-day scheduling projection**, reusing `scheduleProject()` and the existing cross-project dependency DAG. It separates declared start/due dates, local CPM finish, dependency-constrained projected start/finish, and possible deadline slippage. The per-project view identifies constraining predecessor projects, explicitly approved change work included in the CPM estimate, and approved changes still lacking work. Both start and due dates can be edited together in a form, but forecasts never mutate the approved plan.
+
+Missing start dates or work estimates produce unknown dates rather than fabricated results. If a successor has no declared start but all predecessor estimates exist, the view labels its dependency-derived start as an estimate only. Calendar forecasts do not model labor availability, business days, actual completion or independent acceptance. No new authority, storage engine, external data, or task executor is introduced.
+
+Targeted checks on staged JS modules: 15/15 V8 PASS, including approved change → added work → shifted upstream CPM → downstream due-date risk, retained dates, JSON roundtrip and invalid-date rejection. Full Node suite and interactive Chromium remain HOLD until executed.
+
 ## Response and decision route — 2026-11-01
 
 Atlas now turns observed causes (blocked work, stale or missing evidence, source errors, project pauses and undefined expected outcomes) into **linked proposals**, not automatic instructions. From a signal, a user can record a proposed change, make an explicit status decision with mandatory rationale, and create work only after approval. The existing project `changes`, `decisions` and `items` remain the sole authoritative records. New optional `causeKey`, `changeId` and decision-history fields are validated against the actual project objects and persist through the same IndexedDB/JSON snapshot; older snapshots remain readable.

@@ -85,7 +85,10 @@ export function editorSpec(project,action,snapshot=null){
   ]};
  }
  if(action==="status")return {title:"Статус проекта",fields:[choice("status","Текущий статус",statusOptions,project.status)]};
- if(action==="start")return {title:"Дата начала планирования",fields:[field("startDate","Дата начала","date",project.startDate||"",false)]};
+ if(action==="start"||action==="dates")return {title:"Плановые даты проекта",hint:"Указанные даты остаются исходным планом. Расчёт межпроектных зависимостей не меняет их автоматически.",fields:[
+ field("startDate","Дата начала","date",project.startDate||"",false),
+ field("dueDate","Контрольный срок","date",project.dueDate||"",false)
+ ]};
  if(action.startsWith("duration:")){const item=project.items.find(x=>x.id===action.slice(9));if(!item)throw Error("Работа не найдена");return {title:"Продолжительность: "+item.title,fields:[field("estimateDays","Календарных дней (0–36500)","number",String(item.estimateDays??1))]}};
  if(action.startsWith("work:")){const item=project.items.find(x=>x.id===action.slice(5));if(!item)throw Error("Работа не найдена");return {title:"Работа: "+item.title,fields:[choice("state","Состояние",workOptions,item.state),choice("priority","Приоритет",[option("low","Низкий"),option("normal","Обычный"),option("high","Высокий"),option("critical","Критический")],item.priority),field("assignee","Ответственный","text",item.assignee,false),field("estimateDays","Плановая длительность, дней","number",String(item.estimateDays??1)),choice("targetId","Связать с ожидаемым результатом",optionalTargets(project),item.targetIds?.[0]||"",false)]}};
  if(action==="risk")return {title:"Новый риск",fields:[field("text","Что может помешать?","textarea")]};
@@ -142,7 +145,7 @@ export function applyEditor(snapshot,projectId,action,input){
  if(action==="proposal")return {state:planChange(snapshot,projectId,{title:get("title"),description:get("description"),targetIds:get("targetId")?[get("targetId")]:[]}).state};
  if(action.startsWith("change:"))return {state:decideChange(snapshot,projectId,action.slice(7),{status:get("status"),rationale:get("rationale")}).state};
  if(action==="status")return {state:editProject(snapshot,projectId,{status:get("status")})};
- if(action==="start")return {state:editProject(snapshot,projectId,{startDate:get("startDate")||null})};
+ if(action==="start"||action==="dates")return {state:editProject(snapshot,projectId,{startDate:get("startDate")||null,dueDate:get("dueDate")||null})};
  if(action.startsWith("duration:"))return {state:editItem(snapshot,projectId,action.slice(9),{estimateDays:integer("estimateDays")})};
  if(action.startsWith("work:"))return {state:editItem(snapshot,projectId,action.slice(5),{state:get("state"),priority:get("priority"),assignee:get("assignee"),estimateDays:integer("estimateDays"),targetIds:get("targetId")?[get("targetId")]:[]})};
  if(action==="risk")return {state:createRisk(snapshot,projectId,get("text"))};
