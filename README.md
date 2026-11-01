@@ -1,5 +1,13 @@
 # Atlas — universal project workspace (public foundation)
 
+## Unified portfolio attention workspace — 2026-11-02
+
+The standalone overview now opens with **one prioritized attention queue**, not several stacked technical reports. It reuses the existing dependency cascade, source/claim impact, human decision ledger and CPM scheduling as read-only projections. Rows expose the most actionable signal first, a compact calculation of deadline risk, and drill-down actions to a project, an individual requirement, a cause in the human-decision queue, or source/schedule/dependency details. Filters cover blockers, dates, evidence, decisions and source freshness, plus a local text search. The original graphs, tables and detailed portfolio reports remain available under "Показать подробные графы и отчёты".
+
+No independent readiness score, storage, new source authority, agent access or automatic execution is introduced. A negative or missing observation remains an uncertainty and never becomes qualified release acceptance. Search and filtering do not persist personal query strings and do not trigger GitHub API calls.
+
+Targeted verification includes source-blob V8 scenarios for the queue, filter behavior, transitive blocking, critical dates, escaping and deep-link actions. The independent Chromium scenario now also opens the queue and follows an evidence link. Full Node/Chromium qualification is not claimed until the real runs complete.
+
 ## Cross-project schedule consequence forecast — 2026-11-01
 
 The portfolio now has a **read-only calendar-day scheduling projection**, reusing `scheduleProject()` and the existing cross-project dependency DAG. It separates declared start/due dates, local CPM finish, dependency-constrained projected start/finish, and possible deadline slippage. The per-project view identifies constraining predecessor projects, explicitly approved change work included in the CPM estimate, and approved changes still lacking work. Both start and due dates can be edited together in a form, but forecasts never mutate the approved plan.

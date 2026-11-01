@@ -22,7 +22,7 @@ test("UI survives IndexedDB persistence and completes project → evidence → a
  try{
   await import("../src/app.mjs?indexeddb-ui-smoke");
   await settle();
-  assert.match(root.innerHTML,/Общая картина портфеля/);
+  assert.match(root.innerHTML,/Что требует внимания/);
   assert.match(controls["#storage-status"].innerHTML,/IndexedDB/);
   click("new");await settle();
   assert.match(mounts["#atlas-editor-slot"].innerHTML,/Новый проект/);
@@ -44,9 +44,15 @@ test("UI survives IndexedDB persistence and completes project → evidence → a
   snapshot=await persisted();
   assert.equal(snapshot.projects[0].changes[0].status,"approved");
   click("back");await settle();
-  assert.match(root.innerHTML,/Неясно \/ есть разрывы/);
+  assert.match(root.innerHTML,/Что требует внимания/);
+  assert.match(root.innerHTML,/Решения ожидают|решений ожидается|требований к проверке|Home renovation/);
   assert.match(root.innerHTML,/Home renovation/);
   assert.doesNotMatch(root.innerHTML,/Релиз подтверждён/);
+  root.handlers.change({target:{id:"atlas-command-filter",value:"evidence"}});
+  assert.match(controls["#atlas-command-rows"].innerHTML,/Working budget/);
+  click("inspect:"+encodeURIComponent(snapshot.projects[0].id)+":evidence:"+encodeURIComponent(targetId));
+  await settle();
+  assert.match(mounts["#atlas-trace"].innerHTML,/Working budget/);
  }finally{
   for(const name of names)if(previous[name]===undefined)delete globalThis[name];else globalThis[name]=previous[name];
  }

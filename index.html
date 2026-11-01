@@ -49,5 +49,28 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .atlas-response-plan{margin:0 0 8px;padding:10px;border-radius:8px;background:#f4f8fa}
 .atlas-response-plan .muted{margin-top:6px}
 @media(max-width:700px){.atlas-response-row{grid-template-columns:1fr}}
+
+.atlas-command{border-color:#bed4df}
+.atlas-command-controls{gap:8px 12px;margin:16px 0}
+.atlas-command-controls label{margin:0;font-weight:600;color:#516579}
+.atlas-command-controls input{min-width:min(100%,260px);flex:1}
+.atlas-command-list{display:grid;gap:0}
+.atlas-command-row{display:grid;grid-template-columns:minmax(150px,1.1fr) minmax(200px,2fr) minmax(125px,.9fr) auto;gap:16px;align-items:start;padding:18px 0;border-top:1px solid #e4ebf0}
+.atlas-command-project,.atlas-command-deadline{display:grid;gap:5px}
+.atlas-command-project small,.atlas-command-deadline small{font-size:12px}
+.atlas-command-evidence p{margin:6px 0 10px}
+.atlas-command-evidence details{margin-top:8px}
+.atlas-command-evidence summary{cursor:pointer;color:#365f71;font-weight:600}
+.atlas-command-evidence ul{padding-left:18px;margin:10px 0}
+.atlas-command-evidence li{margin:8px 0;overflow-wrap:anywhere}
+.atlas-command-evidence li small{display:block;margin-top:4px;color:#61758a}
+.atlas-command-kind{font-size:11px;color:#597186;font-weight:700}
+.atlas-command-risk{color:#a04440;font-weight:700}
+.atlas-command-actions{display:grid;gap:8px}
+.atlas-portfolio-switch{margin:8px 0 14px}
+.atlas-focus-target{scroll-margin-top:18px}
+.atlas-focus-target:focus-visible{outline:2px solid #137d7e;outline-offset:3px}
+@media(max-width:980px){.atlas-command-row{grid-template-columns:minmax(130px,1fr) minmax(210px,2fr)}.atlas-command-deadline,.atlas-command-actions{grid-column:auto}.atlas-command-actions{display:flex;flex-wrap:wrap}}
+@media(max-width:600px){.atlas-command-row{grid-template-columns:1fr;gap:10px}.atlas-command-controls{display:grid;grid-template-columns:auto 1fr}.atlas-command-controls input{min-width:0}.atlas-command-actions{display:flex}}
 </style></head><body>
 <header><div><h1>IWXA Atlas</h1><small>Управление проектами, связями и источниками · локальная версия</small></div><div class="row"><button id="export">Экспорт JSON</button><button id="import">Импорт JSON</button><input id="file" type="file" hidden accept=".json"></div></header><main><div id="storage-status" role="status" aria-live="polite"></div><div id="message" role="alert"></div><div id="app"></div></main><footer>Atlas public foundation · Без сторонних секретов и принудительного агента</footer><script type="module" src="./src/app.mjs"></script></body></html>

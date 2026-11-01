@@ -88,7 +88,7 @@ export function renderProjectResponses(project,impact,escape=ESCAPE){
    return '<div class="atlas-response-plan"><strong>'+escape(change.title)+'</strong> '+status+' '+actions+logs+linked+'</div>';
   }).join('');
   const propose=row.needsProposal?'<button data-action="respond:'+escape(encodeURIComponent(row.key))+'" class="primary">Предложить изменение</button>':'';
-  return '<div class="atlas-response-row"><div><strong>'+escape(row.title)+'</strong><p class="muted">'+escape(row.detail)+'</p></div><div>'+plans+propose+'</div></div>';
+  return '<div id="atlas-cause-'+escape(encodeURIComponent(row.key))+'" tabindex="-1" class="atlas-response-row atlas-focus-target"><div><strong>'+escape(row.title)+'</strong><p class="muted">'+escape(row.detail)+'</p></div><div>'+plans+propose+'</div></div>';
  }).join('');
  return '<section class="card atlas-response"><h2>Устранение причин и решения</h2><p class="muted">Сигнал → предлагаемое изменение → решение человека → плановая работа. Никаких автоматических утверждений и запусков исполнителей.</p>'+
   '<div class="atlas-kpis"><div><small>Сигналы</small><strong>'+state.signals+'</strong></div><div><small>Без активного плана</small><strong>'+state.unplanned+'</strong></div><div><small>Ожидают решения</small><strong>'+state.proposed+'</strong></div><div><small>Утверждено без работы</small><strong>'+state.approvedWithoutWork+'</strong></div></div>'+

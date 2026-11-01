@@ -102,6 +102,12 @@ async function userJourney(){
   assert.match(await page.locator("#app").innerText(),/Implement → Validate/);
   assert.equal(await page.locator("#atlas-relations svg").count(),1);
   await page.locator('[data-action="back"]').click();
+  await page.locator("#atlas-command").waitFor();
+  await page.locator("#atlas-command-filter").selectOption("evidence");
+  await page.locator('#atlas-command-rows [data-action^="inspect:"]').first().click();
+  await page.locator("#atlas-trace").waitFor();
+  assert.match(await page.locator("#atlas-trace").innerText(),/Offline result/);
+  await page.locator('[data-action="back"]').click();
   await page.locator('[data-action="new"]').click();
   await page.locator('#atlas-editor-form [name="name"]').fill("Consumer project");
   await page.locator('#atlas-editor-form button[type="submit"]').click();
