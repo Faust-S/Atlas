@@ -1,5 +1,11 @@
 # Atlas — universal project workspace (public foundation)
 
+## Verification on the public working branch
+
+A branch-scoped workflow (`.github/workflows/public-qualification.yml`) checks each source/test change in `work/2026-11-01-atlas-foundation`. The single standard `ubuntu-latest` job executes **real `npm test`**, syntax checks, and a temporary CI-only Playwright/Chromium browser test. Browser QA covers native IndexedDB migration/recovery and project → requirement → linked work → dependency graph → finding → reload. The browser driver is not shipped with Atlas.
+
+The workflow has a 15-minute limit, cancels superseded runs and retains a failure screenshot for three days only when a browser test fails. Never equate a passing CI run with independent product/release acceptance. The `main` branch and private IWXA-Atlas are not modified by this workflow.
+
 ## Impact-to-action traceability — 2026-11-01
 
 The project view now joins **accepted/candidate targets → observed claims at exact source refs → source revision/freshness → related change requests → linked work items**. When a source branch changes, previous test/implementation/acceptance claims bound to that SHA become stale; Atlas presents the affected requirement, the reason, an explicit new-finding/review action, and existing follow-up work. Missing or partial outcomes offer a direct action to create work already linked to the target. The portfolio overview aggregates action attention without manufacturing a readiness percentage.

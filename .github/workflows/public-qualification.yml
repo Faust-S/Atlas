@@ -1,0 +1,50 @@
+name: Atlas public branch qualification
+
+on:
+  push:
+    branches:
+      - work/2026-11-01-atlas-foundation
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'index.html'
+      - 'package.json'
+      - '.github/workflows/public-qualification.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: atlas-public-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact branch revision
+        uses: actions/checkout@v4
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run actual Node tests and syntax checks
+        run: |
+          npm test
+          for source in src/*.mjs; do node --check "$source"; done
+      - name: Install temporary CI-only Chromium driver
+        run: |
+          npm install --no-save --package-lock=false playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Test real Chromium, IndexedDB and user journey
+        run: node tests/ci-browser.mjs
+      - name: Keep screenshot only on browser failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas-browser-failure
+          path: atlas-ci-screenshot.png
+          if-no-files-found: ignore
+          retention-days: 3
