@@ -1,5 +1,20 @@
 # Atlas — universal project workspace (public foundation)
 
+## Reality vs target — verified branch implementation (2026-11-01)
+
+Atlas now includes a **cross-source traceability view** with three explicitly separate areas: what should exist (committed/candidate goals), what has been reported about actual implementation/test/acceptance, and what is proposed or approved to change. Source references, branch SHA observations, freshness, contradiction and failed discovery are preserved as **claims**, never silently promoted to accepted release status.
+
+- `src/trace.mjs`: capability targets, evidence records, revisions, stale/conflicting evidence, approved vs proposed changes.
+- `src/github-public.mjs`: reads public branch names **and Git SHAs**, marks pagination completeness; does not access private repos or certify releases.
+- `src/app.mjs`: requirements/facts/changes table for a project and per-project gap/staleness counts in portfolio overview.
+- `tests/trace.test.mjs`: 14 cases PASS on the exact GitHub-published modules in the embedded V8 test runner. Node CI / interactive browser qualification has not been performed for this iteration.
+- `docs/TECH_SELECTION_AND_REALITY_MODEL_2026-11-01.md`: candidate comparison covering Backstage, Apache DevLake, OSLC, Dexie, React Flow, Cytoscape, Graphlib, collaborative CRDTs and resource-scheduling engines.
+
+**Scope warning:** all entries are user-declared or source-linked claims until an authoritative verifier and accepted evidence model are integrated. No claims of medical, business or engineering regulatory readiness; no private IWXA repository data are included.
+
+---
+
+
 ## Planning core update — 2026-11-01
 
 **Implemented on this working branch:** reusable, permissively licensed Marcel Klehr `toposort` (MIT; attribution in `src/vendor/LICENSE-toposort.txt`), a calendar-day critical-path calculation in `src/planning.mjs`, editable work duration estimates, project start date, and a read-only schedule table with float/critical-work indicators.
