@@ -34,7 +34,34 @@ root.addEventListener("click",event=>{const b=event.target.closest("[data-action
  if(!p)return;
  if(a==="status"){const status=input("Статус: planned, active, paused, completed, cancelled",p.status);if(status)save(editProject(data,p.id,{status}));return}
  if(a==="target"){const title=input("Что должно быть? Название требования");if(!title)return;const desired=input("Критерий результата/готовности");if(!desired)return;const intent=input("Обязательное или кандидат? committed / candidate","committed");if(intent===null)return;save(addTarget(data,p.id,{title,desired,intent}).state);return}
- if(a==="finding"){const targets=p.targets||[];if(!targets.length)throw Error("Сначала добавьте ожидаемую возможность");const targetId=input("ID цели: "+targets.map(t=>t.title+" ["+t.id+"]").join("; "),targets[0].id);if(!targetId)return;const result=input("Фактическое состояние: present / partial / absent","partial");if(!result)return;const level=input("Уровень доказательства: implementation / test / acceptance","implementation");if(!level)return;const reference=input("Ссылка на источник/тест (по желанию)","");if(reference===null)return;const note=input("Что именно подтверждено? Запись будет помечена как пользовательское утверждение","");if(note===null)return;save(recordFinding(data,p.id,{targetId,result,level,reference,note}).state);return}
+ if(a==="finding"){
+  const targets=p.targets||[];
+  if(!targets.length)throw Error("Сначала добавьте ожидаемую возможность");
+  const targetIndex=input("Номер требования:\n"+targets.map((t,i)=>(i+1)+". "+t.title).join("\n"),"1");
+  if(targetIndex===null)return;
+  const target=targets[Number(targetIndex)-1];if(!target)throw Error("Неизвестный номер требования");
+  const result=input("Фактическое состояние: present / partial / absent","partial");if(!result)return;
+  const level=input("Уровень доказательства: implementation / test / acceptance","implementation");if(!level)return;
+  const sources=p.sources||[];
+  let sourceId=null,ref=null,revision=null;
+  if(sources.length){
+   const sourceNumber=input("Выбери номер подключённого источника (0 — без привязки):\n0. Только заявление пользователя\n"+sources.map((s,i)=>(i+1)+". "+s.kind+" · "+s.locator+" ["+s.status+"]").join("\n"),"0");
+   if(sourceNumber===null)return;
+   const num=Number(sourceNumber);
+   if(!Number.isInteger(num)||num<0||num>sources.length)throw Error("Неизвестный номер источника");
+   if(num>0){
+    const src=sources[num-1];sourceId=src.id;
+    const refs=src.summary?.branches||[];
+    const branch=refs.length?input("Ветка источника (оставьте пустым, если неизвестна):\n"+refs.join(", "),src.summary?.defaultBranch||refs[0]):input("Ветка или версия источника (по желанию)","");
+    if(branch===null)return;
+    ref=branch||null;
+    revision=ref&&src.summary?.branchHeads?.[ref]||null;
+   }
+  }
+  const reference=input("Ссылка на документ или отчёт (по желанию)","");if(reference===null)return;
+  const note=input("Что именно было проверено? Это заявление пользователя, не автоматическая приёмка","");if(note===null)return;
+  save(recordFinding(data,p.id,{targetId:target.id,result,level,sourceId,ref,revision,reference,note}).state);return
+ }
  if(a==="proposal"){const title=input("Предлагаемое изменение");if(!title)return;const targets=p.targets||[];const targetId=targets.length?input("ID связанного требования (можно пусто): "+targets.map(t=>t.title+" ["+t.id+"]").join("; "),""):"";if(targetId===null)return;const description=input("Описание изменения","");if(description===null)return;save(planChange(data,p.id,{title,description,targetIds:targetId?[targetId]:[]}).state);return}
  if(a.startsWith("change:")){const id=a.slice(7);const change=(p.changes||[]).find(c=>c.id===id);if(!change)return;const status=input("Статус: proposed / approved / in_progress / implemented / deferred / rejected",change.status);if(status)save(updateChange(data,p.id,id,status).state);return}
  if(a==="start"){const value=input("Дата старта YYYY-MM-DD (пусто — удалить)",p.startDate||"");if(value!==null)save(editProject(data,p.id,{startDate:value||null}));return}
