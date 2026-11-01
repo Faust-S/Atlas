@@ -1,5 +1,14 @@
 # Atlas — universal project workspace (public foundation)
 
+## Current handoff and user-facing portfolio UI — 2026-11-01
+
+[**Russian development handoff / prompt for next chat**](docs/HANDOFF_2026-11-01_RU.md). Read it before changing repository architecture.
+
+The current working branch includes a visual portfolio summary (cross-project gaps/stale evidence/proposed changes), issue filters inside each project's expected-vs-observed matrix, and target/source selection without exposing raw UUIDs. The source-linked claim stays clearly distinct from verified acceptance. This iteration was tested using published JavaScript modules in V8 and a mock UI flow; **real Chromium E2E and Node CI are not yet confirmed**.
+
+---
+
+
 ## Reality vs target — verified branch implementation (2026-11-01)
 
 Atlas now includes a **cross-source traceability view** with three explicitly separate areas: what should exist (committed/candidate goals), what has been reported about actual implementation/test/acceptance, and what is proposed or approved to change. Source references, branch SHA observations, freshness, contradiction and failed discovery are preserved as **claims**, never silently promoted to accepted release status.
