@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {ganttViewport,dependencyDiagram} from '../desktop/src/visual-layout.mjs';
+import {ganttViewport,dependencyDiagram,ganttFocusOffset} from '../desktop/src/visual-layout.mjs';
 const rows=[
  {id:'A',title:'A',state:'done',critical:true,earlyStart:0,earlyFinish:3,durationDays:3,floatDays:0,predecessors:[]},
  {id:'B',title:'B',state:'todo',critical:false,earlyStart:0,earlyFinish:2,durationDays:2,floatDays:1,predecessors:[]},
@@ -43,6 +43,21 @@ test('zoomed Gantt selects the current work window instead of offscreen first ro
  assert.match(ui,/const inWindow=matching\.filter\(\(r:any\)=>r\.visible\)/);
  assert.match(ui,/scale==='fit'\?matching:inWindow/);
  assert.match(ui,/Перейти к ближайшей работе/);
+ assert.match(ui,/const focusMatch=\(index:number\)=>/);
+ assert.match(ui,/ganttFocusOffset\(schedule,row\.id,targetScale\)/);
+ assert.match(ui,/Показать на шкале/);
+});
+test('Gantt search jumps to real work at zoom and near schedule end',()=>{
+ const schedule={durationDays:240,rows:Array.from({length:240},(_,i)=>({id:'w-'+i,title:'Work '+i,earlyStart:i,earlyFinish:i+1}))};
+ const before=JSON.stringify(schedule);
+ assert.equal(ganttFocusOffset(schedule,'w-170','30'),164);
+ assert.equal(ganttFocusOffset(schedule,'w-170','90'),150);
+ assert.equal(ganttFocusOffset(schedule,'w-0','30'),0);
+ assert.equal(ganttFocusOffset(schedule,'w-239','30'),210);
+ assert.equal(ganttViewport(schedule,{scale:'30',offset:ganttFocusOffset(schedule,'w-170','30')}).rows[170].visible,true);
+ assert.throws(()=>ganttFocusOffset(schedule,'missing','30'),/not found/);
+ assert.throws(()=>ganttFocusOffset(schedule,'w-170','fit'),/Unsupported/);
+ assert.equal(JSON.stringify(schedule),before);
 });
 test('dependency layout follows DAG and highlights critical links only',()=>{
  const graph=dependencyDiagram(schedule);

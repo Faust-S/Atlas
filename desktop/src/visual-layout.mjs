@@ -55,6 +55,15 @@ export function ganttViewport(schedule,{scale='fit',offset=0,startDate=null,dueD
   visibleCount:rows.filter(r=>r.visible).length};
 }
 
+/** Locate a real CPM work item within a zoomed timeline without changing it. */
+export function ganttFocusOffset(schedule,workId,scale='30'){
+ if(!['30','90'].includes(scale))throw Error('Unsupported Gantt focus scale');
+ const view=ganttViewport(schedule,{scale});
+ const row=view.rows.find(item=>item.id===workId);
+ if(!row)throw Error('Gantt work not found');
+ return clamp(row.earlyStart-Math.floor(view.days/5),0,view.maxOffset);
+}
+
 /** Deterministic layered DAG view; the core already validated/ordered the work DAG. */
 export function dependencyDiagram(schedule,{limit=80,focusId=null}={}){
  if(!schedule||!Array.isArray(schedule.rows))throw Error('Invalid CPM schedule');

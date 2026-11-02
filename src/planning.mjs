@@ -23,7 +23,11 @@ function optionalStartDate(input) {
 }
 function daysFrom(start,days) {
   if (!start) return null;
-  return new Date(start.getTime() + days * 86400000).toISOString().slice(0,10);
+  const at=new Date(start.getTime()+days*86400000);
+  // Atlas accepts four-digit dates. Never truncate an extended ISO year
+  // (e.g. +010000-01-01) into a fabricated YYYY-MM-DD date.
+  if(!Number.isFinite(at.getTime())||at.getUTCFullYear()>9999)return null;
+  return at.toISOString().slice(0,10);
 }
 export function scheduleProject(p) {
   if (!p || !Array.isArray(p.items) || !Array.isArray(p.dependencies)) throw new Error('Invalid project');

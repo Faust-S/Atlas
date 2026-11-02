@@ -15,4 +15,11 @@ test('completed predecessor unblocks',()=>{const r=scheduleProject(project([['a'
 test('invalid estimates',()=>{for(const n of [-1,1.5,36600,NaN])assert.throws(()=>scheduleProject(project([['a',n]])),/estimateDays/)});
 test('cycle and missing endpoint',()=>{assert.throws(()=>scheduleProject(project([['a'],['b']],[['a','b'],['b','a']])),/Cyclic/);assert.throws(()=>scheduleProject(project([['a']],[['a','unknown']])),/missing item/)});
 test('invalid starting date',()=>{assert.throws(()=>scheduleProject(project([['a',1]],[],'2026-02-31')),/Invalid project start date/)});
+test('CPM year overflow never produces a malformed calendar date',()=>{
+ const result=scheduleProject(project([['a',120]],[],'9999-11-01'));
+ assert.equal(result.durationDays,120);
+ assert.equal(result.rows[0].startDate,'9999-11-01');
+ assert.equal(result.rows[0].finishDate,null);
+ assert.equal(result.estimatedFinish,null);
+});
 test('compatible dependency edge shapes',()=>{const p=project([['a',2],['b',3]]);p.dependencies=[{fromId:'a',toId:'b'}];assert.equal(scheduleProject(p).durationDays,5)});

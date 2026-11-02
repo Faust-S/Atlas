@@ -1,5 +1,5 @@
 import React,{useMemo,useState} from 'react';
-import {dependencyDiagram,ganttViewport} from './visual-layout.mjs';
+import {dependencyDiagram,ganttViewport,ganttFocusOffset} from './visual-layout.mjs';
 
 type CPM={durationDays:number;rows:Array<{id:string;title:string;earlyStart:number;earlyFinish:number;durationDays:number;critical:boolean;state:string;predecessors:string[];blockedBy:string[];floatDays:number}>};
 type Mode='fit'|'30'|'90';
@@ -15,11 +15,21 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
  const [scale,setScale]=useState<Mode>('fit');
  const [offset,setOffset]=useState(0);
  const [query,setQuery]=useState('');
+ const [matchIndex,setMatchIndex]=useState(0);
  const [criticalOnly,setCriticalOnly]=useState(false);
  const [visibleLimit,setVisibleLimit]=useState(160);
  const view=useMemo(()=>ganttViewport(schedule,{scale,offset,startDate:projectStart,dueDate:projectDue} as any),
   [schedule,scale,offset,projectStart,projectDue]);
  const matching=view.rows.filter((r:any)=>(!criticalOnly||r.critical)&&r.title.toLocaleLowerCase('ru-RU').includes(query.trim().toLocaleLowerCase('ru-RU')));
+ const focusMatch=(index:number)=>{
+  const row=matching[index];
+  if(!row)return;
+  const targetScale:Mode=scale==='fit'?'30':scale;
+  setMatchIndex(index);
+  setScale(targetScale);
+  setOffset(ganttFocusOffset(schedule,row.id,targetScale));
+  setVisibleLimit(160);
+ };
  const inWindow=matching.filter((r:any)=>r.visible);
  // In zoomed mode list work intersecting the calendar viewport, not the
  // first 160 items (which may all be off screen in a large project).
@@ -45,8 +55,16 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
    <button type="button" className="action-button" disabled={scale==='fit'||view.from>=view.maxOffset}
     onClick={()=>setOffset(Math.min(view.maxOffset,view.from+view.days))}>Позднее →</button>
    <span className="atlas-range">{view.windowLabel}</span>
-   <label className="atlas-gantt-query">Поиск <input type="search" value={query} onChange={e=>{setQuery(e.target.value);setVisibleLimit(160)}} placeholder="Название работы"/></label>
-   <label className="atlas-check"><input type="checkbox" checked={criticalOnly} onChange={e=>{setCriticalOnly(e.target.checked);setVisibleLimit(160)}}/> Критический путь</label>
+   <label className="atlas-gantt-query">Поиск <input type="search" value={query} onChange={e=>{setQuery(e.target.value);setMatchIndex(0);setVisibleLimit(160)}} placeholder="Название работы"/></label>
+   <label className="atlas-check"><input type="checkbox" checked={criticalOnly} onChange={e=>{setCriticalOnly(e.target.checked);setMatchIndex(0);setVisibleLimit(160)}}/> Критический путь</label>
+   {!!query.trim()&&<div className="atlas-gantt-matches">
+    <span className="atlas-range">{matching.length?String(Math.min(matchIndex+1,matching.length))+' из '+matching.length+' работ':'Нет совпадений'}</span>
+    {matching.length>0&&<>
+     <button type="button" className="action-button" disabled={matchIndex<=0} onClick={()=>focusMatch(Math.max(0,matchIndex-1))} title="Предыдущая найденная работа">←</button>
+     <button type="button" className="action-button" disabled={matchIndex>=matching.length-1} onClick={()=>focusMatch(Math.min(matching.length-1,matchIndex+1))} title="Следующая найденная работа">→</button>
+     <button type="button" className="action-button" onClick={()=>focusMatch(Math.min(matchIndex,matching.length-1))}>Показать на шкале</button>
+    </>}
+   </div>}
   </div>
   {(projectStatus==='paused'||projectStatus==='cancelled')&&<p className="atlas-schedule-warning" role="status">
    {projectStatus==='cancelled'?'Проект отменён':'Проект приостановлен'}.
