@@ -55,23 +55,28 @@ test("12/60/120 project tiers: lossless JSON, DAG/CPM, command queue, bounded re
   assert.equal(readback.value.projects.length,projects);
   const schedule=clock(()=>portfolioSchedule(data));
   assert.equal(schedule.value.totals.projects,projects);
-  // The synthetic fixture deliberately pauses its first project. Its entire
-  // dependency chain must remain undated rather than invent delivery dates.
+  // The synthetic fixture pauses every 25th project, beginning with the first.
+  // Every project in this serial dependency chain must remain undated until
+  // every paused upstream project has explicitly resumed.
   assert.equal(data.projects[0].status,"paused");
   assert.equal(schedule.value.totals.dated,0);
   assert.equal(schedule.value.totals.unknown,projects);
-  for(const row of schedule.value.rows) {
+  for(const [index,row] of schedule.value.rows.entries()) {
    assert.equal(row.projectedFinish,null);
-   assert.deepEqual(row.unavailableOrigins.map(x=>x.id),[data.projects[0].id]);
+   const pausedBefore=data.projects.slice(0,index+1)
+    .filter(p=>p.status==="paused").map(p=>p.id);
+   assert.deepEqual(new Set(row.unavailableOrigins.map(x=>x.id)),new Set(pausedBefore));
+   assert.equal(row.unavailableOrigins.length,pausedBefore.length);
   }
-  // Removing the pause in a separate scenario restores the same CPM dates
-  // for all projects without touching the original synthetic portfolio.
+  // Reopen every paused upstream project in a separate scenario (not only the
+  // first); this must recover dates without modifying the original fixture.
   const active=structuredClone(data);
-  active.projects[0].status="active";
+  for(const p of active.projects)if(p.status==="paused")p.status="active";
   const activeSchedule=portfolioSchedule(active);
   assert.equal(activeSchedule.totals.dated,projects);
   assert.equal(activeSchedule.totals.unknown,0);
   assert.ok(activeSchedule.rows.every(x=>x.unavailableOrigins.length===0));
+  assert.equal(serialize(data),serialized.value);
   const cascades=clock(()=>portfolioCascade(data,projectImpact));
   assert.equal(cascades.value.projects.length,projects);
   assert.equal(cascades.value.byId.get(data.projects[0].id).downstreamAll.length,projects-1);

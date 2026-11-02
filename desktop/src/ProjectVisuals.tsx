@@ -6,9 +6,11 @@ type Mode='fit'|'30'|'90';
 const statusName:Record<string,string>={todo:'Запланировано',in_progress:'В работе',blocked:'Заблокировано',done:'Выполнено (заявлено)'};
 const trim=(value:string,max=110)=>value.length>max?value.slice(0,max-1)+'…':value;
 
-export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,shiftDays,projectStatus,onOpenWork,onEditDates}:{
+export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,shiftDays,projectStatus,unavailableOrigins,onOpenWork,onOpenProject,onEditDates}:{
  schedule:CPM;projectStart:string|null;projectDue:string|null;portfolioStart:string|null;
- shiftDays:number|null;projectStatus:string;onOpenWork:(id:string)=>void;onEditDates:()=>void
+ shiftDays:number|null;projectStatus:string;
+ unavailableOrigins:Array<{id:string;name:string;status:string}>;
+ onOpenWork:(id:string)=>void;onOpenProject:(id:string)=>void;onEditDates:()=>void
 }){
  const [scale,setScale]=useState<Mode>('fit');
  const [offset,setOffset]=useState(0);
@@ -49,6 +51,19 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
    Диаграмма ниже показывает исходный календарный план CPM для анализа, а не действующую дату поставки.
    Возобновление или корректировка плана требует отдельного решения человека.
   </p>}
+  {projectStatus!=='paused'&&projectStatus!=='cancelled'&&unavailableOrigins.length>0&&
+   <div className="atlas-schedule-warning" role="status">
+    Поставка этого проекта не имеет расчётной даты: один или несколько предшественников приостановлены или отменены.
+    Ниже показан собственный план работ, а не доступная дата начала проекта.
+    <div className="button-row">
+     {unavailableOrigins.slice(0,5).map(origin=>
+      <button type="button" className="action-button" key={origin.id}
+       onClick={()=>onOpenProject(origin.id)}>
+       {origin.name} ({origin.status==='cancelled'?'отменён':'приостановлен'})
+      </button>)}
+     {unavailableOrigins.length>5&&<small>И ещё {unavailableOrigins.length-5} причин в портфеле</small>}
+    </div>
+   </div>}
   {(shiftDays!=null&&shiftDays>0)&&<p className="atlas-schedule-warning">Начало с учётом межпроектных зависимостей сдвинуто на +{shiftDays} дн.: {portfolioStart||'нет расчётной даты'}. Шкала ниже показывает исходный CPM от планового старта и не переписывает даты автоматически.</p>}
   {!projectStart&&<p className="minor">Начальная дата не задана: на оси показаны относительные дни, не календарные даты.</p>}
   <div className="atlas-gantt-key" aria-label="Условные обозначения"><span><i className="key-normal"/>Плановая работа</span>

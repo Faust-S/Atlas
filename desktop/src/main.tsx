@@ -482,6 +482,8 @@ function App(){
       <ProjectGantt key={project.id} schedule={plan}
        projectStatus={project.status} projectStart={project.startDate||null} projectDue={project.dueDate||null}
        portfolioStart={projected?.projectedStart||null} shiftDays={projected?.shiftDays??null}
+       unavailableOrigins={projected?.unavailableOrigins||[]}
+       onOpenProject={id=>selectProject(id)}
        onEditDates={()=>openEditor("dates")} onOpenWork={id=>openEditor("work:"+id)}/>:
       <section className="surface"><Fallback message="План пока не рассчитан. Добавьте работы или проверьте зависимости."/></section>)}
     {tab==="graph"&&<section className="surface"><div className="section-heading">
