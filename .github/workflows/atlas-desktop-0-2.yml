@@ -109,7 +109,44 @@ jobs:
           path: desktop/src-tauri/target/release/bundle/nsis/*
           if-no-files-found: error
           retention-days: 3
-      # Interactive installed-GUI acceptance remains HOLD until tested in a
-      # real desktop session; hosted-runner UIA/CDP is not a reliable build gate.
-      # The manual script is retained at desktop/tests/installed-windows-uia.py.
+      - name: Relaunch installed EXE twice and verify WebView2 to Rust open
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = $env:ATLAS_INSTALLED_EXE
+          if (!(Test-Path $exe)) { throw "Installed Atlas executable missing: $exe" }
+          $env:ATLAS_CI_RENDERER_PROBE = '1'
+          $launched = @()
+          try {
+            for ($attempt = 1; $attempt -le 2; $attempt++) {
+              $process = Start-Process -FilePath $exe -PassThru
+              $receipt = Join-Path $env:TEMP ("iwxa-atlas-renderer-" + $process.Id + ".probe")
+              try {
+                for ($i = 0; $i -lt 60; $i++) {
+                  Start-Sleep -Milliseconds 500
+                  $process.Refresh()
+                  if ($process.HasExited) { throw "Installed Atlas exited before React opened native store" }
+                  if (Test-Path $receipt) { break }
+                }
+                if (!(Test-Path $receipt)) { throw "Installed WebView2 did not call atlas_open" }
+                $evidence = (Get-Content -LiteralPath $receipt -Raw).Trim()
+                if ($evidence -ne 'ATLAS_TAURI_JS_NATIVE_OPEN_PASS') {
+                  throw "Installed React-to-Rust bridge failed: $evidence"
+                }
+                Write-Output "ATLAS_INSTALLED_WEBVIEW_NATIVE_OPEN_PASS attempt=$attempt pid=$($process.Id)"
+                $launched += $process.Id
+              } finally {
+                if (!$process.HasExited) { Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue }
+                [void]$process.WaitForExit(10000)
+                Remove-Item -LiteralPath $receipt -Force -ErrorAction SilentlyContinue
+              }
+            }
+            if ($launched.Count -ne 2) { throw "Full process relaunch was not qualified" }
+            Write-Output 'ATLAS_INSTALLED_PROCESS_RELAUNCH_PASS'
+          } finally {
+            Remove-Item Env:ATLAS_CI_RENDERER_PROBE -ErrorAction SilentlyContinue
+          }
+      # This qualifies installed WebView startup/open across process relaunches,
+      # NOT the human click -> create -> commit -> full GUI readback lifecycle.
+      # Full interactive acceptance remains HOLD; do not retry unstable UIA/CDP.
 

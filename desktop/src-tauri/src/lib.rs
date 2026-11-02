@@ -60,6 +60,14 @@ fn to_json<T: Serialize>(value: &T) -> Result<Vec<u8>, String> {
 fn checksum(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
+// A saved block, manifest or exported JSON must be readable by read_limited()
+// and the native JSON importer on the next launch.
+fn check_file_size(size: usize, label: &str) -> Result<(), String> {
+    if (size as u64) > MAX_FILE {
+        return Err(format!("{} превышает лимит 100 МБ", label));
+    }
+    Ok(())
+}
 fn path_for(app: &AppHandle) -> Result<PathBuf, String> {
     app.path().app_local_data_dir().map(|p| p.join("atlas-store-v1"))
         .map_err(|e| err("Недоступен каталог данных Atlas", e))
@@ -121,6 +129,41 @@ fn atomic_replace(temp: &Path, destination: &Path) -> Result<(), String> {
 fn atomic_replace(temp: &Path, destination: &Path) -> Result<(), String> {
     fs::rename(temp, destination).map_err(|e| err("Атомарная замена", e))
 }
+// Publish a user backup only if its name remains unused. Writing the complete
+// file in the chosen directory first prevents exposing a truncated .json.
+#[cfg(windows)]
+fn publish_new_export(temp: &Path, destination: &Path) -> Result<(), String> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::Storage::FileSystem::{MoveFileExW, MOVEFILE_WRITE_THROUGH};
+    let src: Vec<u16> = temp.as_os_str().encode_wide().chain(Some(0)).collect();
+    let dst: Vec<u16> = destination.as_os_str().encode_wide().chain(Some(0)).collect();
+    // No MOVEFILE_REPLACE_EXISTING: never overwrite a user's existing backup.
+    if unsafe { MoveFileExW(src.as_ptr(), dst.as_ptr(), MOVEFILE_WRITE_THROUGH) } == 0 {
+        return Err(err("Публикация резервной копии", std::io::Error::last_os_error()));
+    }
+    Ok(())
+}
+#[cfg(not(windows))]
+fn publish_new_export(temp: &Path, destination: &Path) -> Result<(), String> {
+    fs::hard_link(temp, destination).map_err(|e| err("Публикация резервной копии", e))?;
+    let _ = fs::remove_file(temp);
+    Ok(())
+}
+fn write_export_atomic(destination: &Path, bytes: &[u8]) -> Result<(), String> {
+    check_file_size(bytes.len(), "Резервная копия")?;
+    if destination.exists() {
+        return Err("Файл уже существует. Выберите новое имя резервной копии.".into());
+    }
+    let parent = destination.parent().filter(|p| !p.as_os_str().is_empty())
+        .ok_or("Некорректный каталог резервной копии")?;
+    let pending = parent.join(format!(".iwxa-atlas-export-{}.pending", Uuid::new_v4()));
+    let result = (|| {
+        write_new(&pending, bytes)?;
+        publish_new_export(&pending, destination)
+    })();
+    if result.is_err() { let _ = fs::remove_file(&pending); }
+    result
+}
 fn publish(root: &Path, destination: &Path, bytes: &[u8]) -> Result<(), String> {
     let temp = temp_file(root, bytes)?;
     if let Err(e) = atomic_replace(&temp, destination) {
@@ -167,6 +210,7 @@ fn encode(root: &Path, snapshot: Value, generation: String) -> Result<(Manifest,
     let mut written = 0;
     for project in projects {
         let bytes = to_json(project)?;
+        check_file_size(bytes.len(), "Блок проекта")?;
         let hash = checksum(&bytes);
         let filename = root.join("blocks").join(format!("{hash}.json"));
         if !filename.exists() {
@@ -302,30 +346,39 @@ fn commit_root(root:&Path,expected_generation:&str,snapshot:Value)->Result<Write
     }
     let generation=Uuid::new_v4().to_string();
     let (manifest,written)=encode(&root,snapshot,generation.clone())?;
+    let manifest_bytes=to_json(&manifest)?;
+    check_file_size(manifest_bytes.len(), "Индекс портфеля")?;
     // The first saved portfolio has no previous head to archive. Retain its
     // manifest before publication so loss of head.json cannot reopen an empty
     // portfolio while the first generation's blocks still exist.
     if head.is_none() {
         let archived=root.join("history").join(
             format!("{:020}-{}.json",manifest.revision,manifest.generation));
-        write_new(&archived,&to_json(&manifest)?)?;
+        write_new(&archived,&manifest_bytes)?;
     }
-    publish(&root,&root.join("head.json"),&to_json(&manifest)?)?;
+    publish(&root,&root.join("head.json"),&manifest_bytes)?;
     Ok(WriteResult{generation,revision,project_blocks_written:written})
 }
 #[tauri::command]
 fn atlas_commit(app:AppHandle,expected_generation:String,snapshot:Value)->Result<WriteResult,String>{
     commit_root(&path_for(&app)?,&expected_generation,snapshot)
 }
+// Recheck the native generation AFTER the file dialog returns; the user may
+// leave it open while another Atlas window writes a newer portfolio.
+fn export_root(root: &Path, expected_generation: &str, destination: &Path) -> Result<(), String> {
+    let bytes={
+        let _guard=lock(root)?;
+        let head=current(root)?.ok_or("Портфель ещё не сохранён")?;
+        if head.generation!=expected_generation {
+            return Err("Портфель изменился во время экспорта. Откройте актуальную редакцию.".into());
+        }
+        let snapshot=decode(root,&head)?;
+        serde_json::to_vec_pretty(&snapshot).map_err(|e|err("Экспорт",e))?
+    };
+    write_export_atomic(destination,&bytes)
+}
 #[tauri::command]
 fn atlas_export_json(app:AppHandle, expected_generation:String)->Result<String,String>{
-    let root=path_for(&app)?;
-    let (snapshot,generation)={
-        let _guard=lock(&root)?;
-        let head=current(&root)?.ok_or("Портфель ещё не сохранён")?;
-        if head.generation!=expected_generation {return Err("Перед экспортом обновите редакцию портфеля".into());}
-        (decode(&root,&head)?,head.generation)
-    };
     let path=app.dialog().file()
         .set_title("Сохранить резервную копию Atlas JSON")
         .set_file_name("atlas-backup.json")
@@ -335,10 +388,8 @@ fn atlas_export_json(app:AppHandle, expected_generation:String)->Result<String,S
     if selected.extension().and_then(|x|x.to_str()).map(|x|x.to_ascii_lowercase())!=Some("json".into()){
         return Err("Разрешён только файл .json".into());
     }
-    if selected.exists() {return Err("Файл уже существует. Выберите новое имя резервной копии.".into());}
-    let bytes=serde_json::to_vec_pretty(&snapshot).map_err(|e|err("Экспорт",e))?;
-    write_new(&selected,&bytes)?;
-    Ok(format!("Резервная копия сохранена для редакции {}",generation))
+    export_root(&path_for(&app)?,&expected_generation,&selected)?;
+    Ok(format!("Резервная копия сохранена для редакции {}",expected_generation))
 }
 #[tauri::command]
 fn atlas_select_import(app:AppHandle)->Result<Option<Value>,String>{
@@ -474,6 +525,35 @@ mod persistence_tests{
         assert_eq!(load_root(&root.0).unwrap().snapshot["revision"],1);
         assert!(fs::read_dir(&root.0).unwrap().any(|item|
             item.unwrap().file_name().to_string_lossy().starts_with("head-quarantine-")));
+    }
+    #[test]fn backup_export_is_atomic_no_overwrite_and_roundtrips_after_a_relaunch(){
+        let root=scratch();
+        let first=commit_root(&root.0,"none",snapshot(1,&["Personal","Research"])).unwrap();
+        let backup=root.0.join("atlas-backup.json");
+        export_root(&root.0,&first.generation,&backup).unwrap();
+        let original=fs::read(&backup).unwrap();
+        let imported:Value=serde_json::from_slice(&original).unwrap();
+        assert_eq!(imported,load_root(&root.0).unwrap().snapshot);
+        assert!(export_root(&root.0,&first.generation,&backup).is_err());
+        assert_eq!(fs::read(&backup).unwrap(),original);
+        let second=commit_root(&root.0,&first.generation,snapshot(2,&["Updated"])).unwrap();
+        let obsolete=root.0.join("stale.json");
+        assert!(export_root(&root.0,&first.generation,&obsolete).is_err());
+        assert!(!obsolete.exists());
+        export_root(&root.0,&second.generation,&obsolete).unwrap();
+        assert_eq!(serde_json::from_slice::<Value>(&fs::read(&obsolete).unwrap()).unwrap(),
+            load_root(&root.0).unwrap().snapshot);
+        assert!(!fs::read_dir(&root.0).unwrap().any(|entry|
+            entry.unwrap().file_name().to_string_lossy().contains(".pending")));
+    }
+    #[test]fn export_and_block_sizes_cannot_exceed_next_open_import_limit(){
+        assert!(check_file_size(MAX_FILE as usize,"Блок").is_ok());
+        assert!(check_file_size(MAX_FILE as usize+1,"Блок").is_err());
+        let root=scratch();
+        let existing=root.0.join("existing.json");
+        fs::write(&existing,b"previous backup").unwrap();
+        assert!(write_export_atomic(&existing,b"never replace").is_err());
+        assert_eq!(fs::read(existing).unwrap(),b"previous backup");
     }
     #[test]fn invalid_root_and_missing_backup_never_return_empty_portfolio(){
         let root=scratch();
