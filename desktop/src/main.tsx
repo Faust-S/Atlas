@@ -480,7 +480,7 @@ function App(){
     </div>}
     {tab==="timeline"&&(plan?
       <ProjectGantt key={project.id} schedule={plan}
-       projectStart={project.startDate||null} projectDue={project.dueDate||null}
+       projectStatus={project.status} projectStart={project.startDate||null} projectDue={project.dueDate||null}
        portfolioStart={projected?.projectedStart||null} shiftDays={projected?.shiftDays??null}
        onEditDates={()=>openEditor("dates")} onOpenWork={id=>openEditor("work:"+id)}/>:
       <section className="surface"><Fallback message="План пока не рассчитан. Добавьте работы или проверьте зависимости."/></section>)}

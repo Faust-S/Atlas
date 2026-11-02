@@ -6,9 +6,9 @@ type Mode='fit'|'30'|'90';
 const statusName:Record<string,string>={todo:'Запланировано',in_progress:'В работе',blocked:'Заблокировано',done:'Выполнено (заявлено)'};
 const trim=(value:string,max=110)=>value.length>max?value.slice(0,max-1)+'…':value;
 
-export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,shiftDays,onOpenWork,onEditDates}:{
+export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,shiftDays,projectStatus,onOpenWork,onEditDates}:{
  schedule:CPM;projectStart:string|null;projectDue:string|null;portfolioStart:string|null;
- shiftDays:number|null;onOpenWork:(id:string)=>void;onEditDates:()=>void
+ shiftDays:number|null;projectStatus:string;onOpenWork:(id:string)=>void;onEditDates:()=>void
 }){
  const [scale,setScale]=useState<Mode>('fit');
  const [offset,setOffset]=useState(0);
@@ -44,6 +44,11 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
    <label className="atlas-gantt-query">Поиск <input type="search" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Название работы"/></label>
    <label className="atlas-check"><input type="checkbox" checked={criticalOnly} onChange={e=>setCriticalOnly(e.target.checked)}/> Критический путь</label>
   </div>
+  {(projectStatus==='paused'||projectStatus==='cancelled')&&<p className="atlas-schedule-warning" role="status">
+   {projectStatus==='cancelled'?'Проект отменён':'Проект приостановлен'}.
+   Диаграмма ниже показывает исходный календарный план CPM для анализа, а не действующую дату поставки.
+   Возобновление или корректировка плана требует отдельного решения человека.
+  </p>}
   {(shiftDays!=null&&shiftDays>0)&&<p className="atlas-schedule-warning">Начало с учётом межпроектных зависимостей сдвинуто на +{shiftDays} дн.: {portfolioStart||'нет расчётной даты'}. Шкала ниже показывает исходный CPM от планового старта и не переписывает даты автоматически.</p>}
   {!projectStart&&<p className="minor">Начальная дата не задана: на оси показаны относительные дни, не календарные даты.</p>}
   <div className="atlas-gantt-key" aria-label="Условные обозначения"><span><i className="key-normal"/>Плановая работа</span>

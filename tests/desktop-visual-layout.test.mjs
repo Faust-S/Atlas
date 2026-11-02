@@ -80,6 +80,9 @@ test('desktop workbench actually mounts existing Gantt/DAG and preserves real ed
  assert.match(entry,/onEditDates=\{\(\)=>openEditor\("dates"\)\}/);
  assert.match(entry,/onOpenWork=\{id=>openEditor\("work:"\+id\)\}/);
  assert.match(component,/onEditDates:\(\)=>void/);
+ assert.match(component,/projectStatus==='paused'\|\|projectStatus==='cancelled'/);
+ assert.match(component,/исходный календарный план CPM/);
+ assert.match(entry,/projectStatus=\{project.status\}/);
  assert.match(component,/onClick=\{onEditDates\}/);
  assert.doesNotMatch(entry,/className="graph-list"/);
  assert.doesNotMatch(entry,/className="timeline-line"/);
