@@ -89,6 +89,13 @@ test('desktop workbench actually mounts existing Gantt/DAG and preserves real ed
  assert.match(component,/Поставка этого проекта не имеет расчётной даты/);
  assert.match(component,/onClick=\{\(\)=>onOpenProject\(origin.id\)\}/);
  assert.match(component,/onClick=\{onEditDates\}/);
+ assert.match(entry,/getCurrentWindow\(\)\.setTitle\("IWXA Atlas — "/);
+ assert.match(entry,/\[native,ready,project\?\.name,tab\]/);
+ assert.match(entry,/Digit1:"work",Digit2:"timeline",Digit3:"graph"/);
+ assert.match(entry,/openEditor\(code==="KeyN"\?"item":"dep"\)/);
+ assert.match(entry,/code==="KeyL"&&project\.items\.length<2/);
+ assert.match(entry,/title="Ctrl\+Shift\+N"/);
+ assert.match(entry,/title="Ctrl\+Shift\+L"/);
  assert.doesNotMatch(entry,/className="graph-list"/);
  assert.doesNotMatch(entry,/className="timeline-line"/);
 });

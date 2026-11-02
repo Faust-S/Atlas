@@ -13,7 +13,8 @@ test("Tauri close-requested path can destroy only the authorized main window",()
   "core:window:default","core:window:allow-close","core:window:allow-destroy"
  ]);
  assert.ok(capability.permissions.includes("core:event:default"));
- assert.equal(capability.permissions.length,4);
+ assert.equal(capability.permissions.length,5);
+ assert.ok(capability.permissions.includes("core:window:allow-set-title"));
  assert.equal(new Set(capability.permissions).size,capability.permissions.length);
  assert.ok(!capability.permissions.some(p=>/^(fs|shell|http|process|opener):/.test(p)));
 });

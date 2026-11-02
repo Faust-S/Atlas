@@ -182,6 +182,14 @@ function App(){
   }).then(fn=>{unlisten=fn}).catch(issue);
   return ()=>{unlisten?.()};
  },[native]);
+ // Keep the system window title synchronized with the React project/view.
+ useEffect(()=>{
+  if(!native||!ready)return;
+  const subject=String(project?.name||"Портфель").replace(/\s+/g," ").trim().slice(0,84);
+  const display=project?(tabs.find(t=>t.key===tab)?.title||"Обзор"):"Обзор";
+  void getCurrentWindow().setTitle("IWXA Atlas — "+subject+" — "+display)
+   .catch(error=>console.warn("Atlas native window title unavailable",error));
+ },[native,ready,project?.name,tab]);
  const selectProject=(id:string|null)=>{
   setActive(id);setTab("overview");setEditor(null);setForecastId(null);setMessage("");
   setWorkFilter("all");setWorkQuery("");setWorkLimit(200);
@@ -331,16 +339,33 @@ function App(){
  };
  useEffect(()=>{
   const key=(event:KeyboardEvent)=>{
-   const ctrl=event.ctrlKey||event.metaKey;
-   if(ctrl&&event.key.toLowerCase()==="s"){event.preventDefault();void save();return}
-   if(ctrl&&event.key.toLowerCase()==="n"){
+   const ctrl=event.ctrlKey||event.metaKey,code=event.code;
+   // Physical keys retain shortcuts when the UI keyboard layout is changed.
+   if(ctrl&&!event.shiftKey&&code==="KeyS"){event.preventDefault();void save();return}
+   if(ctrl&&event.shiftKey&&(code==="KeyN"||code==="KeyL")){
+    event.preventDefault();
+    if(!ready||busyRef.current)return;
+    if(editorOpenRef.current){issue(Error("Сначала примените или закройте открытую форму."));return}
+    if(!project){issue(Error("Сначала откройте проект."));return}
+    if(code==="KeyL"&&project.items.length<2){issue(Error("Для зависимости нужны минимум две работы."));return}
+    openEditor(code==="KeyN"?"item":"dep");return;
+   }
+   if(ctrl&&!event.shiftKey&&["Digit1","Digit2","Digit3"].includes(code)){
+    event.preventDefault();
+    if(!ready||busyRef.current)return;
+    if(editorOpenRef.current){issue(Error("Сначала примените или закройте открытую форму."));return}
+    if(!project){issue(Error("Сначала откройте проект."));return}
+    view(({Digit1:"work",Digit2:"timeline",Digit3:"graph"} as Record<string,Tab>)[code]);
+    return;
+   }
+   if(ctrl&&!event.shiftKey&&code==="KeyN"){
     event.preventDefault();
     if(!ready||busyRef.current)return;
     if(editorOpenRef.current){issue(Error("Сначала примените или закройте текущую форму."));return}
     openEditor("new");return;
    }
    if(event.key==="Escape"){setEditor(null)}
-   if(ctrl&&event.key.toLowerCase()==="k"){event.preventDefault();document.getElementById("atlas-search")?.focus()}
+   if(ctrl&&!event.shiftKey&&code==="KeyK"){event.preventDefault();document.getElementById("atlas-search")?.focus()}
   };
   window.addEventListener("keydown",key);return ()=>window.removeEventListener("keydown",key);
  });
@@ -449,7 +474,9 @@ function App(){
      <h1>{project.name}</h1><p>{project.goal||"Цель пока не определена"}</p></div>
      <div className="button-row"><Badge>{statuses[project.status]||project.status}</Badge><Action onClick={()=>openEditor("status")}>Изменить статус</Action></div>
     </div>
-    <nav className="tabbar" aria-label="Представления проекта">{tabs.map(t=><button key={t.key} className={tab===t.key?"selected":""} onClick={()=>view(t.key)}>{t.title}</button>)}</nav>
+    <nav className="tabbar" aria-label="Представления проекта">{tabs.map(t=><button key={t.key}
+      title={t.key==="work"?"Ctrl+1":t.key==="timeline"?"Ctrl+2":t.key==="graph"?"Ctrl+3":undefined}
+      className={tab===t.key?"selected":""} onClick={()=>view(t.key)}>{t.title}</button>)}</nav>
     {tab==="overview"&&<>
      <div className="metric-grid"><Metric value={project.targets?.length||0} label="Ожидаемых результатов"/><Metric value={impact?.attention??0} label="Требуют внимания"/>
       <Metric value={project.items.length} label="Работ"/><Metric value={projected?.deadlineSlipDays??"?"} label="Дней риска срока"/></div>
@@ -495,7 +522,7 @@ function App(){
     </>}
     {tab==="work"&&<section className="surface">
      <div className="section-heading"><div><h2>Работы проекта</h2><p>Изменения отражаются в доске, графике и зависимостях.</p></div>
-      <div className="button-row"><Action onClick={()=>openEditor("item")} primary>＋ Работа</Action><Action onClick={()=>openEditor("stage")}>＋ Этап</Action><Action onClick={()=>openEditor("dep")}>Связь работ</Action></div></div>
+      <div className="button-row"><Action onClick={()=>openEditor("item")} primary title="Ctrl+Shift+N">＋ Работа</Action><Action onClick={()=>openEditor("stage")}>＋ Этап</Action><Action onClick={()=>openEditor("dep")} title="Ctrl+Shift+L">Связь работ</Action></div></div>
      <div className="filter-row"><label>Состояние <select value={workFilter} onChange={e=>{setWorkFilter(e.target.value);setWorkLimit(200)}}>
       <option value="all">Все</option>{Object.entries(workStatuses).map(([v,k])=><option value={v} key={v}>{String(k)}</option>)}</select></label>
       <label>Найти работу <input type="search" value={workQuery} aria-label="Найти работу"
