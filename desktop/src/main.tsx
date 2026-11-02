@@ -370,7 +370,7 @@ function App(){
       <div className="summary-line"><span>Начало: {readable(project.startDate)}</span><span>Контрольный срок: {readable(project.dueDate)}</span>
        <span>Прогноз финиша: {readable(projected?.projectedFinish)}</span><span>Критический путь: {plan?.durationDays??0} дн.</span></div>
      </section>
-     <section className="surface"><div className="section-heading"><div><h2>Риски и решения</h2></div>
+     <section className="surface"><div className="section-heading"><div><h2>Риски и решения</h2></div></div>
       <div className="button-row"><Action onClick={()=>openEditor("risk")}>＋ Риск</Action><Action onClick={()=>openEditor("decision")}>＋ Решение</Action>
        <Action onClick={()=>view("changes")}>Предложения изменений</Action></div>
       <div className="summary-line"><span>Рисков: {project.risks.length}</span><span>Решений: {project.decisions.length}</span><span>Предложений: {project.changes?.length||0}</span></div>
