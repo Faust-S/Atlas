@@ -90,6 +90,7 @@ export function planReviewQueue(snapshot,{now=new Date().toISOString(),maxAgeMs=
  return {rows,attention,totals:{
   events:new Set(rows.map(r=>JSON.stringify([r.rootProjectId,r.findingId]))).size,
   affected:rows.length,projects:new Set(rows.map(r=>r.projectId)).size,
+  approvedPlansAffected:rows.filter(r=>r.approvedChanges.length>0).length,
   needsDecision:rows.filter(r=>r.state==="needs_decision").length,
   sourceHold:rows.filter(r=>r.state==="source_hold").length,
   deferred:rows.filter(r=>r.state==="deferred").length,
