@@ -49,7 +49,7 @@ test("undated, unassigned and done work stay separate; no fabricated capacity",(
  assert.equal(unknown.totals.undated,1);
  assert.equal(unknown.totals.potentialConflicts,0);
  assert.equal(unknown.people[0].maxConcurrent,0);
- assert.match(unknown.warning,/not identity/);
+ assert.match(unknown.warning,/не подтверждают личность/);
 });
 test("approved correction shifts projected workload without mutating draft baseline",()=>{
  const f=fixture();
