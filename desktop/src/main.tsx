@@ -7,7 +7,7 @@ import {editorSpec,applyEditor,editorSelectionFields} from "../../src/editor.mjs
 import {compareProject,decideChange} from "../../src/trace.mjs";
 import {projectImpact} from "../../src/impact.mjs";
 import {scheduleProject} from "../../src/planning.mjs";
-import {portfolioSchedule} from "../../src/portfolio-schedule.mjs";
+import {portfolioSchedule,projectedFinishLabel} from "../../src/portfolio-schedule.mjs";
 import {portfolioResources} from "../../src/portfolio-resources.mjs";
 import {planReviewQueue,planReviewAction,planProposalAction} from "../../src/plan-review.mjs";
 import {revisionReview,recheckAction} from "../../src/revision-review.mjs";
@@ -364,7 +364,7 @@ function App(){
        const imp=projectImpact(p),row=dates.byId.get(p.id);
        return <tr key={p.id}><td><button className="text-link" onClick={()=>selectProject(p.id)}>{p.name}</button><small>{p.goal||"Цель не задана"}</small></td>
         <td><Badge>{statuses[p.status]||p.status}</Badge></td><td>{imp.attention} требований · {imp.sourceIssues.length} источников</td>
-        <td>{readable(row?.projectedFinish)}</td><td>{row?.deadlineSlipDays==null?"Неизвестно":row.deadlineSlipDays+" дн."}</td></tr>;
+        <td title={row?.notes?.join("; ")||""}>{projectedFinishLabel(row)}</td><td>{row?.deadlineSlipDays==null?"Неизвестно":row.deadlineSlipDays+" дн."}</td></tr>;
       })}</tbody></table></div>:<Fallback message={data.projects.length?"По запросу проекты не найдены. Измените поиск, чтобы увидеть остальные.":"Здесь появятся проекты. Создайте первый проект, определите результат и сохраните его на диск."}/>}
      {filtered.length>0&&<p className="minor">Показано {Math.min(filtered.length,portfolioLimit)} из {filtered.length} проектов по текущему поиску.</p>}
      {filtered.length>portfolioLimit&&<Action onClick={()=>setPortfolioLimit(n=>Math.min(filtered.length,n+150))}>Показать ещё проекты</Action>}
@@ -422,7 +422,10 @@ function App(){
       <p>CPM по календарным дням, без автоматического распределения ресурсов.</p></div>
       <Action onClick={()=>openEditor("dates")}>Изменить даты</Action></div>
       <div className="summary-line"><span>Начало: {readable(project.startDate)}</span><span>Контрольный срок: {readable(project.dueDate)}</span>
-       <span>Прогноз финиша: {readable(projected?.projectedFinish)}</span><span>Критический путь: {plan?.durationDays??0} дн.</span></div>
+       <span>Прогноз финиша: {projectedFinishLabel(projected)}</span><span>Критический путь: {plan?.durationDays??0} дн.</span></div>
+       {!!projected?.unavailableOrigins?.length&&<p className="atlas-schedule-warning">
+        Поставка заблокирована: {projected.unavailableOrigins.map((o:any)=>o.name+" ("+(o.status==="cancelled"?"отменён":"приостановлен")+")").join(", ")}. Корректировка зависимостей требует решения человека.
+       </p>
      </section>
      <section className="surface"><div className="section-heading"><div><h2>Этапы проекта</h2>
       <p>Этапы связывают работы с принятым планом; завершение этапа не означает приёмку результата.</p></div>
@@ -567,7 +570,7 @@ function App(){
      <Action onClick={()=>void save()} primary disabled={!dirty||busy}>Сохранить редакцию</Action></div>
     {project&&<div className="inspector-block"><small>План проекта</small><p>Начало: {readable(project.startDate)}</p>
      <p>Контрольный срок: {readable(project.dueDate)}</p>
-     <p>Расчётный финиш: {readable(projected?.projectedFinish)}</p>
+     <p>Расчётный финиш: {projectedFinishLabel(projected)}</p>
      <Action onClick={()=>openEditor("dates")}>Изменить даты</Action></div>}
     <div className="inspector-block"><small>Дополнительные сведения</small>
      <p>Источник и результат не получают статус «подтверждено» только из-за успешной сборки или заявления исполнителя.</p></div>

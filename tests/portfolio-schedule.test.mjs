@@ -4,7 +4,7 @@ import {empty,createProject,createItem,editItem,editProject,serialize,deserializ
 import {addPortfolioLink} from "../src/portfolio.mjs";
 import {planChange,decideChange} from "../src/trace.mjs";
 import {applyEditor} from "../src/editor.mjs";
-import {portfolioSchedule,renderPortfolioSchedule,renderProjectSchedule} from "../src/portfolio-schedule.mjs";
+import {portfolioSchedule,projectedFinishLabel,renderPortfolioSchedule,renderProjectSchedule} from "../src/portfolio-schedule.mjs";
 const values=o=>({get:k=>o[k]??""});
 test("approved scoped work changes upstream CPM and downstream due risk without changing declared plan",()=>{
  const a=createProject(empty(),{name:"API",type:"engineering"}),b=createProject(a.state,{name:"UI",type:"engineering"});
@@ -48,4 +48,57 @@ test("project planning dates edit together without silently overwriting due date
  assert.equal(state.projects[0].startDate,"2026-11-03");
  assert.equal(state.projects[0].dueDate,"2026-11-17");
  assert.throws(()=>applyEditor(state,a.id,"dates",values({startDate:"2026-11-20",dueDate:"2026-11-17"})),/Invalid project dates/);
+});
+
+test("pause/cancellation removes projected deliveries and propagates blockers through three projects",()=>{
+ const a=createProject(empty(),{name:"Core"}),b=createProject(a.state,{name:"Integration"}),c=createProject(b.state,{name:"Rollout"});
+ let state=editProject(c.state,a.id,{startDate:"2026-11-01"});
+ state=editProject(state,b.id,{startDate:"2026-11-02"});
+ state=editProject(state,c.id,{startDate:"2026-11-03"});
+ for(const id of [a.id,b.id,c.id]){
+  const item=createItem(state,id,{title:"Deliver"});
+  state=editItem(item.state,id,item.id,{estimateDays:2});
+ }
+ state=addPortfolioLink(state,{from:a.id,to:b.id});
+ state=addPortfolioLink(state,{from:b.id,to:c.id});
+ const baseline=serialize(state);
+ assert.equal(portfolioSchedule(state).byId.get(c.id).projectedFinish,"2026-11-07");
+ const paused=editProject(state,a.id,{status:"paused"});
+ const suspended=portfolioSchedule(paused);
+ for(const id of [a.id,b.id,c.id]){
+  const row=suspended.byId.get(id);
+  assert.equal(row.projectedStart,null);
+  assert.equal(row.projectedFinish,null);
+  assert.equal(row.needsReview,true);
+  assert.deepEqual(row.unavailableOrigins.map(x=>x.id),[a.id]);
+ }
+ assert.equal(suspended.byId.get(a.id).plannedFinish,"2026-11-03");
+ assert.match(projectedFinishLabel(suspended.byId.get(c.id)),/приостановлен/);
+ assert.match(renderPortfolioSchedule(paused),/Поставка заблокирована состоянием предшественников/);
+ assert.deepEqual(deserialize(serialize(paused)),paused);
+ const cancelled=editProject(paused,a.id,{status:"cancelled"});
+ const stopped=portfolioSchedule(cancelled);
+ assert.match(projectedFinishLabel(stopped.byId.get(a.id)),/отменён/);
+ assert.match(projectedFinishLabel(stopped.byId.get(c.id)),/отменённым/);
+ assert.equal(stopped.totals.dated,0);
+ assert.equal(stopped.totals.needsReview,3);
+ const resumed=editProject(cancelled,a.id,{status:"active"});
+ const restored=portfolioSchedule(resumed);
+ assert.equal(restored.byId.get(c.id).projectedFinish,"2026-11-07");
+ assert.deepEqual(restored.byId.get(c.id).unavailableOrigins,[]);
+ assert.equal(serialize(state),baseline);
+});
+test("convergent dependencies preserve all paused and cancelled origins",()=>{
+ const a=createProject(empty(),{name:"Paused root"}),b=createProject(a.state,{name:"Cancelled root"}),c=createProject(b.state,{name:"Dependent"});
+ let s=editProject(c.state,a.id,{status:"paused",startDate:"2026-11-01"});
+ s=editProject(s,b.id,{status:"cancelled",startDate:"2026-11-01"});
+ s=editProject(s,c.id,{startDate:"2026-11-01"});
+ for(const id of [a.id,b.id,c.id])s=createItem(s,id,{title:"Work"}).state;
+ s=addPortfolioLink(s,{from:a.id,to:c.id});
+ s=addPortfolioLink(s,{from:b.id,to:c.id});
+ const row=portfolioSchedule(s).byId.get(c.id);
+ assert.deepEqual(new Set(row.unavailableOrigins.map(x=>x.id)),new Set([a.id,b.id]));
+ assert.equal(row.projectedFinish,null);
+ assert.match(row.notes.join(" "),/отменён/);
+ assert.match(row.notes.join(" "),/приостановлен/);
 });

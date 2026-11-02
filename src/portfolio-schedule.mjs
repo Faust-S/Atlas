@@ -15,6 +15,16 @@ function day(date) {
 const dateOf = value => value != null && value >= 0 && value <= MAX_DAY ?
  new Date(value*DAY).toISOString().slice(0,10) : null;
 const labelDate = value => value || "не определена";
+const inactive = p => p.status==="paused"||p.status==="cancelled";
+const inactiveLabel = p => p.status==="cancelled"?"отменён":"приостановлен";
+export function projectedFinishLabel(row){
+ if(!row)return "Не определён";
+ if(row.status==="cancelled")return "Нет поставки (проект отменён)";
+ if(row.status==="paused")return "Срок неизвестен (проект на паузе)";
+ if(row.unavailableOrigins?.some(x=>x.status==="cancelled"))return "Блокировано отменённым предшественником";
+ if(row.unavailableOrigins?.length)return "Предшественник приостановлен";
+ return labelDate(row.projectedFinish);
+}
 
 // A dependency means successor may start only after the predecessor's CPM finish.
 // The estimate is calendar-day only, does not account for people/capacity/acceptance.
@@ -30,9 +40,17 @@ export function portfolioSchedule(snapshot) {
   const plannedStartDay=day(p.startDate),dueDay=day(p.dueDate);
   const parents=incoming.map(from=>byId.get(from));
   const missingParents=parents.filter(row=>row.projectedFinishDay===null);
+  // A paused/cancelled predecessor cannot promise a delivery date. Preserve
+  // its historical baseline but propagate the root cause through the DAG.
+  const origins=new Map();
+  if(inactive(p))origins.set(id,{id,name:p.name,status:p.status});
+  for(const parent of parents)for(const cause of parent.unavailableOrigins||[])
+   origins.set(cause.id,cause);
+  const unavailableOrigins=[...origins.values()];
+  const unknownParents=missingParents.filter(row=>!row.unavailableOrigins?.length);
   const upstreamReadyDay=incoming.length && !missingParents.length ? Math.max(...parents.map(r=>r.projectedFinishDay)) : null;
   let projectedStartDay=null;
-  if(missingParents.length===0) {
+  if(!inactive(p)&&missingParents.length===0) {
    if(incoming.length) projectedStartDay=plannedStartDay===null?upstreamReadyDay:Math.max(plannedStartDay,upstreamReadyDay);
    else projectedStartDay=plannedStartDay;
   }
@@ -48,7 +66,13 @@ export function portfolioSchedule(snapshot) {
   const unplannedChanges=approvedChanges.filter(change=>["approved","in_progress"].includes(change.status)&&!p.items.some(item=>item.changeId===change.id));
   const notes=[];
   if(!hasEstimate)notes.push("Работы с оценками длительности отсутствуют");
-  if(missingParents.length)notes.push("Нет расчётной даты завершения предшественников: "+missingParents.map(x=>x.name).join(", "));
+  if(inactive(p))notes.push(p.status==="cancelled"?
+   "Проект отменён: расчётная поставка недоступна, требуется решение человека":
+   "Проект приостановлен: дата поставки неизвестна до возобновления");
+  if(unavailableOrigins.length&&!inactive(p))
+   notes.push("Поставка заблокирована состоянием предшественников: "+
+    unavailableOrigins.map(x=>x.name+" ("+inactiveLabel(x)+")").join(", "));
+  if(unknownParents.length)notes.push("Нет расчётной даты завершения предшественников: "+unknownParents.map(x=>x.name).join(", "));
   if(!incoming.length&&plannedStartDay===null)notes.push("Дата начала не задана");
   if(incoming.length&&plannedStartDay===null&&projectedStartDay!==null)notes.push("Начало вычислено только по срокам предшественников");
   if(shiftDays>0)notes.push("Начало потребует пересмотра: +"+shiftDays+" дн. относительно указанного плана");
@@ -61,11 +85,12 @@ export function portfolioSchedule(snapshot) {
    durationDays:plan.durationDays,hasEstimate,plannedFinish:dateOf(plannedFinishDay),
    projectedStart:dateOf(projectedStartDay),projectedFinish:dateOf(projectedFinishDay),
    projectedFinishDay,upstreamReady:dateOf(upstreamReadyDay),missingParents:missingParents.map(x=>x.id),
+   unavailableOrigins,
    shiftDays,deadlineSlipDays,limitingParents,incoming:[...incoming],
    changedWork:changedWork.map(w=>({id:w.id,title:w.title,estimateDays:w.estimateDays??1,changeId:w.changeId})),
    approvedChanges:approvedChanges.map(c=>({id:c.id,title:c.title,status:c.status})),
    unplannedChanges:unplannedChanges.map(c=>c.id),notes,
-   needsReview:shiftDays>0||deadlineSlipDays>0||missingParents.length>0||unplannedChanges.length>0||!hasEstimate||(!incoming.length&&plannedStartDay===null),
+   needsReview:inactive(p)||shiftDays>0||deadlineSlipDays>0||missingParents.length>0||unplannedChanges.length>0||!hasEstimate||(!incoming.length&&plannedStartDay===null),
    // Explicit dates/requirements can be absent; never invent complete delivery.
    confidence:projectedFinishDay===null?"undated":"calendar_estimate_only"
   });
@@ -84,7 +109,7 @@ export function renderPortfolioSchedule(snapshot, escape=escapeHtml){
   const notes=r.notes.length?r.notes.join("; "):"Расчёт без обнаруженных календарных конфликтов";
   return '<tr><td><button class="atlas-plain-button" data-action="open:'+escape(r.id)+'">'+escape(r.name)+'</button></td>'+
    '<td>'+escape(labelDate(r.declaredStart))+'</td><td>'+r.durationDays+'</td><td>'+escape(labelDate(r.plannedFinish))+'</td>'+
-   '<td>'+escape(labelDate(r.projectedStart))+'</td><td>'+escape(labelDate(r.projectedFinish))+'</td>'+
+   '<td>'+escape(labelDate(r.projectedStart))+'</td><td>'+escape(projectedFinishLabel(r))+'</td>'+
    '<td>'+escape(labelDate(r.deadline))+'</td>'+
    '<td>'+(r.deadlineSlipDays===null?"—":r.deadlineSlipDays>0?"+"+r.deadlineSlipDays+" дн.":"В пределах плана")+'</td>'+
    '<td><small>'+escape(notes)+'</small></td></tr>';
@@ -102,7 +127,7 @@ export function renderProjectSchedule(snapshot,projectId,escape=escapeHtml){
  const linked=r.changedWork.map(w=>'<li>'+escape(w.title)+' · '+w.estimateDays+' дн. (по утверждённому изменению)</li>').join("");
  const notes=r.notes.map(note=>'<li>'+escape(note)+'</li>').join("");
  return '<section class="card"><div class="row"><h2>Пересмотр сроков проекта</h2><button data-action="dates">Изменить плановые даты</button></div>'+
-  '<p>Начало по плану: <strong>'+escape(labelDate(r.declaredStart))+'</strong> · Завершение CPM: <strong>'+escape(labelDate(r.plannedFinish))+'</strong> · С учётом зависимостей: <strong>'+escape(labelDate(r.projectedFinish))+'</strong> · Контрольная дата: <strong>'+escape(labelDate(r.deadline))+'</strong></p>'+
+  '<p>Начало по плану: <strong>'+escape(labelDate(r.declaredStart))+'</strong> · Завершение CPM: <strong>'+escape(labelDate(r.plannedFinish))+'</strong> · С учётом зависимостей: <strong>'+escape(projectedFinishLabel(r))+'</strong> · Контрольная дата: <strong>'+escape(labelDate(r.deadline))+'</strong></p>'+
   (predecessor.length?'<p class="muted">Срок ограничивают предшественники: '+escape(predecessor.join(", "))+'</p>':"")+
   (linked?'<p><strong>Работы по утверждённым изменениям</strong></p><ul>'+linked+'</ul>':"")+
   (notes?'<ul>'+notes+'</ul>':'<p class="muted">Календарных конфликтов не выявлено, но готовность не подтверждена.</p>')+
