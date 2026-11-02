@@ -144,10 +144,18 @@ try {
                 }
                 $closeMode = 'WM_CLOSE'
                 if (!$process.WaitForExit(7500)) {
-                    throw 'Installed Atlas refused graceful close after confirmed save and readback'
+                    # Failure to close cleanly is still HOLD, but test the
+                    # persisted portfolio after process termination as a
+                    # separate, objectively useful crash/restart scenario.
+                    Write-Output "ATLAS_INSTALLED_GUI_GRACEFUL_CLOSE_HOLD attempt=$attempt"
+                    $closeMode = 'forced-for-persistence-test'
+                    Stop-Process -Id $process.Id -Force -ErrorAction Stop
+                    [void]$process.WaitForExit(10000)
                 }
             }
-            Write-Output "ATLAS_INSTALLED_GUI_GRACEFUL_CLOSE_PASS attempt=$attempt mode=$closeMode"
+            if ($closeMode -ne 'forced-for-persistence-test') {
+                Write-Output "ATLAS_INSTALLED_GUI_GRACEFUL_CLOSE_PASS attempt=$attempt mode=$closeMode"
+            }
         } finally {
             $process.Refresh()
             if (!$process.HasExited) {

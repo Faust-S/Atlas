@@ -213,3 +213,9 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 @media(max-width:560px){
  .app-shell.editor-active .inspector{width:min(400px,calc(100vw - 12px))}
 }
+
+/* Close guard avoids a blocking browser confirm inside WebView2 close events. */
+.atlas-close-overlay{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;background:#10243f99;padding:24px}
+.atlas-close-dialog{width:min(560px,100%);max-height:calc(100vh - 48px);overflow:auto;background:#fff;color:#203752;border:1px solid #b3c6de;border-radius:16px;box-shadow:0 18px 70px #10243f55;padding:26px}
+.atlas-close-dialog h2{margin:0 0 12px;font-size:21px}.atlas-close-dialog p{line-height:1.6}
+.atlas-close-dialog .button-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}

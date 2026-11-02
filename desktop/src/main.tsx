@@ -118,6 +118,8 @@ function App(){
  const [search,setSearch]=useState(""),[editor,setEditor]=useState<Editor|null>(null);
  const [message,setMessage]=useState(""),[error,setError]=useState("");
  const [inspector,setInspector]=useState(true),[recovery,setRecovery]=useState(false);
+ const [closeGuard,setCloseGuard]=useState(false);
+ const allowCloseRef=useRef(false);
  const saved=useRef<string>(snapshotText(empty()));
  const latestSnapshot=useRef<Atlas>(data);latestSnapshot.current=data;
  const [refreshReport,setRefreshReport]=useState<any>(null);
@@ -172,9 +174,10 @@ function App(){
   }).catch(issue);
   let unlisten:undefined|(()=>void);
   getCurrentWindow().onCloseRequested(event=>{
+   if(allowCloseRef.current)return;
    if(dirtyRef.current||busyRef.current||editorOpenRef.current){
-    if(busyRef.current||!confirmAction("Есть несохранённые изменения или открытая форма. Закрыть Atlas без сохранения?"))
-     event.preventDefault();
+    event.preventDefault();
+    setCloseGuard(true);
    }
   }).then(fn=>{unlisten=fn}).catch(issue);
   return ()=>{unlisten?.()};
@@ -213,12 +216,13 @@ function App(){
    setEditor(null);
   }catch(e){issue(e)}
  };
- const save=async()=>{
+ const save=async():Promise<boolean>=>{
   if(editorOpenRef.current){
    issue(Error("Открытая форма ещё не применена. Нажмите Ctrl+Enter, затем Ctrl+S для записи на диск."));
-   return;
+   return false;
   }
-  if(busyRef.current||!ready||!dirty)return;
+  if(busyRef.current||!ready)return false;
+  if(!dirty)return true;
   busyRef.current=true;setBusy(true);
   try{
    const startedWith=data;
@@ -237,7 +241,19 @@ function App(){
     "Сохранено и перечитано с диска. Новых файлов проектов: "+result.projectBlocksWritten+".";
    setMessage(notice+(changedWhileSaving?" Изменения, внесённые во время записи, ещё не сохранены.":""));
    setError("");
-  }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
+   return !changedWhileSaving;
+  }catch(e){issue(e);return false}finally{busyRef.current=false;setBusy(false)}
+ };
+ const closeWindow=async()=>{
+  // Existing allow-close capability; explicit user intent bypasses only the
+  // close warning, not any native write or permission boundary.
+  allowCloseRef.current=true;
+  try{await getCurrentWindow().close()}
+  catch(e){allowCloseRef.current=false;issue(e)}
+ };
+ const saveAndClose=async()=>{
+  const done=await save();
+  if(done&&latestSnapshot.current===data&&!editorOpenRef.current)await closeWindow();
  };
  const exportJson=async()=>{
   if(busyRef.current||!ready)return;
@@ -597,6 +613,20 @@ function App(){
      {!project.sources.length&&<Fallback message="Источников нет. Добавьте публичный репозиторий или ссылку на внешний источник."/>}
     </section>}
    </>}
+   {closeGuard&&<div className="atlas-close-overlay">
+    <section className="atlas-close-dialog" role="dialog" aria-modal="true" aria-labelledby="atlas-close-title">
+     <h2 id="atlas-close-title">Закрыть IWXA Atlas?</h2>
+     <p>{busy?"Завершается запись или чтение. Закрытие пока недоступно.":
+      editor?"Открытая форма ещё не применена. Вернитесь, примените её к черновику и сохраните.":
+      dirty?"В портфеле есть изменения, которые пока не записаны на диск.":
+      "Все изменения портфеля сохранены."}</p>
+     <div className="button-row">
+      <Action onClick={()=>setCloseGuard(false)} primary>Вернуться в Atlas</Action>
+      {dirty&&!editor&&<Action onClick={()=>void saveAndClose()} disabled={busy}>Сохранить и закрыть</Action>}
+      <Action onClick={()=>void closeWindow()} disabled={busy} title="Несохранённые изменения и открытая форма будут потеряны">Закрыть без сохранения</Action>
+     </div>
+    </section>
+   </div>}
    <footer className="workspace-footer"><span>IWXA Atlas 0.2 · локальный черновик → нативная запись → readback</span>
     <span>Готовность определяется доказательствами и решениями, не количеством коммитов.</span></footer>
   </main>

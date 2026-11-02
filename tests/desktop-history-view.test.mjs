@@ -38,4 +38,8 @@ test('desktop presents complete history and progressive resource list',()=>{
  assert.match(ui,/event\.currentTarget\.requestSubmit\(\)/);
  assert.match(ui,/openEditor\("new"\);return;/);
  assert.match(ui,/autoFocus=\{index===0\}/);
+ assert.match(ui,/setCloseGuard\(true\)/);
+ assert.match(ui,/aria-modal="true"/);
+ assert.match(ui,/await getCurrentWindow\(\)\.close\(\)/);
+ assert.match(ui,/allowCloseRef\.current=true/);
 });
