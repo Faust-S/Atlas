@@ -59,7 +59,8 @@ function Wait-AtlasState([int]$count, [string[]]$required) {
         foreach ($name in $required) { if ($storedNames -notcontains $name) { $present = $false } }
         if ($state.projects.Count -eq $count -and $present) { return $state }
     }
-    throw "Installed GUI did not commit the expected $count projects via Ctrl+S"
+    Capture-AtlasView 'installed-save-no-expected-projects'
+    throw "Installed GUI did not commit the expected $count projects via Ctrl+S; check the retained real-window screenshot"
 }
 function Wait-AtlasOpen([System.Diagnostics.Process]$process) {
     $receipt = Join-Path $env:TEMP ("iwxa-atlas-renderer-" + $process.Id + ".probe")
@@ -110,7 +111,7 @@ function Activate-Atlas([System.Diagnostics.Process]$process) {
     }
 }
 function Wait-AtlasTitle([System.Diagnostics.Process]$process,[string]$marker) {
-    for ($i=0; $i -lt 36; $i++) {
+    for ($i=0; $i -lt 48; $i++) {
         $process.Refresh()
         if ($process.HasExited) { throw 'Native window closed before visual tab qualified' }
         if ($process.MainWindowTitle.Contains($marker)) {
@@ -119,15 +120,16 @@ function Wait-AtlasTitle([System.Diagnostics.Process]$process,[string]$marker) {
         }
         Start-Sleep -Milliseconds 250
     }
+    Capture-AtlasView 'installed-title-mismatch'
     throw "Active installed view was not shown: $marker (window title=$($process.MainWindowTitle))"
 }
-function Send-AtlasWork([string]$name) {
+function Send-AtlasWork([string]$name, [System.Diagnostics.Process]$process) {
     [System.Windows.Forms.SendKeys]::SendWait('^+n')
-    Start-Sleep -Milliseconds 750
+    Wait-AtlasTitle $process 'Форма: Новая работа'
     [System.Windows.Forms.SendKeys]::SendWait($name)
     Start-Sleep -Milliseconds 250
     [System.Windows.Forms.SendKeys]::SendWait('^{ENTER}')
-    Start-Sleep -Milliseconds 800
+    Wait-AtlasTitle $process 'Таблица · Не сохранено'
 }
 function Wait-AtlasDAG([string]$projectName,[string]$beforeGeneration) {
     for ($i=0; $i -lt 90; $i++) {
@@ -143,6 +145,7 @@ function Wait-AtlasDAG([string]$projectName,[string]$beforeGeneration) {
             return $state
         }
     }
+    Capture-AtlasView 'installed-work-dependency-not-saved'
     throw 'Installed GUI did not save both works and a dependency'
 }
 function Capture-AtlasView([string]$name) {
@@ -162,16 +165,17 @@ function Capture-AtlasView([string]$name) {
         Write-Warning "Installed screenshot unavailable: $($_.Exception.Message)"
     }
 }
-function Send-AtlasProject([string]$name) {
-    # Ctrl+N opens the actual React project form. The name input is autofocus.
+function Send-AtlasProject([string]$name, [System.Diagnostics.Process]$process) {
+    # The native-open receipt alone does not mean the React workbench is
+    # ready to receive keystrokes. Verify the actual rendered editor title.
     [System.Windows.Forms.SendKeys]::SendWait('^n')
-    Start-Sleep -Milliseconds 750
+    Wait-AtlasTitle $process 'Форма: Новый проект'
     [System.Windows.Forms.SendKeys]::SendWait($name)
-    Start-Sleep -Milliseconds 200
-    # Ctrl+Enter applies the real form to the React domain draft.
+    Start-Sleep -Milliseconds 250
     [System.Windows.Forms.SendKeys]::SendWait('^{ENTER}')
-    Start-Sleep -Milliseconds 750
-    # Ctrl+S uses Tauri atlas_commit, followed by native readback.
+    # The app must first apply the form and select the named draft.
+    Wait-AtlasTitle $process ($name + ' — Обзор · Не сохранено')
+    # Ctrl+S then uses Tauri atlas_commit and an independent native readback.
     [System.Windows.Forms.SendKeys]::SendWait('^s')
 }
 $original = $null
@@ -182,6 +186,7 @@ try {
         try {
             Wait-AtlasOpen $process
             Activate-Atlas $process
+            Wait-AtlasTitle $process 'Портфель — Обзор'
             if ($attempt -eq 2) {
                 $loaded = Get-AtlasSnapshot
                 if ($null -eq $loaded -or $loaded.projects.Count -ne 1 -or
@@ -191,23 +196,21 @@ try {
                 }
                 Write-Output 'ATLAS_INSTALLED_GUI_REOPEN_PRIOR_PROJECT_PASS'
             }
-            Send-AtlasProject $names[$attempt-1]
+            Send-AtlasProject $names[$attempt-1] $process
             $saved = Wait-AtlasState $attempt $names[0..($attempt-1)]
             if ($attempt -eq 1) {
                 Start-Sleep -Milliseconds 1400
                 Activate-Atlas $process
                 [System.Windows.Forms.SendKeys]::SendWait('^1')
                 Wait-AtlasTitle $process 'Таблица'
-                Send-AtlasWork 'AtlasWorkAlpha'
-                Send-AtlasWork 'AtlasWorkBeta'
-                # Two select controls: first predecessor remains Alpha,
-                # move the destination select to Beta.
+                Send-AtlasWork 'AtlasWorkAlpha' $process
+                Send-AtlasWork 'AtlasWorkBeta' $process
+                # The shared editor defaults to two different works: Alpha -> Beta.
+                # Do not depend on browser-specific TAB/DOWN select behaviour.
                 [System.Windows.Forms.SendKeys]::SendWait('^+l')
-                Start-Sleep -Milliseconds 700
-                [System.Windows.Forms.SendKeys]::SendWait('{TAB}{DOWN}')
-                Start-Sleep -Milliseconds 250
+                Wait-AtlasTitle $process 'Форма: Добавить зависимость'
                 [System.Windows.Forms.SendKeys]::SendWait('^{ENTER}')
-                Start-Sleep -Milliseconds 750
+                Wait-AtlasTitle $process 'Таблица · Не сохранено'
                 [System.Windows.Forms.SendKeys]::SendWait('^s')
                 $saved=Wait-AtlasDAG $names[0] $saved.generation
                 Start-Sleep -Milliseconds 1350

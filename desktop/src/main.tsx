@@ -187,9 +187,15 @@ function App(){
   if(!native||!ready)return;
   const subject=String(project?.name||"Портфель").replace(/\s+/g," ").trim().slice(0,84);
   const display=project?(tabs.find(t=>t.key===tab)?.title||"Обзор"):"Обзор";
-  void getCurrentWindow().setTitle("IWXA Atlas — "+subject+" — "+display)
+  // Show an open form and an unsaved draft in the native taskbar/title bar.
+  // Also lets installed-Windows acceptance distinguish a rendered React form
+  // from the earlier Rust atlas_open receipt without UIA or CDP.
+  const editTitle=editor?.spec.title;
+  const suffix=editTitle?" · Форма: "+String(editTitle).replace(/\s+/g," ").trim().slice(0,70):
+   dirty?" · Не сохранено":"";
+  void getCurrentWindow().setTitle("IWXA Atlas — "+subject+" — "+display+suffix)
    .catch(error=>console.warn("Atlas native window title unavailable",error));
- },[native,ready,project?.name,tab]);
+ },[native,ready,project?.name,tab,editor?.spec.title,dirty]);
  const selectProject=(id:string|null)=>{
   setActive(id);setTab("overview");setEditor(null);setForecastId(null);setMessage("");
   setWorkFilter("all");setWorkQuery("");setWorkLimit(200);
@@ -230,10 +236,13 @@ function App(){
    return false;
   }
   if(busyRef.current||!ready)return false;
-  if(!dirty)return true;
+  // A Ctrl+S can arrive before React has re-rendered after a submitted
+  // form. Save the latest applied domain draft, not a stale render closure.
+  const startedWith=latestSnapshot.current;
+  const startedSignature=snapshotText(startedWith);
+  if(startedSignature===saved.current)return true;
   busyRef.current=true;setBusy(true);
   try{
-   const startedWith=data;
    const result=await commitWithReadback({
     invoke,expectedGeneration:generation,snapshot:startedWith,
     signature:snapshotText,
@@ -241,7 +250,7 @@ function App(){
    });
    // A user may have changed the in-memory draft while the native IPC was
    // pending. Only the exact snapshot verified on disk is marked as saved.
-   saved.current=dataSignature;
+   saved.current=startedSignature;
    setGeneration(result.generation);
    const changedWhileSaving=latestSnapshot.current!==startedWith;
    const notice=result.reconciled?

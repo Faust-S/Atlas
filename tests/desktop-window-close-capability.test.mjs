@@ -33,6 +33,16 @@ test("installed Windows workflow rejects false PASS when close needed a forced k
  assert.match(windowsTest,/ATLAS_INSTALLED_GUI_GRACEFUL_LIFECYCLE_PASS/);
 });
 
+test("native-window keyboard qualification waits for rendered form and applied draft",()=>{
+ assert.match(app,/Форма: /);
+ assert.match(app,/const startedWith=latestSnapshot\.current/);
+ assert.match(windowsTest,/Wait-AtlasTitle \$process 'Портфель — Обзор'/);
+ assert.match(windowsTest,/Wait-AtlasTitle \$process 'Форма: Новый проект'/);
+ assert.match(windowsTest,/Wait-AtlasTitle \$process \(\$name \+ ' — Обзор · Не сохранено'\)/);
+ assert.match(windowsTest,/Wait-AtlasTitle \$process 'Форма: Добавить зависимость'/);
+ assert.doesNotMatch(windowsTest,/SendWait\('\{TAB\}\{DOWN\}'\)/);
+ assert.match(windowsTest,/Capture-AtlasView 'installed-save-no-expected-projects'/);
+});
 test("installed startup probe never discards a valid early Rust receipt",()=>{
  const script=windowsTest.slice(windowsTest.indexOf("function Wait-AtlasOpen"),windowsTest.indexOf("function Activate-Atlas"));
  assert.ok(script.startsWith("function Wait-AtlasOpen"));

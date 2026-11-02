@@ -139,7 +139,16 @@ export function editorSpec(project,action,snapshot=null){
    field("estimateDays","Оценка длительности, календарных дней","number","1")
   ]};
  }
- if(action==="dep")return {title:"Добавить зависимость",hint:"Следующая работа начнётся после предыдущей. Циклы запрещены.",fields:[choice("from","Предшествующая работа",workItems(project)),choice("to","Зависимая работа",workItems(project))]};
+ if(action==="dep"){
+  const options=workItems(project);
+  if(options.length<2)throw Error("Для зависимости необходимы минимум две работы");
+  // Both selects must have real, different initial values. A blank
+  // controlled select is not an explicit selection and can create a
+  // self-link after keyboard navigation.
+  return {title:"Добавить зависимость",hint:"Следующая работа начнётся после предыдущей. Циклы запрещены.",fields:[
+   choice("from","Предшествующая работа",options,options[0].value),
+   choice("to","Зависимая работа",options,options[1].value)]};
+ }
  if(action==="target")return {title:"Ожидаемый результат",fields:[field("title","Название требования"),field("desired","Критерий выполнения","textarea"),choice("intent","Статус цели",[option("committed","Обязательно (принято в план)"),option("candidate","Предложение")],"committed")]};
  if(action.startsWith("recheck:")){
   const {projectId,findingId,expectedSha}=parseRecheckAction(action);

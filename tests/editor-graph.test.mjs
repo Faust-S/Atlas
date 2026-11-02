@@ -16,6 +16,9 @@ test("editors create a project, target, finding, change, named work and dependen
  const [a,b]=s.projects[0].items;
  const spec=editorSpec(s.projects[0],"dep");
  assert.equal(spec.fields[0].options[0].label,"Prepare beds");
+ assert.equal(spec.fields[0].value,a.id);
+ assert.equal(spec.fields[1].value,b.id);
+ assert.notEqual(spec.fields[0].value,spec.fields[1].value);
  s=applyEditor(s,pid,"dep",values({from:a.id,to:b.id})).state;
  assert.equal(s.projects[0].dependencies.length,1);
  assert.throws(()=>applyEditor(s,pid,"dep",values({from:b.id,to:a.id})),/cycle/);

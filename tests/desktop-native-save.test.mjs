@@ -74,5 +74,7 @@ test('React signature is memoized by domain data, not by tab or input renders',(
  assert.match(ui,/const dataSignature=useMemo\(\(\)=>snapshotText\(data\),\[data\]\)/);
  assert.match(ui,/const dirty=ready&&dataSignature!==saved\.current/);
  assert.match(ui,/latestSnapshot\.current!==startedWith/);
- assert.match(ui,/saved\.current=dataSignature/);
+ assert.match(ui,/const startedWith=latestSnapshot\.current/);
+ assert.match(ui,/const startedSignature=snapshotText\(startedWith\)/);
+ assert.match(ui,/saved\.current=startedSignature/);
 });
