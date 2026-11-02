@@ -9,6 +9,7 @@ import time
 import json
 import subprocess
 import traceback
+import tempfile
 from pathlib import Path
 from pywinauto import Application
 
@@ -22,7 +23,9 @@ process=None
 phase="bootstrap"
 
 def diagnose(reason):
-    print("ATLAS_UIA_DIAGNOSTIC",json.dumps({"phase":phase,"reason":str(reason),"pid":process.pid if process else None},ensure_ascii=True),flush=True)
+    marker=Path(tempfile.gettempdir())/("iwxa-atlas-renderer-"+str(process.pid)+".probe") if process else None
+    receipt=marker.read_text(encoding="utf-8") if marker and marker.exists() else "ABSENT"
+    print("ATLAS_UIA_DIAGNOSTIC",json.dumps({"phase":phase,"reason":str(reason),"pid":process.pid if process else None,"rendererReceipt":receipt},ensure_ascii=True),flush=True)
     if window:
         try:
             fields=[]
@@ -36,7 +39,8 @@ def diagnose(reason):
 
 def boot():
     global window,process
-    process=subprocess.Popen([str(APP)],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+    process=subprocess.Popen([str(APP)],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,
+        env={**os.environ,"ATLAS_CI_RENDERER_PROBE":"1"})
     app=Application(backend="uia")
     deadline=time.monotonic()+35
     last=None
@@ -105,6 +109,17 @@ try:
     phase="initial-window"
     boot()
     diagnose("Initial accessible control tree")
+    phase="native-react-bridge"
+    marker=Path(tempfile.gettempdir())/("iwxa-atlas-renderer-"+str(process.pid)+".probe")
+    for _ in range(28):
+        if marker.exists(): break
+        time.sleep(.35)
+    if not marker.exists():
+        raise AssertionError("Native Atlas opened a window, but React did not call atlas_open over Tauri IPC")
+    receipt=marker.read_text(encoding="utf-8")
+    print("ATLAS_CI_NATIVE_RENDERER_RECEIPT",receipt,flush=True)
+    if receipt!="ATLAS_TAURI_JS_NATIVE_OPEN_PASS":
+        raise AssertionError("Renderer reached Rust but native store could not open")
     phase="create-project"
     click("Создать проект")
     set_text("Название проекта",PROJECT)

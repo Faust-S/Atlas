@@ -272,7 +272,16 @@ fn load_root(root:&Path)->Result<OpenResult,String>{
 fn atlas_open(app:AppHandle)->Result<OpenResult,String>{
     let root=path_for(&app)?;
     let _guard=lock(&root)?;
-    load_root(&root)
+    let loaded=load_root(&root);
+    // Observability only: the UIA Windows runner may hide WebView2 accessibility
+    // nodes. A CI-only, fixed-temp receipt proves React reached the native
+    // command through the packaged Tauri bridge without writing portfolio data.
+    if std::env::var_os("ATLAS_CI_RENDERER_PROBE").as_deref()==Some(std::ffi::OsStr::new("1")){
+        let receipt=std::env::temp_dir().join(format!("iwxa-atlas-renderer-{}.probe",std::process::id()));
+        let marker=if loaded.is_ok(){"ATLAS_TAURI_JS_NATIVE_OPEN_PASS"}else{"ATLAS_TAURI_JS_NATIVE_OPEN_ERROR"};
+        let _=fs::write(receipt,marker);
+    }
+    loaded
 }
 fn commit_root(root:&Path,expected_generation:&str,snapshot:Value)->Result<WriteResult,String>{
     let _guard=lock(root)?;
