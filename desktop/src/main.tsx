@@ -101,7 +101,7 @@ function App(){
  dirtyRef.current=dirty;busyRef.current=busy;
  const native=isTauri();
  const dates=useMemo(()=>portfolioSchedule(data),[data]);
- const resources=useMemo(()=>portfolioResources(data,{schedule:dates}),[data,dates]);
+ const resources=useMemo(()=>portfolioResources(data,{schedule:dates} as any),[data,dates]);
  const reviews=useMemo(()=>planReviewQueue(data),[data]);
  const sourceQueue=useMemo(()=>publicSourceQueue(data),[data]);
  const rechecks=useMemo(()=>revisionReview(data),[data]);
@@ -221,7 +221,7 @@ function App(){
   if(!confirmAction("Запросить публичные сведения GitHub? Наблюдение не подтверждает готовность проекта."))return;
   setBusy(true);
   try{
-   const plan=planPublicRefresh(data,{maxAgeMs:0,only:source?[source]:null});
+   const plan=planPublicRefresh(data,{maxAgeMs:0,only:source?[source]:null} as any);
    if(!plan.selected){setMessage("Нет источников для наблюдения.");return}
    const result=await reconcilePublicSources(data,{plan});
    if(result.state!==data)mutate(result.state,"Публичные наблюдения обновлены в черновике. Сохраните результат на диск.");
