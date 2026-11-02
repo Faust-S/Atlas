@@ -32,7 +32,8 @@ test("same branch SHA does not create a revision review; changed SHA exposes imp
  assert.equal(model.rows[0].claimedSha,"a".repeat(40));
  assert.equal(model.rows[0].observedSha,"b".repeat(40));
  assert.deepEqual(model.rows[0].downstream,[f.consumerId]);
- assert.match(renderRevisionReview(updated,{now:at}),/Пересмотреть факт/);
+ assert.match(renderRevisionReview(updated,{now:at}),/Повторно проверить/);
+ assert.match(renderRevisionReview(updated,{now:at}),/История факта/);
  assert.deepEqual(deserialize(serialize(updated)),updated);
 });
 test("incomplete, unavailable and outdated source are uncertainty, not asserted SHA conflict",()=>{
