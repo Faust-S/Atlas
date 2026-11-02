@@ -36,7 +36,12 @@ function Get-AtlasSnapshot {
         if (!(Test-Path -LiteralPath $blockPath)) { throw 'Missing native project block' }
         $project = Get-Content -LiteralPath $blockPath -Raw | ConvertFrom-Json -Depth 100
         if ($project.id -ne $entry.id) { throw 'Native block ID and manifest reference disagree' }
-        $result += [pscustomobject]@{ id = [string]$project.id; name = [string]$project.name }
+        $result += [pscustomobject]@{
+            id = [string]$project.id
+            name = [string]$project.name
+            workTitles = @($project.items | ForEach-Object { [string]$_.title })
+            dependencyCount = @($project.dependencies).Count
+        }
     }
     return [pscustomobject]@{
         generation = [string]$head.generation
@@ -89,6 +94,59 @@ function Activate-Atlas([System.Diagnostics.Process]$process) {
         throw 'Hosted Windows session does not allow foreground keyboard input; GUI acceptance remains HOLD'
     }
 }
+function Wait-AtlasTitle([System.Diagnostics.Process]$process,[string]$marker) {
+    for ($i=0; $i -lt 36; $i++) {
+        $process.Refresh()
+        if ($process.HasExited) { throw 'Native window closed before visual tab qualified' }
+        if ($process.MainWindowTitle.Contains($marker)) {
+            Write-Output "ATLAS_INSTALLED_NATIVE_VIEW_TITLE_PASS marker=$marker"
+            return
+        }
+        Start-Sleep -Milliseconds 250
+    }
+    throw "Active installed view was not shown: $marker (window title=$($process.MainWindowTitle))"
+}
+function Send-AtlasWork([string]$name) {
+    [System.Windows.Forms.SendKeys]::SendWait('^+n')
+    Start-Sleep -Milliseconds 750
+    [System.Windows.Forms.SendKeys]::SendWait($name)
+    Start-Sleep -Milliseconds 250
+    [System.Windows.Forms.SendKeys]::SendWait('^{ENTER}')
+    Start-Sleep -Milliseconds 800
+}
+function Wait-AtlasDAG([string]$projectName,[string]$beforeGeneration) {
+    for ($i=0; $i -lt 90; $i++) {
+        Start-Sleep -Milliseconds 350
+        $state=Get-AtlasSnapshot
+        if ($null -eq $state -or $state.generation -eq $beforeGeneration) { continue }
+        $project=@($state.projects | Where-Object { $_.name -eq $projectName })
+        if ($project.Count -eq 1 -and $project[0].workTitles.Count -eq 2 -and
+            $project[0].workTitles -contains 'AtlasWorkAlpha' -and
+            $project[0].workTitles -contains 'AtlasWorkBeta' -and
+            $project[0].dependencyCount -eq 1) {
+            Write-Output 'ATLAS_INSTALLED_GUI_WORK_DEPENDENCY_READBACK_PASS'
+            return $state
+        }
+    }
+    throw 'Installed GUI did not save both works and a dependency'
+}
+function Capture-AtlasView([string]$name) {
+    try {
+        Add-Type -AssemblyName System.Drawing
+        $bounds=[System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+        $bitmap=[System.Drawing.Bitmap]::new($bounds.Width,$bounds.Height)
+        $graphics=[System.Drawing.Graphics]::FromImage($bitmap)
+        try {
+            $graphics.CopyFromScreen($bounds.Location,[System.Drawing.Point]::Empty,$bounds.Size)
+            $dir=Join-Path $env:GITHUB_WORKSPACE 'desktop/tests/visual-evidence'
+            [void][System.IO.Directory]::CreateDirectory($dir)
+            $bitmap.Save((Join-Path $dir ($name+'.png')),[System.Drawing.Imaging.ImageFormat]::Png)
+            Write-Output "ATLAS_INSTALLED_GUI_SCREENSHOT_CAPTURED view=$name"
+        } finally { $graphics.Dispose();$bitmap.Dispose() }
+    } catch {
+        Write-Warning "Installed screenshot unavailable: $($_.Exception.Message)"
+    }
+}
 function Send-AtlasProject([string]$name) {
     # Ctrl+N opens the actual React project form. The name input is autofocus.
     [System.Windows.Forms.SendKeys]::SendWait('^n')
@@ -120,9 +178,40 @@ try {
             }
             Send-AtlasProject $names[$attempt-1]
             $saved = Wait-AtlasState $attempt $names[0..($attempt-1)]
-            if ($attempt -eq 1) { $original = $saved }
+            if ($attempt -eq 1) {
+                Start-Sleep -Milliseconds 1400
+                Activate-Atlas $process
+                [System.Windows.Forms.SendKeys]::SendWait('^1')
+                Wait-AtlasTitle $process 'Таблица'
+                Send-AtlasWork 'AtlasWorkAlpha'
+                Send-AtlasWork 'AtlasWorkBeta'
+                # Two select controls: first predecessor remains Alpha,
+                # move the destination select to Beta.
+                [System.Windows.Forms.SendKeys]::SendWait('^+l')
+                Start-Sleep -Milliseconds 700
+                [System.Windows.Forms.SendKeys]::SendWait('{TAB}{DOWN}')
+                Start-Sleep -Milliseconds 250
+                [System.Windows.Forms.SendKeys]::SendWait('^{ENTER}')
+                Start-Sleep -Milliseconds 750
+                [System.Windows.Forms.SendKeys]::SendWait('^s')
+                $saved=Wait-AtlasDAG $names[0] $saved.generation
+                Start-Sleep -Milliseconds 1350
+                Activate-Atlas $process
+                [System.Windows.Forms.SendKeys]::SendWait('^2')
+                Wait-AtlasTitle $process 'График'
+                Capture-AtlasView 'installed-gantt'
+                [System.Windows.Forms.SendKeys]::SendWait('^3')
+                Wait-AtlasTitle $process 'Зависимости'
+                Capture-AtlasView 'installed-dag'
+                $original = $saved
+            }
             else {
                 if ($saved.generation -eq $original.generation) { throw 'Second GUI commit did not advance generation' }
+                $prior=@($saved.projects | Where-Object { $_.name -eq $names[0] })
+                if ($prior.Count -ne 1 -or $prior[0].workTitles.Count -ne 2 -or
+                    $prior[0].dependencyCount -ne 1) {
+                    throw 'Saved work dependency graph was not retained across Windows GUI restart'
+                }
                 if (@($saved.projects | ForEach-Object { $_.id }) -notcontains $original.projects[0].id) {
                     throw 'Existing project ID was not preserved through the GUI relaunch'
                 }

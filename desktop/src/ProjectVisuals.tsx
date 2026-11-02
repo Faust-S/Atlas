@@ -16,13 +16,15 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
  const [offset,setOffset]=useState(0);
  const [query,setQuery]=useState('');
  const [criticalOnly,setCriticalOnly]=useState(false);
+ const [visibleLimit,setVisibleLimit]=useState(160);
  const view=useMemo(()=>ganttViewport(schedule,{scale,offset,startDate:projectStart,dueDate:projectDue} as any),
   [schedule,scale,offset,projectStart,projectDue]);
  const matching=view.rows.filter((r:any)=>(!criticalOnly||r.critical)&&r.title.toLocaleLowerCase('ru-RU').includes(query.trim().toLocaleLowerCase('ru-RU')));
  const inWindow=matching.filter((r:any)=>r.visible);
  // In zoomed mode list work intersecting the calendar viewport, not the
  // first 160 items (which may all be off screen in a large project).
- const displayed=(scale==='fit'?matching:inWindow).slice(0,160);
+ const candidates=scale==='fit'?matching:inWindow;
+ const displayed=candidates.slice(0,visibleLimit);
  const nearest=matching.reduce((best:any,row:any)=>
   !best||Math.abs(row.earlyStart-view.from)<Math.abs(best.earlyStart-view.from)?row:best,null);
  const guide=(key:string)=><>
@@ -35,7 +37,7 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
    <div className="button-row"><span className="status-chip">{schedule.rows.length} работ · {schedule.durationDays} дн.</span>
     <button type="button" className="action-button" onClick={onEditDates}>Плановые даты</button></div></div>
   <div className="atlas-gantt-tools">
-   <label>Масштаб <select value={scale} onChange={e=>{setScale(e.target.value as Mode);setOffset(0)}}>
+   <label>Масштаб <select value={scale} onChange={e=>{setScale(e.target.value as Mode);setOffset(0);setVisibleLimit(160)}}>
     <option value="fit">Весь проект</option><option value="30">30 дней</option><option value="90">90 дней</option>
    </select></label>
    <button type="button" className="action-button" disabled={scale==='fit'||view.from===0}
@@ -43,8 +45,8 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
    <button type="button" className="action-button" disabled={scale==='fit'||view.from>=view.maxOffset}
     onClick={()=>setOffset(Math.min(view.maxOffset,view.from+view.days))}>Позднее →</button>
    <span className="atlas-range">{view.windowLabel}</span>
-   <label className="atlas-gantt-query">Поиск <input type="search" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Название работы"/></label>
-   <label className="atlas-check"><input type="checkbox" checked={criticalOnly} onChange={e=>setCriticalOnly(e.target.checked)}/> Критический путь</label>
+   <label className="atlas-gantt-query">Поиск <input type="search" value={query} onChange={e=>{setQuery(e.target.value);setVisibleLimit(160)}} placeholder="Название работы"/></label>
+   <label className="atlas-check"><input type="checkbox" checked={criticalOnly} onChange={e=>{setCriticalOnly(e.target.checked);setVisibleLimit(160)}}/> Критический путь</label>
   </div>
   {(projectStatus==='paused'||projectStatus==='cancelled')&&<p className="atlas-schedule-warning" role="status">
    {projectStatus==='cancelled'?'Проект отменён':'Проект приостановлен'}.
@@ -96,8 +98,11 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
      onClick={()=>setOffset(Math.min(view.maxOffset,Math.max(0,nearest.earlyStart)))}>
      Перейти к ближайшей работе
     </button></p>}
-  {(scale==='fit'?matching.length:inWindow.length)>displayed.length&&
-   <p className="minor">Показаны первые {displayed.length} из {scale==='fit'?matching.length:inWindow.length} работ {scale==='fit'?'проекта':'в текущем периоде'}. Уточните поиск или откройте таблицу.</p>}
+  {candidates.length>0&&<p className="minor">Показано {displayed.length} из {candidates.length} работ на графике. Остальные доступны через раскрытие или поиск.</p>}
+  {candidates.length>displayed.length&&<button type="button" className="action-button"
+   onClick={()=>setVisibleLimit(limit=>Math.min(candidates.length,limit+160))}>
+   Показать ещё 160 работ
+  </button>}
   <p className="minor">Расчёт не распределяет загрузку сотрудников, не подтверждает фактическое исполнение и не переносит автоматически сроки. Изменение плана оформляется отдельно через вкладку «Изменения».</p>
  </section>;
 }

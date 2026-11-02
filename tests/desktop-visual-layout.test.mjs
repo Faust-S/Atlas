@@ -96,6 +96,9 @@ test('desktop workbench actually mounts existing Gantt/DAG and preserves real ed
  assert.match(entry,/code==="KeyL"&&project\.items\.length<2/);
  assert.match(entry,/title="Ctrl\+Shift\+N"/);
  assert.match(entry,/title="Ctrl\+Shift\+L"/);
+ assert.match(component,/setVisibleLimit\(limit=>Math\.min\(candidates\.length,limit\+160\)\)/);
+ assert.match(component,/Показать ещё 160 работ/);
+ assert.match(component,/const displayed=candidates\.slice\(0,visibleLimit\)/);
  assert.doesNotMatch(entry,/className="graph-list"/);
  assert.doesNotMatch(entry,/className="timeline-line"/);
 });

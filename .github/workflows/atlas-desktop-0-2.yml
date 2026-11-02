@@ -117,6 +117,14 @@ jobs:
         shell: pwsh
         timeout-minutes: 4
         run: ./desktop/tests/installed-windows-keyboard.ps1
+      - name: Retain installed Gantt and DAG visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: iwxa-atlas-installed-gantt-dag
+          path: desktop/tests/visual-evidence/*.png
+          if-no-files-found: ignore
+          retention-days: 3
       # Native keyboard interaction is a different hypothesis from UIA/CDP.
       # This is a GUI acceptance attempt, not a release PASS until the logs
       # prove both installed processes committed and reread the same project.
