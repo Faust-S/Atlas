@@ -2,6 +2,8 @@
 
 **Статус:** Windows EXE/NSIS сборка PASS, 5/5 тестов Rust-хранилища PASS, самостоятельное окно Windows PASS ([Actions #41446391609](https://github.com/Faust-S/Atlas/actions/runs/41446391609)). Полная работа через WebView2 и установленный пакет ещё проходят отдельную приёмку.
 
+**Передача в новый чат:** [IWXA Atlas Desktop 0.2 — инженерный handoff](../docs/HANDOFF_ATLAS_0_2_DESKTOP_2026-11-02_RU.md). Последний квалифицированный frontend-коммит: `5ec595d4d634f1e3cd76783b6188d33233cef13a` (133/133 Node PASS; Windows GUI readback HOLD).
+
 ## Назначение
 
 Atlas — самостоятельное локальное приложение для управления проектами. Не требует Personal Agent, Task Engine, Python, локального HTTP-сервера или Интернета для просмотра и редактирования сохранённых проектов.
