@@ -96,3 +96,24 @@ Windows gate теперь сохраняет возможность отдель
 - Windows release gate **FAIL before GUI save/close**: first redundant `atlas_open`-only launch did not emit a probe receipt during the 30-second wait; installed process did not exit unexpectedly. Therefore the new `core:window:allow-destroy` had **not** yet been exercised and should not be reported as accepted.
 - Since `desktop/tests/installed-windows-keyboard.ps1` independently verifies `atlas_open` at each real GUI launch, the extra two-launch probe workflow step was removed. The unified GUI acceptance now includes precise PID/window diagnostics and gives the first real WebView2 launch up to 60 seconds. This is a reduction in duplicated work, not a second workflow or a claim of release readiness.
 - **HOLD** until both real GUI attempts save, close without forced termination and preserve the previous project across restart.
+
+## Windows GUI lifecycle — CLOSED, 2026-11-02
+
+**Квалифицированный HEAD:** `557038f53dea4d13a25306a8da521525b3824882`; TREE `02b2b38fcaaf80886916cbef3656447e6b5fb748`.
+
+**[GitHub Actions #41510178723](https://github.com/Faust-S/Atlas/actions/runs/41510178723): success.**
+
+- **156/156 Node PASS; TypeScript/Vite/production DOM PASS.**
+- **Windows Rust 8/8 PASS; Tauri/NSIS build/install PASS.**
+- Установленный EXE: React → Rust `atlas_open` PASS в обеих независимых сессиях.
+- Создать проект через Ctrl+N → заполнить форму → Ctrl+Enter → Ctrl+S → native readback: `ATLAS_INSTALLED_GUI_COMMIT_READBACK_PASS attempt=1 projects=1`.
+- **Штатный выход**: `ATLAS_INSTALLED_GUI_GRACEFUL_CLOSE_PASS attempt=1 mode=Alt+F4`.
+- Повторный запуск и наличие первого проекта с прежним ID: `ATLAS_INSTALLED_GUI_REOPEN_PRIOR_PROJECT_PASS`.
+- Создание и сохранение второго проекта через GUI, старый ID сохранён: `ATLAS_INSTALLED_GUI_COMMIT_READBACK_PASS attempt=2 projects=2`.
+- **Штатный выход второй раз**: `ATLAS_INSTALLED_GUI_GRACEFUL_CLOSE_PASS attempt=2 mode=Alt+F4`.
+- Итоговые квитанции: `ATLAS_INSTALLED_GUI_FULL_PERSISTENCE_RELAUNCH_PASS`, `ATLAS_INSTALLED_GUI_GRACEFUL_LIFECYCLE_PASS`.
+
+**Реальная причина предыдущего отказа:** отсутствовало `core:window:allow-destroy` для окна `main`. После добавления разрешения в `desktop/src-tauri/capabilities/main.json` обе попытки штатного выхода проходят. В этом квалифицированном прогоне `Stop-Process -Force` для завершения принятых пользовательских сессий не потребовался.
+
+**Что остаётся HOLD для продукта 0.2:** проверка Gantt и DAG непосредственно в установленном GUI; полный реальный маршрут источник/SHA → пересмотр факта → последствия → человеческое решение → предложение → утверждение → применение изменений плана → сохранённый портфель; импорт реального JSON 0.1 и история/backup/restore в установленном интерфейсе; большие портфели при длительной работе. Эти задачи не заменяются успехом базового GUI lifecycle.
+
