@@ -110,9 +110,9 @@ function renderImpact(p){
 }
 function render(){if(storageMount)storageMount.innerHTML=storageBanner();if(!ready){root.innerHTML='<section class="card"><h2>Проекты не загружены</h2><p>Atlas не создаёт пустой портфель вместо повреждённых или недоступных данных. Восстановите доступ к IndexedDB либо импортируйте корректную резервную копию.</p></section>';return;}const p=data.projects.find(x=>x.id===active),stateCounts={active:data.projects.filter(x=>x.status==="active").length,blocked:data.projects.reduce((n,p)=>n+summary(p).blocked,0)};
 root.innerHTML='<div id="atlas-editor-slot"></div>'+(p?projectView(p):'<h2>Портфель проектов</h2><p class="muted">Проекты человека и организации. Связи с внешними системами не дублируют их данные.</p><div class="grid"><div class="card"><small>Всего проектов</small><div class="metric">'+data.projects.length+'</div></div><div class="card"><small>Активные</small><div class="metric">'+stateCounts.active+'</div></div><div class="card"><small>Заблокированные работы</small><div class="metric">'+stateCounts.blocked+'</div></div></div><div class="row">'+button("＋ Создать проект","new","primary")+button("Сверить публичные источники","refresh-portfolio")+'</div>'+
-renderPublicSourceQueue(data,{lastReport:lastRefresh,escape:esc})+renderRevisionReview(data,{escape:esc})+renderPortfolioPlanReviews(data,{escape:esc})+renderPortfolioCommand(buildPortfolioCommand(data),{filter:commandFilter,search:commandSearch,escape:esc})+
+renderPortfolioResources(data,esc)+renderPublicSourceQueue(data,{lastReport:lastRefresh,escape:esc})+renderRevisionReview(data,{escape:esc})+renderPortfolioPlanReviews(data,{escape:esc})+renderPortfolioCommand(buildPortfolioCommand(data),{filter:commandFilter,search:commandSearch,escape:esc})+
 '<div class="row atlas-portfolio-switch">'+button(portfolioView==="focus"?"Показать подробные графы и отчёты":"Скрыть подробные отчёты","portfolio-view:"+(portfolioView==="focus"?"details":"focus"))+'</div>'+
-(portfolioView==="details"?renderPortfolioInsight(data.projects,esc)+renderPortfolioImpact()+renderPortfolioResponses(data,projectImpact,esc)+renderPortfolioSchedule(data,esc)+renderPortfolioResources(data,esc)+renderPortfolioCascade(data,projectImpact,{mode:cascadeMode,escape:esc})+renderPortfolioNetwork(data,esc):"")+'<div class="grid">'+data.projects.map(p=>'<article class="card"><span class="tag">'+esc(p.type)+'</span><h2>'+esc(p.name)+'</h2><p>'+esc(p.goal||"Без описания цели")+'</p><p class="muted">'+summary(p).total+' работ · '+p.sources.length+' источников</p><p class="muted">Требований: '+compareProject(p).committed+' · Без подтверждений: '+compareProject(p).counts.unknown+' · Несоответствия: '+(compareProject(p).counts.gap_reported+compareProject(p).counts.partial_reported)+' · Устарело / конфликтует: '+(compareProject(p).counts.stale+compareProject(p).counts.conflict)+'</p>'+button("Открыть","open:"+esc(p.id))+'</article>').join("")+'</div>');if(p){renderSchedule(p);renderTrace(p);renderGraph(p);renderImpact(p);}renderActiveEditor(p);}
+(portfolioView==="details"?renderPortfolioInsight(data.projects,esc)+renderPortfolioImpact()+renderPortfolioResponses(data,projectImpact,esc)+renderPortfolioSchedule(data,esc)+renderPortfolioCascade(data,projectImpact,{mode:cascadeMode,escape:esc})+renderPortfolioNetwork(data,esc):"")+'<div class="grid">'+data.projects.map(p=>'<article class="card"><span class="tag">'+esc(p.type)+'</span><h2>'+esc(p.name)+'</h2><p>'+esc(p.goal||"Без описания цели")+'</p><p class="muted">'+summary(p).total+' работ · '+p.sources.length+' источников</p><p class="muted">Требований: '+compareProject(p).committed+' · Без подтверждений: '+compareProject(p).counts.unknown+' · Несоответствия: '+(compareProject(p).counts.gap_reported+compareProject(p).counts.partial_reported)+' · Устарело / конфликтует: '+(compareProject(p).counts.stale+compareProject(p).counts.conflict)+'</p>'+button("Открыть","open:"+esc(p.id))+'</article>').join("")+'</div>');if(p){renderSchedule(p);renderTrace(p);renderGraph(p);renderImpact(p);}renderActiveEditor(p);}
 function renderPortfolioImpact(){
  const impact=portfolioImpact(data.projects);
  if(!impact.rows.length)return "";
@@ -156,6 +156,12 @@ root.addEventListener("click",event=>{
    data=await store.restorePrevious();storageStatus="ready";storageWarning="";editorAction=null;render();return;
   }
   if(action==="back"){active=null;editorAction=null;previewAmendment=null;render();return}
+  if(action==="resource-new"||action.startsWith("resource-edit:")){
+   editorSpec(null,action,data);
+   active=null;editorAction=action;render();
+   document.querySelector("#atlas-editor-slot")?.scrollIntoView?.({block:"start",behavior:"auto"});
+   return;
+  }
   if(action==="refresh-portfolio"){
    if(!ready||storageStatus==="recovery")throw Error("Хранилище не готово");
    await runRefresh({manual:true});return;
@@ -282,6 +288,8 @@ root.addEventListener("change",e=>{
    form.elements.namedItem("estimateDays").value=String(updated.estimateDays??1);
    form.elements.namedItem("assignee").value=updated.assignee||"";
    form.elements.namedItem("dueDate").value=updated.dueDate||"";
+   const resource=form.elements.namedItem("resourceId");if(resource)resource.value=updated.resourceId||"";
+   const allocation=form.elements.namedItem("allocationPct");if(allocation)allocation.value=String(updated.allocationPct??100);
   }
   return;
  }

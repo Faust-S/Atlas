@@ -2,6 +2,7 @@
 // Preview reuses the single CPM / portfolio dependency projection; no task execution.
 import {validate} from "./core.mjs";
 import {portfolioSchedule} from "./portfolio-schedule.mjs";
+import {portfolioResources} from "./portfolio-resources.mjs";
 import {planReviewQueue} from "./plan-review.mjs";
 
 const esc = x => String(x ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -10,7 +11,7 @@ const text = (x,name,max=500) => {
  if(typeof x!=="string"||!x.trim()||x.length>max)throw Error("Invalid "+name);
  return x.trim();
 };
-const workFields = item => ({estimateDays:item.estimateDays??1,assignee:item.assignee||"",dueDate:item.dueDate||null});
+const workFields = item => ({estimateDays:item.estimateDays??1,assignee:item.assignee||"",dueDate:item.dueDate||null,resourceId:item.resourceId||null,allocationPct:item.allocationPct??100});
 const dateFields = project => ({startDate:project.startDate||null,dueDate:project.dueDate||null});
 const key = action => action.kind==="dates"?"dates":action.kind==="work"?"work:"+action.itemId:"new_work:"+action.id;
 const eligible = c => c && ["proposed","deferred"].includes(c.status) && !c.planAppliedAt;
@@ -50,12 +51,12 @@ function upsert(change,action) {
 }
 export function setPlanDates(snapshot,projectId,changeId,{startDate,dueDate}) {
  return mutableDraft(snapshot,projectId,changeId,(project,change)=>{
-  const before=dateFields(project),after={startDate:startDate||null,dueDate:dueDate||null};
+  const before=dateFields(project),after={startDate:startDate||null,dueDate:dueDate||null,resourceId:resourceId===""?null:resourceId??item.resourceId??null,allocationPct:allocationPct??item.allocationPct??100};
   if(same(before,after))throw Error("Укажите даты, которые действительно изменятся");
   upsert(change,{kind:"dates",before,after});
  });
 }
-export function setPlanWork(snapshot,projectId,changeId,{itemId,estimateDays,assignee,dueDate}) {
+export function setPlanWork(snapshot,projectId,changeId,{itemId,estimateDays,assignee,dueDate,resourceId,allocationPct}) {
  return mutableDraft(snapshot,projectId,changeId,(project,change)=>{
   const item=project.items.find(x=>x.id===itemId);
   if(!item)throw Error("Работа для изменения не найдена");
@@ -65,7 +66,7 @@ export function setPlanWork(snapshot,projectId,changeId,{itemId,estimateDays,ass
   change.targetIds=[...new Set([...(change.targetIds||[]),...(item.targetIds||[])])];
  });
 }
-export function addPlanWork(snapshot,projectId,changeId,{title,estimateDays,assignee="",dueDate=null,stageId=null,targetId=null}) {
+export function addPlanWork(snapshot,projectId,changeId,{title,estimateDays,assignee="",dueDate=null,stageId=null,targetId=null,resourceId=null,allocationPct=100}) {
  const id=crypto.randomUUID();
  return mutableDraft(snapshot,projectId,changeId,(project,change)=>{
   const stage=stageId||null,target=targetId||null;
@@ -73,7 +74,7 @@ export function addPlanWork(snapshot,projectId,changeId,{title,estimateDays,assi
   if(target&&!(project.targets||[]).some(x=>x.id===target))throw Error("Требование не найдено");
   change.planAmendments.push({kind:"new_work",id,title:text(title,"new work title"),
    estimateDays,assignee:String(assignee??"").trim(),dueDate:dueDate||null,
-   stageId:stage,targetIds:target?[target]:[]});
+   stageId:stage,targetIds:target?[target]:[],resourceId:resourceId||null,allocationPct});
   if(target)change.targetIds=[...new Set([...(change.targetIds||[]),target])];
   if(change.planAmendments.length>60)throw Error("Не более 60 корректировок в одной заявке");
  });
@@ -97,7 +98,7 @@ export function checkPlanAmendment(snapshot,projectId,changeId) {
    throw Error("Даты проекта изменились после подготовки заявки: требуется пересмотр");
   if(action.kind==="work"){
    const item=project.items.find(w=>w.id===action.itemId);
-   if(!item||!same(workFields(item),action.before))
+   if(!item||!Object.entries(action.before).every(([k,v])=>same(workFields(item)[k],v)))
     throw Error("Исходная работа изменилась после подготовки заявки: требуется пересмотр");
   }
   if(action.kind==="new_work"&&project.items.some(w=>w.id===action.id))
@@ -112,20 +113,21 @@ function applyToProject(project,change,actions) {
   else if(action.kind==="new_work")project.items.push({
    id:action.id,title:action.title,state:"todo",priority:"normal",stageId:action.stageId,
    assignee:action.assignee,dueDate:action.dueDate,estimateDays:action.estimateDays,
+   resourceId:action.resourceId||null,allocationPct:action.allocationPct??100,
    targetIds:[...action.targetIds],sourceId:null,executor:null,changeId:change.id
   });
  }
 }
 export function previewPlanAmendment(snapshot,projectId,changeId) {
  const {actions}=checkPlanAmendment(snapshot,projectId,changeId);
- const before=portfolioSchedule(snapshot);
+ const before=portfolioSchedule(snapshot),beforeResources=portfolioResources(snapshot);
  const candidate=structuredClone(snapshot);
  const {project,change}=find(candidate,projectId,changeId);
  applyToProject(project,change,actions);
  // Ephemeral what-if: proposed work is intentionally not yet applied in the real snapshot.
  change.planAmendments=[];
  validate(candidate);
- const after=portfolioSchedule(candidate);
+ const after=portfolioSchedule(candidate),afterResources=portfolioResources(candidate);
  const affected=new Set([projectId]),links=snapshot.portfolioLinks||[];
  const queue=[projectId];
  for(let i=0;i<queue.length;i++)for(const edge of links)if(edge.from===queue[i]&&!affected.has(edge.to)){
@@ -142,7 +144,15 @@ export function previewPlanAmendment(snapshot,projectId,changeId) {
    changed:r.projectedStart!==updated.projectedStart||r.projectedFinish!==updated.projectedFinish||
     r.deadline!==updated.deadline||r.durationDays!==updated.durationDays};
  });
- return {rows,changed:rows.filter(r=>r.changed).length,affected:rows.length,actions:actions.length};
+ const resourceRows=[...new Set([...beforeResources.byId.keys(),...afterResources.byId.keys()])].map(id=>{
+  const prior=beforeResources.byId.get(id),next=afterResources.byId.get(id);
+  return {id,label:next?.label||prior?.label||"Плановый ресурс",
+   beforeOverload:prior?.overloadDays??0,afterOverload:next?.overloadDays??0,
+   beforeUnavailable:prior?.unavailableDays??0,afterUnavailable:next?.unavailableDays??0,
+   beforeMaxLoad:prior?.maxLoadPct??0,afterMaxLoad:next?.maxLoadPct??0};
+ }).filter(r=>r.beforeOverload!==r.afterOverload||r.beforeUnavailable!==r.afterUnavailable||
+  r.beforeMaxLoad!==r.afterMaxLoad);
+ return {rows,resourceRows,changed:rows.filter(r=>r.changed).length,affected:rows.length,actions:actions.length};
 }
 export function applyPlanAmendment(snapshot,projectId,changeId) {
  const {change}=checkPlanAmendment(snapshot,projectId,changeId);
@@ -169,10 +179,12 @@ function describe(project,action) {
   const name=project.items.find(x=>x.id===action.itemId)?.title||"Работа";
   return "Работа «"+name+"»: "+action.before.estimateDays+" → "+action.after.estimateDays+" дн.; "+
    (action.before.assignee||"без ответственного")+" → "+(action.after.assignee||"без ответственного")+
-   "; срок "+shownDate(action.before.dueDate)+" → "+shownDate(action.after.dueDate);
+   "; срок "+shownDate(action.before.dueDate)+" → "+shownDate(action.after.dueDate)+
+   "; плановый ресурс "+(action.before.resourceId||"не назначен")+" → "+(action.after.resourceId||"не назначен")+
+   "; загрузка "+(action.before.allocationPct??100)+"% → "+(action.after.allocationPct??100)+"%";
  }
  return "Новая работа «"+action.title+"»: "+action.estimateDays+" дн.; "+
-  (action.assignee||"ответственный не назначен")+"; срок "+shownDate(action.dueDate);
+  (action.assignee||"ответственный не назначен")+"; срок "+shownDate(action.dueDate)+"; плановая загрузка "+(action.allocationPct??100)+"%";
 }
 export function renderProjectPlanAmendments(snapshot,projectId,{previewId=null,escape=esc}={}) {
  const project=snapshot.projects.find(p=>p.id===projectId);
@@ -201,11 +213,21 @@ export function renderProjectPlanAmendments(snapshot,projectId,{previewId=null,e
      '<td>'+escape(shownDate(r.beforeFinish))+' → '+escape(shownDate(r.afterFinish))+'</td>'+
      '<td>'+escape(shownDate(r.beforeDeadline))+' → '+escape(shownDate(r.afterDeadline))+'</td>'+
      '<td>'+(r.beforeSlip==null?"?":r.beforeSlip)+' → '+(r.afterSlip==null?"?":r.afterSlip)+'</td></tr>').join("");
+    const resourceTable=view.resourceRows.slice(0,15).map(r=>'<tr><td>'+escape(r.label)+'</td>'+
+     '<td>'+r.beforeMaxLoad+'% → '+r.afterMaxLoad+'%</td>'+
+     '<td>'+r.beforeOverload+' → '+r.afterOverload+'</td>'+
+     '<td>'+r.beforeUnavailable+' → '+r.afterUnavailable+'</td></tr>').join("");
+    const capacity=resourceTable?
+     '<p><strong>Последствия для плановых ресурсов</strong></p>'+
+     '<div class="atlas-table-scroll"><table class="atlas-table"><thead><tr>'+
+     '<th>Ресурс</th><th>Максимальная загрузка</th><th>Дни выше мощности</th>'+
+     '<th>Дни вне доступности</th></tr></thead><tbody>'+resourceTable+'</tbody></table></div>':
+     '<p class="muted">Изменений расчётной ресурсной нагрузки не обнаружено; доступность не подтверждена.</p>';
     preview='<p class="muted">Расчёт CPM по календарным дням: '+view.affected+
      ' проектов по цепочке, изменены расчётные показатели у '+view.changed+
      '. Назначение ответственных не является проверкой доступности ресурсов.</p>'+
      '<div class="atlas-table-scroll"><table class="atlas-table"><thead><tr><th>Проект</th><th>Расчётное завершение</th><th>Контрольная дата</th><th>Риск срока, дни</th></tr></thead><tbody>'+tr+'</tbody></table></div>'+
-     (view.rows.length>20?'<p class="muted">Показаны первые 20 проектов из '+view.rows.length+'.</p>':"")+
+     (view.rows.length>20?'<p class="muted">Показаны первые 20 проектов из '+view.rows.length+'.</p>':"")+capacity+
      (["approved","in_progress"].includes(change.status)?
        '<button class="primary" data-action="apply-amendment:'+escape(change.id)+'">Применить утверждённую корректировку</button>':"");
    }catch(e){preview='<p class="atlas-source-error">Применение приостановлено: '+escape(e.message||String(e))+'</p>'}

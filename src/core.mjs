@@ -13,6 +13,22 @@ const validDate=value=>{if(value==null||value==="")return true;if(typeof value!=
 export const empty=()=>({schema:SCHEMA,revision:0,projects:[]});
 export function validate(s){
  if(s?.schema!==SCHEMA||!Number.isSafeInteger(s.revision)||s.revision<0||!Array.isArray(s.projects))throw Error("Invalid Atlas snapshot");
+ const resources=s.resources??[];
+ if(!Array.isArray(resources)||resources.length>2000)throw Error("Invalid planning resources");
+ const resourceIds=new Set(),resourceLabels=new Set();
+ for(const resource of resources){
+  if(!resource||typeof resource.id!=="string"||!resource.id||resourceIds.has(resource.id)||
+   typeof resource.label!=="string"||!resource.label.trim()||resource.label.length>160||
+   !Number.isSafeInteger(resource.capacityPct)||resource.capacityPct<1||resource.capacityPct>1000||
+   !validDate(resource.availableFrom)||!validDate(resource.availableUntil)||
+   resource.availableFrom&&resource.availableUntil&&resource.availableFrom>resource.availableUntil)
+   throw Error("Invalid planning resource");
+  const normalized=resource.label.trim().replace(/\s+/g," ").toLocaleLowerCase("ru-RU");
+  if(resourceLabels.has(normalized))throw Error("Duplicate planning resource name");
+  resourceLabels.add(normalized);resourceIds.add(resource.id);
+ }
+ const validAllocation = value=>value===undefined||Number.isSafeInteger(value)&&value>=1&&value<=100;
+ const validResource = value=>value==null||resourceIds.has(value);
  const ids=new Set();
  for(const p of s.projects){
   if(!p.id||ids.has(p.id)||!types.has(p.type)||!statuses.has(p.status))throw Error("Invalid project");
@@ -22,7 +38,7 @@ export function validate(s){
   for(const stage of p.stages)if(!validDate(stage.dueDate))throw Error("Invalid stage date");
   const itemIds=new Set(p.items.map(x=>x.id)),stageIds=new Set(p.stages.map(x=>x.id)),sourceIds=new Set(p.sources.map(x=>x.id)),targetIds=new Set((p.targets||[]).map(x=>x.id)),changeIds=new Set((p.changes||[]).map(x=>x.id));
   if(itemIds.size!==p.items.length||stageIds.size!==p.stages.length||sourceIds.size!==p.sources.length)throw Error("Duplicate ID");
-  for(const x of p.items){if(!workStates.has(x.state)||!priorities.has(x.priority)||x.stageId&&!stageIds.has(x.stageId)||x.sourceId&&!sourceIds.has(x.sourceId))throw Error("Invalid work item");if(x.estimateDays!==undefined&&(!Number.isSafeInteger(x.estimateDays)||x.estimateDays<0||x.estimateDays>36500))throw Error("Invalid work estimateDays");if(!validDate(x.dueDate))throw Error("Invalid work dueDate");if(x.targetIds!==undefined&&(!Array.isArray(x.targetIds)||new Set(x.targetIds).size!==x.targetIds.length||x.targetIds.some(id=>!targetIds.has(id))))throw Error("Invalid work targetIds");if(x.changeId!=null&&!changeIds.has(x.changeId))throw Error("Invalid work changeId");}
+  for(const x of p.items){if(!workStates.has(x.state)||!priorities.has(x.priority)||x.stageId&&!stageIds.has(x.stageId)||x.sourceId&&!sourceIds.has(x.sourceId))throw Error("Invalid work item");if(x.estimateDays!==undefined&&(!Number.isSafeInteger(x.estimateDays)||x.estimateDays<0||x.estimateDays>36500))throw Error("Invalid work estimateDays");if(!validDate(x.dueDate))throw Error("Invalid work dueDate");if(!validResource(x.resourceId)||!validAllocation(x.allocationPct))throw Error("Invalid work resource commitment");if(x.targetIds!==undefined&&(!Array.isArray(x.targetIds)||new Set(x.targetIds).size!==x.targetIds.length||x.targetIds.some(id=>!targetIds.has(id))))throw Error("Invalid work targetIds");if(x.changeId!=null&&!changeIds.has(x.changeId))throw Error("Invalid work changeId");}
   for(const x of p.sources)if(!kinds.has(x.kind)||!x.locator)throw Error("Invalid source");
   for(const k of ["targets","findings","changes"])if(p[k]!==undefined&&!Array.isArray(p[k]))throw Error("Invalid "+k);
   const targets=p.targets||[],findings=p.findings||[],changes=p.changes||[];
@@ -57,11 +73,11 @@ export function validate(s){
     } else if(a.kind==="work"){
      if(!itemIds.has(a.itemId)||!a.before||!a.after)throw Error("Invalid amendment work");
      for(const v of [a.before,a.after])if(!Number.isSafeInteger(v.estimateDays)||v.estimateDays<0||v.estimateDays>36500||
-      typeof v.assignee!=="string"||!validDate(v.dueDate))throw Error("Invalid amendment work fields");
+      typeof v.assignee!=="string"||!validDate(v.dueDate)||!validResource(v.resourceId)||!validAllocation(v.allocationPct))throw Error("Invalid amendment work fields");
     } else {
      if(typeof a.id!=="string"||!a.id||newIds.has(a.id)||typeof a.title!=="string"||!a.title.trim()||
        !Number.isSafeInteger(a.estimateDays)||a.estimateDays<0||a.estimateDays>36500||
-       typeof a.assignee!=="string"||!validDate(a.dueDate)||
+       typeof a.assignee!=="string"||!validDate(a.dueDate)||!validResource(a.resourceId)||!validAllocation(a.allocationPct)||
        a.stageId&&!stageIds.has(a.stageId)||!Array.isArray(a.targetIds)||a.targetIds.some(id=>!targetIds.has(id)))
       throw Error("Invalid new plan work");
      newIds.add(a.id);
@@ -118,12 +134,15 @@ export function editProject(s,id,patch){return change(s,x=>{const p=project(x,id
 export function createStage(s,pid,name){const id=uid();return {id,state:change(s,x=>project(x,pid).stages.push({id,name:nonempty(name,"Stage name"),status:"planned",dueDate:null}))}}
 export function createItem(s,pid,data){const id=uid();return{id,state:change(s,x=>{const p=project(x,pid);
  if(data.stageId&&!p.stages.some(st=>st.id===data.stageId))throw Error("Unknown stage");
- p.items.push({id,title:nonempty(data.title,"Work title"),state:"todo",stageId:data.stageId||null,priority:"normal",assignee:String(data.assignee||""),dueDate:data.dueDate||null,executor:null,sourceId:null,estimateDays:1,targetIds:data.targetIds===undefined?[]:Array.isArray(data.targetIds)?[...data.targetIds]:data.targetIds,...(data.changeId?{changeId:String(data.changeId)}:{})});
+ p.items.push({id,title:nonempty(data.title,"Work title"),state:"todo",stageId:data.stageId||null,priority:"normal",assignee:String(data.assignee||""),dueDate:data.dueDate||null,resourceId:data.resourceId||null,allocationPct:data.allocationPct??100,executor:null,sourceId:null,estimateDays:1,targetIds:data.targetIds===undefined?[]:Array.isArray(data.targetIds)?[...data.targetIds]:data.targetIds,...(data.changeId?{changeId:String(data.changeId)}:{})});
 })}}
 export function editItem(s,pid,id,patch){return change(s,x=>{const item=project(x,pid).items.find(t=>t.id===id);if(!item)throw Error("Unknown item");
  if("state" in patch){if(!workStates.has(patch.state))throw Error("Invalid work state");item.state=patch.state;}
  if("priority" in patch){if(!priorities.has(patch.priority))throw Error("Invalid priority");item.priority=patch.priority;}
  if("assignee" in patch)item.assignee=String(patch.assignee);
+ if("dueDate" in patch)item.dueDate=patch.dueDate||null;
+ if("resourceId" in patch)item.resourceId=patch.resourceId||null;
+ if("allocationPct" in patch)item.allocationPct=patch.allocationPct;
  if("estimateDays" in patch){if(!Number.isSafeInteger(patch.estimateDays)||patch.estimateDays<0||patch.estimateDays>36500)throw Error("Invalid work estimateDays");item.estimateDays=patch.estimateDays;}
  if("targetIds" in patch){if(!Array.isArray(patch.targetIds))throw Error("Invalid work targetIds");item.targetIds=[...patch.targetIds];}
  if("changeId" in patch)item.changeId=patch.changeId||null;

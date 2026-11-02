@@ -269,7 +269,30 @@ async function browserUserJourney(){
   await page.locator('[data-action="open:'+consumer.id+'"]').first().click();
   assert.match(await page.locator("#atlas-plan-amendments").innerText(),/план изменён/);
   assert.match(await page.locator("#atlas-project-resources").innerText(),/Launch reviewer/);
+  mark("explicit planning resource and work capacity survive native readback");
   await page.locator('[data-action="back"]').click();
+  await form(page,"resource-new",{
+   label:"Launch reviewer capacity",capacityPct:"80",
+   availableFrom:"2026-11-01",availableUntil:"2026-12-01"
+  });
+  state=await snapshot(page);
+  const resource=state.resources.at(-1);
+  assert.equal(resource.capacityPct,80);
+  assert.equal(resource.label,"Launch reviewer capacity");
+  assert.match(await page.locator("#atlas-portfolio-resources").innerText(),/Launch reviewer capacity/);
+  await page.locator('[data-action="open:'+consumer.id+'"]').first().click();
+  await form(page,"work:"+committed.items[0].id,{
+   resourceId:{value:resource.id},allocationPct:"60"
+  });
+  state=await snapshot(page);
+  const bound=state.projects.find(p=>p.id===consumer.id).items.find(w=>w.id===committed.items[0].id);
+  assert.equal(bound.resourceId,resource.id);
+  assert.equal(bound.allocationPct,60);
+  await page.reload({waitUntil:"load"});
+  await page.locator("#storage-status").getByText("Локальные данные: IndexedDB").waitFor();
+  state=await snapshot(page);
+  assert.equal(state.resources.find(r=>r.id===resource.id)?.capacityPct,80);
+  assert.equal(state.projects.find(p=>p.id===consumer.id).items.find(w=>w.id===bound.id).resourceId,resource.id);
   await form(page,reviewAction(main.id),{
    outcome:"keep",rationale:"The current upstream plan remains suitable"
   });
@@ -312,6 +335,8 @@ async function browserUserJourney(){
   const restoredConsumer=state.projects.find(p=>p.id===consumer.id);
   assert.ok(restoredConsumer.changes[0].planAppliedAt);
   assert.equal(restoredConsumer.items.find(w=>w.changeId===amendment.id)?.estimateDays,3);
+  assert.equal(restoredConsumer.items.find(w=>w.changeId===amendment.id)?.resourceId,resource.id);
+  assert.equal(state.resources.find(r=>r.id===resource.id)?.capacityPct,80);
   assert.ok(restoredConsumer.decisions.some(d=>d.kind==="plan_application"));
   await page.reload({waitUntil:"load"});
   await page.locator("#storage-status").getByText("Локальные данные: IndexedDB").waitFor();

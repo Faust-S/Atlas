@@ -7,6 +7,7 @@ import {parseRecheckAction,recheckCandidate} from "./revision-review.mjs";
 import {addPortfolioLink} from "./portfolio.mjs";
 import {parsePlanReviewAction,parsePlanProposalAction,planReviewContext,decidePlanReview,planProposalContext} from "./plan-review.mjs";
 import {setPlanDates,setPlanWork,addPlanWork,checkPlanAmendment} from "./plan-amendment.mjs";
+import {addPlanningResource,editPlanningResource,resourceChoiceOptions} from "./resource-planning.mjs";
 
 const option=(value,label)=>({value:String(value),label});
 const choice=(name,label,items,value="",required=true)=>({name,label,type:"select",options:items,value,required});
@@ -28,6 +29,19 @@ const sourceOptions=p=>{
  return all;
 };
 export function editorSpec(project,action,snapshot=null){
+ if(action==="resource-new"||action.startsWith("resource-edit:")){
+  if(!snapshot)throw Error("Для ресурсов требуется портфель");
+  const id=action.startsWith("resource-edit:")?action.slice("resource-edit:".length):null;
+  const r=id?(snapshot.resources||[]).find(x=>x.id===id):null;
+  if(id&&!r)throw Error("Плановый ресурс не найден");
+  return {title:r?"Изменить плановый ресурс: "+r.label:"Новый плановый ресурс",
+   hint:"Название — плановая подпись, не учётная запись сотрудника. Доступность и мощность задаются вручную; автоматического назначения работ нет.",
+   fields:[field("label","Название ресурса или роли","text",r?.label||""),
+    field("capacityPct","Максимальная плановая мощность, %","number",String(r?.capacityPct??100)),
+    field("availableFrom","Доступен с","date",r?.availableFrom||"",false),
+    field("availableUntil","Доступен до (включительно)","date",r?.availableUntil||"",false)]};
+ }
+
  if(action==="portfolio-link"){
   const projects=snapshot?.projects||[];
   if(projects.length<2)throw Error("Для связи нужны минимум два проекта");
@@ -80,6 +94,8 @@ export function editorSpec(project,action,snapshot=null){
     choice("itemId","Работа",workItems(project)),
     field("estimateDays","Новая оценка, календарных дней","number",String(shown.estimateDays??1)),
     field("assignee","Ответственный (имя или роль)","text",shown.assignee||"",false),
+    choice("resourceId","Плановый ресурс",resourceChoiceOptions(snapshot),shown.resourceId||"",false),
+    field("allocationPct","Доля ресурса на этой работе, %","number",String(shown.allocationPct??100)),
     field("dueDate","Срок работы","date",shown.dueDate||"",false)
    ]};
   }
@@ -89,6 +105,8 @@ export function editorSpec(project,action,snapshot=null){
    choice("targetId","Связанное требование",optionalTargets(project),"",false),
    field("estimateDays","Длительность, календарных дней","number","1"),
    field("assignee","Ответственный (имя или роль)","text","",false),
+   choice("resourceId","Плановый ресурс",resourceChoiceOptions(snapshot),"",false),
+   field("allocationPct","Доля ресурса на этой работе, %","number","100"),
    field("dueDate","Срок работы","date","",false)
   ]};
  }
@@ -108,6 +126,8 @@ export function editorSpec(project,action,snapshot=null){
    choice("targetId","Связать с ожидаемым результатом",optionalTargets(project),targetId,false),
    choice("stageId","Этап",stageOptions(project),"",false),
    field("assignee","Ответственный (имя или роль)","text","",false),
+   choice("resourceId","Плановый ресурс",resourceChoiceOptions(snapshot),"",false),
+   field("allocationPct","Доля ресурса на работе, %","number","100"),
    field("estimateDays","Оценка длительности, календарных дней","number","1")
   ]};
  }
@@ -166,7 +186,7 @@ export function editorSpec(project,action,snapshot=null){
  field("dueDate","Контрольный срок","date",project.dueDate||"",false)
  ]};
  if(action.startsWith("duration:")){const item=project.items.find(x=>x.id===action.slice(9));if(!item)throw Error("Работа не найдена");return {title:"Продолжительность: "+item.title,fields:[field("estimateDays","Календарных дней (0–36500)","number",String(item.estimateDays??1))]}};
- if(action.startsWith("work:")){const item=project.items.find(x=>x.id===action.slice(5));if(!item)throw Error("Работа не найдена");return {title:"Работа: "+item.title,fields:[choice("state","Состояние",workOptions,item.state),choice("priority","Приоритет",[option("low","Низкий"),option("normal","Обычный"),option("high","Высокий"),option("critical","Критический")],item.priority),field("assignee","Ответственный","text",item.assignee,false),field("estimateDays","Плановая длительность, дней","number",String(item.estimateDays??1)),choice("targetId","Связать с ожидаемым результатом",optionalTargets(project),item.targetIds?.[0]||"",false)]}};
+ if(action.startsWith("work:")){const item=project.items.find(x=>x.id===action.slice(5));if(!item)throw Error("Работа не найдена");return {title:"Работа: "+item.title,fields:[choice("state","Состояние",workOptions,item.state),choice("priority","Приоритет",[option("low","Низкий"),option("normal","Обычный"),option("high","Высокий"),option("critical","Критический")],item.priority),field("assignee","Ответственный","text",item.assignee,false),field("estimateDays","Плановая длительность, дней","number",String(item.estimateDays??1)),choice("resourceId","Плановый ресурс",resourceChoiceOptions(snapshot),item.resourceId||"",false),field("allocationPct","Доля ресурса, %","number",String(item.allocationPct??100)),choice("targetId","Связать с ожидаемым результатом",optionalTargets(project),item.targetIds?.[0]||"",false)]}};
  if(action==="risk")return {title:"Новый риск",fields:[field("text","Что может помешать?","textarea")]};
  if(action==="decision")return {title:"Зафиксировать решение",fields:[field("text","Решение и основание","textarea")]};
  if(action==="source")return {title:"Подключить ссылку на источник",hint:"github_owner — публичный владелец GitHub (имя пользователя или организации); github — отдельный публичный owner/repository. Остальные источники пока только ссылки. Приватные данные не запрашиваются.",fields:[choice("kind","Тип источника",["github","github_owner","gitlab","forgejo","gitea","obsidian","anytype","jira","file","other"].map(x=>option(x,x)),"github"),field("locator","Ссылка или идентификатор источника")]};
@@ -179,7 +199,7 @@ export function renderEditor(spec,esc){
   let control;
   if(x.type==="select")control='<select'+attrs+'>'+x.options.map(o=>'<option value="'+esc(o.value)+'"'+(o.value===x.value?' selected':'')+'>'+esc(o.label)+'</option>').join("")+'</select>';
   else if(x.type==="textarea")control='<textarea'+attrs+' rows="3">'+esc(x.value)+'</textarea>';
-  else control='<input'+attrs+' type="'+esc(x.type)+'" value="'+esc(x.value)+'"'+(x.type==="number"?' min="0" max="36500" step="1"':'')+'>';
+  else control='<input'+attrs+' type="'+esc(x.type)+'" value="'+esc(x.value)+'"'+(x.type==="number"?' min="'+(x.name==="allocationPct"||x.name==="capacityPct"?"1":"0")+'" max="'+(x.name==="allocationPct"?"100":x.name==="capacityPct"?"1000":"36500")+'" step="1"':'')+'>';
   return '<label class="atlas-field" for="'+id+'"><span>'+esc(x.label)+'</span>'+control+'</label>';
  }).join("");
  return '<section class="card atlas-editor" aria-labelledby="atlas-editor-title"><h2 id="atlas-editor-title">'+esc(spec.title)+'</h2>'+(spec.hint?'<p class="muted">'+esc(spec.hint)+'</p>':"")+'<form id="atlas-editor-form"><div class="atlas-form-grid">'+fields+'</div><div class="row"><button type="submit" class="primary">Сохранить</button><button type="button" data-action="cancel-editor">Отмена</button></div></form></section>';
@@ -187,6 +207,7 @@ export function renderEditor(spec,esc){
 export function applyEditor(snapshot,projectId,action,input){
  const get=k=>String(input.get(k)??"").trim();
  const integer=k=>{const raw=get(k);if(!/^\d+$/.test(raw))throw Error("Введите неотрицательное целое число");return Number(raw)};
+ const percentage=k=>get(k)===""?100:integer(k);
  if(action.startsWith("plan-review:")){
   const request=parsePlanReviewAction(action);
   if(request.projectId!==projectId)throw Error("Неверный проект решения");
@@ -203,19 +224,21 @@ export function applyEditor(snapshot,projectId,action,input){
   validateLinkedPlan(next);
   return {state:next};
  }
+ if(action==="resource-new")return {state:addPlanningResource(snapshot,{label:get("label"),capacityPct:integer("capacityPct"),availableFrom:get("availableFrom"),availableUntil:get("availableUntil")}).state};
+ if(action.startsWith("resource-edit:"))return {state:editPlanningResource(snapshot,action.slice("resource-edit:".length),{label:get("label"),capacityPct:integer("capacityPct"),availableFrom:get("availableFrom"),availableUntil:get("availableUntil")}).state};
  if(action.startsWith("amend-dates:"))return {state:setPlanDates(snapshot,projectId,action.slice(12),{
   startDate:get("startDate"),dueDate:get("dueDate")}).state};
  if(action.startsWith("amend-work:"))return {state:setPlanWork(snapshot,projectId,action.slice(11),{
-  itemId:get("itemId"),estimateDays:integer("estimateDays"),assignee:get("assignee"),dueDate:get("dueDate")}).state};
+  itemId:get("itemId"),estimateDays:integer("estimateDays"),assignee:get("assignee"),dueDate:get("dueDate"),resourceId:get("resourceId"),allocationPct:percentage("allocationPct")}).state};
  if(action.startsWith("amend-new:"))return {state:addPlanWork(snapshot,projectId,action.slice(10),{
   title:get("title"),stageId:get("stageId"),targetId:get("targetId"),estimateDays:integer("estimateDays"),
-  assignee:get("assignee"),dueDate:get("dueDate")}).state};
+  assignee:get("assignee"),dueDate:get("dueDate"),resourceId:get("resourceId"),allocationPct:percentage("allocationPct")}).state};
  if(action==="new"){const r=createProject(snapshot,{name:get("name"),type:get("type"),goal:get("goal")});return {state:r.state,projectId:r.id}}
  if(action==="portfolio-link")return {state:addPortfolioLink(snapshot,{from:get("from"),to:get("to"),note:get("note")})};
  const p=snapshot.projects.find(x=>x.id===projectId);
  if(!p)throw Error("Проект не найден");
  if(action==="stage")return {state:createStage(snapshot,projectId,get("name")).state};
- if(action==="item"||action.startsWith("item-target:")){const r=createItem(snapshot,projectId,{title:get("title"),stageId:get("stageId"),assignee:get("assignee"),targetIds:get("targetId")?[get("targetId")]:[]});return {state:editItem(r.state,projectId,r.id,{estimateDays:integer("estimateDays")})}};
+ if(action==="item"||action.startsWith("item-target:")){const r=createItem(snapshot,projectId,{title:get("title"),stageId:get("stageId"),assignee:get("assignee"),targetIds:get("targetId")?[get("targetId")]:[],resourceId:get("resourceId"),allocationPct:percentage("allocationPct")});return {state:editItem(r.state,projectId,r.id,{estimateDays:integer("estimateDays")})}};
  if(action==="dep")return {state:connect(snapshot,projectId,get("from"),get("to"))};
  if(action==="target")return {state:addTarget(snapshot,projectId,{title:get("title"),desired:get("desired"),intent:get("intent")}).state};
  if(action.startsWith("recheck:")){
@@ -263,7 +286,7 @@ export function applyEditor(snapshot,projectId,action,input){
  if(action==="status")return {state:editProject(snapshot,projectId,{status:get("status")})};
  if(action==="start"||action==="dates")return {state:editProject(snapshot,projectId,{startDate:get("startDate")||null,dueDate:get("dueDate")||null})};
  if(action.startsWith("duration:"))return {state:editItem(snapshot,projectId,action.slice(9),{estimateDays:integer("estimateDays")})};
- if(action.startsWith("work:"))return {state:editItem(snapshot,projectId,action.slice(5),{state:get("state"),priority:get("priority"),assignee:get("assignee"),estimateDays:integer("estimateDays"),targetIds:get("targetId")?[get("targetId")]:[]})};
+ if(action.startsWith("work:"))return {state:editItem(snapshot,projectId,action.slice(5),{state:get("state"),priority:get("priority"),assignee:get("assignee"),estimateDays:integer("estimateDays"),resourceId:get("resourceId"),allocationPct:percentage("allocationPct"),targetIds:get("targetId")?[get("targetId")]:[]})};
  if(action==="risk")return {state:createRisk(snapshot,projectId,get("text"))};
  if(action==="decision")return {state:createDecision(snapshot,projectId,get("text"))};
  if(action==="source")return {state:attach(snapshot,projectId,get("kind"),get("locator")).state};
