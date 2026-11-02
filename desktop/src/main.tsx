@@ -14,6 +14,7 @@ import {revisionReview,recheckAction} from "../../src/revision-review.mjs";
 import {previewPlanAmendment,applyPlanAmendment,removePlanAmendment} from "../../src/plan-amendment.mjs";
 import {planPublicRefresh,reconcilePublicSources,publicSourceQueue} from "../../src/public-refresh.mjs";
 import {ProjectGantt,ProjectDependencyDiagram} from "./ProjectVisuals";
+import {prepareImportedSnapshot} from "./import-snapshot.mjs";
 import "./style.css";
 
 type Atlas = any;
@@ -115,7 +116,10 @@ function App(){
  const latestSnapshot=useRef<Atlas>(data);latestSnapshot.current=data;
  const [refreshReport,setRefreshReport]=useState<any>(null);
  const [forecastId,setForecastId]=useState<string|null>(null);
- const [workFilter,setWorkFilter]=useState("all");
+ const [workFilter,setWorkFilter]=useState("all"),[workQuery,setWorkQuery]=useState("");
+ const [portfolioLimit,setPortfolioLimit]=useState(150);
+ const [sidebarLimit,setSidebarLimit]=useState(120);
+ const [workLimit,setWorkLimit]=useState(200);
  const [showDetails,setShowDetails]=useState(false);
  const project=data.projects.find((p:any)=>p.id===active)||null;
  const dirty=ready&&snapshotText(data)!==saved.current;
@@ -134,6 +138,14 @@ function App(){
  const projected=active?dates.byId.get(active):null;
  const filtered=useMemo(()=>data.projects.filter((p:any)=>p.name.toLowerCase().includes(search.toLowerCase())||
   p.goal?.toLowerCase().includes(search.toLowerCase())),[data,search]);
+ const filteredWork=useMemo(()=>{
+  if(!project)return [];
+  const query=workQuery.trim().toLocaleLowerCase("ru-RU");
+  return project.items.filter((item:any)=>
+   (workFilter==="all"||item.state===workFilter)&&
+   (!query||item.title.toLocaleLowerCase("ru-RU").includes(query)||
+    String(item.assignee||"").toLocaleLowerCase("ru-RU").includes(query)));
+ },[project,workFilter,workQuery]);
  const mutate=(next:Atlas,notice:string)=>{latestSnapshot.current=next;setData(next);setMessage(notice);setError("");};
  const issue=(e:unknown)=>{setError(deepFreezeError(e));setMessage("");};
  useEffect(()=>{
@@ -154,6 +166,7 @@ function App(){
  },[native]);
  const selectProject=(id:string|null)=>{
   setActive(id);setTab("overview");setEditor(null);setForecastId(null);setMessage("");
+  setWorkFilter("all");setWorkQuery("");setWorkLimit(200);
  };
  const openEditor=(action:string,projectId?:string)=>{
   try{
@@ -215,17 +228,20 @@ function App(){
   if(dirty){issue(Error("Сначала сохраните изменения или отмените их перед импортом."));return}
   busyRef.current=true;setBusy(true);
   try{
+   const startedWith=latestSnapshot.current;
    const imported=await invoke<Atlas|null>("atlas_select_import");
    if(!imported)return;
-   const checked=deserialize(JSON.stringify(imported));
+   // The file chooser can outlive the local draft from which it was opened.
+   if(latestSnapshot.current!==startedWith||dirtyRef.current)
+    throw Error("Портфель изменился во время выбора файла. Импорт отменён, текущий черновик сохранён.");
+   const head=await invoke<OpenResult>("atlas_open");
+   if(head.needsConfirmation||head.generation!==generation)
+    throw Error("Нативный портфель изменился во время импорта. Сначала откройте актуальную редакцию.");
+   const {snapshot:next,originalRevision}=prepareImportedSnapshot(startedWith,imported);
    if(!confirmAction("Заменить текущий портфель импортированным JSON? Предыдущая сохранённая редакция останется в истории Atlas."))return;
-   const next=structuredClone(checked);
-   const previousRevision=next.revision;
-   next.revision=Math.max(data.revision,previousRevision)+1;
-   next.importProvenance={source:"atlas.project/1 JSON",originalRevision:previousRevision,
-    importedAt:new Date().toISOString()};
-   deserialize(JSON.stringify(next));
-   mutate(next,"Архив загружен в черновик (исходная редакция "+previousRevision+"). Нажмите «Сохранить» для переноса в нативное хранилище.");
+   if(latestSnapshot.current!==startedWith||dirtyRef.current)
+    throw Error("Портфель изменился до подтверждения импорта. Изменения не перезаписаны.");
+   mutate(next,"Архив загружен в черновик (исходная редакция "+originalRevision+"). Нажмите «Сохранить» для переноса в нативное хранилище.");
    selectProject(null);
   }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
  };
@@ -298,9 +314,12 @@ function App(){
    </nav>
    <div className="sidebar-label">Мои проекты</div>
    <div className="project-nav" aria-label="Проекты">
-    {filtered.slice(0,120).map((p:any)=><button key={p.id} className={active===p.id?"nav-current":""}
+    {filtered.slice(0,sidebarLimit).map((p:any)=><button key={p.id} className={active===p.id?"nav-current":""}
       onClick={()=>selectProject(p.id)}><span className="project-indicator"/><span className="project-name">{p.name}</span></button>)}
-    {filtered.length>120&&<small className="nav-hint">Показаны первые 120. Уточните поиск.</small>}
+    {filtered.length>sidebarLimit&&<button type="button"
+     onClick={()=>setSidebarLimit(n=>Math.min(filtered.length,n+120))}>
+     Показать ещё проекты ({filtered.length-sidebarLimit})
+    </button>}
     {!filtered.length&&<small className="nav-hint">Проекты не найдены</small>}
    </div>
    <div className="sidebar-foot"><div className="foot-title">Локальная работа</div><p>Без Agent и сервера. Данные сохраняются по вашей команде.</p><small>Схема: atlas.project/1</small></div>
@@ -308,7 +327,7 @@ function App(){
   <main className="workspace">
    <header className="commandbar">
     <label className="search"><span>⌕</span><input id="atlas-search" placeholder="Найти проект · Ctrl+K"
-      value={search} onChange={e=>setSearch(e.target.value)}/><kbd>Ctrl K</kbd></label>
+      value={search} onChange={e=>{setSearch(e.target.value);setPortfolioLimit(150);setSidebarLimit(120)}}/><kbd>Ctrl K</kbd></label>
     <div className="toolbar-actions">
      <Badge tone={dirty?"warning":persisted?"good":"neutral"}>{dirty?"Не сохранено":persisted?"Сохранено":"Новый портфель"}</Badge>
      <Action onClick={()=>void save()} primary disabled={!dirty||busy}>Сохранить</Action>
@@ -333,12 +352,14 @@ function App(){
      <div className="section-heading"><div><h2>Проекты и последствия</h2><p>Перейдите к проекту, чтобы увидеть точные причины и объекты.</p></div>
       {data.projects.length>1&&<Action onClick={()=>openEditor("portfolio-link")}>Связать проекты</Action>}</div>
      {filtered.length?<div className="table-scroll"><table><thead><tr><th>Проект</th><th>Состояние</th><th>Требует внимания</th><th>Расчётный срок</th><th>Риск срока</th></tr></thead>
-      <tbody>{filtered.slice(0,150).map((p:any)=>{
+      <tbody>{filtered.slice(0,portfolioLimit).map((p:any)=>{
        const imp=projectImpact(p),row=dates.byId.get(p.id);
        return <tr key={p.id}><td><button className="text-link" onClick={()=>selectProject(p.id)}>{p.name}</button><small>{p.goal||"Цель не задана"}</small></td>
         <td><Badge>{statuses[p.status]||p.status}</Badge></td><td>{imp.attention} требований · {imp.sourceIssues.length} источников</td>
         <td>{readable(row?.projectedFinish)}</td><td>{row?.deadlineSlipDays==null?"Неизвестно":row.deadlineSlipDays+" дн."}</td></tr>;
-      })}</tbody></table></div>:<Fallback message="Здесь появятся проекты. Создайте первый проект, определите результат и сохраните его на диск."/>}
+      })}</tbody></table></div>:<Fallback message={data.projects.length?"По запросу проекты не найдены. Измените поиск, чтобы увидеть остальные.":"Здесь появятся проекты. Создайте первый проект, определите результат и сохраните его на диск."}/>}
+     {filtered.length>0&&<p className="minor">Показано {Math.min(filtered.length,portfolioLimit)} из {filtered.length} проектов по текущему поиску.</p>}
+     {filtered.length>portfolioLimit&&<Action onClick={()=>setPortfolioLimit(n=>Math.min(filtered.length,n+150))}>Показать ещё проекты</Action>}
     </section>
     <section className="surface">
      <div className="section-heading"><div><h2>Решения после изменения фактов</h2><p>Новые факты не меняют план автоматически.</p></div></div>
@@ -422,14 +443,18 @@ function App(){
     {tab==="work"&&<section className="surface">
      <div className="section-heading"><div><h2>Работы проекта</h2><p>Изменения отражаются в доске, графике и зависимостях.</p></div>
       <div className="button-row"><Action onClick={()=>openEditor("item")} primary>＋ Работа</Action><Action onClick={()=>openEditor("stage")}>＋ Этап</Action><Action onClick={()=>openEditor("dep")}>Связь работ</Action></div></div>
-     <div className="filter-row"><label>Состояние <select value={workFilter} onChange={e=>setWorkFilter(e.target.value)}>
-      <option value="all">Все</option>{Object.entries(workStatuses).map(([v,k])=><option value={v} key={v}>{String(k)}</option>)}</select></label></div>
+     <div className="filter-row"><label>Состояние <select value={workFilter} onChange={e=>{setWorkFilter(e.target.value);setWorkLimit(200)}}>
+      <option value="all">Все</option>{Object.entries(workStatuses).map(([v,k])=><option value={v} key={v}>{String(k)}</option>)}</select></label>
+      <label>Найти работу <input type="search" value={workQuery} aria-label="Найти работу"
+       placeholder="Название или ответственный" onChange={e=>{setWorkQuery(e.target.value);setWorkLimit(200)}}/></label></div>
      <div className="table-scroll"><table><thead><tr><th>Работа</th><th>Состояние</th><th>Длительность</th><th>Ответственный</th><th>Срок</th><th>Изменить</th></tr></thead>
-      <tbody>{project.items.filter((w:any)=>workFilter==="all"||w.state===workFilter).slice(0,200).map((w:any)=><tr key={w.id}>
+      <tbody>{filteredWork.slice(0,workLimit).map((w:any)=><tr key={w.id}>
        <td><strong>{w.title}</strong><small>{project.stages.find((s:any)=>s.id===w.stageId)?.name||"Без этапа"}</small></td>
        <td><Badge>{workStatuses[w.state]}</Badge></td><td>{w.estimateDays??1} дн.</td><td>{w.assignee||"Не назначен"}</td><td>{readable(w.dueDate)}</td>
        <td><Action onClick={()=>openEditor("work:"+w.id)}>Открыть</Action></td></tr>)}</tbody></table></div>
-     {project.items.length>200&&<p className="minor">Первые 200 работ. Уточните состояние или используйте график.</p>}
+     {project.items.length>0&&<p className="minor">Показано {Math.min(filteredWork.length,workLimit)} из {filteredWork.length} работ по фильтру; всего в проекте: {project.items.length}.</p>}
+     {filteredWork.length>workLimit&&<Action onClick={()=>setWorkLimit(n=>Math.min(filteredWork.length,n+200))}>Показать ещё работы</Action>}
+     {project.items.length>0&&!filteredWork.length&&<Fallback message="По фильтру работ нет. Очистите поиск или измените состояние."/>}
      {!project.items.length&&<Fallback message="Пока нет работ. Добавьте первую работу и сохраните проект."/>}
     </section>}
     {tab==="board"&&<div className="board">
