@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   frontend:
-    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[desktop-accept]')
+    if: github.event_name == 'workflow_dispatch' || (contains(github.event.head_commit.message, '[desktop-accept]') || contains(github.event.head_commit.message, '[windows-accept]'))
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
@@ -37,3 +37,32 @@ jobs:
       - name: Compile React TypeScript and Vite
         working-directory: desktop
         run: npm run build
+
+  native-windows:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[windows-accept]')
+    needs: frontend
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v4
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Compile desktop and create native Windows installer
+        shell: pwsh
+        working-directory: desktop
+        run: |
+          npm install --no-audit --no-fund
+          npm run desktop:build
+      - name: Retain installer only when build succeeds
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: iwxa-atlas-0-2-windows-nsis-candidate
+          path: desktop/src-tauri/target/release/bundle/nsis/*
+          if-no-files-found: error
+          retention-days: 3
