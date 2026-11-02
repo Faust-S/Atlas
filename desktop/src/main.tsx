@@ -425,7 +425,7 @@ function App(){
        <span>Прогноз финиша: {projectedFinishLabel(projected)}</span><span>Критический путь: {plan?.durationDays??0} дн.</span></div>
        {!!projected?.unavailableOrigins?.length&&<p className="atlas-schedule-warning">
         Поставка заблокирована: {projected.unavailableOrigins.map((o:any)=>o.name+" ("+(o.status==="cancelled"?"отменён":"приостановлен")+")").join(", ")}. Корректировка зависимостей требует решения человека.
-       </p>
+       </p>}
      </section>
      <section className="surface"><div className="section-heading"><div><h2>Этапы проекта</h2>
       <p>Этапы связывают работы с принятым планом; завершение этапа не означает приёмку результата.</p></div>
