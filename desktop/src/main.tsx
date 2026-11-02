@@ -3,7 +3,7 @@ import {createRoot} from "react-dom/client";
 import {invoke,isTauri} from "@tauri-apps/api/core";
 import {getCurrentWindow} from "@tauri-apps/api/window";
 import {empty,deserialize,serialize,editItem} from "../../src/core.mjs";
-import {editorSpec,applyEditor} from "../../src/editor.mjs";
+import {editorSpec,applyEditor,editorSelectionFields} from "../../src/editor.mjs";
 import {compareProject,decideChange} from "../../src/trace.mjs";
 import {projectImpact} from "../../src/impact.mjs";
 import {scheduleProject} from "../../src/planning.mjs";
@@ -85,7 +85,8 @@ function EditorPanel({editor,onSubmit,onCancel,busy}:{editor:Editor;onSubmit:(ev
    {editor.spec.fields.map(f=><label className="field" key={f.name}>{f.label}
     {f.type==="select"?
       <select name={f.name} aria-label={f.label} required={f.required!==false}
-       value={fields[f.name]??""} onChange={event=>setFields({...fields,[f.name]:event.target.value})}>
+       value={fields[f.name]??""}
+        onChange={event=>setFields(previous=>editorSelectionFields(editor.spec,previous,f.name,event.target.value))}>
        {(f.options||[]).map(o=><option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
       :f.type==="textarea"?

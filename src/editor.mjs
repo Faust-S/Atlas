@@ -88,15 +88,23 @@ export function editorSpec(project,action,snapshot=null){
   ]};
   if(kind==="amend-work"){
    if(!project.items.length)throw Error("В проекте пока нет работ");
-   const first=project.items[0],previous=(change.planAmendments||[]).find(a=>a.kind==="work"&&a.itemId===first.id);
-   const shown=previous?.after||first;
-   return {title:"Изменить работу: "+change.title,hint:context,fields:[
-    choice("itemId","Работа",workItems(project)),
-    field("estimateDays","Новая оценка, календарных дней","number",String(shown.estimateDays??1)),
-    field("assignee","Ответственный (имя или роль)","text",shown.assignee||"",false),
-    choice("resourceId","Плановый ресурс",resourceChoiceOptions(snapshot),shown.resourceId||"",false),
-    field("allocationPct","Доля ресурса на этой работе, %","number",String(shown.allocationPct??100)),
-    field("dueDate","Срок работы","date",shown.dueDate||"",false)
+   const presets=Object.fromEntries(project.items.map(item=>{
+    const previous=(change.planAmendments||[]).find(a=>a.kind==="work"&&a.itemId===item.id);
+    const shown=previous?.after||item;
+    return [item.id,{estimateDays:String(shown.estimateDays??1),
+     assignee:shown.assignee||"",resourceId:shown.resourceId||"",
+     allocationPct:String(shown.allocationPct??100),dueDate:shown.dueDate||""}];
+   }));
+   const first=project.items[0],shown=presets[first.id];
+   return {title:"Изменить работу: "+change.title,
+    hint:context+" При смене работы её поля загружаются заново, чтобы не применять параметры другой работы.",
+    selectionPresets:{name:"itemId",values:presets},fields:[
+    choice("itemId","Работа",workItems(project),first.id),
+    field("estimateDays","Новая оценка, календарных дней","number",shown.estimateDays),
+    field("assignee","Ответственный (имя или роль)","text",shown.assignee,false),
+    choice("resourceId","Плановый ресурс",resourceChoiceOptions(snapshot),shown.resourceId,false),
+    field("allocationPct","Доля ресурса на этой работе, %","number",shown.allocationPct),
+    field("dueDate","Срок работы","date",shown.dueDate,false)
    ]};
   }
   return {title:"Предложить новую работу: "+change.title,hint:context,fields:[
@@ -191,6 +199,15 @@ export function editorSpec(project,action,snapshot=null){
  if(action==="decision")return {title:"Зафиксировать решение",fields:[field("text","Решение и основание","textarea")]};
  if(action==="source")return {title:"Подключить ссылку на источник",hint:"github_owner — публичный владелец GitHub (имя пользователя или организации); github — отдельный публичный owner/repository. Остальные источники пока только ссылки. Приватные данные не запрашиваются.",fields:[choice("kind","Тип источника",["github","github_owner","gitlab","forgejo","gitea","obsidian","anytype","jira","file","other"].map(x=>option(x,x)),"github"),field("locator","Ссылка или идентификатор источника")]};
  throw Error("Неизвестная форма: "+action);
+}
+// One select may control fields in the same form, e.g. which work item is
+// being amended. Use the selected item's own baseline/proposed values.
+export function editorSelectionFields(spec,previous,name,value){
+ const preset=spec?.selectionPresets;
+ if(!preset||preset.name!==name)return {...previous,[name]:value};
+ const fields=preset.values?.[value];
+ if(!fields)throw Error("Неизвестный объект выбранной работы");
+ return {...previous,...fields,[name]:value};
 }
 export function renderEditor(spec,esc){
  const fields=spec.fields.map(x=>{

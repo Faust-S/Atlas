@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {empty,createProject,createItem,editProject,editItem,serialize,deserialize,validate} from "../src/core.mjs";
 import {planChange,decideChange} from "../src/trace.mjs";
 import {addPortfolioLink} from "../src/portfolio.mjs";
-import {editorSpec,applyEditor} from "../src/editor.mjs";
+import {editorSpec,applyEditor,editorSelectionFields} from "../src/editor.mjs";
 import {addPlanWork,setPlanWork,setPlanDates,removePlanAmendment,previewPlanAmendment,applyPlanAmendment,renderProjectPlanAmendments} from "../src/plan-amendment.mjs";
 import {portfolioSchedule} from "../src/portfolio-schedule.mjs";
 const values=o=>({get:k=>o[k]??""});
@@ -57,6 +57,35 @@ test("approved plan applied exactly once and survives export/import with date, o
  assert.ok(s.projects[0].changes[0].planAppliedAt);
  assert.throws(()=>applyPlanAmendment(s,f.root,f.changeId),/применена/);
  assert.deepEqual(deserialize(serialize(s)),s);
+});
+test("amendment form switches to the selected work baseline or its already proposed values",()=>{
+ const f=fixture();
+ const second=createItem(f.state,f.root,{title:"Independent QA",assignee:"Verifier"});
+ let s=editItem(second.state,f.root,second.id,{estimateDays:6,allocationPct:70});
+ s=setPlanWork(s,f.root,f.changeId,{itemId:second.id,estimateDays:9,
+  assignee:"Review team",dueDate:"2026-11-10",allocationPct:85}).state;
+ const action="amend-work:"+f.changeId;
+ const spec=editorSpec(s.projects.find(p=>p.id===f.root),action,s);
+ const first=Object.fromEntries(spec.fields.map(field=>[field.name,String(field.value??"")]));
+ assert.equal(first.itemId,f.itemId);
+ assert.equal(first.estimateDays,"2");
+ assert.equal(first.assignee,"Developer");
+ const selected=editorSelectionFields(spec,first,"itemId",second.id);
+ assert.equal(selected.itemId,second.id);
+ assert.equal(selected.estimateDays,"9");
+ assert.equal(selected.assignee,"Review team");
+ assert.equal(selected.dueDate,"2026-11-10");
+ assert.equal(selected.allocationPct,"85");
+ const switchedBack=editorSelectionFields(spec,selected,"itemId",f.itemId);
+ assert.equal(switchedBack.estimateDays,"2");
+ assert.equal(switchedBack.assignee,"Developer");
+ assert.throws(()=>editorSelectionFields(spec,first,"itemId","missing"),/Неизвестный объект/);
+ const edited=applyEditor(s,f.root,action,values({...selected,estimateDays:"10"})).state;
+ const proposal=edited.projects.find(p=>p.id===f.root).changes.find(c=>c.id===f.changeId);
+ assert.equal(proposal.planAmendments.length,1);
+ assert.equal(proposal.planAmendments[0].itemId,second.id);
+ assert.equal(proposal.planAmendments[0].after.estimateDays,10);
+ assert.equal(edited.projects.find(p=>p.id===f.root).items.find(w=>w.id===second.id).estimateDays,6);
 });
 test("new planned work gets existing change link; no duplicate work on retry",()=>{
  const f=fixture();
