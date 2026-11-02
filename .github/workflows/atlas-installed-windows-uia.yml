@@ -1,0 +1,66 @@
+name: IWXA Atlas installed Windows UI Automation acceptance
+
+on:
+  push:
+    branches:
+      - work/2026-11-02-atlas-desktop-0.2
+    paths:
+      - 'desktop/tests/installed-windows-uia.py'
+      - '.github/workflows/atlas-installed-windows-uia.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  windows-uia:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[windows-uia-accept]')
+    runs-on: windows-latest
+    timeout-minutes: 9
+    steps:
+      - name: Checkout Atlas
+        uses: actions/checkout@v4
+      - name: Set up Python for isolated Windows UIA test
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install UIA test driver (not part of shipped Atlas)
+        shell: pwsh
+        run: python -m pip install --disable-pip-version-check pywinauto==0.6.9 pillow
+      - name: Download already qualified Windows NSIS installer
+        uses: actions/download-artifact@v4
+        with:
+          name: iwxa-atlas-0-2-windows-nsis-candidate
+          run-id: 41446391609
+          github-token: ${{ github.token }}
+          path: desktop/qualified-installer
+      - name: Install independently qualified Windows application
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installer = Get-ChildItem desktop/qualified-installer -Recurse -Filter '*.exe' | Select-Object -First 1
+          if (!$installer) { throw 'Windows installer artifact missing' }
+          $process = Start-Process -FilePath $installer.FullName -ArgumentList '/S' -PassThru
+          try { $process | Wait-Process -Timeout 85 -ErrorAction Stop }
+          catch {
+            if (!$process.HasExited) { Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue }
+            throw 'NSIS installer did not finish'
+          }
+          $process.Refresh()
+          if ($process.ExitCode -ne 0) { throw "NSIS failed: $($process.ExitCode)" }
+          $exe = Join-Path $env:LOCALAPPDATA 'IWXA Atlas\iwxa-atlas-desktop.exe'
+          if (!(Test-Path $exe)) { throw "Installed Atlas EXE missing: $exe" }
+          "ATLAS_INSTALLED_EXE=$exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Output 'ATLAS_NSIS_INSTALLED_WINDOWS_PASS'
+      - name: Verify actual Windows accessibility actions across full process restarts
+        shell: pwsh
+        run: python desktop/tests/installed-windows-uia.py
+      - name: Retain Windows screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas-installed-windows-uia-evidence
+          path: desktop/test-artifacts/*.png
+          if-no-files-found: ignore
+          retention-days: 3
