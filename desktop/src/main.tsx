@@ -15,11 +15,11 @@ import {previewPlanAmendment,applyPlanAmendment,removePlanAmendment} from "../..
 import {planPublicRefresh,reconcilePublicSources,publicSourceQueue} from "../../src/public-refresh.mjs";
 import {ProjectGantt,ProjectDependencyDiagram} from "./ProjectVisuals";
 import {prepareImportedSnapshot} from "./import-snapshot.mjs";
+import {commitWithReadback} from "./native-save.mjs";
 import "./style.css";
 
 type Atlas = any;
 type OpenResult = {generation:string;snapshot:Atlas;restoredFromBackup:boolean;needsConfirmation:boolean};
-type CommitResult = {generation:string;revision:number;projectBlocksWritten:number};
 type Field = {name:string;label:string;value?:string;required?:boolean;type:string;options?:{value:string;label:string}[]};
 type Editor = {action:string;spec:{title:string;hint?:string;fields:Field[]}};
 type Tab = "overview"|"work"|"board"|"timeline"|"graph"|"reality"|"changes"|"resources"|"history"|"sources";
@@ -122,7 +122,10 @@ function App(){
  const [workLimit,setWorkLimit]=useState(200);
  const [showDetails,setShowDetails]=useState(false);
  const project=data.projects.find((p:any)=>p.id===active)||null;
- const dirty=ready&&snapshotText(data)!==saved.current;
+ // Canonical snapshot text is expensive for large portfolios: compute only
+ // when domain data change, not for typing, scrolling, or tab switches.
+ const dataSignature=useMemo(()=>snapshotText(data),[data]);
+ const dirty=ready&&dataSignature!==saved.current;
  const persisted=generation!=="none";
  const dirtyRef=useRef(false),busyRef=useRef(false);
  dirtyRef.current=dirty;busyRef.current=busy;
@@ -201,16 +204,21 @@ function App(){
   if(busyRef.current||!ready||!dirty)return;
   busyRef.current=true;setBusy(true);
   try{
-   const source=snapshotText(data);
-   const committed=await invoke<CommitResult>("atlas_commit",{expectedGeneration:generation,snapshot:data});
-   const readback=await invoke<OpenResult>("atlas_open");
-   const checked=deserialize(JSON.stringify(readback.snapshot));
-   if(readback.generation!==committed.generation||snapshotText(checked)!==source){
-    throw Error("Данные записаны, но повторное чтение не совпало. Не закрывайте программу; проверьте хранилище.");
-   }
-   setGeneration(committed.generation);
-   saved.current=source;
-   setMessage("Сохранено и перечитано с диска. Новых файлов проектов: "+committed.projectBlocksWritten+".");
+   const startedWith=data;
+   const result=await commitWithReadback({
+    invoke,expectedGeneration:generation,snapshot:startedWith,
+    signature:snapshotText,
+    readValidated:(raw:Atlas)=>deserialize(JSON.stringify(raw))
+   });
+   // A user may have changed the in-memory draft while the native IPC was
+   // pending. Only the exact snapshot verified on disk is marked as saved.
+   saved.current=dataSignature;
+   setGeneration(result.generation);
+   const changedWhileSaving=latestSnapshot.current!==startedWith;
+   const notice=result.reconciled?
+    "Запись найдена и сверена с диском после потери ответа нативной команды.":
+    "Сохранено и перечитано с диска. Новых файлов проектов: "+result.projectBlocksWritten+".";
+   setMessage(notice+(changedWhileSaving?" Изменения, внесённые во время записи, ещё не сохранены.":""));
    setError("");
   }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
  };
