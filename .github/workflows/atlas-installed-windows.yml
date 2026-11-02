@@ -17,7 +17,7 @@ jobs:
   installed-windows:
     if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[windows-ui-accept]')
     runs-on: windows-latest
-    timeout-minutes: 12
+    timeout-minutes: 9
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
@@ -39,19 +39,37 @@ jobs:
       - name: Install Atlas into this Windows user
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
           $installer = Get-ChildItem desktop/qualified-installer -Filter '*.exe' -Recurse | Select-Object -First 1
           if (!$installer) { throw "Qualified Atlas NSIS installer not found" }
-          $result = Start-Process -FilePath $installer.FullName -ArgumentList '/S' -PassThru -Wait
-          if ($result.ExitCode -ne 0) { throw "NSIS installation failed: $($result.ExitCode)" }
-          $roots = @("$env:LOCALAPPDATA\Programs", "$env:LOCALAPPDATA", "$env:ProgramFiles", "${env:ProgramFiles(x86)}")
-          $installed = foreach ($root in $roots) {
-            if ((Test-Path $root) -and $root) {
-              Get-ChildItem -Path $root -Filter 'iwxa-atlas-desktop.exe' -Recurse -File -ErrorAction SilentlyContinue |
-                Where-Object { $_.FullName -notmatch 'WebView|cache' }
+          Write-Output "ATLAS_INSTALL_START $($installer.FullName)"
+          $process = Start-Process -FilePath $installer.FullName -ArgumentList '/S' -PassThru
+          try {
+            $process | Wait-Process -Timeout 100 -ErrorAction Stop
+          } catch {
+            Write-Output "ATLAS_INSTALL_TIMEOUT - collecting process diagnostics"
+            Get-Process -Name '*atlas*','*setup*' -ErrorAction SilentlyContinue | Format-Table -AutoSize | Out-String | Write-Output
+            if (!$process.HasExited) { Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue }
+            throw "NSIS installer did not exit within 100 seconds; installation HOLD"
+          }
+          $process.Refresh()
+          if ($process.ExitCode -ne 0) { throw "NSIS installation failed: $($process.ExitCode)" }
+          Write-Output "ATLAS_NSIS_INSTALLER_EXIT_0"
+          $uninstallPaths = @('HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*','HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*',
+            'HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*')
+          $entries = @(Get-ItemProperty -Path $uninstallPaths -ErrorAction SilentlyContinue |
+            Where-Object { $_.DisplayName -like '*IWXA Atlas*' })
+          $entries | Select-Object DisplayName,InstallLocation,DisplayIcon | Format-Table | Out-String | Write-Output
+          $roots = @("$env:LOCALAPPDATA\Programs\IWXA Atlas","$env:LOCALAPPDATA\IWXA Atlas",
+            "$env:ProgramFiles\IWXA Atlas","${env:ProgramFiles(x86)}\IWXA Atlas") +
+            @($entries | ForEach-Object { $_.InstallLocation })
+          $candidate = foreach ($root in ($roots | Where-Object { $_ } | Select-Object -Unique)) {
+            if (Test-Path -LiteralPath $root) {
+              Get-ChildItem -LiteralPath $root -Depth 3 -Filter 'iwxa-atlas-desktop.exe' -File -ErrorAction SilentlyContinue
             }
           }
-          $app = @($installed) | Select-Object -First 1
-          if (!$app) { throw "NSIS exited 0 but installed Atlas executable cannot be located" }
+          $app = @($candidate) | Select-Object -First 1
+          if (!$app) { throw "NSIS succeeded but installed executable missing from installation directories" }
           "ATLAS_INSTALLED_EXE=$($app.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           Write-Output "ATLAS_NSIS_INSTALL_PASS path=$($app.FullName)"
       - name: Test real installed WebView2 lifecycle
