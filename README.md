@@ -1,3 +1,13 @@
+# IWXA Atlas — самостоятельная программа и версии
+
+**0.1 (зафиксированная браузерная основа):** `release/0.1` → `addee450b8d80f8fad1fcb9af8e8d13dc1824151`, проверено 127/127 Node и на трёх ОС через Chromium/IndexedDB. Это не установщик Windows.
+
+**0.2 (рабочая ветка):** `work/2026-11-02-atlas-desktop-0.2`. Настольная реализация Tauri 2 + React 19/TypeScript + Vite в каталоге [desktop/](desktop/README.md), с исходным предметным ядром `src/*.mjs` без копирования его алгоритмов. Нативное хранение, ручное сохранение и readback, формы проекта, фактов, решений и ресурсов — в разработке. **Компиляция, установщик и реальные Windows-проверки 0.2 остаются HOLD до запуска сборки.**
+
+[Фиксация версии и границы переноса](docs/ATLAS_VERSION_0_1_AND_DESKTOP_0_2_RU.md). Ветка `main` не изменена. Корпоративная интеграция Admin Center/T3 отложена.
+
+---
+
 # Atlas — universal project workspace (public foundation)
 
 ## Human plan-review decisions after source rechecks — 2026-11-02
