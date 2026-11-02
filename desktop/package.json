@@ -22,7 +22,6 @@
     "@types/react-dom": "19.2.2",
     "typescript": "5.9.3",
     "vite": "7.1.0",
-    "@types/node": "22.15.30",
-    "playwright-core": "1.56.1"
+    "@types/node": "22.15.30"
   }
 }
