@@ -55,7 +55,23 @@ test("12/60/120 project tiers: lossless JSON, DAG/CPM, command queue, bounded re
   assert.equal(readback.value.projects.length,projects);
   const schedule=clock(()=>portfolioSchedule(data));
   assert.equal(schedule.value.totals.projects,projects);
-  assert.equal(schedule.value.rows.filter(x=>x.projectedFinish!==null).length,projects);
+  // The synthetic fixture deliberately pauses its first project. Its entire
+  // dependency chain must remain undated rather than invent delivery dates.
+  assert.equal(data.projects[0].status,"paused");
+  assert.equal(schedule.value.totals.dated,0);
+  assert.equal(schedule.value.totals.unknown,projects);
+  for(const row of schedule.value.rows) {
+   assert.equal(row.projectedFinish,null);
+   assert.deepEqual(row.unavailableOrigins.map(x=>x.id),[data.projects[0].id]);
+  }
+  // Removing the pause in a separate scenario restores the same CPM dates
+  // for all projects without touching the original synthetic portfolio.
+  const active=structuredClone(data);
+  active.projects[0].status="active";
+  const activeSchedule=portfolioSchedule(active);
+  assert.equal(activeSchedule.totals.dated,projects);
+  assert.equal(activeSchedule.totals.unknown,0);
+  assert.ok(activeSchedule.rows.every(x=>x.unavailableOrigins.length===0));
   const cascades=clock(()=>portfolioCascade(data,projectImpact));
   assert.equal(cascades.value.projects.length,projects);
   assert.equal(cascades.value.byId.get(data.projects[0].id).downstreamAll.length,projects-1);
