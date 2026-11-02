@@ -1,6 +1,7 @@
 // Atlas v0.1 project domain; never executes agent tasks or writes to external sources.
 import {validatePortfolioLinks} from "./portfolio.mjs";
 import {validCauseKey} from "./response.mjs";
+import toposort from "./vendor/toposort.mjs";
 export const SCHEMA="atlas.project/1";
 const types=new Set(["personal","team","business","engineering","research","care","other"]);
 const statuses=new Set(["planned","active","paused","completed","cancelled"]);
@@ -88,10 +89,18 @@ export function validate(s){
   }
   for(const d of p.decisions)if(d.changeId!=null&&!changeIds.has(d.changeId))throw Error("Invalid decision changeId");
 
-  const edges=new Set();
-  for(const x of p.dependencies){const key=x.from+"|"+x.to;if(!itemIds.has(x.from)||!itemIds.has(x.to)||edges.has(key)||x.from===x.to)throw Error("Invalid dependency");edges.add(key);}
-  const walk=(id,seen)=>{if(seen.has(id))throw Error("Dependency cycle");seen.add(id);for(const e of p.dependencies)if(e.from===id)walk(e.to,new Set(seen));};
-  for(const id of itemIds)walk(id,new Set());
+  const edges=new Set(),workEdges=[];
+  for(const x of p.dependencies){
+   const key=JSON.stringify([x.from,x.to]);
+   if(!itemIds.has(x.from)||!itemIds.has(x.to)||edges.has(key)||x.from===x.to)
+    throw Error("Invalid dependency");
+   edges.add(key);workEdges.push([x.from,x.to]);
+  }
+  // Use the SAME iterative topological implementation as CPM, not a separate
+  // exponential walk over every path for every node during import/save/edit.
+  try{toposort.array([...itemIds],workEdges);}
+  catch(e){if(e instanceof Error&&e.message.startsWith("Cyclic dependency"))
+   throw Error("Dependency cycle");throw e;}
  }
  // Optional plan-review references must remain inside the same Atlas portfolio.
  // Older snapshots have no such records and are unaffected.

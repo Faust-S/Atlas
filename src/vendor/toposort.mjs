@@ -12,33 +12,40 @@ toposort.array = sort;
 function sort(nodes, edges) {
   let cursor = nodes.length;
   const sorted = new Array(cursor);
-  const visited = {};
-  let i = cursor;
+  const state = new Uint8Array(nodes.length); // 0: unseen, 1: visiting, 2: ordered
   const outgoingEdges = outgoing(edges);
   const nodesHash = new Map(nodes.map((node, index) => [node, index]));
-  edges.forEach(edge => {
-    if (!nodesHash.has(edge[0]) || !nodesHash.has(edge[1])) {
+  for (const [from, to] of edges) {
+    if (!nodesHash.has(from) || !nodesHash.has(to)) {
       throw new Error('Unknown node in supplied edges');
     }
-  });
-  while (i--) if (!visited[i]) visit(nodes[i], i, new Set());
-  return sorted;
-  function visit(node, i, predecessors) {
-    if (predecessors.has(node)) throw new Error('Cyclic dependency, node: ' + String(node));
-    if (!nodesHash.has(node)) throw new Error('Unknown node: ' + String(node));
-    if (visited[i]) return;
-    visited[i] = true;
-    let nodesOut = Array.from(outgoingEdges.get(node) || new Set());
-    if (i = nodesOut.length) {
-      predecessors.add(node);
-      do {
-        const child = nodesOut[--i];
-        visit(child, nodesHash.get(child), predecessors);
-      } while (i);
-      predecessors.delete(node);
-    }
-    sorted[--cursor] = node;
   }
+
+  // Preserve the original depth-first order (including isolated nodes and the
+  // reverse insertion order of children) without recursion. Project work DAGs
+  // can be thousands of nodes deep and must not exhaust the JS call stack.
+  for (let start = nodes.length - 1; start >= 0; start--) {
+    if (state[start] !== 0) continue;
+    const stack = [{index: start, remaining: null}];
+    while (stack.length) {
+      const frame = stack[stack.length - 1];
+      if (frame.remaining === null) {
+        state[frame.index] = 1;
+        frame.remaining = Array.from(outgoingEdges.get(nodes[frame.index]) || []);
+      }
+      if (frame.remaining.length) {
+        const child = frame.remaining.pop();
+        const index = nodesHash.get(child);
+        if (state[index] === 1) throw new Error('Cyclic dependency, node: ' + String(child));
+        if (state[index] === 0) stack.push({index, remaining: null});
+      } else {
+        state[frame.index] = 2;
+        sorted[--cursor] = nodes[frame.index];
+        stack.pop();
+      }
+    }
+  }
+  return sorted;
 }
 function outgoing(edges) {
   const adj = new Map();
