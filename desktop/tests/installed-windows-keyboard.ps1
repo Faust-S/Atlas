@@ -63,17 +63,28 @@ function Wait-AtlasState([int]$count, [string[]]$required) {
 }
 function Wait-AtlasOpen([System.Diagnostics.Process]$process) {
     $receipt = Join-Path $env:TEMP ("iwxa-atlas-renderer-" + $process.Id + ".probe")
-    if (Test-Path -LiteralPath $receipt) { Remove-Item -LiteralPath $receipt -Force }
+    # NEVER delete a receipt after Start-Process: WebView2 may have called
+    # atlas_open before this function starts. Deletion caused a false timeout.
+    # A reused process ID from an older run must not qualify this one.
+    $launchTimeUtc = $process.StartTime.ToUniversalTime()
     for ($i=0; $i -lt 120; $i++) {
-        Start-Sleep -Milliseconds 500
         $process.Refresh()
         if ($process.HasExited) { throw "Installed Atlas terminated before native open: $($process.ExitCode)" }
-        if (Test-Path -LiteralPath $receipt) {
-            $message = (Get-Content -LiteralPath $receipt -Raw).Trim()
-            if ($message -ne 'ATLAS_TAURI_JS_NATIVE_OPEN_PASS') { throw "Native open failed: $message" }
-            Write-Output "ATLAS_INSTALLED_GUI_NATIVE_OPEN_PASS pid=$($process.Id)"
-            return
+        $file = Get-Item -LiteralPath $receipt -ErrorAction SilentlyContinue
+        if ($null -ne $file -and $file.LastWriteTimeUtc -ge $launchTimeUtc.AddSeconds(-2)) {
+            # A short read may race fs::write; retry rather than treating a
+            # transient empty/locked file as a product failure.
+            try { $message = (Get-Content -LiteralPath $receipt -Raw -ErrorAction Stop).Trim() }
+            catch [System.IO.IOException] { $message = "" }
+            if ($message -eq 'ATLAS_TAURI_JS_NATIVE_OPEN_PASS') {
+                Write-Output "ATLAS_INSTALLED_GUI_NATIVE_OPEN_PASS pid=$($process.Id)"
+                return
+            }
+            if ($message -eq 'ATLAS_TAURI_JS_NATIVE_OPEN_ERROR') {
+                throw "Installed Atlas reached Rust but atlas_open failed: pid=$($process.Id)"
+            }
         }
+        Start-Sleep -Milliseconds 500
     }
     $process.Refresh()
     Write-Output "ATLAS_INSTALLED_STARTUP_DIAGNOSTIC_HOLD pid=$($process.Id) window=$($process.MainWindowHandle) title=$($process.MainWindowTitle)"

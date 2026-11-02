@@ -32,3 +32,18 @@ test("installed Windows workflow rejects false PASS when close needed a forced k
  assert.match(windowsTest,/throw "Persisted across forced restart but GUI normal close failed/);
  assert.match(windowsTest,/ATLAS_INSTALLED_GUI_GRACEFUL_LIFECYCLE_PASS/);
 });
+
+test("installed startup probe never discards a valid early Rust receipt",()=>{
+ const script=windowsTest.slice(windowsTest.indexOf("function Wait-AtlasOpen"),windowsTest.indexOf("function Activate-Atlas"));
+ assert.ok(script.startsWith("function Wait-AtlasOpen"));
+ assert.doesNotMatch(script,/Remove-Item/);
+ assert.match(script,/\$launchTimeUtc = \$process\.StartTime\.ToUniversalTime\(\)/);
+ assert.match(script,/\$file\.LastWriteTimeUtc -ge \$launchTimeUtc\.AddSeconds\(-2\)/);
+ assert.match(script,/ATLAS_INSTALLED_GUI_NATIVE_OPEN_PASS/);
+});
+test("Windows qualification uses only installed NSIS GUI, not redundant standalone launches",()=>{
+ const pipeline=readFileSync(new URL("../.github/workflows/atlas-desktop-0-2.yml",import.meta.url),"utf8");
+ assert.doesNotMatch(pipeline,/name: Launch standalone desktop window without development server/);
+ assert.match(pipeline,/name: Install this exact Windows build using NSIS/);
+ assert.match(pipeline,/name: Exercise installed React forms save close and reopen/);
+});
