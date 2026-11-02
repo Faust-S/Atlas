@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {empty,createProject,attach,serialize,deserialize} from "../src/core.mjs";
-import {planPublicRefresh,reconcilePublicSources} from "../src/public-refresh.mjs";
+import {planPublicRefresh,reconcilePublicSources,publicSourceQueue,renderPublicSourceQueue} from "../src/public-refresh.mjs";
 function sample(){
  const a=createProject(empty(),{name:"A"}),b=createProject(a.state,{name:"B"});
  let state=b.state;const bindings=[];
@@ -25,7 +25,7 @@ test("deduplicates repeated GitHub bindings and preserves one authoritative snap
  let calls=0;
  const result=await reconcilePublicSources(state,{plan,repoObserver:async name=>{calls++;return observed(name)}});
  assert.equal(calls,2);assert.equal(result.report.updated,3);assert.equal(result.report.failed,0);
- assert.equal(result.state.revision,state.revision+3);
+ assert.equal(result.state.revision,state.revision+1);
  assert.ok(result.state.projects.every(p=>p.sources.filter(s=>s.kind==="github").every(s=>s.status==="ok")));
  assert.equal(result.state.projects[0].sources.find(s=>s.id===other).status,"never");
  assert.deepEqual(deserialize(serialize(result.state)),result.state);
@@ -62,4 +62,68 @@ test("partial observations do not invent deleted branches or release qualificati
  assert.equal(source.summary.changes.comparable,false);
  assert.deepEqual(source.summary.changes.removed,[]);
  assert.equal(source.summary.readiness,"not_assessed");
+});
+
+test("manual refresh progresses fairly through an oversized public-source queue",async()=>{
+ const initial=createProject(empty(),{name:"Portfolio"});
+ let state=initial.state;
+ for(let i=0;i<10;i++)state=attach(state,initial.id,"github","example/repo"+i).state;
+ const observedRepos=[];
+ const observer=async name=>{observedRepos.push(name);return observed(name)};
+ const first=await reconcilePublicSources(state,{plan:planPublicRefresh(state,{maxAgeMs:0}),repoObserver:observer});
+ assert.equal(first.report.requests,4);
+ assert.equal(first.report.updated,4);
+ assert.equal(first.report.remaining,6);
+ assert.equal(first.state.revision,state.revision+1);
+ const second=await reconcilePublicSources(first.state,{plan:planPublicRefresh(first.state,{maxAgeMs:0}),repoObserver:observer});
+ assert.equal(second.report.requests,4);
+ assert.equal(second.report.remaining,6);
+ assert.equal(new Set(observedRepos).size,8,"second run must not repeat already-fresh repos");
+ const third=await reconcilePublicSources(second.state,{plan:planPublicRefresh(second.state,{maxAgeMs:0}),repoObserver:observer});
+ assert.equal(new Set(observedRepos).size,10);
+ assert.equal(third.report.requests,4,"two previously observed sources can be rechecked after draining the initial queue");
+ assert.equal(planPublicRefresh(third.state).due,0);
+});
+
+test("global binding limit applies to all groups, including shared repositories",async()=>{
+ const first=createProject(empty(),{name:"Large"});
+ let state=first.state;
+ for(let i=0;i<40;i++)state=attach(state,first.id,"github","Example/repo"+Math.floor(i/10)).state;
+ const plan=planPublicRefresh(state,{maxAgeMs:0,limit:30,maxRequests:4});
+ assert.equal(plan.due,40);
+ assert.equal(plan.selected,30);
+ assert.equal(plan.remaining,10);
+ assert.equal(plan.unique,3);
+ const result=await reconcilePublicSources(state,{plan,repoObserver:async name=>observed(name)});
+ assert.equal(result.report.updated,30);
+ assert.equal(result.report.remaining,10);
+ assert.equal(result.state.revision,state.revision+1);
+ assert.equal(planPublicRefresh(result.state).due,10);
+});
+
+test("queue exposes observed freshness and escapes untrusted source identifiers",async()=>{
+ const fixture=sample();
+ const queue=publicSourceQueue(fixture.state);
+ assert.equal(queue.unique,2);
+ assert.equal(queue.pending,2);
+ const markup=renderPublicSourceQueue(fixture.state);
+ assert.match(markup,/Публичные источники портфеля/);
+ assert.match(markup,/example\/shared/);
+ const result=await reconcilePublicSources(fixture.state,{repoObserver:async name=>observed(name)});
+ assert.equal(publicSourceQueue(result.state).pending,0);
+ const poisoned=structuredClone(result.state);
+ poisoned.projects[0].sources[0].locator="<img src=x onerror=alert(1)>";
+ const html=renderPublicSourceQueue(poisoned);
+ assert.match(html,/&lt;img/);
+ assert.doesNotMatch(html,/<img/);
+});
+
+test("failed and pending bindings do not become claimed delivery",async()=>{
+ const a=sample();
+ const result=await reconcilePublicSources(a.state,{repoObserver:async()=>{throw Error("HTTP 429") }});
+ assert.equal(result.report.rateLimited,true);
+ assert.equal(result.report.failed,2);
+ assert.equal(result.report.remaining,1);
+ assert.ok(result.state.projects.every(p=>p.sources.every(s=>!s.summary?.qualified)));
+ assert.match(renderPublicSourceQueue(result.state,{lastReport:result.report}),/GitHub API ограничил запросы/);
 });

@@ -1,5 +1,13 @@
 # Atlas — universal project workspace (public foundation)
 
+## Fair public-source queue and single-revision refresh — 2026-11-02
+
+The standalone overview exposes an explicit read-only **public-source queue** showing never-observed, stale, errored, partially observed and recently changed GitHub bindings. It deduplicates references to the same public source across projects while retaining each project's own observation record. The work selector prioritises never-observed and oldest bindings, so repeated manual refreshes reach later repositories instead of selecting the same first four forever. Limits apply to the **whole batch** (at most 30 attached bindings, four unique API sources manually, three automatically). The number of untouched bindings is surfaced, never silently labelled as checked.
+
+A batch is committed to the **existing IndexedDB snapshot once**, with one global revision and one integrity-protected backup; no additional persistence engine. On API failure the old source summary is retained, while an error and attempt timestamp are recorded. Rate-limit responses stop subsequent calls; source incompleteness never proves deletions or delivery acceptance. Previous JSON exports remain compatible.
+
+The tested 120-project Chromium/IndexedDB scale result predates this source-queue change. The new source batch is covered by targeted Node tests and requires its own real-browser qualification before an updated release candidate.
+
 ## Public portfolio source reconciliation — 2026-11-02
 
 The portfolio home view now offers **«Сверить публичные источники»**, a bounded batch refresh of public GitHub repository and owner bindings. It groups equivalent case-insensitive references across projects and retrieves each unique source once per batch, applies the same source freshness/diff logic to each attached project, and writes the resulting snapshot through the existing IndexedDB store. Per-source refresh shares the same path. Automatic refresh checks due sources on focus/timer and is capped at **3 unique public API bindings per pass**; the explicit user action allows at most **4 unique bindings / 30 attached references per pass**. Remaining references are shown as deferred instead of silently implying completeness.
