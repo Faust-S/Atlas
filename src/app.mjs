@@ -220,10 +220,13 @@ root.addEventListener("submit",event=>{
   const values=new FormData(event.target);
   if(!ready)throw Error("Хранилище не готово");
   const result=applyEditor(data,active,editorAction,values);
-  await save(result.state);
-  if(result.projectId)active=result.projectId;
+  const previousAction=editorAction,previousProject=active;
+  // An accepted recheck/decision can invalidate its own editor. Close before
+  // save() renders the new snapshot; keep rollback when persistence rejects.
   editorAction=null;
-  render();
+  if(result.projectId)active=result.projectId;
+  try{await save(result.state)}
+  catch(e){editorAction=previousAction;active=previousProject;render();throw e}
  });
 });
 root.addEventListener("input",e=>{
