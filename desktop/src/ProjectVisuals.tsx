@@ -14,7 +14,7 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
  const [offset,setOffset]=useState(0);
  const [query,setQuery]=useState('');
  const [criticalOnly,setCriticalOnly]=useState(false);
- const view=useMemo(()=>ganttViewport(schedule,{scale,offset,startDate:projectStart,dueDate:projectDue}),
+ const view=useMemo(()=>ganttViewport(schedule,{scale,offset,startDate:projectStart,dueDate:projectDue} as any),
   [schedule,scale,offset,projectStart,projectDue]);
  const matching=view.rows.filter((r:any)=>(!criticalOnly||r.critical)&&r.title.toLocaleLowerCase('ru-RU').includes(query.trim().toLocaleLowerCase('ru-RU')));
  const displayed=matching.slice(0,160);
@@ -73,7 +73,7 @@ export function ProjectDependencyDiagram({schedule,onOpenWork}:{schedule:CPM;onO
  const [matchIndex,setMatchIndex]=useState(0);
  const matches=useMemo(()=>query.trim()?schedule.rows.filter(row=>row.title.toLocaleLowerCase('ru-RU').includes(query.trim().toLocaleLowerCase('ru-RU'))):[],[schedule,query]);
  const activeMatch=matches[Math.min(matchIndex,Math.max(0,matches.length-1))];
- const display=useMemo(()=>dependencyDiagram(schedule,{limit:80,focusId:activeMatch?.id||null}),[schedule,activeMatch?.id]);
+ const display=useMemo(()=>dependencyDiagram(schedule,{limit:80,focusId:activeMatch?.id||null} as any),[schedule,activeMatch?.id]);
  return <>
   <div className="atlas-graph-tools"><label>Найти работу <input type="search" value={query} placeholder="Название или фрагмент" onChange={e=>{setQuery(e.target.value);setMatchIndex(0)}}/></label>
    {!!query.trim()&&<><span className="atlas-range">{matches.length?String(Math.min(matchIndex+1,matches.length))+' из '+matches.length+' совпадений':'Нет совпадений'}</span>
