@@ -86,7 +86,7 @@ test("stale baseline, invalid dates and unapproved edits reject atomically",()=>
  assert.equal(altered.projects[0].changes[0].planAppliedAt,undefined);
  const f2=fixture();
  assert.throws(()=>setPlanDates(f2.state,f2.root,f2.changeId,{startDate:"2026-11-20",dueDate:"2026-11-10"}),/dates/);
- assert.throws(()=>addPlanWork(f2.state,f2.root,f2.changeId,{title:"Bad",estimateDays:-1}),/estimateDays/);
+ assert.throws(()=>addPlanWork(f2.state,f2.root,f2.changeId,{title:"Bad",estimateDays:-1}),/Invalid new plan work/);
  assert.throws(()=>setPlanWork(f2.state,f2.root,f2.changeId,{itemId:"ghost",estimateDays:1}),/не найдена/);
 });
 test("action replacement, removal and invalid imported amendments",()=>{

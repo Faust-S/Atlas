@@ -74,11 +74,13 @@ export function editorSpec(project,action,snapshot=null){
   ]};
   if(kind==="amend-work"){
    if(!project.items.length)throw Error("В проекте пока нет работ");
+   const first=project.items[0],previous=(change.planAmendments||[]).find(a=>a.kind==="work"&&a.itemId===first.id);
+   const shown=previous?.after||first;
    return {title:"Изменить работу: "+change.title,hint:context,fields:[
     choice("itemId","Работа",workItems(project)),
-    field("estimateDays","Новая оценка, календарных дней","number","1"),
-    field("assignee","Ответственный (имя или роль)","text","",false),
-    field("dueDate","Срок работы","date","",false)
+    field("estimateDays","Новая оценка, календарных дней","number",String(shown.estimateDays??1)),
+    field("assignee","Ответственный (имя или роль)","text",shown.assignee||"",false),
+    field("dueDate","Срок работы","date",shown.dueDate||"",false)
    ]};
   }
   return {title:"Предложить новую работу: "+change.title,hint:context,fields:[
