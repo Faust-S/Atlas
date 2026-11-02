@@ -5,7 +5,16 @@ on:
     branches:
       - work/2026-11-02-atlas-desktop-0.2
     paths:
-      - 'desktop/**'
+      # Documentation-only desktop commits must not cancel an ongoing
+      # Windows installer qualification via concurrency.cancel-in-progress.
+      - 'desktop/src/**'
+      - 'desktop/src-tauri/**'
+      - 'desktop/tests/**'
+      - 'desktop/package.json'
+      - 'desktop/package-lock.json'
+      - 'desktop/index.html'
+      - 'desktop/vite.config.*'
+      - 'desktop/tsconfig*.json'
       - 'src/**'
       - '.github/workflows/atlas-desktop-0-2.yml'
   workflow_dispatch:
