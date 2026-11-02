@@ -100,6 +100,7 @@ function Send-AtlasProject([string]$name) {
     [System.Windows.Forms.SendKeys]::SendWait('^s')
 }
 $original = $null
+$forcedCloseAttempts = @()
 try {
     for ($attempt=1; $attempt -le 2; $attempt++) {
         $process = Start-Process -FilePath $exe -PassThru
@@ -148,6 +149,7 @@ try {
                     # persisted portfolio after process termination as a
                     # separate, objectively useful crash/restart scenario.
                     Write-Output "ATLAS_INSTALLED_GUI_GRACEFUL_CLOSE_HOLD attempt=$attempt"
+                    $forcedCloseAttempts += $attempt
                     $closeMode = 'forced-for-persistence-test'
                     Stop-Process -Id $process.Id -Force -ErrorAction Stop
                     [void]$process.WaitForExit(10000)
@@ -167,6 +169,10 @@ try {
         }
     }
     Write-Output 'ATLAS_INSTALLED_GUI_FULL_PERSISTENCE_RELAUNCH_PASS'
+    if ($forcedCloseAttempts.Count -gt 0) {
+        throw "Persisted across forced restart but GUI normal close failed: $($forcedCloseAttempts -join ', '). Release acceptance remains HOLD."
+    }
+    Write-Output 'ATLAS_INSTALLED_GUI_GRACEFUL_LIFECYCLE_PASS'
 } finally {
     Remove-Item Env:ATLAS_CI_RENDERER_PROBE -ErrorAction SilentlyContinue
 }
