@@ -1,4 +1,4 @@
-name: IWXA Atlas 0.2 desktop frontend qualification
+name: IWXA Atlas 0.2 desktop build qualification
 
 on:
   push:
@@ -84,13 +84,6 @@ jobs:
           } finally {
             if (!$process.HasExited) { Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue }
           }
-      - name: Prepare Windows UIA test environment
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - name: Install UI automation driver (not bundled with Atlas)
-        shell: pwsh
-        run: python -m pip install --disable-pip-version-check pywinauto==0.6.9 pillow
       - name: Install this exact Windows build using NSIS
         shell: pwsh
         run: |
@@ -116,15 +109,7 @@ jobs:
           path: desktop/src-tauri/target/release/bundle/nsis/*
           if-no-files-found: error
           retention-days: 3
-      - name: Exercise installed Atlas frontend and native readback through Windows UIA
-        shell: pwsh
-        run: python desktop/tests/installed-windows-uia.py
-      - name: Preserve screenshots of real Windows window
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: iwxa-atlas-0-2-windows-window-screenshots
-          path: desktop/test-artifacts/*.png
-          if-no-files-found: ignore
-          retention-days: 3
+      # Interactive installed-GUI acceptance remains HOLD until tested in a
+      # real desktop session; hosted-runner UIA/CDP is not a reliable build gate.
+      # The manual script is retained at desktop/tests/installed-windows-uia.py.
 

@@ -31,6 +31,19 @@ test('relative Gantt zoom clips spans and clamps navigation',()=>{
  assert.match(view.windowLabel,/День 44/);
  assert.equal(ganttViewport({rows:[],durationDays:150},{scale:'90',offset:999}).from,60);
 });
+test('zoomed Gantt selects the current work window instead of offscreen first rows',()=>{
+ const long={durationDays:300,rows:Array.from({length:210},(_,i)=>({
+  id:'task-'+i,title:'Work '+i,earlyStart:i,earlyFinish:i+1
+ }))};
+ const window=ganttViewport(long,{scale:'30',offset:170});
+ assert.equal(window.rows[0].visible,false);
+ assert.equal(window.rows[170].visible,true);
+ assert.equal(window.rows.filter(row=>row.visible).length,30);
+ const ui=readFileSync(new URL('../desktop/src/ProjectVisuals.tsx',import.meta.url),'utf8');
+ assert.match(ui,/const inWindow=matching\.filter\(\(r:any\)=>r\.visible\)/);
+ assert.match(ui,/scale==='fit'\?matching:inWindow/);
+ assert.match(ui,/Перейти к ближайшей работе/);
+});
 test('dependency layout follows DAG and highlights critical links only',()=>{
  const graph=dependencyDiagram(schedule);
  assert.equal(graph.nodes.length,4);

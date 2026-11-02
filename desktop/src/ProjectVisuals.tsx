@@ -17,7 +17,12 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
  const view=useMemo(()=>ganttViewport(schedule,{scale,offset,startDate:projectStart,dueDate:projectDue} as any),
   [schedule,scale,offset,projectStart,projectDue]);
  const matching=view.rows.filter((r:any)=>(!criticalOnly||r.critical)&&r.title.toLocaleLowerCase('ru-RU').includes(query.trim().toLocaleLowerCase('ru-RU')));
- const displayed=matching.slice(0,160);
+ const inWindow=matching.filter((r:any)=>r.visible);
+ // In zoomed mode list work intersecting the calendar viewport, not the
+ // first 160 items (which may all be off screen in a large project).
+ const displayed=(scale==='fit'?matching:inWindow).slice(0,160);
+ const nearest=matching.reduce((best:any,row:any)=>
+  !best||Math.abs(row.earlyStart-view.from)<Math.abs(best.earlyStart-view.from)?row:best,null);
  const guide=(key:string)=><>
   {view.ticks.map((tick:any)=><span className="atlas-gantt-guide" aria-hidden="true" key={key+'-tick-'+tick.day} style={{left:tick.positionPct+'%'}}/>)}
   {view.deadline&&<span className="atlas-gantt-deadline" aria-hidden="true" title={'Контрольный срок: '+view.deadline.label} style={{left:view.deadline.positionPct+'%'}}/>}
@@ -64,7 +69,15 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
    </div>)}
   </div>
   {!matching.length&&<p className="minor">По выбранному фильтру работ нет.</p>}
-  {matching.length>displayed.length&&<p className="minor">Показаны первые {displayed.length} из {matching.length} соответствующих работ. Уточните поиск или откройте таблицу.</p>}
+  {scale!=='fit'&&<p className="minor">В выбранном периоде: {inWindow.length} из {matching.length} работ по текущему фильтру.</p>}
+  {scale!=='fit'&&matching.length>0&&!inWindow.length&&nearest&&
+   <p className="minor">На этом участке календаря нет работ из выборки.{' '}
+    <button type="button" className="action-button"
+     onClick={()=>setOffset(Math.min(view.maxOffset,Math.max(0,nearest.earlyStart)))}>
+     Перейти к ближайшей работе
+    </button></p>}
+  {(scale==='fit'?matching.length:inWindow.length)>displayed.length&&
+   <p className="minor">Показаны первые {displayed.length} из {scale==='fit'?matching.length:inWindow.length} работ {scale==='fit'?'проекта':'в текущем периоде'}. Уточните поиск или откройте таблицу.</p>}
   <p className="minor">Расчёт не распределяет загрузку сотрудников, не подтверждает фактическое исполнение и не переносит автоматически сроки. Изменение плана оформляется отдельно через вкладку «Изменения».</p>
  </section>;
 }

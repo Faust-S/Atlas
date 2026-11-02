@@ -302,6 +302,14 @@ fn commit_root(root:&Path,expected_generation:&str,snapshot:Value)->Result<Write
     }
     let generation=Uuid::new_v4().to_string();
     let (manifest,written)=encode(&root,snapshot,generation.clone())?;
+    // The first saved portfolio has no previous head to archive. Retain its
+    // manifest before publication so loss of head.json cannot reopen an empty
+    // portfolio while the first generation's blocks still exist.
+    if head.is_none() {
+        let archived=root.join("history").join(
+            format!("{:020}-{}.json",manifest.revision,manifest.generation));
+        write_new(&archived,&to_json(&manifest)?)?;
+    }
     publish(&root,&root.join("head.json"),&to_json(&manifest)?)?;
     Ok(WriteResult{generation,revision,project_blocks_written:written})
 }
@@ -420,6 +428,26 @@ mod persistence_tests{
         assert!(commit_root(&root.0,&first.generation,snapshot(3,&["stale"])).is_err());
         assert_eq!(load_root(&root.0).unwrap().generation,second.generation);
         assert!(restore_root(&root.0).is_err()); // healthy state cannot be rolled back silently
+    }
+    #[test]fn first_saved_portfolio_recovers_after_head_loss_or_damage(){
+        let root=scratch();
+        let saved=commit_root(&root.0,"none",snapshot(1,&["First project"])).unwrap();
+        assert_eq!(backup_candidates(&root.0).unwrap().len(),1);
+        fs::remove_file(root.0.join("head.json")).unwrap();
+        let missing=load_root(&root.0).unwrap();
+        assert!(missing.needs_confirmation&&missing.restored_from_backup);
+        assert_eq!(missing.generation,saved.generation);
+        assert_eq!(missing.snapshot["projects"][0]["name"],"First project");
+        assert!(commit_root(&root.0,"none",snapshot(2,&["Overwrite"])).is_err());
+        let restored=restore_root(&root.0).unwrap();
+        assert_eq!(restored.snapshot["projects"][0]["name"],"First project");
+        assert!(!restored.needs_confirmation);
+        fs::write(root.0.join("head.json"),"{damaged").unwrap();
+        let damaged=load_root(&root.0).unwrap();
+        assert!(damaged.needs_confirmation);
+        assert_eq!(restore_root(&root.0).unwrap().snapshot["revision"],1);
+        assert!(fs::read_dir(&root.0).unwrap().any(|entry|
+            entry.unwrap().file_name().to_string_lossy().starts_with("head-quarantine-")));
     }
     #[test]fn missing_head_does_not_erase_retained_history(){
         let root=scratch();
