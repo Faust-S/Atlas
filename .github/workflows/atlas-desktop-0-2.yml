@@ -1,0 +1,39 @@
+name: IWXA Atlas 0.2 desktop frontend qualification
+
+on:
+  push:
+    branches:
+      - work/2026-11-02-atlas-desktop-0.2
+    paths:
+      - 'desktop/**'
+      - 'src/**'
+      - '.github/workflows/atlas-desktop-0-2.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: atlas-desktop-02-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[desktop-accept]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v4
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Preserve existing domain core
+        run: npm test
+      - name: Install desktop UI dependencies
+        working-directory: desktop
+        run: npm install --no-audit --no-fund
+      - name: Compile React TypeScript and Vite
+        working-directory: desktop
+        run: npm run build
