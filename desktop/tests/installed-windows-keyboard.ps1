@@ -10,6 +10,9 @@ public static class AtlasWindowsInput {
     [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
     [DllImport("user32.dll")] public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
     [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll", EntryPoint="PostMessageW", SetLastError=true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool PostMessage(IntPtr hwnd, uint message, IntPtr wParam, IntPtr lParam);
 }
 '@
 
@@ -122,10 +125,29 @@ try {
                 }
             }
             Write-Output "ATLAS_INSTALLED_GUI_COMMIT_READBACK_PASS attempt=$attempt projects=$($saved.projects.Count)"
-            # Graceful close follows the same window-close request as a human Alt+F4.
+            # The disk manifest appears as soon as Rust publishes the write.
+            # Allow React's asynchronous atlas_open readback to finish before
+            # requesting close; otherwise busyRef blocks the window event.
+            Start-Sleep -Milliseconds 1500
+            Activate-Atlas $process
             [System.Windows.Forms.SendKeys]::SendWait('%{F4}')
-            if (!$process.WaitForExit(10000)) { throw 'Atlas did not close after a saved GUI project' }
-            Write-Output "ATLAS_INSTALLED_GUI_GRACEFUL_CLOSE_PASS attempt=$attempt"
+            $closeMode = 'Alt+F4'
+            if (!$process.WaitForExit(4500)) {
+                # GitHub-hosted Windows may deliver form keystrokes yet drop
+                # Alt+F4. Post WM_CLOSE to the exact installed app HWND;
+                # Tauri still runs its ordinary onCloseRequested handler.
+                $process.Refresh()
+                $handle = $process.MainWindowHandle
+                if ($handle -eq [IntPtr]::Zero -or
+                    ![AtlasWindowsInput]::PostMessage($handle,0x0010,[IntPtr]::Zero,[IntPtr]::Zero)) {
+                    throw 'Installed Atlas did not receive a native window close request'
+                }
+                $closeMode = 'WM_CLOSE'
+                if (!$process.WaitForExit(7500)) {
+                    throw 'Installed Atlas refused graceful close after confirmed save and readback'
+                }
+            }
+            Write-Output "ATLAS_INSTALLED_GUI_GRACEFUL_CLOSE_PASS attempt=$attempt mode=$closeMode"
         } finally {
             $process.Refresh()
             if (!$process.HasExited) {
