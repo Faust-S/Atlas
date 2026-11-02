@@ -242,7 +242,11 @@ async function browserUserJourney(){
   await page.locator("#file").setInputFiles({name:"atlas-backup.json",mimeType:"application/json",buffer:exported});
   state=await until(page,s=>s.projects.length===2 && !s.projects.some(p=>p.name==="Temporary project"),"imported JSON restored");
   assert.equal(state.portfolioLinks.length,1);
-  assert.equal(state.projects.find(p=>p.id===main.id).findings.length,1);
+  const restoredFindings=state.projects.find(p=>p.id===main.id).findings;
+  assert.equal(restoredFindings.length,2);
+  assert.equal(restoredFindings[0].revision,oldSha);
+  assert.equal(restoredFindings[1].revision,branchSha);
+  assert.equal(restoredFindings[1].reviewOfFindingId,restoredFindings[0].id);
   await page.reload({waitUntil:"load"});
   await page.locator("#storage-status").getByText("Локальные данные: IndexedDB").waitFor();
   assert.match(await page.locator("#app").innerText(),/Consumer project/);
