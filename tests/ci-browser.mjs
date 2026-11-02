@@ -154,6 +154,23 @@ async function browserUserJourney(){
   assert.equal(state.projects[0].findings[0].revision,oldSha,"earlier claim must remain on its original commit");
   assert.deepEqual(state.projects[0].sources.find(x=>x.id===repo.id).summary.changes.changed,["main"]);
   assert.match(await page.locator("#atlas-trace").innerText(),/Данные требуют сверки/);
+  mark("review changed SHA with an explicit, revision-pinned human claim");
+  const previousFinding=state.projects[0].findings[0];
+  const recheck="recheck:"+[main.id,previousFinding.id,branchSha].map(encodeURIComponent).join(":");
+  await page.locator('[data-action="back"]').click();
+  await page.locator('#atlas-revision-review [data-action^="recheck:"]').first().waitFor();
+  await form(page,recheck,{result:"partial",level:"test",reference:"https://example.org/recheck",
+   note:"Executed the offline recovery scenario against the newly observed Git SHA"});
+  state=await snapshot(page);
+  assert.equal(state.projects[0].findings.length,2);
+  const followup=state.projects[0].findings[1];
+  assert.equal(followup.reviewOfFindingId,previousFinding.id);
+  assert.equal(followup.revision,branchSha);
+  assert.equal(previousFinding.revision,oldSha);
+  assert.match(await page.locator("#atlas-trace").innerText(),/Реализовано частично/);
+  await page.locator('[data-action="back"]').click();
+  assert.equal(await page.locator('#atlas-revision-review [data-action^="recheck:"]').count(),0);
+  await page.locator('[data-action="open:'+main.id+'"]').first().click();
   mark("human decision with rationale and approved remediation work");
   const blocked=state.projects[0].items.find(x=>x.title==="Implement");
   await page.locator('select[data-work="'+blocked.id+'"]').selectOption("blocked");
@@ -175,7 +192,11 @@ async function browserUserJourney(){
   await page.reload({waitUntil:"load"});
   await page.locator("#storage-status").getByText("Локальные данные: IndexedDB").waitFor();
   await page.locator('[data-action="open:'+main.id+'"]').first().click();
-  assert.match(await page.locator("#atlas-trace").innerText(),/Данные требуют сверки/);
+  assert.match(await page.locator("#atlas-trace").innerText(),/Реализовано частично/);
+  assert.match(await page.locator("#atlas-trace").innerText(),/повторная проверка/);
+  state=await snapshot(page);
+  assert.equal(state.projects[0].findings[0].revision,oldSha);
+  assert.equal(state.projects[0].findings[1].revision,branchSha);
   assert.match(await page.locator("#atlas-project-response").innerText(),/Owner reviewed the recovery procedure/);
   assert.ok(await page.locator('#atlas-relations svg').count());
   mark("second project, cross-project link and portfolio visualization");
