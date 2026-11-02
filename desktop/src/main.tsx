@@ -268,7 +268,7 @@ function App(){
    {native&&!recovery&&!error&&<p className="minor">Открытие нативного хранилища…</p>}
   </div>
  </main>;
- return <div className={"app-shell"+(inspector?"":" no-inspector")}>
+ return <div className={"app-shell"+(inspector?"":" no-inspector")+(editor?" editor-active":"")}>
   <aside className="sidebar">
    <div className="brand"><span className="logo-symbol">A</span><div><strong>Atlas</strong><small>IWXA · 0.2 Desktop</small></div></div>
    <nav className="main-nav" aria-label="Основная навигация">

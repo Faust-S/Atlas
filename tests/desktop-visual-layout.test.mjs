@@ -1,0 +1,58 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {ganttViewport,dependencyDiagram} from '../desktop/src/visual-layout.mjs';
+const rows=[
+ {id:'A',title:'A',state:'done',critical:true,earlyStart:0,earlyFinish:3,durationDays:3,floatDays:0,predecessors:[]},
+ {id:'B',title:'B',state:'todo',critical:false,earlyStart:0,earlyFinish:2,durationDays:2,floatDays:1,predecessors:[]},
+ {id:'C',title:'C',state:'blocked',critical:true,earlyStart:3,earlyFinish:7,durationDays:4,floatDays:0,blockedBy:['A'],predecessors:['A','B']},
+ {id:'D',title:'D',state:'todo',critical:true,earlyStart:7,earlyFinish:7,durationDays:0,floatDays:0,predecessors:['C']}
+];
+const schedule={durationDays:7,rows};
+test('calendar Gantt follows original CPM without inventing progress',()=>{
+ const original=JSON.stringify(schedule);
+ const view=ganttViewport(schedule,{startDate:'2026-11-01',dueDate:'2026-11-06'});
+ assert.equal(view.rows[2].dateStart,'2026-11-04');
+ assert.equal(view.rows[2].dateFinish,'2026-11-08');
+ assert.equal(view.deadline.day,5);
+ assert.equal(view.rows[3].isMilestone,true);
+ assert.equal(view.rows[3].leftPct,100);
+ assert.equal(JSON.stringify(schedule),original);
+});
+test('relative Gantt zoom clips spans and clamps navigation',()=>{
+ const view=ganttViewport({rows:[{id:'X',earlyStart:40,earlyFinish:80,durationDays:40}],durationDays:150},
+  {scale:'30',offset:44,dueDate:'2026-11-01'});
+ assert.equal(view.dated,false);
+ assert.equal(view.from,44);
+ assert.equal(view.until,74);
+ assert.equal(view.rows[0].leftPct,0);
+ assert.equal(view.rows[0].widthPct,100);
+ assert.equal(view.deadline,null);
+ assert.match(view.windowLabel,/День 44/);
+ assert.equal(ganttViewport({rows:[],durationDays:150},{scale:'90',offset:999}).from,60);
+});
+test('dependency layout follows DAG and highlights critical links only',()=>{
+ const graph=dependencyDiagram(schedule);
+ assert.equal(graph.nodes.length,4);
+ assert.equal(graph.edges.length,3);
+ assert.ok(graph.nodes.find(x=>x.id==='C').x>graph.nodes.find(x=>x.id==='A').x);
+ assert.ok(graph.nodes.find(x=>x.id==='D').x>graph.nodes.find(x=>x.id==='C').x);
+ assert.equal(graph.edges.find(e=>e.from==='B'&&e.to==='C').critical,false);
+ assert.equal(graph.edges.find(e=>e.from==='C'&&e.to==='D').critical,true);
+ assert.ok(graph.edges.every(e=>/^M \d+/.test(e.path)));
+});
+test('large graph limits display but focus keeps a local DAG neighborhood',()=>{
+ const many=[];
+ for(let i=0;i<160;i++)many.push({id:String(i),title:'Work '+i,critical:false,
+  earlyStart:i,earlyFinish:i+1,predecessors:i?[String(i-1)]:[]});
+ const first=dependencyDiagram({rows:many},{limit:20});
+ assert.equal(first.shown,20);assert.equal(first.total,160);assert.equal(first.partial,true);
+ const focused=dependencyDiagram({rows:many},{limit:20,focusId:'100'});
+ assert.equal(focused.shown,5);
+ assert.deepEqual(new Set(focused.nodes.map(n=>n.id)),new Set(['98','99','100','101','102']));
+ assert.equal(focused.edges.length,4);
+});
+test('empty portfolio and zero-day schedule can render without invented dates',()=>{
+ assert.deepEqual(dependencyDiagram({rows:[]}).nodes,[]);
+ const value=ganttViewport({rows:[],durationDays:0});
+ assert.equal(value.days,1);assert.equal(value.visibleCount,0);
+});
