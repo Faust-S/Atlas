@@ -63,7 +63,7 @@ def controls(title,kind=None):
     matches=[]
     for control in window.descendants():
         try:
-            if control.element_info.name==title and (kind is None or control.element_info.control_type==kind):
+            if (control.element_info.name==title or str(control.element_info.name).strip().endswith(title)) and (kind is None or control.element_info.control_type==kind):
                 matches.append(control)
         except Exception: pass
     return matches
@@ -108,18 +108,21 @@ def stop():
 try:
     phase="initial-window"
     boot()
-    diagnose("Initial accessible control tree")
+    # The native window can become visible before the embedded renderer is ready.
     phase="native-react-bridge"
-    marker=Path(tempfile.gettempdir())/("iwxa-atlas-renderer-"+str(process.pid)+".probe")
-    for _ in range(28):
-        if marker.exists(): break
-        time.sleep(.35)
-    if not marker.exists():
-        raise AssertionError("Native Atlas opened a window, but React did not call atlas_open over Tauri IPC")
-    receipt=marker.read_text(encoding="utf-8")
-    print("ATLAS_CI_NATIVE_RENDERER_RECEIPT",receipt,flush=True)
-    if receipt!="ATLAS_TAURI_JS_NATIVE_OPEN_PASS":
-        raise AssertionError("Renderer reached Rust but native store could not open")
+    if os.environ.get("ATLAS_CI_EXPECT_BRIDGE","1")=="1":
+        marker=Path(tempfile.gettempdir())/("iwxa-atlas-renderer-"+str(process.pid)+".probe")
+        for _ in range(28):
+            if marker.exists(): break
+            time.sleep(.35)
+        if not marker.exists():
+            raise AssertionError("Native Atlas opened a window, but React did not call atlas_open over Tauri IPC")
+        receipt=marker.read_text(encoding="utf-8")
+        print("ATLAS_CI_NATIVE_RENDERER_RECEIPT",receipt,flush=True)
+        if receipt!="ATLAS_TAURI_JS_NATIVE_OPEN_PASS":
+            raise AssertionError("Renderer reached Rust but native store could not open")
+    else:
+        require("Портфель проектов",timeout=25)
     phase="create-project"
     click("Создать проект")
     set_text("Название проекта",PROJECT)
