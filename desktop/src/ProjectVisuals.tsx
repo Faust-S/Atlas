@@ -6,9 +6,9 @@ type Mode='fit'|'30'|'90';
 const statusName:Record<string,string>={todo:'Запланировано',in_progress:'В работе',blocked:'Заблокировано',done:'Выполнено (заявлено)'};
 const trim=(value:string,max=110)=>value.length>max?value.slice(0,max-1)+'…':value;
 
-export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,shiftDays,onOpenWork}:{
+export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,shiftDays,onOpenWork,onEditDates}:{
  schedule:CPM;projectStart:string|null;projectDue:string|null;portfolioStart:string|null;
- shiftDays:number|null;onOpenWork:(id:string)=>void
+ shiftDays:number|null;onOpenWork:(id:string)=>void;onEditDates:()=>void
 }){
  const [scale,setScale]=useState<Mode>('fit');
  const [offset,setOffset]=useState(0);
@@ -25,7 +25,8 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
  return <section className="surface atlas-gantt-panel">
   <div className="section-heading"><div><h2>План-график CPM</h2>
    <p>Расчётная длительность и критический путь по календарным дням. Состояния работ — заявления, а не фактическая приёмка.</p></div>
-   <span className="status-chip">{schedule.rows.length} работ · {schedule.durationDays} дн.</span></div>
+   <div className="button-row"><span className="status-chip">{schedule.rows.length} работ · {schedule.durationDays} дн.</span>
+    <button type="button" className="action-button" onClick={onEditDates}>Плановые даты</button></div></div>
   <div className="atlas-gantt-tools">
    <label>Масштаб <select value={scale} onChange={e=>{setScale(e.target.value as Mode);setOffset(0)}}>
     <option value="fit">Весь проект</option><option value="30">30 дней</option><option value="90">90 дней</option>

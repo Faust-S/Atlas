@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {ganttViewport,dependencyDiagram} from '../desktop/src/visual-layout.mjs';
 const rows=[
  {id:'A',title:'A',state:'done',critical:true,earlyStart:0,earlyFinish:3,durationDays:3,floatDays:0,predecessors:[]},
@@ -55,4 +56,18 @@ test('empty portfolio and zero-day schedule can render without invented dates',(
  assert.deepEqual(dependencyDiagram({rows:[]}).nodes,[]);
  const value=ganttViewport({rows:[],durationDays:0});
  assert.equal(value.days,1);assert.equal(value.visibleCount,0);
+});
+
+test('desktop workbench actually mounts existing Gantt/DAG and preserves real editing actions',()=>{
+ const entry=readFileSync(new URL('../desktop/src/main.tsx',import.meta.url),'utf8');
+ const component=readFileSync(new URL('../desktop/src/ProjectVisuals.tsx',import.meta.url),'utf8');
+ assert.match(entry,/import\s*\{ProjectGantt,ProjectDependencyDiagram\}\s*from\s*["']\.\/ProjectVisuals["']/);
+ assert.match(entry,/tab==="timeline"[\s\S]*?<ProjectGantt/);
+ assert.match(entry,/tab==="graph"[\s\S]*?<ProjectDependencyDiagram/);
+ assert.match(entry,/onEditDates=\{\(\)=>openEditor\("dates"\)\}/);
+ assert.match(entry,/onOpenWork=\{id=>openEditor\("work:"\+id\)\}/);
+ assert.match(component,/onEditDates:\(\)=>void/);
+ assert.match(component,/onClick=\{onEditDates\}/);
+ assert.doesNotMatch(entry,/className="graph-list"/);
+ assert.doesNotMatch(entry,/className="timeline-line"/);
 });

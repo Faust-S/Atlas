@@ -13,6 +13,7 @@ import {planReviewQueue,planReviewAction,planProposalAction} from "../../src/pla
 import {revisionReview,recheckAction} from "../../src/revision-review.mjs";
 import {previewPlanAmendment,applyPlanAmendment,removePlanAmendment} from "../../src/plan-amendment.mjs";
 import {planPublicRefresh,reconcilePublicSources,publicSourceQueue} from "../../src/public-refresh.mjs";
+import {ProjectGantt,ProjectDependencyDiagram} from "./ProjectVisuals";
 import "./style.css";
 
 type Atlas = any;
@@ -83,14 +84,14 @@ function EditorPanel({editor,onSubmit,onCancel,busy}:{editor:Editor;onSubmit:(ev
   <form onSubmit={onSubmit}>
    {editor.spec.fields.map(f=><label className="field" key={f.name}>{f.label}
     {f.type==="select"?
-      <select name={f.name} required={f.required!==false}
+      <select name={f.name} aria-label={f.label} required={f.required!==false}
        value={fields[f.name]??""} onChange={event=>setFields({...fields,[f.name]:event.target.value})}>
        {(f.options||[]).map(o=><option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
       :f.type==="textarea"?
-      <textarea rows={3} name={f.name} required={f.required!==false}
+      <textarea rows={3} name={f.name} aria-label={f.label} required={f.required!==false}
        value={fields[f.name]??""} onChange={event=>setFields({...fields,[f.name]:event.target.value})}/>
-      :<input type={f.type||"text"} name={f.name} required={f.required!==false}
+      :<input type={f.type||"text"} name={f.name} aria-label={f.label} required={f.required!==false}
        min={f.type==="number"?(f.name==="allocationPct"||f.name==="capacityPct"?1:0):undefined}
        max={f.type==="number"?(f.name==="allocationPct"?100:f.name==="capacityPct"?1000:36500):undefined}
        step={f.type==="number"?"1":undefined}
@@ -292,7 +293,7 @@ function App(){
    <div className="brand"><span className="logo-symbol">A</span><div><strong>Atlas</strong><small>IWXA · 0.2 Desktop</small></div></div>
    <nav className="main-nav" aria-label="Основная навигация">
     <button className={!active?"nav-current":""} onClick={()=>selectProject(null)}>▦ <span>Портфель проектов</span><b>{data.projects.length}</b></button>
-    <button onClick={()=>{selectProject(null);openEditor("new")}}>＋ <span>Создать проект</span></button>
+    <button aria-label="Создать проект" onClick={()=>{selectProject(null);openEditor("new")}}>＋ <span>Создать проект</span></button>
    </nav>
    <div className="sidebar-label">Мои проекты</div>
    <div className="project-nav" aria-label="Проекты">
@@ -440,29 +441,24 @@ function App(){
         <p className="minor">Показаны первые 60 из {project.items.filter((w:any)=>w.state===key).length} работ. Откройте таблицу для остальных.</p>}
       </section>)}
     </div>}
-    {tab==="timeline"&&<section className="surface"><div className="section-heading"><div><h2>План-график CPM</h2><p>Оценка по календарным дням. Красные отрезки образуют критический путь.</p></div>
-     <Action onClick={()=>openEditor("dates")}>Плановые даты</Action></div>
-     <div className="timeline">{(plan?.rows||[]).slice(0,150).map((r:any)=>{
-      const range=Math.max(1,plan?.durationDays||1);
-      return <div className="timeline-line" key={r.id}><button onClick={()=>openEditor("work:"+r.id)} title={r.title}>{r.title}</button>
-       <div className="timeline-track" title={"Начало: "+r.earlyStart+" дн.; длительность: "+r.durationDays+" дн."}>
-        <span className={r.critical?"timeline-bar critical":"timeline-bar"} style={{left:(r.earlyStart/range*100)+"%",
-          width:Math.max(.5,r.durationDays/range*100)+"%"}}/></div><small>{r.durationDays} дн.</small></div>
-     })}</div>
-     {!plan?.rows.length&&<Fallback message="График появится после добавления работ."/>}
-     {(plan?.rows.length||0)>150&&<p className="minor">Показаны первые 150 из {plan?.rows.length} работ. Полный перечень доступен в таблице.</p>}
-     <p className="minor">Базовый план не переписывается прогнозом. Для сценарного изменения используйте «Изменения».</p>
-    </section>}
-    {tab==="graph"&&<section className="surface"><div className="section-heading"><div><h2>Зависимости работ</h2><p>Ориентированный граф на основе существующей модели; кликом открывается точная работа.</p></div>
-     <Action onClick={()=>openEditor("dep")}>＋ Зависимость</Action></div>
-     {project.items.length>80?<Fallback message="Для крупного проекта используйте таблицу зависимостей: полный граф ограничен 80 работами, чтобы сохранить отзывчивость."/>:
-      <div className="graph-list">{(plan?.rows||[]).map((w:any)=><div className="graph-node" key={w.id}>
-       <button onClick={()=>openEditor("work:"+w.id)}>{w.title}</button><Badge tone={w.critical?"warning":"neutral"}>{w.critical?"Критический":"Резерв "+w.floatDays+" дн."}</Badge>
-       <small>Зависит от: {w.predecessors.map((id:string)=>project.items.find((t:any)=>t.id===id)?.title||id).join(", ")||"нет"}</small></div>)}</div>}
-     <div className="table-scroll"><table><thead><tr><th>Предшествующая</th><th>Зависимая</th></tr></thead><tbody>
-      {project.dependencies.map((d:any,i:number)=><tr key={i}><td>{project.items.find((w:any)=>w.id===d.from)?.title}</td>
-       <td>{project.items.find((w:any)=>w.id===d.to)?.title}</td></tr>)}</tbody></table></div>
-    </section>}
+    {tab==="timeline"&&(plan?
+      <ProjectGantt key={project.id} schedule={plan}
+       projectStart={project.startDate||null} projectDue={project.dueDate||null}
+       portfolioStart={projected?.projectedStart||null} shiftDays={projected?.shiftDays??null}
+       onEditDates={()=>openEditor("dates")} onOpenWork={id=>openEditor("work:"+id)}/>:
+      <section className="surface"><Fallback message="План пока не рассчитан. Добавьте работы или проверьте зависимости."/></section>)}
+    {tab==="graph"&&<section className="surface"><div className="section-heading">
+      <div><h2>Зависимости работ</h2><p>Интерактивный DAG существующего CPM; выделенный путь не означает подтверждение исполнения.</p></div>
+      <Action onClick={()=>openEditor("dep")}>＋ Зависимость</Action></div>
+      {plan&&<ProjectDependencyDiagram key={project.id} schedule={plan} onOpenWork={id=>openEditor("work:"+id)}/>}
+      <div className="table-scroll"><table><thead><tr><th>Предшествующая работа</th><th>Зависимая работа</th><th>Переход</th></tr></thead>
+       <tbody>{project.dependencies.map((d:any,i:number)=><tr key={d.from+"-"+d.to+"-"+i}>
+        <td>{project.items.find((w:any)=>w.id===d.from)?.title||d.from}</td>
+        <td>{project.items.find((w:any)=>w.id===d.to)?.title||d.to}</td>
+        <td><Action onClick={()=>openEditor("work:"+d.to)}>Открыть работу</Action></td>
+       </tr>)}</tbody></table></div>
+      {project.dependencies.length===0&&<p className="minor">Связей пока нет. Добавьте зависимости между работами для расчёта критического пути.</p>}
+     </section>}
     {tab==="reality"&&<section className="surface"><div className="section-heading"><div><h2>Матрица «должно быть / известно»</h2>
      <p>Показывает заявления, происхождение, свежесть, но не выдумывает процент подтверждённой готовности.</p></div>
      <div className="button-row"><Action onClick={()=>openEditor("target")}>＋ Требование</Action><Action onClick={()=>openEditor("finding")} disabled={!project.targets?.length}>＋ Наблюдение</Action></div></div>
