@@ -1,0 +1,102 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {empty,createProject,createItem,editProject,editItem,serialize,deserialize,validate} from "../src/core.mjs";
+import {planChange,decideChange} from "../src/trace.mjs";
+import {addPortfolioLink} from "../src/portfolio.mjs";
+import {editorSpec,applyEditor} from "../src/editor.mjs";
+import {addPlanWork,setPlanWork,setPlanDates,removePlanAmendment,previewPlanAmendment,applyPlanAmendment,renderProjectPlanAmendments} from "../src/plan-amendment.mjs";
+import {portfolioSchedule} from "../src/portfolio-schedule.mjs";
+const values=o=>({get:k=>o[k]??""});
+function fixture(){
+ const a=createProject(empty(),{name:"Core"}),b=createProject(a.state,{name:"Dependent"});
+ let s=editProject(b.state,a.id,{startDate:"2026-11-01",dueDate:"2026-11-05"});
+ s=editProject(s,b.id,{startDate:"2026-11-02",dueDate:"2026-11-08"});
+ const w=createItem(s,a.id,{title:"Build",assignee:"Developer"});
+ s=editItem(w.state,a.id,w.id,{estimateDays:2});
+ const v=createItem(s,b.id,{title:"Integrate"});
+ s=editItem(v.state,b.id,v.id,{estimateDays:3});
+ s=addPortfolioLink(s,{from:a.id,to:b.id});
+ const proposal=planChange(s,a.id,{title:"Extend core",description:"Change core delivery"});
+ return {state:proposal.state,root:a.id,child:b.id,changeId:proposal.id,itemId:w.id};
+}
+test("draft amendments show schedule consequences but never mutate baseline",()=>{
+ const f=fixture(),before=serialize(f.state);
+ let s=addPlanWork(f.state,f.root,f.changeId,{title:"Retest core",estimateDays:4,assignee:"QA",dueDate:"2026-11-06"}).state;
+ const report=previewPlanAmendment(s,f.root,f.changeId);
+ assert.equal(report.affected,2);
+ assert.equal(report.changed,2);
+ assert.equal(report.rows.find(r=>r.id===f.root).afterFinish,"2026-11-05");
+ assert.equal(report.rows.find(r=>r.id===f.child).afterFinish,"2026-11-08");
+ assert.equal(report.rows.find(r=>r.id===f.child).afterSlip,0);
+ assert.equal(s.projects[0].items.length,1);
+ assert.equal(s.projects[0].changes[0].status,"proposed");
+ assert.equal(serialize(f.state),before);
+ assert.match(renderProjectPlanAmendments(s,f.root,{previewId:f.changeId}),/Ретест|Retest core/);
+ assert.deepEqual(deserialize(serialize(s)),s);
+ assert.throws(()=>applyPlanAmendment(s,f.root,f.changeId),/утверждение/);
+});
+test("approved plan applied exactly once and survives export/import with date, owner and downstream change",()=>{
+ const f=fixture();
+ let s=setPlanWork(f.state,f.root,f.changeId,{itemId:f.itemId,estimateDays:5,assignee:"Lead",dueDate:"2026-11-09"}).state;
+ s=setPlanDates(s,f.root,f.changeId,{startDate:"2026-11-03",dueDate:"2026-11-15"}).state;
+ const view=previewPlanAmendment(s,f.root,f.changeId);
+ assert.equal(view.rows.find(r=>r.id===f.root).afterFinish,"2026-11-08");
+ assert.equal(view.rows.find(r=>r.id===f.child).afterFinish,"2026-11-11");
+ assert.equal(view.rows.find(r=>r.id===f.child).afterSlip,3);
+ const approved=decideChange(s,f.root,f.changeId,{status:"approved",rationale:"Planning owner approved amended deadlines"});
+ assert.equal(approved.state.projects[0].items[0].estimateDays,2);
+ assert.equal(approved.state.projects[0].startDate,"2026-11-01");
+ s=applyPlanAmendment(approved.state,f.root,f.changeId).state;
+ assert.equal(s.projects[0].items[0].estimateDays,5);
+ assert.equal(s.projects[0].items[0].assignee,"Lead");
+ assert.equal(s.projects[0].items[0].dueDate,"2026-11-09");
+ assert.equal(s.projects[0].startDate,"2026-11-03");
+ assert.equal(s.projects[0].dueDate,"2026-11-15");
+ assert.equal(portfolioSchedule(s).byId.get(f.child).deadlineSlipDays,3);
+ assert.equal(s.projects[0].decisions.at(-1).kind,"plan_application");
+ assert.ok(s.projects[0].changes[0].planAppliedAt);
+ assert.throws(()=>applyPlanAmendment(s,f.root,f.changeId),/применена/);
+ assert.deepEqual(deserialize(serialize(s)),s);
+});
+test("new planned work gets existing change link; no duplicate work on retry",()=>{
+ const f=fixture();
+ let s=applyEditor(f.state,f.root,"amend-new:"+f.changeId,values({
+  title:"Independent validation",estimateDays:"3",assignee:"Verifier",dueDate:"2026-11-09"
+ })).state;
+ const proposal=s.projects[0].changes[0];
+ assert.equal(s.projects[0].items.length,1);
+ assert.match(editorSpec(s.projects[0],"amend-dates:"+f.changeId,s).title,/даты/);
+ s=decideChange(s,f.root,f.changeId,{status:"approved",rationale:"Approved validation work"}).state;
+ s=applyPlanAmendment(s,f.root,f.changeId).state;
+ const work=s.projects[0].items.find(w=>w.changeId===f.changeId);
+ assert.equal(work.id,proposal.planAmendments[0].id);
+ assert.equal(work.assignee,"Verifier");
+ assert.equal(work.estimateDays,3);
+ assert.throws(()=>applyPlanAmendment(s,f.root,f.changeId),/применена/);
+ assert.deepEqual(deserialize(serialize(s)),s);
+});
+test("stale baseline, invalid dates and unapproved edits reject atomically",()=>{
+ const f=fixture();
+ let s=setPlanWork(f.state,f.root,f.changeId,{itemId:f.itemId,estimateDays:4,assignee:"QA"}).state;
+ s=decideChange(s,f.root,f.changeId,{status:"approved",rationale:"Approved initial work"}).state;
+ assert.throws(()=>setPlanDates(s,f.root,f.changeId,{startDate:"2026-11-04",dueDate:"2026-11-07"}),/до утверждения/);
+ const altered=editItem(s,f.root,f.itemId,{estimateDays:10});
+ assert.throws(()=>applyPlanAmendment(altered,f.root,f.changeId),/изменилась/);
+ assert.equal(altered.projects[0].items[0].estimateDays,10);
+ assert.equal(altered.projects[0].changes[0].planAppliedAt,undefined);
+ const f2=fixture();
+ assert.throws(()=>setPlanDates(f2.state,f2.root,f2.changeId,{startDate:"2026-11-20",dueDate:"2026-11-10"}),/dates/);
+ assert.throws(()=>addPlanWork(f2.state,f2.root,f2.changeId,{title:"Bad",estimateDays:-1}),/estimateDays/);
+ assert.throws(()=>setPlanWork(f2.state,f2.root,f2.changeId,{itemId:"ghost",estimateDays:1}),/не найдена/);
+});
+test("action replacement, removal and invalid imported amendments",()=>{
+ const f=fixture();
+ let s=setPlanWork(f.state,f.root,f.changeId,{itemId:f.itemId,estimateDays:4,assignee:"QA"}).state;
+ s=setPlanWork(s,f.root,f.changeId,{itemId:f.itemId,estimateDays:5,assignee:"QA"}).state;
+ assert.equal(s.projects[0].changes[0].planAmendments.length,1);
+ s=removePlanAmendment(s,f.root,f.changeId,"work:"+f.itemId).state;
+ assert.deepEqual(s.projects[0].changes[0].planAmendments,[]);
+ const forged=structuredClone(f.state);
+ forged.projects[0].changes[0].planAmendments=[{kind:"new_work",id:"fake",title:"Forgery",estimateDays:1,assignee:"",dueDate:null,stageId:null,targetIds:["nonexistent"]}];
+ assert.throws(()=>validate(forged),/Invalid new plan work/);
+});

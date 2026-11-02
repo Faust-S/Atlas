@@ -6,6 +6,7 @@ import {projectImpact} from "./impact.mjs";
 import {parseRecheckAction,recheckCandidate} from "./revision-review.mjs";
 import {addPortfolioLink} from "./portfolio.mjs";
 import {parsePlanReviewAction,parsePlanProposalAction,planReviewContext,decidePlanReview,planProposalContext} from "./plan-review.mjs";
+import {setPlanDates,setPlanWork,addPlanWork,checkPlanAmendment} from "./plan-amendment.mjs";
 
 const option=(value,label)=>({value:String(value),label});
 const choice=(name,label,items,value="",required=true)=>({name,label,type:"select",options:items,value,required});
@@ -58,6 +59,36 @@ export function editorSpec(project,action,snapshot=null){
     field("title","Что изменить в плане?","text","Пересмотреть план: "+ctx.row.targetTitle),
     field("description","Предлагаемое изменение и причины","textarea",ctx.decision.text,true)
    ]};
+ }
+ if(action.startsWith("amend-dates:")||action.startsWith("amend-work:")||action.startsWith("amend-new:")){
+  if(!snapshot||!project)throw Error("Для корректировки требуется снимок проекта");
+  const kind=action.split(":")[0],id=action.slice(kind.length+1);
+  const change=(project.changes||[]).find(x=>x.id===id);
+  if(!change||!["proposed","deferred"].includes(change.status)||change.planAppliedAt)
+   throw Error("Изменение нельзя уточнить после утверждения");
+  const dateAction=(change.planAmendments||[]).find(a=>a.kind==="dates");
+  const context="Корректировки фиксируются в заявке до утверждения; текущий план пока не меняется.";
+  if(kind==="amend-dates")return {title:"Изменить плановые даты: "+change.title,hint:context,fields:[
+   field("startDate","Плановое начало","date",dateAction?.after.startDate??project.startDate??"",false),
+   field("dueDate","Контрольный срок","date",dateAction?.after.dueDate??project.dueDate??"",false)
+  ]};
+  if(kind==="amend-work"){
+   if(!project.items.length)throw Error("В проекте пока нет работ");
+   return {title:"Изменить работу: "+change.title,hint:context,fields:[
+    choice("itemId","Работа",workItems(project)),
+    field("estimateDays","Новая оценка, календарных дней","number","1"),
+    field("assignee","Ответственный (имя или роль)","text","",false),
+    field("dueDate","Срок работы","date","",false)
+   ]};
+  }
+  return {title:"Предложить новую работу: "+change.title,hint:context,fields:[
+   field("title","Название обязательства / работы"),
+   choice("stageId","Этап",stageOptions(project),"",false),
+   choice("targetId","Связанное требование",optionalTargets(project),"",false),
+   field("estimateDays","Длительность, календарных дней","number","1"),
+   field("assignee","Ответственный (имя или роль)","text","",false),
+   field("dueDate","Срок работы","date","",false)
+  ]};
  }
  if(action==="new")return {title:"Новый проект",fields:[
   field("name","Название проекта"),
@@ -122,7 +153,7 @@ export function editorSpec(project,action,snapshot=null){
   const choices={proposed:["approved","rejected","deferred"],deferred:["approved","rejected"],approved:["in_progress","deferred"],in_progress:["implemented","deferred"]};
   const allowed=choices[c.status]||[];
   if(!allowed.length)throw Error("Изменение завершено или отклонено");
-  return {title:"Решение: "+c.title,hint:"Решение и обоснование останутся в истории. Изменения сами по себе не запускают исполнителей.",fields:[
+  return {title:"Решение: "+c.title,hint:"Решение и обоснование останутся в истории. Если заявка содержит конкретную корректировку, утверждение не применяет её автоматически.",fields:[
    choice("status","Новый статус",changeOptions.filter(o=>allowed.includes(o.value)),allowed[0]),
    field("rationale","Почему принято это решение?","textarea")
   ]};
@@ -170,6 +201,13 @@ export function applyEditor(snapshot,projectId,action,input){
   validateLinkedPlan(next);
   return {state:next};
  }
+ if(action.startsWith("amend-dates:"))return {state:setPlanDates(snapshot,projectId,action.slice(12),{
+  startDate:get("startDate"),dueDate:get("dueDate")}).state};
+ if(action.startsWith("amend-work:"))return {state:setPlanWork(snapshot,projectId,action.slice(11),{
+  itemId:get("itemId"),estimateDays:integer("estimateDays"),assignee:get("assignee"),dueDate:get("dueDate")}).state};
+ if(action.startsWith("amend-new:"))return {state:addPlanWork(snapshot,projectId,action.slice(10),{
+  title:get("title"),stageId:get("stageId"),targetId:get("targetId"),estimateDays:integer("estimateDays"),
+  assignee:get("assignee"),dueDate:get("dueDate")}).state};
  if(action==="new"){const r=createProject(snapshot,{name:get("name"),type:get("type"),goal:get("goal")});return {state:r.state,projectId:r.id}}
  if(action==="portfolio-link")return {state:addPortfolioLink(snapshot,{from:get("from"),to:get("to"),note:get("note")})};
  const p=snapshot.projects.find(x=>x.id===projectId);
@@ -213,7 +251,13 @@ export function applyEditor(snapshot,projectId,action,input){
   return {state:editItem(created.state,projectId,created.id,{estimateDays:integer("estimateDays")})};
  }
  if(action==="proposal")return {state:planChange(snapshot,projectId,{title:get("title"),description:get("description"),targetIds:get("targetId")?[get("targetId")]:[]}).state};
- if(action.startsWith("change:"))return {state:decideChange(snapshot,projectId,action.slice(7),{status:get("status"),rationale:get("rationale")}).state};
+ if(action.startsWith("change:")){
+  const id=action.slice(7),status=get("status");
+  const current=p.changes?.find(c=>c.id===id);
+  if(["approved","in_progress"].includes(status)&&current?.planAmendments?.length)
+   checkPlanAmendment(snapshot,projectId,id);
+  return {state:decideChange(snapshot,projectId,id,{status,rationale:get("rationale")}).state};
+ }
  if(action==="status")return {state:editProject(snapshot,projectId,{status:get("status")})};
  if(action==="start"||action==="dates")return {state:editProject(snapshot,projectId,{startDate:get("startDate")||null,dueDate:get("dueDate")||null})};
  if(action.startsWith("duration:"))return {state:editItem(snapshot,projectId,action.slice(9),{estimateDays:integer("estimateDays")})};

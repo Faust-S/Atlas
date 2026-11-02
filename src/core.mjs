@@ -22,7 +22,7 @@ export function validate(s){
   for(const stage of p.stages)if(!validDate(stage.dueDate))throw Error("Invalid stage date");
   const itemIds=new Set(p.items.map(x=>x.id)),stageIds=new Set(p.stages.map(x=>x.id)),sourceIds=new Set(p.sources.map(x=>x.id)),targetIds=new Set((p.targets||[]).map(x=>x.id)),changeIds=new Set((p.changes||[]).map(x=>x.id));
   if(itemIds.size!==p.items.length||stageIds.size!==p.stages.length||sourceIds.size!==p.sources.length)throw Error("Duplicate ID");
-  for(const x of p.items){if(!workStates.has(x.state)||!priorities.has(x.priority)||x.stageId&&!stageIds.has(x.stageId)||x.sourceId&&!sourceIds.has(x.sourceId))throw Error("Invalid work item");if(x.estimateDays!==undefined&&(!Number.isSafeInteger(x.estimateDays)||x.estimateDays<0||x.estimateDays>36500))throw Error("Invalid work estimateDays");if(x.targetIds!==undefined&&(!Array.isArray(x.targetIds)||new Set(x.targetIds).size!==x.targetIds.length||x.targetIds.some(id=>!targetIds.has(id))))throw Error("Invalid work targetIds");if(x.changeId!=null&&!changeIds.has(x.changeId))throw Error("Invalid work changeId");}
+  for(const x of p.items){if(!workStates.has(x.state)||!priorities.has(x.priority)||x.stageId&&!stageIds.has(x.stageId)||x.sourceId&&!sourceIds.has(x.sourceId))throw Error("Invalid work item");if(x.estimateDays!==undefined&&(!Number.isSafeInteger(x.estimateDays)||x.estimateDays<0||x.estimateDays>36500))throw Error("Invalid work estimateDays");if(!validDate(x.dueDate))throw Error("Invalid work dueDate");if(x.targetIds!==undefined&&(!Array.isArray(x.targetIds)||new Set(x.targetIds).size!==x.targetIds.length||x.targetIds.some(id=>!targetIds.has(id))))throw Error("Invalid work targetIds");if(x.changeId!=null&&!changeIds.has(x.changeId))throw Error("Invalid work changeId");}
   for(const x of p.sources)if(!kinds.has(x.kind)||!x.locator)throw Error("Invalid source");
   for(const k of ["targets","findings","changes"])if(p[k]!==undefined&&!Array.isArray(p[k]))throw Error("Invalid "+k);
   const targets=p.targets||[],findings=p.findings||[],changes=p.changes||[];
@@ -39,6 +39,37 @@ export function validate(s){
    }
   }
   for(const c of changes)if(!Array.isArray(c.targetIds)||!c.targetIds.every(id=>targetIds.has(id))||!["proposed","approved","in_progress","implemented","deferred","rejected"].includes(c.status)||typeof c.title!=="string"||!c.title||(c.causeKey!==undefined&&!validCauseKey(p,c.causeKey)))throw Error("Invalid change record");
+  for(const c of changes){
+   if(c.planAmendments===undefined&&c.planAppliedAt===undefined)continue;
+   if(!Array.isArray(c.planAmendments)||c.planAmendments.length>60)throw Error("Invalid plan amendments");
+   if(c.planAppliedAt!==undefined&&(!["approved","in_progress","implemented"].includes(c.status)||!Number.isFinite(Date.parse(c.planAppliedAt))||!c.planAmendments.length))
+    throw Error("Invalid plan application");
+   const amendmentKeys=new Set(),newIds=new Set();
+   for(const a of c.planAmendments){
+    if(!a||!["dates","work","new_work"].includes(a.kind))throw Error("Invalid plan amendment");
+    const key=a.kind==="dates"?"dates":a.kind==="work"?"work:"+a.itemId:"new_work:"+a.id;
+    if(amendmentKeys.has(key))throw Error("Duplicate plan amendment");
+    amendmentKeys.add(key);
+    if(a.kind==="dates"){
+     if(!a.before||!a.after||!validDate(a.before.startDate)||!validDate(a.before.dueDate)||
+        !validDate(a.after.startDate)||!validDate(a.after.dueDate)||
+        a.after.startDate&&a.after.dueDate&&a.after.startDate>a.after.dueDate)throw Error("Invalid amendment dates");
+    } else if(a.kind==="work"){
+     if(!itemIds.has(a.itemId)||!a.before||!a.after)throw Error("Invalid amendment work");
+     for(const v of [a.before,a.after])if(!Number.isSafeInteger(v.estimateDays)||v.estimateDays<0||v.estimateDays>36500||
+      typeof v.assignee!=="string"||!validDate(v.dueDate))throw Error("Invalid amendment work fields");
+    } else {
+     if(typeof a.id!=="string"||!a.id||newIds.has(a.id)||typeof a.title!=="string"||!a.title.trim()||
+       !Number.isSafeInteger(a.estimateDays)||a.estimateDays<0||a.estimateDays>36500||
+       typeof a.assignee!=="string"||!validDate(a.dueDate)||
+       a.stageId&&!stageIds.has(a.stageId)||!Array.isArray(a.targetIds)||a.targetIds.some(id=>!targetIds.has(id)))
+      throw Error("Invalid new plan work");
+     newIds.add(a.id);
+     if(c.planAppliedAt!==undefined&&!itemIds.has(a.id))throw Error("Applied plan work missing");
+     if(c.planAppliedAt===undefined&&itemIds.has(a.id))throw Error("Unapplied plan work already exists");
+    }
+   }
+  }
   for(const d of p.decisions)if(d.changeId!=null&&!changeIds.has(d.changeId))throw Error("Invalid decision changeId");
 
   const edges=new Set();

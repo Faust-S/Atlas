@@ -4,6 +4,7 @@ import {attachDiscoveredRepo} from "./source-observation.mjs";
 import {planPublicRefresh,reconcilePublicSources,renderPublicSourceQueue} from "./public-refresh.mjs";
 import {renderRevisionReview,parseRecheckAction} from "./revision-review.mjs";
 import {renderPortfolioPlanReviews,renderProjectPlanReviews,parsePlanReviewAction,parsePlanProposalAction} from "./plan-review.mjs";
+import {renderProjectPlanAmendments,removePlanAmendment,applyPlanAmendment} from "./plan-amendment.mjs";
 import {scheduleProject} from "./planning.mjs";
 import {addTarget,recordFinding,planChange,updateChange,compareProject} from "./trace.mjs";
 import {renderPortfolioInsight,statusBand,filterTraceRows} from "./visual.mjs";
@@ -19,7 +20,7 @@ import {buildPortfolioCommand,renderPortfolioCommand,renderPortfolioCommandRows}
 const root=document.querySelector("#app"),msg=document.querySelector("#message"),storageMount=document.querySelector("#storage-status");
 const esc=x=>String(x??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const store=createStandaloneStore();
-let data=empty(),active=null,traceMode="all",editorAction=null,graphMode="all",cascadeMode="attention",portfolioView="focus",commandFilter="all",commandSearch="";
+let data=empty(),active=null,traceMode="all",editorAction=null,graphMode="all",cascadeMode="attention",portfolioView="focus",commandFilter="all",commandSearch="",previewAmendment=null;
 let ready=false,storageStatus="loading",storageWarning="",storageError=null,busy=false,lastRefresh=null;
 async function save(next){await store.save(next);data=next;storageStatus="ready";storageWarning="";render()}
 async function safe(fn){
@@ -141,7 +142,7 @@ function renderTrace(p){
 function projectView(p){const s=summary(p), cols=[["todo","Запланировано"],["in_progress","В работе"],["blocked","Блокировано"],["done","Готово"]];
 return '<div class="row">'+button("← Все проекты","back")+'<span class="tag">'+esc(p.status)+'</span>'+button("Изменить статус","status")+'</div><h1>'+esc(p.name)+'</h1><p class="muted">'+esc(p.goal)+'</p><div class="grid"><div class="card"><small>Выполнено работ</small><div class="metric">'+(s.progress===null?"—":s.progress+"%")+'</div><small>Не является подтверждением готовности релиза</small></div><div class="card"><small>Блокеры</small><div class="metric">'+s.blocked+'</div></div><div class="card"><small>Связанных источников</small><div class="metric">'+s.sourceCount+'</div></div></div><div class="row">'+button("＋ Этап","stage")+button("＋ Работа","item","primary")+button("＋ Зависимость","dep")+button("Дата старта","start")+button("＋ Риск","risk")+button("＋ Решение","decision")+'</div><section class="card"><h2>Этапы</h2>'+p.stages.map(x=>'<p>◈ '+esc(x.name)+' <small>('+p.items.filter(y=>y.stageId===x.id).length+' работ)</small></p>').join("")+'</section>'+'<div id="atlas-project-relations" class="atlas-focus-target" tabindex="-1">'+renderProjectRelations(data,p.id,esc)+renderProjectCascade(data,p.id,projectImpact,esc)+'</div>'+
 '<div id="atlas-project-response" class="atlas-focus-target" tabindex="-1">'+renderProjectResponses(p,projectImpact(p),esc)+renderProjectPlanReviews(data,p.id,esc)+'</div>'+
-'<div id="atlas-project-schedule" class="atlas-focus-target" tabindex="-1">'+renderProjectSchedule(data,p.id,esc)+'</div>'+'<h2>План-график</h2><div id="atlas-schedule"></div><div id="atlas-relations"></div><div id="atlas-impact"></div><div id="atlas-trace" class="atlas-focus-target" tabindex="-1"></div><h2>Работы</h2><div class="board">'+cols.map(([st,title])=>'<section class="column"><strong>'+title+'</strong>'+p.items.filter(x=>x.state===st).map(x=>'<div class="item"><strong>'+esc(x.title)+'</strong><small>'+esc(x.assignee||"Не назначено")+'</small><div class="row">'+button("Редактировать · "+(x.estimateDays??1)+" дн.","work:"+esc(x.id))+'</div><select data-work="'+esc(x.id)+'">'+cols.map(([v,t])=>'<option value="'+v+'" '+(x.state===v?"selected":"")+'>'+t+'</option>').join("")+'</select></div>').join("")+'</section>').join("")+'</div><section class="card"><h2>Зависимости</h2>'+p.dependencies.map(x=>'<p>'+esc(p.items.find(t=>t.id===x.from)?.title)+' → '+esc(p.items.find(t=>t.id===x.to)?.title)+'</p>').join("")+'</section><section class="card"><h2>Риски и решения</h2>'+p.risks.map(r=>'<p>⚠ '+esc(r.title)+'</p>').join("")+p.decisions.map(d=>'<p>✓ '+esc(d.text)+'</p>').join("")+'</section><section id="atlas-project-sources" class="card atlas-focus-target" tabindex="-1"><div class="row"><h2>Источники</h2>'+button("＋ Источник","source")+'</div><p class="muted">Публичный владелец GitHub обнаруживает новые репозитории, выбранный репозиторий — ветки и SHA. Изменения источников не подтверждают готовность продукта.</p>'+p.sources.map(sourceCard).join("")+'</section>';
+''<div id="atlas-project-schedule" class="atlas-focus-target" tabindex="-1">'+renderProjectSchedule(data,p.id,esc)+renderProjectPlanAmendments(data,p.id,{previewId:previewAmendment,escape:esc})+'</div>'+'<h2>План-график</h2><div id="atlas-schedule"></div><div id="atlas-relations"></div><div id="atlas-impact"></div><div id="atlas-trace" class="atlas-focus-target" tabindex="-1"></div><h2>Работы</h2><div class="board">'+cols.map(([st,title])=>'<section class="column"><strong>'+title+'</strong>'+p.items.filter(x=>x.state===st).map(x=>'<div class="item"><strong>'+esc(x.title)+'</strong><small>'+esc(x.assignee||"Не назначено")+'</small><div class="row">'+button("Редактировать · "+(x.estimateDays??1)+" дн.","work:"+esc(x.id))+'</div><select data-work="'+esc(x.id)+'">'+cols.map(([v,t])=>'<option value="'+v+'" '+(x.state===v?"selected":"")+'>'+t+'</option>').join("")+'</select></div>').join("")+'</section>').join("")+'</div><section class="card"><h2>Зависимости</h2>'+p.dependencies.map(x=>'<p>'+esc(p.items.find(t=>t.id===x.from)?.title)+' → '+esc(p.items.find(t=>t.id===x.to)?.title)+'</p>').join("")+'</section><section class="card"><h2>Риски и решения</h2>'+p.risks.map(r=>'<p>⚠ '+esc(r.title)+'</p>').join("")+p.decisions.map(d=>'<p>✓ '+esc(d.text)+'</p>').join("")+'</section><section id="atlas-project-sources" class="card atlas-focus-target" tabindex="-1"><div class="row"><h2>Источники</h2>'+button("＋ Источник","source")+'</div><p class="muted">Публичный владелец GitHub обнаруживает новые репозитории, выбранный репозиторий — ветки и SHA. Изменения источников не подтверждают готовность продукта.</p>'+p.sources.map(sourceCard).join("")+'</section>';
 }
 root.addEventListener("click",event=>{
  const b=event.target.closest("[data-action]");if(!b)return;
@@ -153,7 +154,7 @@ root.addEventListener("click",event=>{
    if(!confirm("Восстановить предыдущую исправную версию? Повреждённый снимок будет сохранён в карантине."))return;
    data=await store.restorePrevious();storageStatus="ready";storageWarning="";editorAction=null;render();return;
   }
-  if(action==="back"){active=null;editorAction=null;render();return}
+  if(action==="back"){active=null;editorAction=null;previewAmendment=null;render();return}
   if(action==="refresh-portfolio"){
    if(!ready||storageStatus==="recovery")throw Error("Хранилище не готово");
    await runRefresh({manual:true});return;
@@ -162,6 +163,28 @@ root.addEventListener("click",event=>{
    const mode=action.slice("portfolio-view:".length);
    if(!["focus","details"].includes(mode))throw Error("Неизвестный режим портфеля");
    portfolioView=mode;render();return;
+  }
+  if(action.startsWith("preview-amendment:")){
+   const id=action.slice("preview-amendment:".length);
+   previewAmendment=previewAmendment===id?null:id;
+   render();document.querySelector("#atlas-plan-amendments")?.scrollIntoView?.({block:"nearest",behavior:"auto"});
+   return;
+  }
+  if(action.startsWith("apply-amendment:")){
+   const id=action.slice("apply-amendment:".length);
+   if(!active)throw Error("Выберите проект");
+   if(!confirm("Применить утверждённые корректировки к текущему плану? Действие сохранится в истории решения."))return;
+   await save(applyPlanAmendment(data,active,id).state);
+   previewAmendment=null;
+   return;
+  }
+  if(action.startsWith("remove-amendment:")){
+   const raw=action.slice("remove-amendment:".length),separator=raw.indexOf(":");
+   if(separator<0||!active)throw Error("Неверная корректировка");
+   const id=raw.slice(0,separator),key=decodeURIComponent(raw.slice(separator+1));
+   await save(removePlanAmendment(data,active,id,key).state);
+   previewAmendment=null;
+   return;
   }
   if(action.startsWith("plan-review:")||action.startsWith("plan-proposal:")){
    if(!ready||storageStatus==="recovery")throw Error("Хранилище не готово");
@@ -205,7 +228,7 @@ root.addEventListener("click",event=>{
    if(confirm("Удалить межпроектную зависимость? Это не удаляет проекты или работы."))await save(removePortfolioLink(data,action.slice(7)));
    return;
   }
-  if(action.startsWith("open:")){active=action.slice(5);editorAction=null;traceMode="all";graphMode="all";render();return}
+  if(action.startsWith("open:")){active=action.slice(5);editorAction=null;previewAmendment=null;traceMode="all";graphMode="all";render();return}
   if(!ready)throw Error("Локальное хранилище не готово");
   const p=data.projects.find(x=>x.id===active);
   if(action.startsWith("sync:")){
