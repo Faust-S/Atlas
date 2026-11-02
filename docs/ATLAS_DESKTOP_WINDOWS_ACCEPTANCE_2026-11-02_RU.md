@@ -87,3 +87,12 @@ PASS этой проверки подтверждает установленны
 Исправлено **только** разрешение разрушения окна для локального окна `main`, необходимое штатному закрытию через событие Tauri. Новых политик пользователей, файловых, сетевых или исполнительных разрешений нет; защита несохранённого черновика продолжает вызывать `preventDefault()`.
 
 Windows gate теперь сохраняет возможность отдельно установить PASS восстановления после аварийного завершения, но **завершается ошибкой**, если хоть одна попытка штатного закрытия потребовала `Stop-Process -Force`. Не считать исправление принятым без успешного прогона текущего NSIS.
+
+
+## Qualification #41508770785 — why Windows gate remained HOLD
+
+- Frontend: **156/156 Node PASS**, TypeScript/Vite, production DOM PASS.
+- NSIS build/install and **8/8 Rust tests PASS** at commit `9da7eb09d2cf3ddcab736a523acb5a1d7acd86ee`.
+- Windows release gate **FAIL before GUI save/close**: first redundant `atlas_open`-only launch did not emit a probe receipt during the 30-second wait; installed process did not exit unexpectedly. Therefore the new `core:window:allow-destroy` had **not** yet been exercised and should not be reported as accepted.
+- Since `desktop/tests/installed-windows-keyboard.ps1` independently verifies `atlas_open` at each real GUI launch, the extra two-launch probe workflow step was removed. The unified GUI acceptance now includes precise PID/window diagnostics and gives the first real WebView2 launch up to 60 seconds. This is a reduction in duplicated work, not a second workflow or a claim of release readiness.
+- **HOLD** until both real GUI attempts save, close without forced termination and preserve the previous project across restart.

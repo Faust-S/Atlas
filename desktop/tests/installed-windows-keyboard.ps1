@@ -59,17 +59,19 @@ function Wait-AtlasState([int]$count, [string[]]$required) {
 function Wait-AtlasOpen([System.Diagnostics.Process]$process) {
     $receipt = Join-Path $env:TEMP ("iwxa-atlas-renderer-" + $process.Id + ".probe")
     if (Test-Path -LiteralPath $receipt) { Remove-Item -LiteralPath $receipt -Force }
-    for ($i=0; $i -lt 60; $i++) {
+    for ($i=0; $i -lt 120; $i++) {
         Start-Sleep -Milliseconds 500
         $process.Refresh()
-        if ($process.HasExited) { throw 'Installed Atlas terminated before native open' }
+        if ($process.HasExited) { throw "Installed Atlas terminated before native open: $($process.ExitCode)" }
         if (Test-Path -LiteralPath $receipt) {
             $message = (Get-Content -LiteralPath $receipt -Raw).Trim()
             if ($message -ne 'ATLAS_TAURI_JS_NATIVE_OPEN_PASS') { throw "Native open failed: $message" }
+            Write-Output "ATLAS_INSTALLED_GUI_NATIVE_OPEN_PASS pid=$($process.Id)"
             return
         }
     }
-    throw 'Installed Atlas WebView2 did not open the native store'
+    $process.Refresh()
+    throw "Installed WebView2 did not call atlas_open in GUI scenario (pid=$($process.Id), hasExited=$($process.HasExited), window=$($process.MainWindowHandle)). GUI acceptance HOLD."
 }
 function Activate-Atlas([System.Diagnostics.Process]$process) {
     for ($i = 0; $i -lt 20; $i++) {
