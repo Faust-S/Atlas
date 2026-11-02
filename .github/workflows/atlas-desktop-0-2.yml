@@ -146,7 +146,11 @@ jobs:
           } finally {
             Remove-Item Env:ATLAS_CI_RENDERER_PROBE -ErrorAction SilentlyContinue
           }
-      # This qualifies installed WebView startup/open across process relaunches,
-      # NOT the human click -> create -> commit -> full GUI readback lifecycle.
-      # Full interactive acceptance remains HOLD; do not retry unstable UIA/CDP.
+      - name: Exercise installed React forms save close and reopen using native keyboard input
+        shell: pwsh
+        timeout-minutes: 4
+        run: ./desktop/tests/installed-windows-keyboard.ps1
+      # Native keyboard interaction is a different hypothesis from UIA/CDP.
+      # This is a GUI acceptance attempt, not a release PASS until the logs
+      # prove both installed processes committed and reread the same project.
 
