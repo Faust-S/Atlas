@@ -1,1 +1,20 @@
-<!doctype html><html lang="ru"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><meta http-equiv="Content-Security-Policy" content="default-src 'self' tauri:; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' ipc: http://ipc.localhost https://api.github.com; object-src 'none'; frame-src 'none'; base-uri 'none'"><title>IWXA Atlas 0.2</title></head><body><div id="root"></div><script type="module" src="/src/main.tsx"></script></body></html>
+<!doctype html>
+<html lang="ru">
+<head>
+ <meta charset="UTF-8"/>
+ <meta name="viewport" content="width=device-width,initial-scale=1"/>
+ <title>IWXA Atlas 0.2</title>
+</head>
+<body>
+ <main id="atlas-bootstrap" role="status" aria-live="polite"
+  style="font:14px/1.6 'Segoe UI',sans-serif;background:#f0f5fb;color:#244367;
+  min-height:100vh;box-sizing:border-box;padding:40px">
+  <h1 style="font-size:24px;margin:0 0 12px">IWXA Atlas 0.2</h1>
+  <p id="atlas-bootstrap-message">Загрузка локального рабочего пространства…</p>
+  <p style="font-size:12px;color:#59708c">Программа работает локально. Если интерфейс не откроется, здесь появится причина ошибки.</p>
+ </main>
+ <div id="root"></div>
+ <script type="module" src="/src/bootstrap.ts"></script>
+ <script type="module" src="/src/main.tsx"></script>
+</body>
+</html>

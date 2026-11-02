@@ -4,6 +4,7 @@ Fail closed if the actual project/work/save UI is not accessible.
 """
 import os
 import sys
+sys.stdout.reconfigure(encoding="utf-8",errors="replace")
 import time
 import json
 import subprocess
@@ -21,7 +22,7 @@ process=None
 phase="bootstrap"
 
 def diagnose(reason):
-    print("ATLAS_UIA_DIAGNOSTIC",json.dumps({"phase":phase,"reason":str(reason),"pid":process.pid if process else None},ensure_ascii=False),flush=True)
+    print("ATLAS_UIA_DIAGNOSTIC",json.dumps({"phase":phase,"reason":str(reason),"pid":process.pid if process else None},ensure_ascii=True),flush=True)
     if window:
         try:
             fields=[]

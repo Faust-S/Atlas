@@ -42,6 +42,25 @@ const stable=(value:any):any=>Array.isArray(value)?value.map(stable):
  value&&typeof value==="object"?Object.fromEntries(Object.keys(value).sort().map(k=>[k,stable(value[k])])):value;
 const snapshotText=(v:Atlas)=>JSON.stringify(stable(v));
 const deepFreezeError=(e:unknown)=>e instanceof Error?e.message:String(e);
+class AtlasRenderBoundary extends React.Component<{children:React.ReactNode},{failure:string|null}>{
+ state:{failure:string|null}={failure:null};
+ static getDerivedStateFromError(error:unknown){
+  return {failure:error instanceof Error?error.message:String(error)};
+ }
+ componentDidCatch(error:unknown){
+  console.error("Atlas desktop renderer failed:",error);
+ }
+ render(){
+  if(this.state.failure){
+   return <main className="entry"><div className="entry-card">
+    <span className="logo-symbol">A</span><h1>Atlas: ошибка интерфейса</h1>
+    <p role="alert" className="error">Ошибка при отображении: {this.state.failure}</p>
+    <p>Сохранённые данные не изменены. Закройте и повторно откройте программу; при повторении ошибки сохраните это сообщение для диагностики.</p>
+   </div></main>;
+  }
+  return this.props.children;
+ }
+}
 function Badge({children,tone="neutral"}:{children:React.ReactNode;tone?:string}){
  return <span className={"status-chip "+tone}>{children}</span>;
 }
@@ -547,4 +566,4 @@ function AmendmentForecast({state,projectId,changeId,onApply,canApply,onError}:{
   {canApply&&<Action onClick={onApply} primary>Применить утверждённый план</Action>}
  </div>;
 }
-createRoot(document.getElementById("root")!).render(<App/>);
+createRoot(document.getElementById("root")!).render(<AtlasRenderBoundary><App/></AtlasRenderBoundary>);

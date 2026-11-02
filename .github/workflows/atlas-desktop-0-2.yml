@@ -80,6 +80,42 @@ jobs:
           } finally {
             if (!$process.HasExited) { Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue }
           }
+      - name: Prepare Windows UIA test environment
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install UI automation driver (not bundled with Atlas)
+        shell: pwsh
+        run: python -m pip install --disable-pip-version-check pywinauto==0.6.9 pillow
+      - name: Install this exact Windows build using NSIS
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installer = Get-ChildItem desktop/src-tauri/target/release/bundle/nsis -Filter '*.exe' | Select-Object -First 1
+          if (!$installer) { throw 'NSIS output missing' }
+          $installerProcess = Start-Process -FilePath $installer.FullName -ArgumentList '/S' -PassThru
+          try { $installerProcess | Wait-Process -Timeout 85 -ErrorAction Stop }
+          catch {
+            if (!$installerProcess.HasExited) { Stop-Process -Id $installerProcess.Id -Force -ErrorAction SilentlyContinue }
+            throw 'NSIS installer timeout'
+          }
+          $installerProcess.Refresh()
+          if ($installerProcess.ExitCode -ne 0) { throw "Installer returned $($installerProcess.ExitCode)" }
+          $exe = Join-Path $env:LOCALAPPDATA 'IWXA Atlas\iwxa-atlas-desktop.exe'
+          if (!(Test-Path $exe)) { throw "Installed app absent: $exe" }
+          "ATLAS_INSTALLED_EXE=$exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Output "ATLAS_EXACT_REVISION_NSIS_INSTALL_PASS"
+      - name: Exercise installed Atlas frontend and native readback through Windows UIA
+        shell: pwsh
+        run: python desktop/tests/installed-windows-uia.py
+      - name: Preserve screenshots of real Windows window
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: iwxa-atlas-0-2-windows-window-screenshots
+          path: desktop/test-artifacts/*.png
+          if-no-files-found: ignore
+          retention-days: 3
       - name: Retain installer only when build succeeds
         if: success()
         uses: actions/upload-artifact@v4
