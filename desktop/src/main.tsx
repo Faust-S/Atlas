@@ -133,6 +133,9 @@ function App(){
  const [historyType,setHistoryType]=useState("all");
  const [historyLimit,setHistoryLimit]=useState(120);
  const [resourceLimit,setResourceLimit]=useState(40);
+ const [reviewLimit,setReviewLimit]=useState(20);
+ const [sourceLimit,setSourceLimit]=useState(15);
+ const [recheckLimit,setRecheckLimit]=useState(25);
  const project=data.projects.find((p:any)=>p.id===active)||null;
  // Canonical snapshot text is expensive for large portfolios: compute only
  // when domain data change, not for typing, scrolling, or tab switches.
@@ -147,6 +150,11 @@ function App(){
  const reviews=useMemo(()=>planReviewQueue(data),[data]);
  const sourceQueue=useMemo(()=>publicSourceQueue(data),[data]);
  const rechecks=useMemo(()=>revisionReview(data),[data]);
+ // The full review queue remains available in large portfolios. Rendering
+ // is paged; records never disappear silently after an arbitrary first page.
+ const reviewRows=useMemo(()=>reviews.rows.filter((r:any)=>
+  ["needs_decision","deferred","needs_proposal","source_hold"].includes(r.state)),[reviews]);
+ const recheckRows=useMemo(()=>active?rechecks.rows.filter((r:any)=>r.projectId===active):[],[rechecks,active]);
  const history=useMemo(()=>project?projectHistoryRows(project,{kind:historyType,query:historyQuery}):[],
   [project,historyType,historyQuery]);
  const plan=useMemo(()=>project?scheduleProject(project):null,[project]);
@@ -199,7 +207,7 @@ function App(){
  const selectProject=(id:string|null)=>{
   setActive(id);setTab("overview");setEditor(null);setForecastId(null);setMessage("");
   setWorkFilter("all");setWorkQuery("");setWorkLimit(200);
-  setHistoryQuery("");setHistoryType("all");setHistoryLimit(120);
+  setHistoryQuery("");setHistoryType("all");setHistoryLimit(120);setRecheckLimit(25);
  };
  const openEditor=(action:string,projectId?:string)=>{
   try{
@@ -445,14 +453,16 @@ function App(){
     </section>
     <section className="surface">
      <div className="section-heading"><div><h2>Решения после изменения фактов</h2><p>Новые факты не меняют план автоматически.</p></div></div>
-     {(reviews.rows||[]).filter((r:any)=>["needs_decision","deferred","needs_proposal","source_hold"].includes(r.state)).slice(0,20).map((r:any,i:number)=>
+     {reviewRows.slice(0,reviewLimit).map((r:any,i:number)=>
       <div className="attention-row" key={r.projectId+"-"+i}><div><strong>{r.projectName}</strong><small>{r.targetTitle||"Пересмотр плана"} · {r.state}</small></div>
        <div className="button-row">
         {["needs_decision","deferred"].includes(r.state)&&<Action onClick={()=>openEditorFor(r.projectId,planReviewAction(r.rootProjectId,r.findingId,r.projectId,r.revision))}>Рассмотреть план</Action>}
         {r.state==="needs_proposal"&&r.decision&&<Action onClick={()=>openEditorFor(r.projectId,planProposalAction(r.projectId,r.decision.id))}>Предложить изменение</Action>}
         <Action onClick={()=>selectProject(r.projectId)}>Открыть</Action>
        </div></div>)}
-     {reviews.totals?.needsDecision===0&&<p className="minor">Сейчас нет отмеченных новых решений. Это не подтверждение завершения проектов.</p>}
+     {reviewRows.length>0&&<p className="minor">Показано {Math.min(reviewLimit,reviewRows.length)} из {reviewRows.length} записей, требующих внимания.</p>}
+     {reviewRows.length>reviewLimit&&<Action onClick={()=>setReviewLimit(n=>Math.min(reviewRows.length,n+20))}>Показать ещё решения ({reviewRows.length-reviewLimit})</Action>}
+     {!reviewRows.length&&<p className="minor">Сейчас нет записей, требующих нового решения или сверки. Это не подтверждение завершения проектов.</p>}
     </section>
     <section className="surface">
      <div className="section-heading"><div><h2>Плановые ресурсы</h2><p>Ресурсы объединяются только по явному назначению, не по имени человека.</p></div>
@@ -469,8 +479,10 @@ function App(){
       <Action onClick={()=>void syncPublic()} disabled={busy||!sourceQueue.bindings}>Сверить источники</Action></div>
      {refreshReport&&<p className="minor">Последняя попытка: {refreshReport.updated} обновлено · {refreshReport.failed} ошибок · {refreshReport.remaining} отложено.</p>}
      <div className="summary-line"><span>Всего привязок: {sourceQueue.bindings}</span><span>Требуют проверки: {sourceQueue.pending}</span><span>Ошибки: {sourceQueue.errors}</span></div>
-     {sourceQueue.rows.slice(0,15).map((r:any,i:number)=><div key={i} className="attention-row"><div><strong>{r.locator}</strong><small>{r.error?"Ошибка":r.stale?"Требует обновления":"Наблюдался"} · {r.count} привязок</small></div>
+     {sourceQueue.rows.slice(0,sourceLimit).map((r:any,i:number)=><div key={i} className="attention-row"><div><strong>{r.locator}</strong><small>{r.error?"Ошибка":r.stale?"Требует обновления":"Наблюдался"} · {r.count} привязок</small></div>
       <Action onClick={()=>selectProject(r.projectId)}>Открыть</Action></div>)}
+     {sourceQueue.rows.length>0&&<p className="minor">Показано {Math.min(sourceLimit,sourceQueue.rows.length)} из {sourceQueue.rows.length} источников.</p>}
+     {sourceQueue.rows.length>sourceLimit&&<Action onClick={()=>setSourceLimit(n=>Math.min(sourceQueue.rows.length,n+15))}>Показать ещё источники ({sourceQueue.rows.length-sourceLimit})</Action>}
     </section>
     <section className="surface">
      <button className="text-link" onClick={()=>setShowDetails(!showDetails)}>{showDetails?"Скрыть":"Показать"} межпроектные зависимости</button>
@@ -585,11 +597,13 @@ function App(){
        <td>{r.freshness?.state||"Неизвестно"}</td><td className="mono">{r.latest?.revision?.slice(0,12)||"—"}</td>
        <td><Action onClick={()=>openEditor("finding-target:"+r.id)}>Новый факт</Action></td></tr>)}</tbody></table></div>
      <div className="section-heading"><h3>Факты на изменившихся исходных ревизиях</h3></div>
-     {rechecks.rows.filter((r:any)=>r.projectId===project.id).slice(0,25).map((r:any)=>
+     {recheckRows.slice(0,recheckLimit).map((r:any)=>
       <div className="attention-row" key={r.id}><div><strong>{r.targetTitle}</strong>
        <small>{r.locator} / {r.ref} · {r.claimedSha?.slice(0,12)} → {r.observedSha?.slice(0,12)||"неизвестно"}</small></div>
        {r.canRecheck?<Action onClick={()=>openEditor(recheckAction(project.id,r.claimId,r.observedSha))}>Повторно проверить</Action>:
         <Badge tone="warning">Обновите источник</Badge>}</div>)}
+     {recheckRows.length>0&&<p className="minor">Показано {Math.min(recheckLimit,recheckRows.length)} из {recheckRows.length} повторных проверок.</p>}
+     {recheckRows.length>recheckLimit&&<Action onClick={()=>setRecheckLimit(n=>Math.min(recheckRows.length,n+25))}>Показать ещё проверки ({recheckRows.length-recheckLimit})</Action>}
      </section>}
     {tab==="changes"&&<section className="surface"><div className="section-heading"><div><h2>Предложения и утверждённые изменения</h2>
      <p>Утверждение - отдельное решение человека. Применение конкретного плана также требует подтверждения.</p></div>
