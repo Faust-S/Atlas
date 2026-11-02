@@ -34,6 +34,7 @@ test("source deltas detect renames via stable GitHub ID and revisions by SHA",()
  assert.deepEqual(sourceChanges(previous,next).removed,["old"]);
  assert.deepEqual(sourceChanges(previous,next).added,["new"]);
  assert.deepEqual(sourceChanges(previous,next).changed,["main"]);
+ assert.deepEqual(sourceChanges(previous,next).revisions,[{ref:"main",previousSha:"abc",currentSha:"xyz"}]);
  assert.equal(sourceChanges(previous,{...next,complete:false}).comparable,false);
 });
 test("owner selection attaches only explicitly approved public repository and leaves prior claims untouched",()=>{

@@ -1,5 +1,13 @@
 # Atlas — universal project workspace (public foundation)
 
+## Source-revision review and downstream impact — 2026-11-02
+
+The public Atlas portfolio has an **«Изменения Git и пересмотр фактов»** view. It compares each *source-linked, ref- and SHA-pinned claim* to the latest observed repository branch head and shows the claim's original SHA beside the observed SHA. It distinguishes a changed SHA, an absent branch on a complete enumeration, an incomplete enumeration, an unavailable source and an out-of-date observation. A transitive dependency walk shows the number of downstream projects *potentially affected* by each project requiring evidence review, without claiming those projects have actually failed.
+
+Each row opens the precise target in the existing requirements/evidence view. Original evidence entries remain immutable; neither branch movement nor source errors automatically approve a result, delete prior claims or create tasks. Complete source-to-source comparisons now optionally retain `revisions: [{ref, previousSha, currentSha}]` within the existing observation summary. Older JSON snapshots without `revisions` remain readable. No new persistence, external authority, permissions or private IWXA integration.
+
+This view is a review queue, not a trusted validation of upstream tests, releases or acceptance. Full Node CI and a real Chromium qualification are separate gates for the new code.
+
 ## Fair public-source queue and single-revision refresh — 2026-11-02
 
 The standalone overview exposes an explicit read-only **public-source queue** showing never-observed, stale, errored, partially observed and recently changed GitHub bindings. It deduplicates references to the same public source across projects while retaining each project's own observation record. The work selector prioritises never-observed and oldest bindings, so repeated manual refreshes reach later repositories instead of selecting the same first four forever. Limits apply to the **whole batch** (at most 30 attached bindings, four unique API sources manually, three automatically). The number of untouched bindings is surfaced, never silently labelled as checked.

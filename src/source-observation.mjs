@@ -25,7 +25,11 @@ export function sourceChanges(previous,next){
  const old=new Set(previous.branches||Object.keys(prior)),fresh=new Set(next.branches||Object.keys(current));
  return {baseline:false,comparable:true,added:[...fresh].filter(x=>!old.has(x)),
   removed:[...old].filter(x=>!fresh.has(x)),renamed:[],
-  changed:[...fresh].filter(x=>old.has(x)&&prior[x]!==current[x])};
+  changed:[...fresh].filter(x=>old.has(x)&&prior[x]!==current[x]),
+  // Retain the actual before/after commit IDs inside the existing source summary.
+  // Older snapshots without this optional field remain readable.
+  revisions:[...fresh].filter(x=>old.has(x)&&typeof prior[x]==="string"&&typeof current[x]==="string"&&prior[x]!==current[x])
+   .map(ref=>({ref,previousSha:prior[ref],currentSha:current[ref]}))};
 }
 export function applySourceObservation(snapshot,projectId,sourceId,observation){
  const p=snapshot.projects.find(x=>x.id===projectId),source=p?.sources.find(x=>x.id===sourceId);
