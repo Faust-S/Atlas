@@ -152,3 +152,10 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
  .workspace{overflow:visible}.commandbar{position:static}.toolbar-actions{justify-content:flex-start}.toolbar-actions .action-button{font-size:10px;padding:5px 8px;min-height:32px}
  .metric-grid{gap:7px}.metric{padding:10px}.board{grid-template-columns:repeat(4,190px)}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
+
+.split-details{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:16px}
+.split-details h3{font-size:12px;margin:0 0 10px}
+.detail-row{border-top:1px solid #e1e9f3;display:flex;align-items:start;justify-content:space-between;gap:10px;padding:10px 0;color:#415b79;font-size:11px}
+.detail-row span{overflow-wrap:anywhere;min-width:0}
+.detail-row small{flex:none;color:#6a83a2}
+@media(max-width:800px){.split-details{grid-template-columns:1fr}}

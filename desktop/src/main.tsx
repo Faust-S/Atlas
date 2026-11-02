@@ -371,15 +371,33 @@ function App(){
       <div className="summary-line"><span>Начало: {readable(project.startDate)}</span><span>Контрольный срок: {readable(project.dueDate)}</span>
        <span>Прогноз финиша: {readable(projected?.projectedFinish)}</span><span>Критический путь: {plan?.durationDays??0} дн.</span></div>
      </section>
+     <section className="surface"><div className="section-heading"><div><h2>Этапы проекта</h2>
+      <p>Этапы связывают работы с принятым планом; завершение этапа не означает приёмку результата.</p></div>
+      <Action onClick={()=>openEditor("stage")}>＋ Этап</Action></div>
+      {project.stages.length?<div className="table-scroll"><table><thead><tr><th>Этап</th><th>Состояние</th><th>Срок</th><th>Работ</th></tr></thead>
+       <tbody>{project.stages.map((stage:any)=><tr key={stage.id}><td>{stage.name}</td><td>{statuses[stage.status]||stage.status}</td>
+        <td>{readable(stage.dueDate)}</td><td>{project.items.filter((w:any)=>w.stageId===stage.id).length}</td></tr>)}</tbody></table></div>:
+       <Fallback message="Добавьте этап, чтобы организовать работу проекта."/>}
+     </section>
      <section className="surface"><div className="section-heading"><div><h2>Риски и решения</h2></div></div>
       <div className="button-row"><Action onClick={()=>openEditor("risk")}>＋ Риск</Action><Action onClick={()=>openEditor("decision")}>＋ Решение</Action>
        <Action onClick={()=>view("changes")}>Предложения изменений</Action></div>
       <div className="summary-line"><span>Рисков: {project.risks.length}</span><span>Решений: {project.decisions.length}</span><span>Предложений: {project.changes?.length||0}</span></div>
+      <div className="split-details">
+       <div><h3>Заявленные риски</h3>{project.risks.length?project.risks.slice(0,30).map((risk:any)=>
+        <div className="detail-row" key={risk.id}><span>{risk.title}</span><Badge tone={risk.status==="open"?"warning":"neutral"}>{risk.status==="open"?"Открыт":risk.status}</Badge></div>):
+        <p className="minor">Риски ещё не внесены.</p>}
+        {project.risks.length>30&&<p className="minor">Показаны 30 из {project.risks.length} рисков.</p>}</div>
+       <div><h3>Последние решения</h3>{project.decisions.length?project.decisions.slice(-15).reverse().map((decision:any)=>
+        <div className="detail-row" key={decision.id}><span>{decision.text}</span><small>{readable(decision.at)}</small></div>):
+        <p className="minor">Решений пока нет.</p>}
+        {project.decisions.length>15&&<Action onClick={()=>view("history")}>Вся история</Action>}</div>
+      </div>
      </section>
     </>}
     {tab==="work"&&<section className="surface">
      <div className="section-heading"><div><h2>Работы проекта</h2><p>Изменения отражаются в доске, графике и зависимостях.</p></div>
-      <div className="button-row"><Action onClick={()=>openEditor("item")} primary>＋ Работа</Action><Action onClick={()=>openEditor("dep")}>Связь работ</Action></div></div>
+      <div className="button-row"><Action onClick={()=>openEditor("item")} primary>＋ Работа</Action><Action onClick={()=>openEditor("stage")}>＋ Этап</Action><Action onClick={()=>openEditor("dep")}>Связь работ</Action></div></div>
      <div className="filter-row"><label>Состояние <select value={workFilter} onChange={e=>setWorkFilter(e.target.value)}>
       <option value="all">Все</option>{Object.entries(workStatuses).map(([v,k])=><option value={v} key={v}>{String(k)}</option>)}</select></label></div>
      <div className="table-scroll"><table><thead><tr><th>Работа</th><th>Состояние</th><th>Длительность</th><th>Ответственный</th><th>Срок</th><th>Изменить</th></tr></thead>
@@ -396,6 +414,8 @@ function App(){
        <div className="board-actions"><select aria-label={"Состояние "+w.title} value={w.state} onChange={e=>quickWork(w.id,e.target.value)}>
         {Object.entries(workStatuses).map(([v,title])=><option key={v} value={v}>{String(title)}</option>)}</select>
         <button onClick={()=>openEditor("work:"+w.id)}>Детали</button></div></div>)}
+       {project.items.filter((w:any)=>w.state===key).length>60&&
+        <p className="minor">Показаны первые 60 из {project.items.filter((w:any)=>w.state===key).length} работ. Откройте таблицу для остальных.</p>}
       </section>)}
     </div>}
     {tab==="timeline"&&<section className="surface"><div className="section-heading"><div><h2>План-график CPM</h2><p>Оценка по календарным дням. Красные отрезки образуют критический путь.</p></div>
@@ -408,6 +428,7 @@ function App(){
           width:Math.max(.5,r.durationDays/range*100)+"%"}}/></div><small>{r.durationDays} дн.</small></div>
      })}</div>
      {!plan?.rows.length&&<Fallback message="График появится после добавления работ."/>}
+     {(plan?.rows.length||0)>150&&<p className="minor">Показаны первые 150 из {plan?.rows.length} работ. Полный перечень доступен в таблице.</p>}
      <p className="minor">Базовый план не переписывается прогнозом. Для сценарного изменения используйте «Изменения».</p>
     </section>}
     {tab==="graph"&&<section className="surface"><div className="section-heading"><div><h2>Зависимости работ</h2><p>Ориентированный граф на основе существующей модели; кликом открывается точная работа.</p></div>
