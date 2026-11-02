@@ -1,5 +1,7 @@
 # IWXA Atlas Desktop 0.2 — самостоятельная Windows-версия
 
+**Актуальная проверенная точка передачи:** [первый раздел handoff](../docs/HANDOFF_ATLAS_0_2_DESKTOP_2026-11-02_RU.md) — исправление startup probe `146b9034`, frontend 158/158 PASS, Windows #41516480112 проверять отдельно. Базовый GUI lifecycle PASS на #41510178723, расширенный Gantt/DAG пока требует установленной GUI-приёмки. Старые данные о 5 Rust-тестах и 133 Node-тестах ниже — исторические, не текущая квалификация.
+
 **Статус:** Windows EXE/NSIS сборка PASS, 5/5 тестов Rust-хранилища PASS, самостоятельное окно Windows PASS ([Actions #41446391609](https://github.com/Faust-S/Atlas/actions/runs/41446391609)). Полная работа через WebView2 и установленный пакет ещё проходят отдельную приёмку.
 
 **Передача в новый чат:** [IWXA Atlas Desktop 0.2 — инженерный handoff](../docs/HANDOFF_ATLAS_0_2_DESKTOP_2026-11-02_RU.md). Последний квалифицированный frontend-коммит: `5ec595d4d634f1e3cd76783b6188d33233cef13a` (133/133 Node PASS; Windows GUI readback HOLD).
