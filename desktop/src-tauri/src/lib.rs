@@ -25,7 +25,8 @@ struct Manifest {
     generation: String,
     revision: u64,
     root: Value,
-    root_sha256: String,
+    #[serde(default)]
+    root_sha256: Option<String>,
     projects: Vec<BlockRef>,
 }
 
@@ -184,7 +185,7 @@ fn encode(root: &Path, snapshot: Value, generation: String) -> Result<(Manifest,
         });
     }
     Ok((Manifest{schema:"atlas.store/1".into(),generation,revision,
-        root_sha256:checksum(&to_json(&extras)?),root:Value::Object(extras),projects:blocks},written))
+        root_sha256:Some(checksum(&to_json(&extras)?)),root:Value::Object(extras),projects:blocks},written))
 }
 fn read_manifest(path: &Path) -> Result<Manifest, String> {
     let manifest: Manifest = serde_json::from_slice(&read_limited(path)?)
@@ -194,7 +195,11 @@ fn read_manifest(path: &Path) -> Result<Manifest, String> {
         return Err("Повреждён идентификатор записи".into());
     }
     if manifest.projects.len() > MAX_PROJECTS {return Err("Превышен лимит проектов".into());}
-    if checksum(&to_json(&manifest.root)?) != manifest.root_sha256 {return Err("Ошибка целостности индекса портфеля".into());}
+    if let Some(expected)=&manifest.root_sha256{
+        if checksum(&to_json(&manifest.root)?)!=*expected {
+            return Err("Ошибка целостности индекса портфеля".into());
+        }
+    }
     Ok(manifest)
 }
 fn decode(root: &Path, m: &Manifest) -> Result<Value, String> {
@@ -246,27 +251,36 @@ fn backup_open(root:&Path)->Result<OpenResult,String>{
     }
     Err("Основной индекс повреждён; исправная резервная редакция не найдена. Исходные файлы сохранены.".into())
 }
-#[tauri::command]
-fn atlas_open(app: AppHandle)->Result<OpenResult,String>{
-    let root=path_for(&app)?;
-    let _guard=lock(&root)?;
-    match current(&root) {
+fn load_root(root:&Path)->Result<OpenResult,String>{
+    match current(root) {
         Ok(Some(m))=>match decode(&root,&m){
             Ok(snapshot)=>Ok(OpenResult{generation:m.generation,snapshot,
                 restored_from_backup:false,needs_confirmation:false}),
-            Err(_)=>backup_open(&root),
+            Err(_)=>backup_open(root),
         },
-        Ok(None)=>Ok(OpenResult{generation:"none".into(),
-            snapshot:serde_json::json!({"schema":"atlas.project/1","revision":0,"projects":[]}),
-            restored_from_backup:false,needs_confirmation:false}),
-        Err(_)=>backup_open(&root),
+        Ok(None)=>{
+            // Missing head with retained history is not an empty portfolio.
+            if !backup_candidates(root)?.is_empty(){return backup_open(root);}
+            Ok(OpenResult{generation:"none".into(),
+                snapshot:serde_json::json!({"schema":"atlas.project/1","revision":0,"projects":[]}),
+                restored_from_backup:false,needs_confirmation:false})
+        },
+        Err(_)=>backup_open(root),
     }
 }
 #[tauri::command]
-fn atlas_commit(app: AppHandle, expected_generation:String, snapshot:Value)->Result<WriteResult,String>{
+fn atlas_open(app:AppHandle)->Result<OpenResult,String>{
     let root=path_for(&app)?;
     let _guard=lock(&root)?;
-    let head=current(&root)?;
+    load_root(&root)
+}
+fn commit_root(root:&Path,expected_generation:&str,snapshot:Value)->Result<WriteResult,String>{
+    let _guard=lock(root)?;
+    let head=current(root)?;
+    if head.is_none()&&!backup_candidates(root)?.is_empty(){
+        return Err("Отсутствует текущий индекс, но осталась история. Сначала восстановите портфель.".into());
+    }
+    if let Some(old)=&head{decode(root,old)?;}
     let observed=head.as_ref().map(|m|m.generation.as_str()).unwrap_or("none");
     if observed!=expected_generation {return Err("Данные изменились в другом окне или процессе. Запись отклонена; перечитайте портфель.".into());}
     validate_snapshot(&snapshot)?;
@@ -281,6 +295,10 @@ fn atlas_commit(app: AppHandle, expected_generation:String, snapshot:Value)->Res
     let (manifest,written)=encode(&root,snapshot,generation.clone())?;
     publish(&root,&root.join("head.json"),&to_json(&manifest)?)?;
     Ok(WriteResult{generation,revision,project_blocks_written:written})
+}
+#[tauri::command]
+fn atlas_commit(app:AppHandle,expected_generation:String,snapshot:Value)->Result<WriteResult,String>{
+    commit_root(&path_for(&app)?,&expected_generation,snapshot)
 }
 #[tauri::command]
 fn atlas_export_json(app:AppHandle, expected_generation:String)->Result<String,String>{
@@ -318,11 +336,15 @@ fn atlas_select_import(app:AppHandle)->Result<Option<Value>,String>{
     validate_snapshot(&data)?;
     Ok(Some(data))
 }
-#[tauri::command]
-fn atlas_restore_previous(app:AppHandle)->Result<OpenResult,String>{
-    let root=path_for(&app)?;
-    let _guard=lock(&root)?;
-    let backup=backup_open(&root)?;
+fn restore_root(root:&Path)->Result<OpenResult,String>{
+    let _guard=lock(root)?;
+    // Never permit rollback through a native command when the active head is sound.
+    if let Ok(Some(head))=current(root){
+        if decode(root,&head).is_ok(){
+            return Err("Текущий портфель исправен. Восстановление не требуется.".into());
+        }
+    }
+    let backup=backup_open(root)?;
     // Re-publish only after explicit user confirmation. Keep damaged head in quarantine.
     if root.join("head.json").exists(){
         let quarantine=root.join(format!("head-quarantine-{}.json",Uuid::new_v4()));
@@ -336,8 +358,93 @@ fn atlas_restore_previous(app:AppHandle)->Result<OpenResult,String>{
     let generation=Uuid::new_v4().to_string();
     let restored=Manifest{generation:generation.clone(),..previous};
     publish(&root,&root.join("head.json"),&to_json(&restored)?)?;
+    let verified=read_manifest(&root.join("head.json"))?;
+    if decode(root,&verified)?!=backup.snapshot {
+        return Err("Восстановленная редакция не совпала при повторном чтении".into());
+    }
     Ok(OpenResult{generation,snapshot:backup.snapshot,
         restored_from_backup:true,needs_confirmation:false})
+}
+#[tauri::command]
+fn atlas_restore_previous(app:AppHandle)->Result<OpenResult,String>{
+    restore_root(&path_for(&app)?)
+}
+
+#[cfg(test)]
+mod persistence_tests{
+    use super::*;
+    struct Scratch(PathBuf);
+    impl Drop for Scratch{fn drop(&mut self){let _=fs::remove_dir_all(&self.0);}}
+    fn scratch()->Scratch{
+        let path=std::env::temp_dir().join(format!("iwxa-atlas-{}",Uuid::new_v4()));
+        ensure_dirs(&path).expect("create temporary standalone store");
+        Scratch(path)
+    }
+    fn snapshot(rev:u64,names:&[&str])->Value{
+        serde_json::json!({"schema":"atlas.project/1","revision":rev,
+        "portfolioLinks":[],"projects":names.iter().enumerate().map(|(i,name)|
+          serde_json::json!({"id":format!("project-{i}"),"name":name,"items":[],
+          "dependencies":[],"stages":[],"risks":[],"decisions":[],"sources":[]})
+        ).collect::<Vec<_>>()})
+    }
+    #[test]fn empty_starts_clean_without_files(){
+        let root=scratch();
+        let loaded=load_root(&root.0).expect("open empty Atlas");
+        assert_eq!(loaded.generation,"none");
+        assert!(!loaded.needs_confirmation);
+        assert_eq!(loaded.snapshot["revision"],0);
+        assert!(!root.0.join("head.json").exists());
+    }
+    #[test]fn atomic_commit_readback_immutable_blocks_and_stale_generation(){
+        let root=scratch();
+        let first=commit_root(&root.0,"none",snapshot(1,&["A","B"])).unwrap();
+        assert_eq!(first.project_blocks_written,2);
+        let opened=load_root(&root.0).unwrap();
+        assert_eq!(opened.generation,first.generation);
+        assert_eq!(opened.snapshot["projects"][0]["name"],"A");
+        let second=commit_root(&root.0,&first.generation,snapshot(2,&["A","B updated"])).unwrap();
+        assert_eq!(second.project_blocks_written,1);
+        assert_ne!(first.generation,second.generation);
+        let opened_again=load_root(&root.0).unwrap();
+        assert_eq!(opened_again.snapshot["revision"],2);
+        assert_eq!(opened_again.snapshot["projects"][1]["name"],"B updated");
+        assert!(commit_root(&root.0,&first.generation,snapshot(3,&["stale"])).is_err());
+        assert_eq!(load_root(&root.0).unwrap().generation,second.generation);
+        assert!(restore_root(&root.0).is_err()); // healthy state cannot be rolled back silently
+    }
+    #[test]fn missing_head_does_not_erase_retained_history(){
+        let root=scratch();
+        let first=commit_root(&root.0,"none",snapshot(1,&["A"])).unwrap();
+        commit_root(&root.0,&first.generation,snapshot(2,&["B"])).unwrap();
+        fs::remove_file(root.0.join("head.json")).unwrap();
+        let recovery=load_root(&root.0).unwrap();
+        assert!(recovery.needs_confirmation);
+        assert_eq!(recovery.snapshot["projects"][0]["name"],"A");
+        assert!(commit_root(&root.0,"none",snapshot(3,&["C"])).is_err());
+        assert!(!root.0.join("head.json").exists());
+    }
+    #[test]fn corrupted_head_requires_explicit_recovery_and_quarantine(){
+        let root=scratch();
+        let first=commit_root(&root.0,"none",snapshot(1,&["A"])).unwrap();
+        commit_root(&root.0,&first.generation,snapshot(2,&["B"])).unwrap();
+        fs::write(root.0.join("head.json"),"{not valid json").unwrap();
+        let candidate=load_root(&root.0).unwrap();
+        assert!(candidate.restored_from_backup&&candidate.needs_confirmation);
+        assert_eq!(candidate.snapshot["revision"],1);
+        assert!(commit_root(&root.0,"none",snapshot(3,&["C"])).is_err());
+        let result=restore_root(&root.0).unwrap();
+        assert!(!result.needs_confirmation);
+        assert_eq!(load_root(&root.0).unwrap().snapshot["revision"],1);
+        assert!(fs::read_dir(&root.0).unwrap().any(|item|
+            item.unwrap().file_name().to_string_lossy().starts_with("head-quarantine-")));
+    }
+    #[test]fn invalid_root_and_missing_backup_never_return_empty_portfolio(){
+        let root=scratch();
+        fs::write(root.0.join("head.json"),"{broken").unwrap();
+        assert!(load_root(&root.0).is_err());
+        assert!(restore_root(&root.0).is_err());
+        assert_eq!(fs::read(root.0.join("head.json")).unwrap(),b"{broken");
+    }
 }
 pub fn run(){
     tauri::Builder::default()

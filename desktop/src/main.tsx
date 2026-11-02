@@ -97,6 +97,7 @@ function App(){
  const [showDetails,setShowDetails]=useState(false);
  const project=data.projects.find((p:any)=>p.id===active)||null;
  const dirty=ready&&snapshotText(data)!==saved.current;
+ const persisted=generation!=="none";
  const dirtyRef=useRef(false),busyRef=useRef(false);
  dirtyRef.current=dirty;busyRef.current=busy;
  const native=isTauri();
@@ -285,7 +286,7 @@ function App(){
     <label className="search"><span>⌕</span><input id="atlas-search" placeholder="Найти проект · Ctrl+K"
       value={search} onChange={e=>setSearch(e.target.value)}/><kbd>Ctrl K</kbd></label>
     <div className="toolbar-actions">
-     <Badge tone={dirty?"warning":"good"}>{dirty?"Не сохранено":"Сохранено"}</Badge>
+     <Badge tone={dirty?"warning":persisted?"good":"neutral"}>{dirty?"Не сохранено":persisted?"Сохранено":"Новый портфель"}</Badge>
      <Action onClick={()=>void save()} primary disabled={!dirty||busy}>Сохранить</Action>
      <Action onClick={()=>void importJson()} disabled={busy}>Открыть JSON</Action>
      <Action onClick={()=>void exportJson()} disabled={busy||dirty}>Резервная копия</Action>
@@ -488,7 +489,7 @@ function App(){
    <section><div className="section-heading"><h2>Инспектор</h2><button className="icon-button" aria-label="Скрыть инспектор" onClick={()=>setInspector(false)}>×</button></div>
     <div className="inspector-block"><small>Текущий контекст</small><strong>{project?.name||"Портфель проектов"}</strong>
      <p>{project?.goal||"Выберите проект для работы с планом, доказательствами и изменениями."}</p></div>
-    <div className="inspector-block"><small>Состояние данных</small><Badge tone={dirty?"warning":"good"}>{dirty?"Только в памяти":"Сохранено на диск"}</Badge>
+    <div className="inspector-block"><small>Состояние данных</small><Badge tone={dirty?"warning":persisted?"good":"neutral"}>{dirty?"Только в памяти":persisted?"Сохранено на диск":"Ещё не сохранялся"}</Badge>
      <p>Редакция: {data.revision}</p><p>Хранилище: нативное Atlas</p>
      <Action onClick={()=>void save()} primary disabled={!dirty||busy}>Сохранить редакцию</Action></div>
     {project&&<div className="inspector-block"><small>План проекта</small><p>Начало: {readable(project.startDate)}</p>
