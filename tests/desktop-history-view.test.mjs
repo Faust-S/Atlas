@@ -34,4 +34,8 @@ test('desktop presents complete history and progressive resource list',()=>{
  assert.match(ui,/history\.slice\(0,historyLimit\)/);
  assert.match(ui,/setHistoryLimit\(n=>Math\.min\(history\.length,n\+120\)\)/);
  assert.match(ui,/setResourceLimit\(n=>Math\.min\(resources\.people\.length,n\+40\)\)/);
+ assert.match(ui,/editorOpenRef\.current/);
+ assert.match(ui,/event\.currentTarget\.requestSubmit\(\)/);
+ assert.match(ui,/openEditor\("new"\);return;/);
+ assert.match(ui,/autoFocus=\{index===0\}/);
 });

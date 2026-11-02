@@ -83,25 +83,30 @@ function EditorPanel({editor,onSubmit,onCancel,busy}:{editor:Editor;onSubmit:(ev
   <div className="section-heading"><div><small>Изменение данных</small><h2>{editor.spec.title}</h2></div>
    <button className="icon-button" onClick={onCancel} aria-label="Закрыть редактор">×</button></div>
   {editor.spec.hint&&<p className="minor">{editor.spec.hint}</p>}
-  <form onSubmit={onSubmit}>
-   {editor.spec.fields.map(f=><label className="field" key={f.name}>{f.label}
+  <form onSubmit={onSubmit} onKeyDown={event=>{
+   if((event.ctrlKey||event.metaKey)&&event.key==="Enter"){
+    event.preventDefault();
+    event.currentTarget.requestSubmit();
+   }
+  }}>
+   {editor.spec.fields.map((f,index)=><label className="field" key={f.name}>{f.label}
     {f.type==="select"?
-      <select name={f.name} aria-label={f.label} required={f.required!==false}
+      <select name={f.name} aria-label={f.label} autoFocus={index===0} required={f.required!==false}
        value={fields[f.name]??""}
         onChange={event=>setFields(previous=>editorSelectionFields(editor.spec,previous,f.name,event.target.value))}>
        {(f.options||[]).map(o=><option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
       :f.type==="textarea"?
-      <textarea rows={3} name={f.name} aria-label={f.label} required={f.required!==false}
+      <textarea rows={3} name={f.name} aria-label={f.label} autoFocus={index===0} required={f.required!==false}
        value={fields[f.name]??""} onChange={event=>setFields({...fields,[f.name]:event.target.value})}/>
-      :<input type={f.type||"text"} name={f.name} aria-label={f.label} required={f.required!==false}
+      :<input type={f.type||"text"} name={f.name} aria-label={f.label} autoFocus={index===0} required={f.required!==false}
        min={f.type==="number"?(f.name==="allocationPct"||f.name==="capacityPct"?1:0):undefined}
        max={f.type==="number"?(f.name==="allocationPct"?100:f.name==="capacityPct"?1000:36500):undefined}
        step={f.type==="number"?"1":undefined}
        value={fields[f.name]??""} onChange={event=>setFields({...fields,[f.name]:event.target.value})}/>
     }
    </label>)}
-   <div className="form-footer"><Action onClick={onCancel}>Отмена</Action><button className="action-button primary" disabled={busy} type="submit">Применить к черновику</button></div>
+   <div className="form-footer"><Action onClick={onCancel}>Отмена</Action><button className="action-button primary" disabled={busy} type="submit" title="Ctrl+Enter">Применить к черновику</button></div>
   </form>
  </section>
 }
@@ -132,8 +137,8 @@ function App(){
  const dataSignature=useMemo(()=>snapshotText(data),[data]);
  const dirty=ready&&dataSignature!==saved.current;
  const persisted=generation!=="none";
- const dirtyRef=useRef(false),busyRef=useRef(false);
- dirtyRef.current=dirty;busyRef.current=busy;
+ const dirtyRef=useRef(false),busyRef=useRef(false),editorOpenRef=useRef(false);
+ dirtyRef.current=dirty;busyRef.current=busy;editorOpenRef.current=!!editor;
  const native=isTauri();
  const dates=useMemo(()=>portfolioSchedule(data),[data]);
  const resources=useMemo(()=>portfolioResources(data,{schedule:dates} as any),[data,dates]);
@@ -167,8 +172,8 @@ function App(){
   }).catch(issue);
   let unlisten:undefined|(()=>void);
   getCurrentWindow().onCloseRequested(event=>{
-   if(dirtyRef.current||busyRef.current){
-    if(busyRef.current||!confirmAction("Есть несохранённые изменения. Закрыть Atlas без сохранения?"))
+   if(dirtyRef.current||busyRef.current||editorOpenRef.current){
+    if(busyRef.current||!confirmAction("Есть несохранённые изменения или открытая форма. Закрыть Atlas без сохранения?"))
      event.preventDefault();
    }
   }).then(fn=>{unlisten=fn}).catch(issue);
@@ -209,6 +214,10 @@ function App(){
   }catch(e){issue(e)}
  };
  const save=async()=>{
+  if(editorOpenRef.current){
+   issue(Error("Открытая форма ещё не применена. Нажмите Ctrl+Enter, затем Ctrl+S для записи на диск."));
+   return;
+  }
   if(busyRef.current||!ready||!dirty)return;
   busyRef.current=true;setBusy(true);
   try{
@@ -306,9 +315,16 @@ function App(){
  };
  useEffect(()=>{
   const key=(event:KeyboardEvent)=>{
-   if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==="s"){event.preventDefault();void save()}
+   const ctrl=event.ctrlKey||event.metaKey;
+   if(ctrl&&event.key.toLowerCase()==="s"){event.preventDefault();void save();return}
+   if(ctrl&&event.key.toLowerCase()==="n"){
+    event.preventDefault();
+    if(!ready||busyRef.current)return;
+    if(editorOpenRef.current){issue(Error("Сначала примените или закройте текущую форму."));return}
+    openEditor("new");return;
+   }
    if(event.key==="Escape"){setEditor(null)}
-   if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==="k"){event.preventDefault();document.getElementById("atlas-search")?.focus()}
+   if(ctrl&&event.key.toLowerCase()==="k"){event.preventDefault();document.getElementById("atlas-search")?.focus()}
   };
   window.addEventListener("keydown",key);return ()=>window.removeEventListener("keydown",key);
  });
@@ -345,8 +361,8 @@ function App(){
     <label className="search"><span>⌕</span><input id="atlas-search" placeholder="Найти проект · Ctrl+K"
       value={search} onChange={e=>{setSearch(e.target.value);setPortfolioLimit(150);setSidebarLimit(120)}}/><kbd>Ctrl K</kbd></label>
     <div className="toolbar-actions">
-     <Badge tone={dirty?"warning":persisted?"good":"neutral"}>{dirty?"Не сохранено":persisted?"Сохранено":"Новый портфель"}</Badge>
-     <Action onClick={()=>void save()} primary disabled={!dirty||busy}>Сохранить</Action>
+     <Badge tone={editor||dirty?"warning":persisted?"good":"neutral"}>{editor?"Форма не применена":dirty?"Не сохранено":persisted?"Сохранено":"Новый портфель"}</Badge>
+     <Action onClick={()=>void save()} primary disabled={!dirty||busy||!!editor} title={editor?"Сначала примените открытую форму":"Ctrl+S"}>Сохранить</Action>
      <Action onClick={()=>void importJson()} disabled={busy}>Открыть JSON</Action>
      <Action onClick={()=>void exportJson()} disabled={busy||dirty}>Резервная копия</Action>
      <button className="icon-button inspector-button" title="Инспектор" onClick={()=>setInspector(!inspector)}>◧</button>
@@ -357,7 +373,7 @@ function App(){
    {!project?<>
     <div className="page-heading"><div><small>Ваше рабочее пространство</small><h1>Портфель проектов</h1>
       <p>Что должно быть, что известно и какие решения влияют на планы.</p></div>
-      <Action onClick={()=>openEditor("new")} primary>＋ Новый проект</Action></div>
+      <Action onClick={()=>openEditor("new")} primary title="Ctrl+N">＋ Новый проект</Action></div>
     <div className="metric-grid">
      <Metric value={data.projects.length} label="Проектов"/>
      <Metric value={data.projects.filter((p:any)=>p.status==="active").length} label="В работе"/>
@@ -589,9 +605,9 @@ function App(){
    <section><div className="section-heading"><h2>Инспектор</h2><button className="icon-button" aria-label="Скрыть инспектор" onClick={()=>setInspector(false)}>×</button></div>
     <div className="inspector-block"><small>Текущий контекст</small><strong>{project?.name||"Портфель проектов"}</strong>
      <p>{project?.goal||"Выберите проект для работы с планом, доказательствами и изменениями."}</p></div>
-    <div className="inspector-block"><small>Состояние данных</small><Badge tone={dirty?"warning":persisted?"good":"neutral"}>{dirty?"Только в памяти":persisted?"Сохранено на диск":"Ещё не сохранялся"}</Badge>
+    <div className="inspector-block"><small>Состояние данных</small><Badge tone={editor||dirty?"warning":persisted?"good":"neutral"}>{editor?"Форма не применена":dirty?"Только в памяти":persisted?"Сохранено на диск":"Ещё не сохранялся"}</Badge>
      <p>Редакция: {data.revision}</p><p>Хранилище: нативное Atlas</p>
-     <Action onClick={()=>void save()} primary disabled={!dirty||busy}>Сохранить редакцию</Action></div>
+     <Action onClick={()=>void save()} primary disabled={!dirty||busy||!!editor}>Сохранить редакцию</Action></div>
     {project&&<div className="inspector-block"><small>План проекта</small><p>Начало: {readable(project.startDate)}</p>
      <p>Контрольный срок: {readable(project.dueDate)}</p>
      <p>Расчётный финиш: {projectedFinishLabel(projected)}</p>
