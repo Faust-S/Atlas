@@ -51,7 +51,7 @@ function upsert(change,action) {
 }
 export function setPlanDates(snapshot,projectId,changeId,{startDate,dueDate}) {
  return mutableDraft(snapshot,projectId,changeId,(project,change)=>{
-  const before=dateFields(project),after={startDate:startDate||null,dueDate:dueDate||null,resourceId:resourceId===""?null:resourceId??item.resourceId??null,allocationPct:allocationPct??item.allocationPct??100};
+  const before=dateFields(project),after={startDate:startDate||null,dueDate:dueDate||null};
   if(same(before,after))throw Error("Укажите даты, которые действительно изменятся");
   upsert(change,{kind:"dates",before,after});
  });
@@ -60,7 +60,8 @@ export function setPlanWork(snapshot,projectId,changeId,{itemId,estimateDays,ass
  return mutableDraft(snapshot,projectId,changeId,(project,change)=>{
   const item=project.items.find(x=>x.id===itemId);
   if(!item)throw Error("Работа для изменения не найдена");
-  const before=workFields(item),after={estimateDays,assignee:String(assignee??"").trim(),dueDate:dueDate||null};
+  const before=workFields(item),after={estimateDays,assignee:String(assignee??"").trim(),dueDate:dueDate||null,
+   resourceId:resourceId===""?null:resourceId??item.resourceId??null,allocationPct:allocationPct??item.allocationPct??100};
   if(same(before,after))throw Error("Укажите изменённый срок, длительность или ответственного");
   upsert(change,{kind:"work",itemId,before,after});
   change.targetIds=[...new Set([...(change.targetIds||[]),...(item.targetIds||[])])];
