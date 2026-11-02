@@ -3,6 +3,7 @@ import {observePublicRepo,observePublicOwner} from "./github-public.mjs";
 import {attachDiscoveredRepo} from "./source-observation.mjs";
 import {planPublicRefresh,reconcilePublicSources,renderPublicSourceQueue} from "./public-refresh.mjs";
 import {renderRevisionReview,parseRecheckAction} from "./revision-review.mjs";
+import {renderPortfolioPlanReviews,renderProjectPlanReviews,parsePlanReviewAction,parsePlanProposalAction} from "./plan-review.mjs";
 import {scheduleProject} from "./planning.mjs";
 import {addTarget,recordFinding,planChange,updateChange,compareProject} from "./trace.mjs";
 import {renderPortfolioInsight,statusBand,filterTraceRows} from "./visual.mjs";
@@ -107,7 +108,7 @@ function renderImpact(p){
 }
 function render(){if(storageMount)storageMount.innerHTML=storageBanner();if(!ready){root.innerHTML='<section class="card"><h2>Проекты не загружены</h2><p>Atlas не создаёт пустой портфель вместо повреждённых или недоступных данных. Восстановите доступ к IndexedDB либо импортируйте корректную резервную копию.</p></section>';return;}const p=data.projects.find(x=>x.id===active),stateCounts={active:data.projects.filter(x=>x.status==="active").length,blocked:data.projects.reduce((n,p)=>n+summary(p).blocked,0)};
 root.innerHTML='<div id="atlas-editor-slot"></div>'+(p?projectView(p):'<h2>Портфель проектов</h2><p class="muted">Проекты человека и организации. Связи с внешними системами не дублируют их данные.</p><div class="grid"><div class="card"><small>Всего проектов</small><div class="metric">'+data.projects.length+'</div></div><div class="card"><small>Активные</small><div class="metric">'+stateCounts.active+'</div></div><div class="card"><small>Заблокированные работы</small><div class="metric">'+stateCounts.blocked+'</div></div></div><div class="row">'+button("＋ Создать проект","new","primary")+button("Сверить публичные источники","refresh-portfolio")+'</div>'+
-renderPublicSourceQueue(data,{lastReport:lastRefresh,escape:esc})+renderRevisionReview(data,{escape:esc})+renderPortfolioCommand(buildPortfolioCommand(data),{filter:commandFilter,search:commandSearch,escape:esc})+
+renderPublicSourceQueue(data,{lastReport:lastRefresh,escape:esc})+renderRevisionReview(data,{escape:esc})+renderPortfolioPlanReviews(data,{escape:esc})+renderPortfolioCommand(buildPortfolioCommand(data),{filter:commandFilter,search:commandSearch,escape:esc})+
 '<div class="row atlas-portfolio-switch">'+button(portfolioView==="focus"?"Показать подробные графы и отчёты":"Скрыть подробные отчёты","portfolio-view:"+(portfolioView==="focus"?"details":"focus"))+'</div>'+
 (portfolioView==="details"?renderPortfolioInsight(data.projects,esc)+renderPortfolioImpact()+renderPortfolioResponses(data,projectImpact,esc)+renderPortfolioSchedule(data,esc)+renderPortfolioCascade(data,projectImpact,{mode:cascadeMode,escape:esc})+renderPortfolioNetwork(data,esc):"")+'<div class="grid">'+data.projects.map(p=>'<article class="card"><span class="tag">'+esc(p.type)+'</span><h2>'+esc(p.name)+'</h2><p>'+esc(p.goal||"Без описания цели")+'</p><p class="muted">'+summary(p).total+' работ · '+p.sources.length+' источников</p><p class="muted">Требований: '+compareProject(p).committed+' · Без подтверждений: '+compareProject(p).counts.unknown+' · Несоответствия: '+(compareProject(p).counts.gap_reported+compareProject(p).counts.partial_reported)+' · Устарело / конфликтует: '+(compareProject(p).counts.stale+compareProject(p).counts.conflict)+'</p>'+button("Открыть","open:"+esc(p.id))+'</article>').join("")+'</div>');if(p){renderSchedule(p);renderTrace(p);renderGraph(p);renderImpact(p);}renderActiveEditor(p);}
 function renderPortfolioImpact(){
@@ -139,7 +140,7 @@ function renderTrace(p){
 }
 function projectView(p){const s=summary(p), cols=[["todo","Запланировано"],["in_progress","В работе"],["blocked","Блокировано"],["done","Готово"]];
 return '<div class="row">'+button("← Все проекты","back")+'<span class="tag">'+esc(p.status)+'</span>'+button("Изменить статус","status")+'</div><h1>'+esc(p.name)+'</h1><p class="muted">'+esc(p.goal)+'</p><div class="grid"><div class="card"><small>Выполнено работ</small><div class="metric">'+(s.progress===null?"—":s.progress+"%")+'</div><small>Не является подтверждением готовности релиза</small></div><div class="card"><small>Блокеры</small><div class="metric">'+s.blocked+'</div></div><div class="card"><small>Связанных источников</small><div class="metric">'+s.sourceCount+'</div></div></div><div class="row">'+button("＋ Этап","stage")+button("＋ Работа","item","primary")+button("＋ Зависимость","dep")+button("Дата старта","start")+button("＋ Риск","risk")+button("＋ Решение","decision")+'</div><section class="card"><h2>Этапы</h2>'+p.stages.map(x=>'<p>◈ '+esc(x.name)+' <small>('+p.items.filter(y=>y.stageId===x.id).length+' работ)</small></p>').join("")+'</section>'+'<div id="atlas-project-relations" class="atlas-focus-target" tabindex="-1">'+renderProjectRelations(data,p.id,esc)+renderProjectCascade(data,p.id,projectImpact,esc)+'</div>'+
-'<div id="atlas-project-response" class="atlas-focus-target" tabindex="-1">'+renderProjectResponses(p,projectImpact(p),esc)+'</div>'+
+'<div id="atlas-project-response" class="atlas-focus-target" tabindex="-1">'+renderProjectResponses(p,projectImpact(p),esc)+renderProjectPlanReviews(data,p.id,esc)+'</div>'+
 '<div id="atlas-project-schedule" class="atlas-focus-target" tabindex="-1">'+renderProjectSchedule(data,p.id,esc)+'</div>'+'<h2>План-график</h2><div id="atlas-schedule"></div><div id="atlas-relations"></div><div id="atlas-impact"></div><div id="atlas-trace" class="atlas-focus-target" tabindex="-1"></div><h2>Работы</h2><div class="board">'+cols.map(([st,title])=>'<section class="column"><strong>'+title+'</strong>'+p.items.filter(x=>x.state===st).map(x=>'<div class="item"><strong>'+esc(x.title)+'</strong><small>'+esc(x.assignee||"Не назначено")+'</small><div class="row">'+button("Редактировать · "+(x.estimateDays??1)+" дн.","work:"+esc(x.id))+'</div><select data-work="'+esc(x.id)+'">'+cols.map(([v,t])=>'<option value="'+v+'" '+(x.state===v?"selected":"")+'>'+t+'</option>').join("")+'</select></div>').join("")+'</section>').join("")+'</div><section class="card"><h2>Зависимости</h2>'+p.dependencies.map(x=>'<p>'+esc(p.items.find(t=>t.id===x.from)?.title)+' → '+esc(p.items.find(t=>t.id===x.to)?.title)+'</p>').join("")+'</section><section class="card"><h2>Риски и решения</h2>'+p.risks.map(r=>'<p>⚠ '+esc(r.title)+'</p>').join("")+p.decisions.map(d=>'<p>✓ '+esc(d.text)+'</p>').join("")+'</section><section id="atlas-project-sources" class="card atlas-focus-target" tabindex="-1"><div class="row"><h2>Источники</h2>'+button("＋ Источник","source")+'</div><p class="muted">Публичный владелец GitHub обнаруживает новые репозитории, выбранный репозиторий — ветки и SHA. Изменения источников не подтверждают готовность продукта.</p>'+p.sources.map(sourceCard).join("")+'</section>';
 }
 root.addEventListener("click",event=>{
@@ -161,6 +162,17 @@ root.addEventListener("click",event=>{
    const mode=action.slice("portfolio-view:".length);
    if(!["focus","details"].includes(mode))throw Error("Неизвестный режим портфеля");
    portfolioView=mode;render();return;
+  }
+  if(action.startsWith("plan-review:")||action.startsWith("plan-proposal:")){
+   if(!ready||storageStatus==="recovery")throw Error("Хранилище не готово");
+   const {projectId}=action.startsWith("plan-review:")?
+    parsePlanReviewAction(action):parsePlanProposalAction(action);
+   const project=data.projects.find(p=>p.id===projectId);
+   if(!project)throw Error("Проект для пересмотра не найден");
+   editorSpec(project,action,data);
+   active=projectId;editorAction=action;traceMode="all";graphMode="all";render();
+   document.querySelector("#atlas-editor-slot")?.scrollIntoView?.({block:"start",behavior:"auto"});
+   return;
   }
   if(action.startsWith("recheck:")){
    if(!ready||storageStatus==="recovery")throw Error("Хранилище не готово");

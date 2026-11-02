@@ -1,10 +1,11 @@
 // Named, accessible in-page editors. Never expose internal IDs as editable text.
-import {createProject,editProject,createStage,createItem,editItem,connect,createRisk,createDecision,attach} from "./core.mjs";
+import {validate as validateLinkedPlan,createProject,editProject,createStage,createItem,editItem,connect,createRisk,createDecision,attach} from "./core.mjs";
 import {addTarget,recordFinding,planChange,updateChange,decideChange} from "./trace.mjs";
 import {projectSignals,validCauseKey} from "./response.mjs";
 import {projectImpact} from "./impact.mjs";
 import {parseRecheckAction,recheckCandidate} from "./revision-review.mjs";
 import {addPortfolioLink} from "./portfolio.mjs";
+import {parsePlanReviewAction,parsePlanProposalAction,planReviewContext,decidePlanReview,planProposalContext} from "./plan-review.mjs";
 
 const option=(value,label)=>({value:String(value),label});
 const choice=(name,label,items,value="",required=true)=>({name,label,type:"select",options:items,value,required});
@@ -33,6 +34,31 @@ export function editorSpec(project,action,snapshot=null){
   return {title:"Межпроектная зависимость",hint:"Первый проект предоставляет результат, необходимый второму. Связь плановая, а не подтверждение релиза.",fields:[choice("from","Предшествующий проект",options),choice("to","Зависимый проект",options,projects[1].id),field("note","Условие или результат зависимости","textarea","",false)]};
  }
 
+ if(action.startsWith("plan-review:")){
+  if(!snapshot)throw Error("Для решения требуется снимок портфеля");
+  const request=parsePlanReviewAction(action),row=planReviewContext(snapshot,request);
+  return {title:"Решение по плану: "+row.projectName,
+   hint:"Перепроверка "+row.rootProjectName+" · "+row.targetTitle+" · "+row.oldSha+" → "+row.revision+
+   ". Влияние по зависимостям потенциальное; решение не меняет существующий план.",
+   fields:[
+    choice("outcome","Что делать с текущим планом?",[
+     option("keep","Сохранить действующий план"),
+     option("revise","Предложить изменение плана"),
+     option("defer","Отложить рассмотрение")],"defer"),
+    field("rationale","Основание решения (не менее восьми символов)","textarea","",true)
+   ]};
+ }
+ if(action.startsWith("plan-proposal:")){
+  if(!snapshot)throw Error("Для заявки требуется снимок портфеля");
+  const request=parsePlanProposalAction(action),ctx=planProposalContext(snapshot,request.projectId,request.decisionId);
+  return {title:"Изменение плана: "+ctx.project.name,
+   hint:"Предложение по решению о перепроверке "+ctx.row.targetTitle+
+    ". Заявка не изменяет работы, сроки и обязательства до отдельного утверждения.",
+   fields:[
+    field("title","Что изменить в плане?","text","Пересмотреть план: "+ctx.row.targetTitle),
+    field("description","Предлагаемое изменение и причины","textarea",ctx.decision.text,true)
+   ]};
+ }
  if(action==="new")return {title:"Новый проект",fields:[
   field("name","Название проекта"),
   choice("type","Тип проекта",["personal:Личный","team:Команда","business:Бизнес","engineering:Разработка","research:Исследование","care:Здоровье (без медицинских записей)","other:Другое"].map(s=>option(...s.split(":"))),"personal"),
@@ -128,6 +154,22 @@ export function renderEditor(spec,esc){
 export function applyEditor(snapshot,projectId,action,input){
  const get=k=>String(input.get(k)??"").trim();
  const integer=k=>{const raw=get(k);if(!/^\d+$/.test(raw))throw Error("Введите неотрицательное целое число");return Number(raw)};
+ if(action.startsWith("plan-review:")){
+  const request=parsePlanReviewAction(action);
+  if(request.projectId!==projectId)throw Error("Неверный проект решения");
+  return {state:decidePlanReview(snapshot,request,{outcome:get("outcome"),rationale:get("rationale")}).state};
+ }
+ if(action.startsWith("plan-proposal:")){
+  const request=parsePlanProposalAction(action);
+  if(request.projectId!==projectId)throw Error("Неверный проект заявки");
+  const ctx=planProposalContext(snapshot,request.projectId,request.decisionId);
+  const targetIds=ctx.row.rootProjectId===projectId?[ctx.row.targetId]:[];
+  const result=planChange(snapshot,projectId,{title:get("title"),description:get("description"),targetIds});
+  const next=result.state,change=next.projects.find(p=>p.id===projectId).changes.find(c=>c.id===result.id);
+  change.planReviewDecisionId=ctx.decision.id;
+  validateLinkedPlan(next);
+  return {state:next};
+ }
  if(action==="new"){const r=createProject(snapshot,{name:get("name"),type:get("type"),goal:get("goal")});return {state:r.state,projectId:r.id}}
  if(action==="portfolio-link")return {state:addPortfolioLink(snapshot,{from:get("from"),to:get("to"),note:get("note")})};
  const p=snapshot.projects.find(x=>x.id===projectId);

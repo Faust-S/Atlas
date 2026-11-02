@@ -1,5 +1,15 @@
 # Atlas — universal project workspace (public foundation)
 
+## Human plan-review decisions after source rechecks — 2026-11-02
+
+A SHA-pinned human recheck now produces a **read-only portfolio consequence queue**, including the originating project and all transitively dependent projects. Each row shows the newly reported result, previous/current source SHA, outstanding work and existing approved/in-progress changes that may need human consideration. A connected Git revision change does not, by itself, rewrite project status, dates, work, approved changes or source claims.
+
+The user can **keep the existing plan**, **propose a plan change** or **defer** independently for each affected project. Decisions require an explicit reason and are appended to the existing Atlas `project.decisions` history, pinned to the rechecked finding's ID and SHA. A proposal is a normal `project.changes` entry linked to that decision and begins in `proposed` state; approval and work creation continue through the existing human-authorized change workflow. Duplicate active proposals for the same decision are rejected. A changed/new unobserved Git SHA blocks additional decisions until the latest source has been observed and rechecked; earlier decisions remain in history.
+
+All data stays in the existing `atlas.project/1` snapshot, IndexedDB and JSON export/import. The new optional fields are compatible with old snapshots. No second project model, change engine, executor, authority service or corporate connector is introduced. Standalone is still public-source-only; Admin Center/T3 integration stays deferred.
+
+
+
 ## Human revision recheck workflow — 2026-11-02
 
 The source-revision panel now offers **«Повторно проверить»** for a *latest* source-linked finding when a complete, current GitHub repository observation has a changed branch SHA. The in-page editor shows the original and observed SHA and requires the reviewer to state what was checked. Submitting appends a new manual claim pinned to the exact observed SHA, linked back to its previous finding via optional `reviewOfFindingId`. Neither the old finding nor the original source revision is rewritten. The submission is rejected if another review superseded that finding or the branch SHA moved while the editor was open.

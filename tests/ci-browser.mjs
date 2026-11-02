@@ -214,6 +214,37 @@ async function browserUserJourney(){
   assert.equal(state.portfolioLinks.length,1);
   assert.equal(state.portfolioLinks[0].from,main.id);
   assert.equal(state.portfolioLinks[0].to,consumer.id);
+  mark("human plan-review decisions and linked proposal for downstream projects");
+  const rechecked=state.projects.find(p=>p.id===main.id).findings.at(-1);
+  const reviewAction=(pid)=>"plan-review:"+[main.id,rechecked.id,pid,branchSha].map(encodeURIComponent).join(":");
+  await page.locator('#atlas-plan-reviews [data-action^="plan-review:"]').first().waitFor();
+  await form(page,reviewAction(consumer.id),{
+   outcome:"revise",rationale:"Upstream retest requires dependent launch review"
+  });
+  state=await snapshot(page);
+  const reviewDecision=state.projects.find(p=>p.id===consumer.id).decisions.at(-1);
+  assert.equal(reviewDecision.kind,"plan_review");
+  assert.equal(reviewDecision.outcome,"revise");
+  assert.equal(state.projects.find(p=>p.id===consumer.id).changes.length,0);
+  await page.locator('[data-action="back"]').click();
+  const proposalAction="plan-proposal:"+[consumer.id,reviewDecision.id].map(encodeURIComponent).join(":");
+  await form(page,proposalAction,{
+   title:"Revalidate consumer launch",
+   description:"Recheck consumer assumptions and dependencies after changed upstream SHA"
+  });
+  state=await snapshot(page);
+  const dependent=state.projects.find(p=>p.id===consumer.id);
+  assert.equal(dependent.changes.length,1);
+  assert.equal(dependent.changes[0].status,"proposed");
+  assert.equal(dependent.changes[0].planReviewDecisionId,reviewDecision.id);
+  assert.equal(dependent.items.length,0);
+  await page.locator('[data-action="back"]').click();
+  await form(page,reviewAction(main.id),{
+   outcome:"keep",rationale:"The current upstream plan remains suitable"
+  });
+  state=await snapshot(page);
+  assert.equal(state.projects.find(p=>p.id===main.id).decisions.at(-1).outcome,"keep");
+  await page.locator('[data-action="back"]').click();
   mark("portfolio evidence filter and deep-link navigation");
   await page.locator("#atlas-command-filter").selectOption("evidence");
   assert.ok(await page.locator('#atlas-command-rows [data-action^="inspect:"]').count());

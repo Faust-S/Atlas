@@ -46,6 +46,26 @@ export function validate(s){
   const walk=(id,seen)=>{if(seen.has(id))throw Error("Dependency cycle");seen.add(id);for(const e of p.dependencies)if(e.from===id)walk(e.to,new Set(seen));};
   for(const id of itemIds)walk(id,new Set());
  }
+ // Optional plan-review references must remain inside the same Atlas portfolio.
+ // Older snapshots have no such records and are unaffected.
+ const projectById=new Map(s.projects.map(p=>[p.id,p]));
+ for(const project of s.projects){
+  for(const decision of project.decisions){
+   if(decision.kind!=="plan_review")continue;
+   const upstream=projectById.get(decision.upstreamProjectId);
+   const finding=upstream?.findings?.find(x=>x.id===decision.reviewOfFindingId);
+   if(!finding||!["keep","revise","defer"].includes(decision.outcome)||
+      typeof decision.text!=="string"||decision.text.trim().length<8||
+      typeof decision.reviewRevision!=="string"||decision.reviewRevision!==finding.revision||
+      finding.targetId!==decision.reviewTargetId)
+    throw Error("Invalid plan review decision");
+  }
+  for(const proposal of project.changes||[]){
+   if(proposal.planReviewDecisionId==null)continue;
+   const linked=project.decisions.find(d=>d.id===proposal.planReviewDecisionId&&d.kind==="plan_review"&&d.outcome==="revise");
+   if(!linked)throw Error("Invalid plan review proposal");
+  }
+ }
  validatePortfolioLinks(s);
  return true;
 }
