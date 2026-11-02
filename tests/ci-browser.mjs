@@ -238,6 +238,37 @@ async function browserUserJourney(){
   assert.equal(dependent.changes[0].status,"proposed");
   assert.equal(dependent.changes[0].planReviewDecisionId,reviewDecision.id);
   assert.equal(dependent.items.length,0);
+  mark("concrete amendment proposal, forecast, approval and explicit plan application");
+  const amendment=dependent.changes[0];
+  await form(page,"amend-new:"+amendment.id,{
+   title:"Revalidate consumer delivery",estimateDays:"3",assignee:"Launch reviewer",dueDate:"2026-11-20"
+  });
+  state=await snapshot(page);
+  assert.equal(state.projects.find(p=>p.id===consumer.id).items.length,0,"proposal must not create real work");
+  assert.equal(state.projects.find(p=>p.id===consumer.id).changes[0].planAmendments.length,1);
+  await page.locator('[data-action="preview-amendment:'+amendment.id+'"]').click();
+  assert.match(await page.locator("#atlas-plan-amendments").innerText(),/Расчёт CPM/);
+  await noUiError(page);
+  await form(page,"change:"+amendment.id,{status:"approved",rationale:"Owner reviewed the concrete work and assumptions"});
+  state=await snapshot(page);
+  assert.equal(state.projects.find(p=>p.id===consumer.id).items.length,0,"approval cannot apply plan");
+  await page.locator('[data-action="preview-amendment:'+amendment.id+'"]').click();
+  await page.locator('[data-action="preview-amendment:'+amendment.id+'"]').click();
+  page.once("dialog",dialog=>dialog.accept());
+  await page.locator('[data-action="apply-amendment:'+amendment.id+'"]').click();
+  state=await until(page,s=>s.projects.find(p=>p.id===consumer.id)?.changes[0]?.planAppliedAt,
+   "applied amendment persisted");
+  const committed=state.projects.find(p=>p.id===consumer.id);
+  assert.equal(committed.items.length,1);
+  assert.equal(committed.items[0].assignee,"Launch reviewer");
+  assert.equal(committed.items[0].estimateDays,3);
+  assert.equal(committed.items[0].changeId,amendment.id);
+  assert.ok(committed.decisions.some(d=>d.kind==="plan_application"&&d.changeId===amendment.id));
+  await page.reload({waitUntil:"load"});
+  await page.locator("#storage-status").getByText("Локальные данные: IndexedDB").waitFor();
+  await page.locator('[data-action="open:'+consumer.id+'"]').first().click();
+  assert.match(await page.locator("#atlas-plan-amendments").innerText(),/план изменён/);
+  assert.match(await page.locator("#atlas-project-resources").innerText(),/Launch reviewer/);
   await page.locator('[data-action="back"]').click();
   await form(page,reviewAction(main.id),{
    outcome:"keep",rationale:"The current upstream plan remains suitable"
@@ -278,6 +309,10 @@ async function browserUserJourney(){
   assert.equal(restoredFindings[0].revision,oldSha);
   assert.equal(restoredFindings[1].revision,branchSha);
   assert.equal(restoredFindings[1].reviewOfFindingId,restoredFindings[0].id);
+  const restoredConsumer=state.projects.find(p=>p.id===consumer.id);
+  assert.ok(restoredConsumer.changes[0].planAppliedAt);
+  assert.equal(restoredConsumer.items.find(w=>w.changeId===amendment.id)?.estimateDays,3);
+  assert.ok(restoredConsumer.decisions.some(d=>d.kind==="plan_application"));
   await page.reload({waitUntil:"load"});
   await page.locator("#storage-status").getByText("Локальные данные: IndexedDB").waitFor();
   assert.match(await page.locator("#app").innerText(),/Consumer project/);
