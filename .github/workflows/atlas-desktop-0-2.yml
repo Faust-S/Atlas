@@ -38,6 +38,20 @@ jobs:
         working-directory: desktop
         run: npm run build
 
+      - name: Check compiled frontend in a real Chromium runtime
+        working-directory: desktop
+        run: |
+          npm install --no-save --no-audit --no-fund playwright-core@1.56.1
+          node tests/frontend-runtime.mjs
+      - name: Preserve frontend runtime screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas-02-compiled-frontend-render
+          path: desktop/desktop-frontend-runtime.png
+          if-no-files-found: ignore
+          retention-days: 3
+
   native-windows:
     if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[windows-accept]')
     needs: frontend
