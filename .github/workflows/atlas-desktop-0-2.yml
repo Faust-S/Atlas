@@ -109,6 +109,13 @@ jobs:
           if (!(Test-Path $exe)) { throw "Installed app absent: $exe" }
           "ATLAS_INSTALLED_EXE=$exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           Write-Output "ATLAS_EXACT_REVISION_NSIS_INSTALL_PASS"
+      - name: Retain built Windows installer candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: iwxa-atlas-0-2-windows-nsis-candidate
+          path: desktop/src-tauri/target/release/bundle/nsis/*
+          if-no-files-found: error
+          retention-days: 3
       - name: Exercise installed Atlas frontend and native readback through Windows UIA
         shell: pwsh
         run: python desktop/tests/installed-windows-uia.py
@@ -120,11 +127,4 @@ jobs:
           path: desktop/test-artifacts/*.png
           if-no-files-found: ignore
           retention-days: 3
-      - name: Retain installer only when build succeeds
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: iwxa-atlas-0-2-windows-nsis-candidate
-          path: desktop/src-tauri/target/release/bundle/nsis/*
-          if-no-files-found: error
-          retention-days: 3
+
