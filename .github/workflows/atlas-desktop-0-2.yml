@@ -61,25 +61,6 @@ jobs:
       - name: Verify native on-disk transaction and recovery tests
         shell: pwsh
         run: cargo test --release --manifest-path desktop/src-tauri/Cargo.toml --lib
-      - name: Launch standalone desktop window without development server
-        shell: pwsh
-        run: |
-          $exe = "desktop/src-tauri/target/release/iwxa-atlas-desktop.exe"
-          if (!(Test-Path $exe)) { throw "Desktop executable missing" }
-          $process = Start-Process -FilePath (Resolve-Path $exe) -PassThru
-          try {
-            $opened = $false
-            for ($i = 0; $i -lt 25; $i++) {
-              Start-Sleep -Seconds 1
-              $process.Refresh()
-              if ($process.HasExited) { throw "Standalone Atlas exited unexpectedly: $($process.ExitCode)" }
-              if ($process.MainWindowHandle -ne [IntPtr]::Zero) { $opened = $true; break }
-            }
-            if (!$opened) { throw "Native Atlas window did not appear" }
-            Write-Output "ATLAS_DESKTOP_NATIVE_WINDOW_PASS PID=$($process.Id) Handle=$($process.MainWindowHandle)"
-          } finally {
-            if (!$process.HasExited) { Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue }
-          }
       - name: Exercise native WebView2 project save and restart
         shell: pwsh
         run: node desktop/tests/native-window-cdp.mjs

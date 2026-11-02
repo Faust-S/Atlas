@@ -91,6 +91,7 @@ function App(){
  const [message,setMessage]=useState(""),[error,setError]=useState("");
  const [inspector,setInspector]=useState(true),[recovery,setRecovery]=useState(false);
  const saved=useRef<string>(snapshotText(empty()));
+ const latestSnapshot=useRef<Atlas>(data);latestSnapshot.current=data;
  const [refreshReport,setRefreshReport]=useState<any>(null);
  const [forecastId,setForecastId]=useState<string|null>(null);
  const [workFilter,setWorkFilter]=useState("all");
@@ -112,7 +113,7 @@ function App(){
  const projected=active?dates.byId.get(active):null;
  const filtered=useMemo(()=>data.projects.filter((p:any)=>p.name.toLowerCase().includes(search.toLowerCase())||
   p.goal?.toLowerCase().includes(search.toLowerCase())),[data,search]);
- const mutate=(next:Atlas,notice:string)=>{setData(next);setMessage(notice);setError("");};
+ const mutate=(next:Atlas,notice:string)=>{latestSnapshot.current=next;setData(next);setMessage(notice);setError("");};
  const issue=(e:unknown)=>{setError(deepFreezeError(e));setMessage("");};
  useEffect(()=>{
   if(!native){setError("Нативный Atlas 0.2 запускается как установленное приложение Tauri. Для работы с данными откройте его через собственное окно Windows.");return}
@@ -164,7 +165,7 @@ function App(){
  };
  const save=async()=>{
   if(busyRef.current||!ready||!dirty)return;
-  setBusy(true);
+  busyRef.current=true;setBusy(true);
   try{
    const source=snapshotText(data);
    const committed=await invoke<CommitResult>("atlas_commit",{expectedGeneration:generation,snapshot:data});
@@ -177,21 +178,21 @@ function App(){
    saved.current=source;
    setMessage("Сохранено и перечитано с диска. Новых файлов проектов: "+committed.projectBlocksWritten+".");
    setError("");
-  }catch(e){issue(e)}finally{setBusy(false)}
+  }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
  };
  const exportJson=async()=>{
   if(busyRef.current||!ready)return;
   if(dirty){issue(Error("Сначала сохраните изменения, затем создайте резервную копию."));return}
-  setBusy(true);
+  busyRef.current=true;setBusy(true);
   try{
    const result=await invoke<string>("atlas_export_json",{expectedGeneration:generation});
    setMessage(result);setError("");
-  }catch(e){issue(e)}finally{setBusy(false)}
+  }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
  };
  const importJson=async()=>{
   if(busyRef.current||!ready)return;
   if(dirty){issue(Error("Сначала сохраните изменения или отмените их перед импортом."));return}
-  setBusy(true);
+  busyRef.current=true;setBusy(true);
   try{
    const imported=await invoke<Atlas|null>("atlas_select_import");
    if(!imported)return;
@@ -205,29 +206,31 @@ function App(){
    deserialize(JSON.stringify(next));
    mutate(next,"Архив загружен в черновик (исходная редакция "+previousRevision+"). Нажмите «Сохранить» для переноса в нативное хранилище.");
    selectProject(null);
-  }catch(e){issue(e)}finally{setBusy(false)}
+  }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
  };
  const restore=async()=>{
   if(!confirmAction("Восстановить предыдущую исправную редакцию? Повреждённый индекс будет сохранён в карантине."))return;
-  setBusy(true);
+  busyRef.current=true;setBusy(true);
   try{
    const result=await invoke<OpenResult>("atlas_restore_previous");
    const checked=deserialize(JSON.stringify(result.snapshot));
    saved.current=snapshotText(checked);setData(checked);setGeneration(result.generation);
    setReady(true);setRecovery(false);setMessage("Предыдущая редакция восстановлена и перечитана.");setError("");
-  }catch(e){issue(e)}finally{setBusy(false)}
+  }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
  };
  const syncPublic=async(source?:{projectId:string;sourceId:string})=>{
   if(busyRef.current)return;
   if(!confirmAction("Запросить публичные сведения GitHub? Наблюдение не подтверждает готовность проекта."))return;
-  setBusy(true);
+  busyRef.current=true;setBusy(true);
   try{
+   const startedWith=data;
    const plan=planPublicRefresh(data,{maxAgeMs:0,only:source?[source]:null} as any);
    if(!plan.selected){setMessage("Нет источников для наблюдения.");return}
    const result=await reconcilePublicSources(data,{plan});
+   if(latestSnapshot.current!==startedWith)throw Error("Портфель изменён во время обращения к источнику. Наблюдения не применены; повторите сверку.");
    if(result.state!==data)mutate(result.state,"Публичные наблюдения обновлены в черновике. Сохраните результат на диск.");
    setRefreshReport(result.report);
-  }catch(e){issue(e)}finally{setBusy(false)}
+  }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
  };
  const applyAmendment=(changeId:string)=>{
   if(!project)return;

@@ -68,7 +68,7 @@ try{
  await save();
  await page.screenshot({path:"desktop/test-artifacts/atlas-created.png"});
  await stop();
- await launch(9282);
+ await launch(9281);
  assert.equal(await page.locator(".page-heading h1").innerText(),"Портфель проектов");
  await page.locator(".project-nav button").filter({hasText:projectName}).click();
  assert.equal(await page.locator(".page-heading h1").innerText(),projectName);
@@ -76,7 +76,7 @@ try{
  await edit("＋ Работа",{title:"Readback persisted work",estimateDays:"3"});
  await save();
  await stop();
- await launch(9283);
+ await launch(9281);
  await page.locator(".project-nav button").filter({hasText:projectName}).click();
  await page.getByRole("button",{name:"Таблица",exact:true}).click();
  assert.match(await page.locator("table").innerText(),/Readback persisted work/);

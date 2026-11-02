@@ -3,7 +3,7 @@
 //! cloud identity, Task Engine or access to arbitrary frontend-supplied paths.
 use fs2::FileExt;
 use serde::{Deserialize, Serialize};
-use serde_json::{Map, Value};
+use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::{
     collections::HashSet,
