@@ -76,7 +76,11 @@ function Wait-AtlasOpen([System.Diagnostics.Process]$process) {
         }
     }
     $process.Refresh()
-    throw "Installed WebView2 did not call atlas_open in GUI scenario (pid=$($process.Id), hasExited=$($process.HasExited), window=$($process.MainWindowHandle)). GUI acceptance HOLD."
+    Write-Output "ATLAS_INSTALLED_STARTUP_DIAGNOSTIC_HOLD pid=$($process.Id) window=$($process.MainWindowHandle) title=$($process.MainWindowTitle)"
+    # Preserve a real image of the hosted session when the WebView2 bridge
+    # did not start. No UIA/CDP, synthetic success, or implicit retry.
+    Capture-AtlasView 'installed-startup-no-native-open'
+    throw "Installed WebView2 did not call atlas_open in GUI scenario (pid=$($process.Id), hasExited=$($process.HasExited), window=$($process.MainWindowHandle), title=$($process.MainWindowTitle)). GUI acceptance HOLD."
 }
 function Activate-Atlas([System.Diagnostics.Process]$process) {
     for ($i = 0; $i -lt 20; $i++) {
