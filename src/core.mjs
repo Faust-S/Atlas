@@ -29,7 +29,15 @@ export function validate(s){
   const findingIds=new Set(findings.map(x=>x.id));
   if(targetIds.size!==targets.length||findingIds.size!==findings.length||changeIds.size!==changes.length)throw Error("Duplicate trace record");
   for(const t of targets)if(typeof t.title!=="string"||!t.title||typeof t.desired!=="string"||!t.desired||!["committed","candidate"].includes(t.intent))throw Error("Invalid target record");
-  for(const e of findings)if(!targetIds.has(e.targetId)||!["present","partial","absent"].includes(e.result)||!["implementation","test","acceptance"].includes(e.level)||e.sourceId&&!sourceIds.has(e.sourceId)||!Number.isFinite(Date.parse(e.observedAt||"")))throw Error("Invalid finding record");
+  for(const [position,e] of findings.entries()){
+   if(!targetIds.has(e.targetId)||!["present","partial","absent"].includes(e.result)||!["implementation","test","acceptance"].includes(e.level)||e.sourceId&&!sourceIds.has(e.sourceId)||!Number.isFinite(Date.parse(e.observedAt||"")))throw Error("Invalid finding record");
+   if(e.reviewOfFindingId!=null){
+    const prior=findings.slice(0,position).find(x=>x.id===e.reviewOfFindingId);
+    if(!prior||prior.targetId!==e.targetId||prior.sourceId!==e.sourceId||prior.ref!==e.ref||
+       !e.revision||e.revision===prior.revision||!String(e.note||"").trim())
+     throw Error("Invalid finding revision review");
+   }
+  }
   for(const c of changes)if(!Array.isArray(c.targetIds)||!c.targetIds.every(id=>targetIds.has(id))||!["proposed","approved","in_progress","implemented","deferred","rejected"].includes(c.status)||typeof c.title!=="string"||!c.title||(c.causeKey!==undefined&&!validCauseKey(p,c.causeKey)))throw Error("Invalid change record");
   for(const d of p.decisions)if(d.changeId!=null&&!changeIds.has(d.changeId))throw Error("Invalid decision changeId");
 

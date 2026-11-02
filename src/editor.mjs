@@ -3,6 +3,7 @@ import {createProject,editProject,createStage,createItem,editItem,connect,create
 import {addTarget,recordFinding,planChange,updateChange,decideChange} from "./trace.mjs";
 import {projectSignals,validCauseKey} from "./response.mjs";
 import {projectImpact} from "./impact.mjs";
+import {parseRecheckAction,recheckCandidate} from "./revision-review.mjs";
 import {addPortfolioLink} from "./portfolio.mjs";
 
 const option=(value,label)=>({value:String(value),label});
@@ -53,6 +54,22 @@ export function editorSpec(project,action,snapshot=null){
  }
  if(action==="dep")return {title:"Добавить зависимость",hint:"Следующая работа начнётся после предыдущей. Циклы запрещены.",fields:[choice("from","Предшествующая работа",workItems(project)),choice("to","Зависимая работа",workItems(project))]};
  if(action==="target")return {title:"Ожидаемый результат",fields:[field("title","Название требования"),field("desired","Критерий выполнения","textarea"),choice("intent","Статус цели",[option("committed","Обязательно (принято в план)"),option("candidate","Предложение")],"committed")]};
+ if(action.startsWith("recheck:")){
+  const {projectId,findingId,expectedSha}=parseRecheckAction(action);
+  if(projectId!==project.id)throw Error("Revision review project mismatch");
+  const candidate=recheckCandidate(project,findingId,expectedSha);
+  if(!candidate)throw Error("Сначала обновите источник: ревизия или активный факт изменились");
+  return {title:"Повторная проверка: "+candidate.target.title,
+   hint:"Было: "+candidate.previousSha+" · Сейчас: "+candidate.observedSha+
+    ". Это новое заявление о проверке, а не автоматическая приёмка. Старая запись останется в истории.",
+   fields:[
+    choice("result","Что установлено после повторной проверки?",[
+     option("present","Реализовано (заявлено)"),option("partial","Частично"),option("absent","Отсутствует")],"partial"),
+    choice("level","Уровень проверки",[option("implementation","Реализация"),option("test","Тестирование"),option("acceptance","Приёмка")],"test"),
+    field("reference","Ссылка на подтверждающий материал","text","",false),
+    field("note","Что именно перепроверено на этой ревизии?","textarea","",true)
+   ]};
+ }
  if(action==="finding"||action.startsWith("finding-target:"))return {title:"Фактическое состояние — заявление",hint:"Это запись сведений, а не независимая приёмка. Для подтверждения выберите источник и версию.",fields:[choice("targetId","К какому требованию относится",targetOptions(project),action.startsWith("finding-target:")?action.slice("finding-target:".length):targetOptions(project)[0]?.value),choice("result","Что известно",[option("present","Реализовано (заявлено)"),option("partial","Частично"),option("absent","Отсутствует")],"partial"),choice("level","Уровень заявления",[option("implementation","Реализация"),option("test","Тестирование"),option("acceptance","Приёмка")],"implementation"),choice("sourceRef","Внешний источник и ветка",sourceOptions(project),"",false),field("reference","Ссылка на документ или проверку","text","",false),field("note","Что именно наблюдалось","textarea","",false)]};
  if(action.startsWith("respond:")){
   const key=decodeURIComponent(action.slice(8));
@@ -119,6 +136,17 @@ export function applyEditor(snapshot,projectId,action,input){
  if(action==="item"||action.startsWith("item-target:")){const r=createItem(snapshot,projectId,{title:get("title"),stageId:get("stageId"),assignee:get("assignee"),targetIds:get("targetId")?[get("targetId")]:[]});return {state:editItem(r.state,projectId,r.id,{estimateDays:integer("estimateDays")})}};
  if(action==="dep")return {state:connect(snapshot,projectId,get("from"),get("to"))};
  if(action==="target")return {state:addTarget(snapshot,projectId,{title:get("title"),desired:get("desired"),intent:get("intent")}).state};
+ if(action.startsWith("recheck:")){
+  const {projectId:requestProject,findingId,expectedSha}=parseRecheckAction(action);
+  if(requestProject!==projectId)throw Error("Revision review project mismatch");
+  const candidate=recheckCandidate(p,findingId,expectedSha);
+  if(!candidate)throw Error("Повторная проверка отклонена: исходная ревизия или актуальный факт изменились");
+  return {state:recordFinding(snapshot,projectId,{
+   targetId:candidate.target.id,result:get("result"),level:get("level"),
+   sourceId:candidate.source.id,ref:candidate.claim.ref,revision:candidate.observedSha,
+   reference:get("reference"),note:get("note"),reviewOfFindingId:candidate.claim.id
+  }).state};
+ }
  if(action==="finding"||action.startsWith("finding-target:")){
   const sourceRef=get("sourceRef");
   const marker=sourceRef.indexOf("::");

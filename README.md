@@ -1,5 +1,13 @@
 # Atlas — universal project workspace (public foundation)
 
+## Human revision recheck workflow — 2026-11-02
+
+The source-revision panel now offers **«Повторно проверить»** for a *latest* source-linked finding when a complete, current GitHub repository observation has a changed branch SHA. The in-page editor shows the original and observed SHA and requires the reviewer to state what was checked. Submitting appends a new manual claim pinned to the exact observed SHA, linked back to its previous finding via optional `reviewOfFindingId`. Neither the old finding nor the original source revision is rewritten. The submission is rejected if another review superseded that finding or the branch SHA moved while the editor was open.
+
+The same latest-finding selector now drives the trace matrix and revision-review queue: resolved old-revision entries remain visible in the project's history, but do not reopen the active issue after a newer review. Ties at identical millisecond timestamps are broken by append order, not random UUID sorting. The current project-impact projection then classifies the newly reported result and offers the existing work/change-planning actions when a gap remains.
+
+Only source-linked GitHub findings with complete and recent branch observations qualify for direct review. Incomplete or unavailable sources require a new observation first. Findings are human assertions, **not independently verified acceptance**. Optional schema fields preserve compatibility with older `atlas.project/1` JSON and IndexedDB snapshots; no new store, grants model, synchroniser or executor.
+
 ## Source-revision review and downstream impact — 2026-11-02
 
 The public Atlas portfolio has an **«Изменения Git и пересмотр фактов»** view. It compares each *source-linked, ref- and SHA-pinned claim* to the latest observed repository branch head and shows the claim's original SHA beside the observed SHA. It distinguishes a changed SHA, an absent branch on a complete enumeration, an incomplete enumeration, an unavailable source and an out-of-date observation. A transitive dependency walk shows the number of downstream projects *potentially affected* by each project requiring evidence review, without claiming those projects have actually failed.

@@ -2,7 +2,7 @@ import {empty,validate,createProject,editProject,createStage,createItem,editItem
 import {observePublicRepo,observePublicOwner} from "./github-public.mjs";
 import {attachDiscoveredRepo} from "./source-observation.mjs";
 import {planPublicRefresh,reconcilePublicSources,renderPublicSourceQueue} from "./public-refresh.mjs";
-import {renderRevisionReview} from "./revision-review.mjs";
+import {renderRevisionReview,parseRecheckAction} from "./revision-review.mjs";
 import {scheduleProject} from "./planning.mjs";
 import {addTarget,recordFinding,planChange,updateChange,compareProject} from "./trace.mjs";
 import {renderPortfolioInsight,statusBand,filterTraceRows} from "./visual.mjs";
@@ -128,8 +128,14 @@ function renderTrace(p){
  const view=compareProject(p),titles={unknown:"Нет подтверждений",conflict:"Противоречия",stale:"Данные требуют сверки",gap_reported:"Сообщено об отсутствии",partial_reported:"Реализовано частично (заявлено)",implemented_claim:"Реализовано (заявлено)",test_claim:"Проверено (заявлено)",acceptance_claim:"Принято (заявлено)"};
  const labels=Object.entries(view.counts).filter(([,v])=>v>0).map(([k,v])=>'<span class="tag">'+esc(titles[k]||k)+': '+v+'</span>').join(" ");
  const rows=filterTraceRows(view.rows,traceMode).map(x=>'<tr id="atlas-target-'+esc(encodeURIComponent(x.id))+'" tabindex="-1" class="atlas-focus-target"><td>'+esc(x.title)+'<div class="muted">'+esc(x.desired)+'</div></td><td>'+esc(x.intent==="candidate"?"Предложено":"Обязательно")+'</td><td>'+esc(titles[x.assessment]||x.assessment)+'</td><td>'+esc(x.latest?.reference||x.latest?.sourceId||"Не указан")+'</td><td>'+esc(x.latest?.revision||"—")+'</td><td>'+esc(x.latest?.observedAt||"—")+'</td></tr>').join("");
+ const history=(p.findings||[]).slice().reverse().slice(0,20).map(e=>{
+  const target=p.targets?.find(t=>t.id===e.targetId);
+  return '<li><strong>'+esc(target?.title||"Неизвестное требование")+'</strong> · '+esc(e.result)+
+   ' · '+esc(e.revision||"без SHA")+(e.reviewOfFindingId?' · повторная проверка':'')+
+   '<small> '+esc(e.observedAt||"")+' · '+esc(e.note||"")+'</small></li>';
+ }).join("");
  const proposed=(p.changes||[]).map(c=>'<div class="item"><strong>'+esc(c.title)+'</strong><span class="tag">'+esc(c.status)+'</span> '+button("Изменить статус","change:"+esc(c.id))+'<p class="muted">'+esc(c.description||"")+'</p></div>').join("");
- mount.innerHTML='<section class="card"><h2>Что должно быть / что есть / что изменим</h2><p class="muted">Ниже перечислены требования, утверждения с происхождением и запросы изменений. Эти записи не заменяют независимую квалификацию результата.</p><div class="row">'+button("＋ Требование","target")+button("＋ Факт","finding")+button("＋ Изменение","proposal")+'</div><p>'+labels+'</p>'+statusBand(view.counts,esc)+'<div class="row"><label for="trace-filter">Показать:</label><select id="trace-filter"><option value="all"'+(traceMode==="all"?" selected":"")+'>Все требования</option><option value="needs_attention"'+(traceMode==="needs_attention"?" selected":"")+'>Есть вопросы</option><option value="unconfirmed"'+(traceMode==="unconfirmed"?" selected":"")+'>Нет подтверждений / устарело</option><option value="reported"'+(traceMode==="reported"?" selected":"")+'>Заявлена реализация или проверка</option><option value="candidate"'+(traceMode==="candidate"?" selected":"")+'>Предлагаемые возможности</option></select></div><div style="overflow:auto"><table style="width:100%;text-align:left"><thead><tr><th>Ожидается</th><th>Статус плана</th><th>Фактически</th><th>Источник</th><th>Версия</th><th>Дата</th></tr></thead><tbody>'+rows+'</tbody></table></div><h3>Изменения и предложения</h3>'+proposed+'</section>';
+ mount.innerHTML='<section class="card"><h2>Что должно быть / что есть / что изменим</h2><p class="muted">Ниже перечислены требования, утверждения с происхождением и запросы изменений. Эти записи не заменяют независимую квалификацию результата.</p><div class="row">'+button("＋ Требование","target")+button("＋ Факт","finding")+button("＋ Изменение","proposal")+'</div><p>'+labels+'</p>'+statusBand(view.counts,esc)+'<div class="row"><label for="trace-filter">Показать:</label><select id="trace-filter"><option value="all"'+(traceMode==="all"?" selected":"")+'>Все требования</option><option value="needs_attention"'+(traceMode==="needs_attention"?" selected":"")+'>Есть вопросы</option><option value="unconfirmed"'+(traceMode==="unconfirmed"?" selected":"")+'>Нет подтверждений / устарело</option><option value="reported"'+(traceMode==="reported"?" selected":"")+'>Заявлена реализация или проверка</option><option value="candidate"'+(traceMode==="candidate"?" selected":"")+'>Предлагаемые возможности</option></select></div><div style="overflow:auto"><table style="width:100%;text-align:left"><thead><tr><th>Ожидается</th><th>Статус плана</th><th>Фактически</th><th>Источник</th><th>Версия</th><th>Дата</th></tr></thead><tbody>'+rows+'</tbody></table></div><h3>История заявленных фактов</h3>'+(history?'<ul>'+history+'</ul>':'<p class="muted">История пока пуста.</p>')+'<h3>Изменения и предложения</h3>'+proposed+'</section>';
 }
 function projectView(p){const s=summary(p), cols=[["todo","Запланировано"],["in_progress","В работе"],["blocked","Блокировано"],["done","Готово"]];
 return '<div class="row">'+button("← Все проекты","back")+'<span class="tag">'+esc(p.status)+'</span>'+button("Изменить статус","status")+'</div><h1>'+esc(p.name)+'</h1><p class="muted">'+esc(p.goal)+'</p><div class="grid"><div class="card"><small>Выполнено работ</small><div class="metric">'+(s.progress===null?"—":s.progress+"%")+'</div><small>Не является подтверждением готовности релиза</small></div><div class="card"><small>Блокеры</small><div class="metric">'+s.blocked+'</div></div><div class="card"><small>Связанных источников</small><div class="metric">'+s.sourceCount+'</div></div></div><div class="row">'+button("＋ Этап","stage")+button("＋ Работа","item","primary")+button("＋ Зависимость","dep")+button("Дата старта","start")+button("＋ Риск","risk")+button("＋ Решение","decision")+'</div><section class="card"><h2>Этапы</h2>'+p.stages.map(x=>'<p>◈ '+esc(x.name)+' <small>('+p.items.filter(y=>y.stageId===x.id).length+' работ)</small></p>').join("")+'</section>'+'<div id="atlas-project-relations" class="atlas-focus-target" tabindex="-1">'+renderProjectRelations(data,p.id,esc)+renderProjectCascade(data,p.id,projectImpact,esc)+'</div>'+
@@ -155,6 +161,16 @@ root.addEventListener("click",event=>{
    const mode=action.slice("portfolio-view:".length);
    if(!["focus","details"].includes(mode))throw Error("Неизвестный режим портфеля");
    portfolioView=mode;render();return;
+  }
+  if(action.startsWith("recheck:")){
+   if(!ready||storageStatus==="recovery")throw Error("Хранилище не готово");
+   const {projectId}=parseRecheckAction(action);
+   const project=data.projects.find(x=>x.id===projectId);
+   if(!project)throw Error("Проект для повторной проверки не найден");
+   active=projectId;editorAction=action;traceMode="all";graphMode="all";
+   editorSpec(project,action,data);render();
+   document.querySelector("#atlas-editor-slot")?.scrollIntoView?.({block:"start",behavior:"auto"});
+   return;
   }
   if(action.startsWith("inspect:")){
    const parts=action.slice("inspect:".length).split(":");

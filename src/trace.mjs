@@ -33,12 +33,26 @@ export function addTarget(snapshot,projectId,{title,desired,intent="committed",p
   p.targets.push(target);return target.id;
  });
 }
-export function recordFinding(snapshot,projectId,{targetId,result,level="implementation",sourceId=null,ref=null,revision=null,reference=null,observedAt=null,note=""}){
+export function recordFinding(snapshot,projectId,{targetId,result,level="implementation",sourceId=null,ref=null,revision=null,reference=null,observedAt=null,note="",reviewOfFindingId=null}){
  if(!EVIDENCE_RESULT.has(result)||!EVIDENCE_LEVEL.has(level))throw Error("Invalid finding");
  return mutate(snapshot,projectId,p=>{
   if(!p.targets.some(t=>t.id===targetId))throw Error("Unknown target");
   if(sourceId&&!p.sources.some(s=>s.id===sourceId))throw Error("Unknown source");
-  const e={id:id(),targetId,result,level,sourceId:optional(sourceId),ref:optional(ref),revision:optional(revision),reference:optional(reference),observedAt:observedAt?timestamp(observedAt,"evidence date"):new Date().toISOString(),note:String(note||""),origin:"manual"};
+  if(reviewOfFindingId!=null){
+   const previous=p.findings.find(e=>e.id===reviewOfFindingId);
+   const latest=latestFindings(p.findings.filter(e=>e.targetId===targetId)).latest;
+   if(!previous||latest?.id!==previous.id||previous.targetId!==targetId||
+      previous.sourceId!==sourceId||previous.ref!==ref||previous.revision===revision)
+    throw Error("Revision review must reference the latest matching finding on an older SHA");
+   const source=p.sources.find(s=>s.id===sourceId),seen=Date.parse(source?.observedAt||"");
+   const now=Date.now();
+   if(source?.kind!=="github"||source.status!=="ok"||source.summary?.complete!==true||
+      !ref||!revision||source.summary.branchHeads?.[ref]!==revision||
+      !Number.isFinite(seen)||seen>now+5*MINUTE||now-seen>7*DAY)
+    throw Error("Refresh the complete public source before revision review");
+   if(!String(note||"").trim())throw Error("Revision review note required");
+  }
+  const e={id:id(),targetId,result,level,sourceId:optional(sourceId),ref:optional(ref),revision:optional(revision),reference:optional(reference),observedAt:observedAt?timestamp(observedAt,"evidence date"):new Date().toISOString(),note:String(note||""),origin:"manual",...(reviewOfFindingId!=null?{reviewOfFindingId}:{})};
   p.findings.push(e);return e.id;
  });
 }
@@ -87,7 +101,7 @@ function sourceFreshness(e,source,nowMs,maxAgeMs) {
  if(source.status!=="ok")return {state:"unavailable",note:"Source is not currently readable"};
  const sourceTime=Date.parse(source.observedAt||"");
  if(!Number.isFinite(sourceTime)||sourceTime>nowMs+5*MINUTE||nowMs-sourceTime>maxAgeMs) return {state:"outdated",note:"Source observation is out of date"};
- if(source.summary?.complete===false)return {state:"incomplete",note:"Source enumeration was truncated"};
+ if(source.summary?.complete!==true)return {state:"incomplete",note:"Source enumeration was not proven complete"};
  const refs=source.summary?.branchHeads;
  if(e.ref&&e.revision&&refs&&Object.hasOwn(refs,e.ref)) {
    if(refs[e.ref]!==e.revision)return {state:"revision_changed",note:"Evidence references an older/different source revision"};
@@ -97,7 +111,10 @@ function sourceFreshness(e,source,nowMs,maxAgeMs) {
  return {state:"source_fresh",note:"Source reached recently; finding is not independently certified"};
 }
 function latestFindings(events) {
- const sorted=[...events].sort((a,b)=>Date.parse(b.observedAt)-Date.parse(a.observedAt)||a.id.localeCompare(b.id));
+ // Append order, not random UUID lexical order, breaks equal-millisecond timestamps.
+ const sorted=events.map((event,index)=>({event,index}))
+  .sort((a,b)=>Date.parse(b.event.observedAt)-Date.parse(a.event.observedAt)||b.index-a.index)
+  .map(({event})=>event);
  if(!sorted.length)return {latest:null,conflict:false};
  const latest=sorted[0];
  const sameRevision=sorted.filter(e=>e.sourceId===latest.sourceId&&e.ref===latest.ref&&e.revision===latest.revision);
