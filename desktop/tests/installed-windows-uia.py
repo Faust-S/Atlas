@@ -78,17 +78,18 @@ def require(title,kind=None,timeout=12):
 
 def click(title):
     btn=require(title,"Button")
-    try: btn.invoke()
-    except Exception: btn.click_input()
-    time.sleep(.45)
+    try:
+        btn.click_input()
+    except Exception:
+        btn.invoke()
+    time.sleep(.55)
 
 def set_text(title,value):
     control=require(title,"Edit")
-    try: control.set_edit_text(value)
-    except Exception:
-        control.click_input()
-        control.type_keys("^a",set_foreground=True)
-        control.type_keys(value,with_spaces=True,set_foreground=True)
+    control.click_input()
+    control.type_keys("^a",set_foreground=True)
+    control.type_keys(value,with_spaces=True,set_foreground=True)
+    time.sleep(.2)
 
 def save():
     click("Сохранить")
