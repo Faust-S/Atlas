@@ -16,6 +16,7 @@ import {planPublicRefresh,reconcilePublicSources,publicSourceQueue} from "../../
 import {ProjectGantt,ProjectDependencyDiagram} from "./ProjectVisuals";
 import {prepareImportedSnapshot} from "./import-snapshot.mjs";
 import {commitWithReadback} from "./native-save.mjs";
+import {projectHistoryRows} from "./history-view.mjs";
 import "./style.css";
 
 type Atlas = any;
@@ -121,6 +122,10 @@ function App(){
  const [sidebarLimit,setSidebarLimit]=useState(120);
  const [workLimit,setWorkLimit]=useState(200);
  const [showDetails,setShowDetails]=useState(false);
+ const [historyQuery,setHistoryQuery]=useState("");
+ const [historyType,setHistoryType]=useState("all");
+ const [historyLimit,setHistoryLimit]=useState(120);
+ const [resourceLimit,setResourceLimit]=useState(40);
  const project=data.projects.find((p:any)=>p.id===active)||null;
  // Canonical snapshot text is expensive for large portfolios: compute only
  // when domain data change, not for typing, scrolling, or tab switches.
@@ -135,6 +140,8 @@ function App(){
  const reviews=useMemo(()=>planReviewQueue(data),[data]);
  const sourceQueue=useMemo(()=>publicSourceQueue(data),[data]);
  const rechecks=useMemo(()=>revisionReview(data),[data]);
+ const history=useMemo(()=>project?projectHistoryRows(project,{kind:historyType,query:historyQuery}):[],
+  [project,historyType,historyQuery]);
  const plan=useMemo(()=>project?scheduleProject(project):null,[project]);
  const reality=useMemo(()=>project?compareProject(project):null,[project]);
  const impact=useMemo(()=>project?projectImpact(project):null,[project]);
@@ -170,6 +177,7 @@ function App(){
  const selectProject=(id:string|null)=>{
   setActive(id);setTab("overview");setEditor(null);setForecastId(null);setMessage("");
   setWorkFilter("all");setWorkQuery("");setWorkLimit(200);
+  setHistoryQuery("");setHistoryType("all");setHistoryLimit(120);
  };
  const openEditor=(action:string,projectId?:string)=>{
   try{
@@ -384,9 +392,11 @@ function App(){
      <div className="section-heading"><div><h2>Плановые ресурсы</h2><p>Ресурсы объединяются только по явному назначению, не по имени человека.</p></div>
       <Action onClick={()=>openEditor("resource-new")}>＋ Плановый ресурс</Action></div>
      {resources.people.length?<div className="table-scroll"><table><thead><tr><th>Ресурс</th><th>Мощность</th><th>Максимум</th><th>Выше мощности</th><th>Вне доступности</th><th></th></tr></thead><tbody>
-      {resources.people.slice(0,40).map((r:any)=><tr key={r.id}><td>{r.label}</td><td>{r.capacityPct}%</td><td>{r.maxLoadPct}%</td>
+      {resources.people.slice(0,resourceLimit).map((r:any)=><tr key={r.id}><td>{r.label}</td><td>{r.capacityPct}%</td><td>{r.maxLoadPct}%</td>
        <td>{r.overloadDays} дн.</td><td>{r.unavailableDays} дн.</td><td><Action onClick={()=>openEditor("resource-edit:"+r.id)}>Настроить</Action></td></tr>)}</tbody></table></div>:
       <Fallback message="Плановые ресурсы пока не добавлены. Назначения ответственных в текстовых полях не считаются подтверждёнными ресурсами."/>}
+     {resources.people.length>0&&<p className="minor">Показано {Math.min(resourceLimit,resources.people.length)} из {resources.people.length} ресурсов.</p>}
+     {resources.people.length>resourceLimit&&<Action onClick={()=>setResourceLimit(n=>Math.min(resources.people.length,n+40))}>Показать ещё ресурсы</Action>}
     </section>
     <section className="surface">
      <div className="section-heading"><div><h2>Публичные источники</h2><p>Read-only наблюдения GitHub, без доступа к приватным репозиториям.</p></div>
@@ -542,13 +552,25 @@ function App(){
         <td>{usage?.label||"Не привязан"}</td><td>{r.allocationPct}%</td><td>{readable(r.startDate)}</td><td>{readable(r.finishDate)}</td>
         <td>{!usage?"Требует назначения":usage.overloadDays?"Превышение мощности: "+usage.overloadDays+" дн.":"Не подтверждена фактическая доступность"}</td></tr>})}</tbody></table></div>
     </section>}
-    {tab==="history"&&<section className="surface"><div className="section-heading"><div><h2>История решений и фактов</h2><p>История проекта не равна независимой приёмке результата.</p></div>
+    {tab==="history"&&<section className="surface"><div className="section-heading"><div><h2>История решений и фактов</h2>
+      <p>История не равна независимой приёмке результата. Все записи доступны без ограничения первыми 120.</p></div>
      <Action onClick={()=>openEditor("decision")}>＋ Решение</Action></div>
-     {[...project.decisions.map((d:any)=>({...d,_kind:"Решение",_date:d.at})),
-       ...(project.findings||[]).map((f:any)=>({...f,_kind:"Заявление",_date:f.observedAt,text:f.note||f.result}))]
-      .sort((a:any,b:any)=>Date.parse(b._date||"")-Date.parse(a._date||"")).slice(0,120).map((d:any,i:number)=>
-       <div className="history-entry" key={d.id||i}><small>{readable(d._date)} · {d._kind}</small><p>{d.text}</p>
-        {d.reviewRevision&&<small className="mono">SHA: {d.reviewRevision}</small>}</div>)}
+     <div className="filter-row">
+      <label>Тип записей <select value={historyType} onChange={e=>{setHistoryType(e.target.value);setHistoryLimit(120)}}>
+       <option value="all">Все</option><option value="decision">Решения</option><option value="finding">Факты</option>
+      </select></label>
+      <label>Поиск в истории <input type="search" value={historyQuery} aria-label="Поиск в истории"
+       placeholder="Текст, источник или SHA" onChange={e=>{setHistoryQuery(e.target.value);setHistoryLimit(120)}}/></label>
+     </div>
+     {history.slice(0,historyLimit).map((entry:any)=><div className="history-entry" key={entry.kind+"-"+entry.id}>
+      <small>{readable(entry.at)} · {entry.kind==="decision"?"Решение":"Заявление"}{entry.source?" · "+entry.source:""}</small>
+      <p>{entry.text||"Без пояснения"}</p>
+      {entry.revision&&<small className="mono" title={entry.revision}>SHA: {entry.revision}</small>}
+     </div>)}
+     {!history.length&&<Fallback message={(project.decisions.length+(project.findings||[]).length)>0?
+      "По фильтру записей нет. Измените параметры, чтобы увидеть историю.":"История пуста. Добавьте решение или наблюдение."}/>}
+     {history.length>0&&<p className="minor">Показано {Math.min(historyLimit,history.length)} из {history.length} записей. Всего в проекте: {project.decisions.length+(project.findings||[]).length}.</p>}
+     {history.length>historyLimit&&<Action onClick={()=>setHistoryLimit(n=>Math.min(history.length,n+120))}>Показать ещё записи</Action>}
     </section>}
     {tab==="sources"&&<section className="surface"><div className="section-heading"><div><h2>Связанные источники</h2>
      <p>Только публичные сведения GitHub доступны напрямую. Иные источники остаются ссылками до подключения разрешённого адаптера.</p></div>
