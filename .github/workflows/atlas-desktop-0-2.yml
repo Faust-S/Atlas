@@ -191,9 +191,9 @@ jobs:
       - name: Check installed GUI import script syntax
         shell: pwsh
         run: python -m py_compile desktop/tests/installed-windows-import.py
-      - name: Import genuine 0.1 archive through installed EXE dialog and save/readback
+      - name: Qualify installed legacy 0.1 import and 120-project GUI persistence/restart
         shell: pwsh
-        timeout-minutes: 5
+        timeout-minutes: 8
         run: python desktop/tests/installed-windows-import.py
       - name: Retain installed Gantt and DAG visual evidence
         if: always()

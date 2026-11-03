@@ -228,6 +228,62 @@ try:
     assert sorted(p["id"] for p in after)==sorted(p["id"] for p in legacy["projects"])
     shot("reopened")
     print("ATLAS_INSTALLED_LEGACY_01_IMPORT_RESTART_PASS",flush=True)
+    # Large GUI scenario runs ONLY after the authentic 0.1 installed
+    # import has committed, survived graceful close and restarted.
+    stop()
+    phase="large-portfolio-open"
+    r5_path=Path(os.environ["ATLAS_R5_PORTFOLIO_JSON"])
+    expected=json.loads(r5_path.read_text(encoding="utf-8-sig"))
+    assert len(expected["projects"])==120
+    expected_ids=sorted(p["id"] for p in expected["projects"])
+    expected_works=sum(len(p["items"]) for p in expected["projects"])
+    expected_links=sum(len(p["dependencies"]) for p in expected["projects"])
+    assert expected_works==1200 and expected_links==300
+    boot()
+    t0=time.monotonic()
+    click_button("Открыть JSON")
+    choose_json_file(r5_path)
+    phase="large-portfolio-preview"
+    confirmation=find_button("Заменить портфель в черновике",timeout=35)
+    assert confirmation.is_visible() and confirmation.is_enabled(), "Large portfolio confirmation outside viewport"
+    preview_ms=round((time.monotonic()-t0)*1000)
+    shot("large-preview")
+    click_button("Заменить портфель в черновике")
+    phase="large-portfolio-save"
+    click_button("Сохранить",timeout=45)
+    deadline=time.monotonic()+60
+    large=None
+    while time.monotonic()<deadline:
+        try:
+            opened,actual=native_data()
+            if opened["generation"]!=reread["generation"] and sorted(p["id"] for p in actual)==expected_ids:
+                large=(opened,actual)
+                break
+        except (OSError,ValueError,KeyError):
+            pass
+        time.sleep(.4)
+    if large is None:
+        ui_diagnostic("r5-save-no-readback")
+        raise RuntimeError("Large GUI import was not committed to native Atlas store")
+    large_head,actual=large
+    assert sum(len(p["items"]) for p in actual)==expected_works
+    assert sum(len(p["dependencies"]) for p in actual)==expected_links
+    assert large_head["revision"]>reread["revision"]
+    gui_total_ms=round((time.monotonic()-t0)*1000)
+    print("ATLAS_INSTALLED_R5_GUI_IMPORT_READBACK_PASS projects=120 works=1200 workLinks=300 previewMs="+str(preview_ms)+" totalMs="+str(gui_total_ms),flush=True)
+    stop()
+    phase="large-portfolio-restart"
+    t0=time.monotonic()
+    boot()
+    reopened,actual=native_data()
+    assert reopened["generation"]==large_head["generation"]
+    assert sorted(p["id"] for p in actual)==expected_ids
+    assert sum(len(p["items"]) for p in actual)==expected_works
+    assert sum(len(p["dependencies"]) for p in actual)==expected_links
+    boot_ms=round((time.monotonic()-t0)*1000)
+    shot("large-reopened")
+    print("ATLAS_INSTALLED_R5_GUI_REOPEN_PASS projects=120 works=1200 startupMs="+str(boot_ms),flush=True)
+    stop()
 except Exception as exc:
     print("ATLAS_INSTALLED_LEGACY_01_GUI_HOLD phase="+phase+" reason="+repr(exc),flush=True)
     shot("failure")

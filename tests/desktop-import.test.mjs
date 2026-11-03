@@ -97,3 +97,13 @@ test("installed JSON import preview keeps confirmation visible while details scr
  assert.match(acceptance,/ATLAS_IMPORT_CONFIRM_VISIBLE_PASS/);
  assert.match(acceptance,/ATLAS_IMPORT_PRE_SAVE_NATIVE_UNCHANGED_PASS/);
 });
+
+test("installed GUI qualifies R5 only after authentic legacy import restart",()=>{
+ const script=readFileSync(new URL("../desktop/tests/installed-windows-import.py",import.meta.url),"utf8");
+ assert.ok(script.indexOf("ATLAS_INSTALLED_LEGACY_01_IMPORT_RESTART_PASS")<
+  script.indexOf("phase=\"large-portfolio-open\""));
+ assert.match(script,/ATLAS_R5_PORTFOLIO_JSON/);
+ assert.match(script,/ATLAS_INSTALLED_R5_GUI_IMPORT_READBACK_PASS/);
+ assert.match(script,/ATLAS_INSTALLED_R5_GUI_REOPEN_PASS/);
+ assert.match(script,/expected_works==1200 and expected_links==300/);
+});
