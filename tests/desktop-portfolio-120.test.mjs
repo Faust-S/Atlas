@@ -1,0 +1,26 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {desktopLoadPortfolio} from "./fixtures/desktop-portfolio-120.mjs";
+import {validate,serialize,deserialize,editItem} from "../src/core.mjs";
+import {portfolioSchedule} from "../src/portfolio-schedule.mjs";
+import {portfolioResources} from "../src/portfolio-resources.mjs";
+import {planReviewQueue} from "../src/plan-review.mjs";
+test("R5 reproducible portfolio has the required objects and supports 20 edits",()=>{
+ const portfolio=desktopLoadPortfolio(),before=serialize(portfolio);
+ assert.equal(portfolio.projects.length,120);
+ assert.equal(portfolio.projects.reduce((n,p)=>n+p.items.length,0),1200);
+ assert.equal(portfolio.projects.reduce((n,p)=>n+p.dependencies.length,0),300);
+ assert.equal(portfolio.portfolioLinks.length,40);
+ assert.equal(portfolio.projects.reduce((n,p)=>n+p.findings.length,0),200);
+ assert.equal(portfolio.projects.reduce((n,p)=>n+p.decisions.length,0),100);
+ const forecast=portfolioSchedule(portfolio);
+ assert.equal(forecast.totals.dated,120);
+ assert.equal(portfolioResources(portfolio,{schedule:forecast}).people.length,0);
+ assert.ok(Array.isArray(planReviewQueue(portfolio).rows));
+ let edited=portfolio;
+ for(let i=0;i<20;i++)edited=editItem(edited,`load-project-${i}`,`load-work-${i}-0`,{estimateDays:2});
+ assert.equal(edited.revision,20);
+ assert.equal(validate(edited),true);
+ assert.equal(deserialize(serialize(edited)).projects[0].items[0].estimateDays,2);
+ assert.equal(serialize(portfolio),before);
+});
