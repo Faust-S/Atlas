@@ -456,7 +456,9 @@ fn list_history_root(root: &Path, expected_generation: &str) -> Result<Vec<Histo
     let mut entries = Vec::new();
     for path in backup_candidates(root)? {
         let Ok(item) = read_manifest(&path) else { continue };
-        if item.generation == current.generation { continue; }
+        if item.generation == current.generation || decode(root, &item).is_err() {
+            continue;
+        }
         entries.push(HistoryEntry {
             generation: item.generation,
             revision: item.revision,

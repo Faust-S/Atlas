@@ -183,6 +183,10 @@ function App(){
  // Open forms keep local, unapplied input state. A project/tab change or
  // competing action must never unmount that form without explicit cancellation.
  const requireClosedForm=()=>{
+  if(savedVersions!==null){
+   issue(Error("Закройте просмотр сохранённых редакций перед продолжением работы."));
+   return false;
+  }
   if(!editorOpenRef.current)return true;
   issue(Error("Открытая форма содержит неприменённые данные. Примените её (Ctrl+Enter) или нажмите «Отмена» перед переходом."));
   return false;
@@ -342,7 +346,8 @@ function App(){
   }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
  };
  const restoreHistoricalVersion=async(item:HistoryEntry)=>{
-  if(busyRef.current||dirtyRef.current||editorOpenRef.current)return;
+  if(savedVersions===null||!savedVersions.some(row=>row.generation===item.generation)||
+   busyRef.current||dirtyRef.current||editorOpenRef.current)return;
   const approved=confirmAction("Восстановить архивную редакцию "+item.revision+
    " ("+item.projects+" проектов)?\n\nТекущая редакция останется в истории. "+
    "Восстановленная копия станет новой редакцией. Это не автоматическое объединение портфелей.");
@@ -409,6 +414,15 @@ function App(){
  useEffect(()=>{
   const key=(event:KeyboardEvent)=>{
    const ctrl=event.ctrlKey||event.metaKey,code=event.code;
+   // A native history selector is modal: keyboard shortcuts must not change
+   // the portfolio underneath a pending recovery decision.
+   if(savedVersions!==null){
+    if(event.key==="Escape"&&!busyRef.current){
+     event.preventDefault();setSavedVersions(null);return;
+    }
+    if(ctrl||event.key==="Escape")event.preventDefault();
+    return;
+   }
    // Physical keys retain shortcuts when the UI keyboard layout is changed.
    if(ctrl&&!event.shiftKey&&code==="KeyS"){event.preventDefault();void save();return}
    if(ctrl&&event.shiftKey&&(code==="KeyN"||code==="KeyL")){
