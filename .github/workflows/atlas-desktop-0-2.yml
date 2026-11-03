@@ -83,6 +83,17 @@ jobs:
           node-version: '22'
       - name: Preserve existing domain core
         run: npm test
+      - name: Checkout frozen Atlas 0.1 for a genuine migration source
+        uses: actions/checkout@v4
+        with:
+          ref: addee450b8d80f8fad1fcb9af8e8d13dc1824151
+          path: legacy-01
+      - name: Create JSON using actual 0.1 source code
+        run: node tests/generate-release-01-archive.mjs legacy-01 "${{ runner.temp }}/atlas-legacy-0-1.json"
+      - name: Verify lossless migration using current 0.2 validator and adapter
+        env:
+          ATLAS_LEGACY_ARCHIVE: ${{ runner.temp }}/atlas-legacy-0-1.json
+        run: node tests/qualify-release-01-archive.mjs
       - name: Install desktop UI dependencies
         working-directory: desktop
         run: npm ci --no-audit --no-fund
