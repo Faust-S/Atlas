@@ -463,8 +463,12 @@ function App(){
  };
  const removeAmendment=(changeId:string,key:string)=>{
   if(!project||!requireClosedForm()||busyRef.current)return;
-  try{mutate(removePlanAmendment(data,project.id,changeId,key).state,"Корректировка удалена из черновика.")}
-  catch(e){issue(e)}
+  if(!confirmAction("Убрать выбранную корректировку из ещё не утверждённой заявки?"))return;
+  try{
+   mutate(removePlanAmendment(data,project.id,changeId,key).state,
+    "Корректировка удалена из черновика заявки. Сохраните изменение.");
+   setForecastId(null);
+  }catch(e){issue(e)}
  };
  const removeDependency=(from:string,to:string)=>{
   if(!project||!requireClosedForm()||busyRef.current)return;
@@ -803,6 +807,28 @@ function App(){
        {!!c.planAmendments?.length&&!c.planAppliedAt&&<Action onClick={()=>setForecastId(forecastId===c.id?null:c.id)}>Сценарий до / после</Action>}
       </div>
       {!!c.planAmendments?.length&&<div className="minor">Корректировок: {c.planAmendments.length} · {c.planAppliedAt?"Применено "+c.planAppliedAt:"Пока не применено"}</div>}
+      {!!c.planAmendments?.length&&<div className="table-scroll"><table>
+       <thead><tr><th>Корректировка</th><th>Было</th><th>Предлагается</th><th>Действие</th></tr></thead>
+       <tbody>{c.planAmendments.map((a:any,i:number)=>{
+        const key=a.kind==="dates"?"dates":a.kind==="work"?"work:"+a.itemId:"new_work:"+a.id;
+        const item=a.kind==="work"?project.items.find((w:any)=>w.id===a.itemId):null;
+        const before=a.kind==="dates"?
+         "Начало: "+readable(a.before.startDate)+" · срок: "+readable(a.before.dueDate):
+         a.kind==="work"?
+         (a.before.estimateDays??1)+" дн. · срок: "+readable(a.before.dueDate):
+         "Работа отсутствует";
+        const after=a.kind==="dates"?
+         "Начало: "+readable(a.after.startDate)+" · срок: "+readable(a.after.dueDate):
+         a.kind==="work"?
+         (a.after.estimateDays??1)+" дн. · срок: "+readable(a.after.dueDate):
+         (a.estimateDays??1)+" дн. · срок: "+readable(a.dueDate);
+        return <tr key={key+"-"+i}>
+         <td>{a.kind==="dates"?"Даты проекта":a.kind==="work"?"Работа: "+(item?.title||"Не найдена"):"Новая работа: "+a.title}</td>
+         <td>{before}</td><td>{after}</td>
+         <td>{["proposed","deferred"].includes(c.status)&&!c.planAppliedAt?
+          <Action onClick={()=>removeAmendment(c.id,key)}>Убрать</Action>:"—"}</td>
+        </tr>;
+       })}</tbody></table></div>}
       {forecastId===c.id&&<AmendmentForecast state={data} projectId={project.id} changeId={c.id} onApply={()=>applyAmendment(c.id)}
        canApply={["approved","in_progress"].includes(c.status)} onError={issue}/>}
      </div>)}
