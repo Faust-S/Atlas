@@ -76,8 +76,8 @@ class AtlasRenderBoundary extends React.Component<{children:React.ReactNode},{fa
 function Badge({children,tone="neutral"}:{children:React.ReactNode;tone?:string}){
  return <span className={"status-chip "+tone}>{children}</span>;
 }
-function Action({children,onClick,primary=false,disabled=false,title}:{children:React.ReactNode;onClick:()=>void;primary?:boolean;disabled?:boolean;title?:string}){
- return <button type="button" disabled={disabled} title={title} className={"action-button"+(primary?" primary":"")} onClick={onClick}>{children}</button>;
+function Action({children,onClick,primary=false,disabled=false,title,autoFocus=false}:{children:React.ReactNode;onClick:()=>void;primary?:boolean;disabled?:boolean;title?:string;autoFocus?:boolean}){
+ return <button type="button" disabled={disabled} title={title} autoFocus={autoFocus} className={"action-button"+(primary?" primary":"")} onClick={onClick}>{children}</button>;
 }
 function Metric({value,label,note}:{value:number|string;label:string;note?:string}){
  return <div className="metric"><small>{label}</small><strong>{value}</strong>{note&&<small>{note}</small>}</div>;
@@ -390,7 +390,11 @@ function App(){
  };
  const applyPendingImport=async()=>{
   const candidate=pendingImport;
-  if(!candidate||busyRef.current||dirtyRef.current||editorOpenRef.current)return;
+  if(!candidate)return;
+  if(busyRef.current||dirtyRef.current||editorOpenRef.current){
+   issue(Error("Импорт пока нельзя применить: завершите текущее действие или закройте открытую форму."));
+   return;
+  }
   busyRef.current=true;setBusy(true);
   try{
    const head=await invoke<OpenResult>("atlas_open");
@@ -902,9 +906,10 @@ function App(){
       Внимание: архив пуст. После сохранения все текущие проекты исчезнут из активного портфеля.
      </p>}
      <p className="minor">После нативного сохранения прежняя редакция останется в разделе «Версии на диске».</p>
+     {error&&<p className="alert error" role="alert">Не удалось подтвердить импорт: {error}</p>}
      </div>
      <div className="button-row atlas-import-actions">
-      <Action disabled={busy} onClick={()=>setPendingImport(null)}>Отменить импорт</Action>
+      <Action autoFocus disabled={busy} onClick={()=>setPendingImport(null)}>Отменить импорт</Action>
       <Action primary disabled={busy} onClick={()=>void applyPendingImport()}>Заменить портфель в черновике</Action>
      </div>
     </section>

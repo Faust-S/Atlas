@@ -93,6 +93,50 @@ def click_button(title,timeout=35):
     ui_diagnostic("button-unavailable")
     raise RuntimeError("Installed GUI button not actionable: "+title+" / "+str(last))
 
+
+def import_preview_active():
+    # Re-query current UIA nodes after every React render. A click attempt is
+    # not activation until the modal is gone and Save is enabled.
+    nodes=window.descendants()
+    preview=next((n for n in nodes if n.element_info.control_type=="Button"
+                  and n.element_info.name.strip()=="Заменить портфель в черновике"),None)
+    save=next((n for n in nodes if n.element_info.control_type=="Button"
+               and n.element_info.name.strip()=="Сохранить"),None)
+    return preview,save
+
+def confirm_import_draft():
+    confirmation=find_button("Заменить портфель в черновике",timeout=25)
+    if not confirmation.is_visible() or not confirmation.is_enabled():
+        ui_diagnostic("confirm-outside-viewport")
+        raise RuntimeError("Import confirmation is offscreen or disabled")
+    try:
+        window.set_focus()
+        confirmation.set_focus()
+        keyboard.send_keys("{ENTER}")
+        print("ATLAS_IMPORT_CONFIRM_KEYBOARD_ENTER",flush=True)
+    except Exception as exc:
+        print("ATLAS_IMPORT_CONFIRM_FOCUS_FALLBACK "+repr(exc),flush=True)
+        confirmation.click_input()
+        print("ATLAS_IMPORT_CONFIRM_POINTER_FALLBACK",flush=True)
+    for attempt in range(36):
+        try:
+            preview,save=import_preview_active()
+            if preview is None and save is not None and save.is_enabled():
+                print("ATLAS_IMPORT_CONFIRMED_DRAFT_READY_PASS",flush=True)
+                return
+            # A second input method is attempted only when the preview
+            # remains open. No repeat is sent after the draft changes.
+            if attempt==18 and preview is not None:
+                print("ATLAS_IMPORT_CONFIRM_FIRST_ATTEMPT_NOT_APPLIED",flush=True)
+                if preview.is_enabled() and preview.is_visible():
+                    preview.click_input()
+                    print("ATLAS_IMPORT_CONFIRM_POINTER_RETRY",flush=True)
+        except Exception as exc:
+            print("ATLAS_IMPORT_CONFIRM_PROBE "+repr(exc)[:160],flush=True)
+        time.sleep(.4)
+    ui_diagnostic("confirm-no-draft")
+    raise RuntimeError("Import confirmation did not change React draft; inspect UI alert and button state")
+
 def choose_json_file(path):
     # Hosted Windows may expose a classic IFileDialog to Win32, but not UIA.
     # Enumerate actual top-level windows instead of guessing an inaccessible
@@ -188,7 +232,7 @@ try:
         raise RuntimeError("Legacy import confirmation cannot be reached in the installed viewport")
     print("ATLAS_IMPORT_CONFIRM_VISIBLE_PASS",flush=True)
     shot("preview")
-    click_button("Заменить портфель в черновике")
+    confirm_import_draft()
     # Approval changes the React draft only; persistence still needs Save.
     after_preview,still_on_disk=native_data()
     assert after_preview["generation"]==baseline["generation"]
@@ -248,7 +292,7 @@ try:
     assert confirmation.is_visible() and confirmation.is_enabled(), "Large portfolio confirmation outside viewport"
     preview_ms=round((time.monotonic()-t0)*1000)
     shot("large-preview")
-    click_button("Заменить портфель в черновике")
+    confirm_import_draft()
     phase="large-portfolio-save"
     click_button("Сохранить",timeout=45)
     deadline=time.monotonic()+60

@@ -107,3 +107,15 @@ test("installed GUI qualifies R5 only after authentic legacy import restart",()=
  assert.match(script,/ATLAS_INSTALLED_R5_GUI_REOPEN_PASS/);
  assert.match(script,/expected_works==1200 and expected_links==300/);
 });
+
+test("installed import confirmation is keyboard reachable and exposes failures inside modal",()=>{
+ const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ const driver=readFileSync(new URL("../desktop/tests/installed-windows-import.py",import.meta.url),"utf8");
+ assert.match(ui,/autoFocus=\{autoFocus\}/);
+ assert.match(ui,/autoFocus disabled=\{busy\} onClick=\{\(\)=>setPendingImport\(null\)\}/);
+ assert.match(ui,/Не удалось подтвердить импорт: \{error\}/);
+ assert.match(ui,/Импорт пока нельзя применить/);
+ assert.match(driver,/ATLAS_IMPORT_CONFIRM_KEYBOARD_ENTER/);
+ assert.match(driver,/ATLAS_IMPORT_CONFIRMED_DRAFT_READY_PASS/);
+ assert.equal((driver.match(/confirm_import_draft\(\)/g)||[]).length,3);
+});
