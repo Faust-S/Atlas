@@ -4,15 +4,20 @@ import {validatePortfolioLinks} from "./portfolio.mjs";
 import {scheduleProject} from "./planning.mjs";
 
 const DAY = 86400000;
+const MIN_DAY = Date.parse("0000-01-01T00:00:00Z") / DAY;
 const MAX_DAY = Date.parse("9999-12-31T00:00:00Z") / DAY;
 const escapeHtml = value => String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 function day(date) {
  if (!date) return null;
+ if(typeof date!=="string"||!/^\d{4}-\d{2}-\d{2}$/.test(date))
+  throw Error("Invalid schedule date");
  const value = Date.parse(date+"T00:00:00Z") / DAY;
- if (!Number.isSafeInteger(value) || value < 0 || value > MAX_DAY) throw Error("Invalid schedule date");
+ if (!Number.isSafeInteger(value) || value < MIN_DAY || value > MAX_DAY ||
+     new Date(value*DAY).toISOString().slice(0,10)!==date)
+  throw Error("Invalid schedule date");
  return value;
 }
-const dateOf = value => value != null && value >= 0 && value <= MAX_DAY ?
+const dateOf = value => value != null && value >= MIN_DAY && value <= MAX_DAY ?
  new Date(value*DAY).toISOString().slice(0,10) : null;
 const labelDate = value => value || "не определена";
 const inactive = p => p.status==="paused"||p.status==="cancelled";

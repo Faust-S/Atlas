@@ -61,3 +61,22 @@ test("work dependency identifiers containing separators do not collide",()=>{
  assert.equal(validate(s),true);
  assert.equal(scheduleProject(p).rows.length,4);
 });
+
+test("R1.1 rejects malformed project fields and missing work titles before serialization",()=>{
+ const valid=make().state;
+ for(const invalid of [
+  p=>{delete p.name;},p=>{p.name=" ";},p=>{p.goal=42;},
+  p=>{p.description=42;}
+ ]){
+  const snapshot=structuredClone(valid);invalid(snapshot.projects[0]);
+  assert.throws(()=>deserialize(JSON.stringify(snapshot)),/Invalid project/);
+  assert.equal(validate(valid),true);
+ }
+ assert.throws(()=>createProject(empty(),{name:"Bad",goal:17}),/Invalid project text/);
+ const withItem=createItem(valid,valid.projects[0].id,{title:"Keep"});
+ for(const broken of [item=>delete item.title,item=>item.title=""]){
+  const snapshot=structuredClone(withItem.state);broken(snapshot.projects[0].items[0]);
+  assert.throws(()=>serialize(snapshot),/Invalid work item/);
+ }
+ assert.equal(validate(withItem.state),true);
+});

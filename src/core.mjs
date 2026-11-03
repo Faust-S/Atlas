@@ -32,14 +32,20 @@ export function validate(s){
  const validResource = value=>value==null||resourceIds.has(value);
  const ids=new Set();
  for(const p of s.projects){
-  if(!p.id||ids.has(p.id)||!types.has(p.type)||!statuses.has(p.status))throw Error("Invalid project");
+  if(!p||typeof p.id!=="string"||!p.id||ids.has(p.id)||!types.has(p.type)||!statuses.has(p.status)||
+     typeof p.name!=="string"||!p.name.trim()||
+     (p.goal!==undefined&&typeof p.goal!=="string")||
+     (p.owner!==undefined&&typeof p.owner!=="string")||
+     (p.description!==undefined&&typeof p.description!=="string"))
+   throw Error("Invalid project");
   ids.add(p.id);
   for(const k of ["stages","items","dependencies","sources","risks","decisions"])if(!Array.isArray(p[k]))throw Error("Invalid "+k);
   if(!validDate(p.startDate)||!validDate(p.dueDate)||p.startDate&&p.dueDate&&p.startDate>p.dueDate)throw Error("Invalid project dates");
   for(const stage of p.stages)if(!validDate(stage.dueDate))throw Error("Invalid stage date");
   const itemIds=new Set(p.items.map(x=>x.id)),stageIds=new Set(p.stages.map(x=>x.id)),sourceIds=new Set(p.sources.map(x=>x.id)),targetIds=new Set((p.targets||[]).map(x=>x.id)),changeIds=new Set((p.changes||[]).map(x=>x.id));
   if(itemIds.size!==p.items.length||stageIds.size!==p.stages.length||sourceIds.size!==p.sources.length)throw Error("Duplicate ID");
-  for(const x of p.items){if(!workStates.has(x.state)||!priorities.has(x.priority)||x.stageId&&!stageIds.has(x.stageId)||x.sourceId&&!sourceIds.has(x.sourceId))throw Error("Invalid work item");if(x.estimateDays!==undefined&&(!Number.isSafeInteger(x.estimateDays)||x.estimateDays<0||x.estimateDays>36500))throw Error("Invalid work estimateDays");if(!validDate(x.dueDate))throw Error("Invalid work dueDate");if(!validResource(x.resourceId)||!validAllocation(x.allocationPct))throw Error("Invalid work resource commitment");if(x.targetIds!==undefined&&(!Array.isArray(x.targetIds)||new Set(x.targetIds).size!==x.targetIds.length||x.targetIds.some(id=>!targetIds.has(id))))throw Error("Invalid work targetIds");if(x.changeId!=null&&!changeIds.has(x.changeId))throw Error("Invalid work changeId");}
+  for(const x of p.items){if(!x||typeof x.id!=="string"||!x.id||typeof x.title!=="string"||!x.title.trim()||
+    !workStates.has(x.state)||!priorities.has(x.priority)||x.stageId&&!stageIds.has(x.stageId)||x.sourceId&&!sourceIds.has(x.sourceId))throw Error("Invalid work item");if(x.estimateDays!==undefined&&(!Number.isSafeInteger(x.estimateDays)||x.estimateDays<0||x.estimateDays>36500))throw Error("Invalid work estimateDays");if(!validDate(x.dueDate))throw Error("Invalid work dueDate");if(!validResource(x.resourceId)||!validAllocation(x.allocationPct))throw Error("Invalid work resource commitment");if(x.targetIds!==undefined&&(!Array.isArray(x.targetIds)||new Set(x.targetIds).size!==x.targetIds.length||x.targetIds.some(id=>!targetIds.has(id))))throw Error("Invalid work targetIds");if(x.changeId!=null&&!changeIds.has(x.changeId))throw Error("Invalid work changeId");}
   for(const x of p.sources)if(!kinds.has(x.kind)||!x.locator)throw Error("Invalid source");
   for(const k of ["targets","findings","changes"])if(p[k]!==undefined&&!Array.isArray(p[k]))throw Error("Invalid "+k);
   const targets=p.targets||[],findings=p.findings||[],changes=p.changes||[];
@@ -129,15 +135,18 @@ function change(s,fn){validate(s);const next=structuredClone(s);fn(next);next.re
 function project(s,id){const p=s.projects.find(x=>x.id===id);if(!p)throw Error("Unknown project");return p}
 export function createProject(s,data){
  const name=nonempty(data.name,"Project name");
+ if((data.goal!==undefined&&typeof data.goal!=="string")||
+    (data.owner!==undefined&&typeof data.owner!=="string"))
+   throw Error("Invalid project text fields");
  if(!types.has(data.type||"personal"))throw Error("Invalid project type");
  const id=uid(),now=new Date().toISOString();
- return {id,state:change(s,x=>x.projects.push({id,name,type:data.type||"personal",goal:String(data.goal||""),owner:String(data.owner||""),status:"planned",startDate:null,dueDate:null,budget:null,currency:"USD",stages:[],items:[],dependencies:[],risks:[],decisions:[],sources:[],createdAt:now}))};
+ return {id,state:change(s,x=>x.projects.push({id,name,type:data.type||"personal",goal:data.goal??"",owner:data.owner??"",status:"planned",startDate:null,dueDate:null,budget:null,currency:"USD",stages:[],items:[],dependencies:[],risks:[],decisions:[],sources:[],createdAt:now}))};
 }
 export function editProject(s,id,patch){return change(s,x=>{const p=project(x,id);
  for(const key of ["name","goal","owner","startDate","dueDate","currency"]){if(key in patch)p[key]=patch[key]}
  if("status" in patch){if(!statuses.has(patch.status))throw Error("Invalid project status");p.status=patch.status;}
  if("budget" in patch){const b=patch.budget;if(b!==null&&(!Number.isFinite(Number(b))||Number(b)<0))throw Error("Invalid budget");p.budget=b===null?null:Number(b);}
- if(!p.name?.trim())throw Error("Project name required");
+ if(typeof p.name!=="string"||!p.name.trim())throw Error("Project name required");
  if(p.startDate&&p.dueDate&&p.startDate>p.dueDate)throw Error("Invalid project dates");
 })}
 export function createStage(s,pid,name){const id=uid();return {id,state:change(s,x=>project(x,pid).stages.push({id,name:nonempty(name,"Stage name"),status:"planned",dueDate:null}))}}

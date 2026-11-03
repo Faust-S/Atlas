@@ -102,3 +102,21 @@ test("convergent dependencies preserve all paused and cancelled origins",()=>{
  assert.match(row.notes.join(" "),/отменён/);
  assert.match(row.notes.join(" "),/приостановлен/);
 });
+
+test("R1.1 pre-1970 four-digit dates agree with CPM, import and portfolio DAG",()=>{
+ const upstream=createProject(empty(),{name:"Historical upstream"});
+ const downstream=createProject(upstream.state,{name:"Historical downstream"});
+ let snapshot=editProject(downstream.state,upstream.id,{startDate:"1960-01-01"});
+ snapshot=editProject(snapshot,downstream.id,{startDate:"1960-01-02"});
+ snapshot=createItem(snapshot,upstream.id,{title:"Source"}).state;
+ snapshot=createItem(snapshot,downstream.id,{title:"Dependent"}).state;
+ snapshot=addPortfolioLink(snapshot,{from:upstream.id,to:downstream.id});
+ const before=serialize(snapshot);
+ const reopened=deserialize(before);
+ const result=portfolioSchedule(reopened);
+ assert.equal(result.byId.get(upstream.id).projectedStart,"1960-01-01");
+ assert.equal(result.byId.get(upstream.id).projectedFinish,"1960-01-02");
+ assert.equal(result.byId.get(downstream.id).projectedStart,"1960-01-02");
+ assert.equal(result.byId.get(downstream.id).projectedFinish,"1960-01-03");
+ assert.equal(serialize(snapshot),before);
+});
