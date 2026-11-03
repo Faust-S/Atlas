@@ -213,7 +213,11 @@ function App(){
    return false;
   }
   if(!editorOpenRef.current)return true;
-  if(!editorDirtyRef.current){setEditor(null);return true;}
+  if(!editorDirtyRef.current){
+   setEditor(null);
+   if(window.innerWidth<=1220)setInspector(false);
+   return true;
+  }
   issue(Error("Открытая форма содержит неприменённые данные. Примените её (Ctrl+Enter) или нажмите «Отмена» перед переходом."));
   return false;
  };
@@ -291,6 +295,7 @@ function App(){
  const cancelEditor=()=>{
   if(editorDirtyRef.current&&!confirmAction("Отказаться от введённых изменений формы?"))return;
   editorDirtyRef.current=false;setEditor(null);
+  if(window.innerWidth<=1220)setInspector(false);
  };
  const submit=(event:React.FormEvent<HTMLFormElement>)=>{
   event.preventDefault();
@@ -304,6 +309,7 @@ function App(){
    mutate(result.state,"Изменение внесено в черновик. Для записи на диск нажмите «Сохранить».");
    if(result.projectId)selectProject(result.projectId,true);
    editorDirtyRef.current=false;setEditor(null);
+   if(window.innerWidth<=1220)setInspector(false);
   }catch(e){issue(e)}
  };
  const save=async():Promise<boolean>=>{

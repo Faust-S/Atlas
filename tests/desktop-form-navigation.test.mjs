@@ -50,7 +50,7 @@ test("JSON preview guards a draft until human approval and native generation rec
 
 
 test("R3 keyboard and sidebar navigation allow untouched forms, block changed fields",()=>{
- assert.match(ui,/if\(!editorDirtyRef\.current\)\{setEditor\(null\);return true;\}/);
+ assert.match(ui,/if\(!editorDirtyRef\.current\)\{\s*setEditor\(null\);\s*if\(window\.innerWidth<=1220\)setInspector\(false\);\s*return true;/);
  const handlers=ui.slice(ui.indexOf(" const key=(event:KeyboardEvent)=>"),ui.indexOf('window.addEventListener("keydown",key)'));
  assert.equal((handlers.match(/if\(!requireClosedForm\(\)\)return/g)||[]).length,3);
  assert.doesNotMatch(handlers,/if\(editorOpenRef\.current\)\{issue\(Error\("Сначала примените или закройте/);
