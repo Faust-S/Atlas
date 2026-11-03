@@ -139,6 +139,7 @@ function App(){
  const [historyType,setHistoryType]=useState("all");
  const [historyLimit,setHistoryLimit]=useState(120);
  const [savedVersions,setSavedVersions]=useState<HistoryEntry[]|null>(null);
+ const savedVersionsOpenRef=useRef(false);savedVersionsOpenRef.current=savedVersions!==null;
  const [resourceLimit,setResourceLimit]=useState(40);
  const [reviewLimit,setReviewLimit]=useState(20);
  const [sourceLimit,setSourceLimit]=useState(15);
@@ -201,6 +202,13 @@ function App(){
   let unlisten:undefined|(()=>void);
   getCurrentWindow().onCloseRequested(event=>{
    if(allowCloseRef.current)return;
+   if(savedVersionsOpenRef.current){
+    // Alt+F4 first closes the history modal, never dismisses the app while
+    // a selected generation is being read or restored.
+    event.preventDefault();
+    if(!busyRef.current)setSavedVersions(null);
+    return;
+   }
    if(dirtyRef.current||busyRef.current||editorOpenRef.current){
     event.preventDefault();
     setCloseGuard(true);
@@ -362,7 +370,9 @@ function App(){
    latestSnapshot.current=checked;
    saved.current=snapshotText(checked);
    setData(checked);setGeneration(result.generation);setSavedVersions(null);
-   selectProject(null);
+   // React state updates asynchronously. Navigation after an explicitly
+   // confirmed restore must not use the prior modal-guard render closure.
+   selectProject(null,true);
    setMessage("Архивная редакция "+item.revision+" восстановлена, сохранена новым поколением и перечитана.");
    setError("");
   }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
