@@ -117,5 +117,5 @@ test("installed import confirmation is keyboard reachable and exposes failures i
  assert.match(ui,/Импорт пока нельзя применить/);
  assert.match(driver,/ATLAS_IMPORT_CONFIRM_KEYBOARD_ENTER/);
  assert.match(driver,/ATLAS_IMPORT_CONFIRMED_DRAFT_READY_PASS/);
- assert.equal((driver.match(/confirm_import_draft\(\)/g)||[]).length,3);
+ assert.equal((driver.match(/confirm_import_draft\(\)/g)||[]).length,4);
 });
