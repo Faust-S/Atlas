@@ -37,12 +37,12 @@ button{transition:background .12s ease,border-color .12s ease}a{color:#2b62b9}
 .search{display:flex;align-items:center;gap:9px;max-width:430px;width:100%;min-width:100px;height:42px;padding:0 13px;border-radius:11px;
  border:1px solid #c2d3e9;background:#fafdff;box-shadow:0 3px 10px #6d8db024;color:#41638c}
 .search span{font-size:24px;line-height:1}
-.search input{min-width:0;flex:1;border:0;background:transparent;outline:0;color:#24405f;font-size:12px}
+.search input{min-width:0;flex:1;border:0;background:transparent;outline:0;color:#24405f;font-size:14px}
 .search kbd{font-size:10px;white-space:nowrap;background:#e4eefe;border:1px solid #d4e0f3;padding:3px 5px;border-radius:5px}
 .toolbar-actions,.button-row,.form-footer{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .toolbar-actions{justify-content:flex-end}
 .action-button{border:1px solid #c4d5e9;background:#fcfdff;color:#284a78;min-height:36px;border-radius:9px;
- padding:7px 12px;white-space:normal;font-weight:600;font-size:12px}
+ padding:7px 12px;white-space:normal;font-weight:600;font-size:13px}
 .action-button:hover:not(:disabled){background:#e7f0ff;border-color:#8eace0}
 .action-button.primary{color:white;border-color:#2369dc;background:linear-gradient(130deg,#286be5,#4189f1);box-shadow:0 3px 8px #2b70e733}
 .action-button.primary:hover:not(:disabled){background:#215fce}
@@ -74,8 +74,8 @@ button{transition:background .12s ease,border-color .12s ease}a{color:#2b62b9}
 .section-heading small{display:block;font-size:11px;color:#6984a3}
 .section-heading p{margin:4px 0;color:#6a7d95}
 .table-scroll{max-width:100%;overflow-x:auto}
-table{border-collapse:collapse;width:100%;min-width:600px;text-align:left;font-size:12px}
-th{font-size:10px;letter-spacing:.2px;font-weight:650;color:#607998;background:#f1f6fd}
+table{border-collapse:collapse;width:100%;min-width:600px;text-align:left;font-size:13px}
+th{font-size:12px;letter-spacing:.2px;font-weight:650;color:#526b8a;background:#f1f6fd}
 td,th{padding:11px 12px;border-bottom:1px solid #e2eaf4;vertical-align:middle}
 td{color:#314a68}td strong{display:block;font-size:12px;font-weight:650}td small{display:block;margin-top:4px;font-size:10px;color:#7285a1;line-height:1.4}
 tbody tr:hover{background:#f6f9fe}
@@ -131,7 +131,7 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .inspector-block strong{display:block;color:#2b4467;font-size:13px;margin-bottom:9px}
 .inspector-block p{font-size:11px;color:#667e9a;line-height:1.6;margin:7px 0}
 .editor-panel h2{font-size:16px;margin:0;color:#203b61}
-.editor-panel .field{display:block;font-size:11px;color:#34516e;font-weight:600;margin:13px 0}
+.editor-panel .field{display:block;font-size:13px;color:#34516e;font-weight:600;margin:13px 0}
 .editor-panel .field select,.editor-panel .field input,.editor-panel .field textarea{display:block;width:100%;min-height:38px;margin-top:6px;font-weight:400;background:#fff}
 .editor-panel .form-footer{justify-content:flex-end;margin-top:20px}
 .alert{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:11px 13px;border:1px solid transparent;
@@ -162,8 +162,8 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 
 /* Atlas 0.2 CPM visualization: one source of planning truth, responsive scroll surfaces. */
 .atlas-gantt-tools,.atlas-graph-tools{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:0 0 13px}
-.atlas-gantt-tools label,.atlas-graph-tools label{display:flex;align-items:center;gap:7px;font-size:11px;color:#526f91}
-.atlas-gantt-tools select,.atlas-gantt-query input,.atlas-graph-tools input{min-height:34px;font-size:11px}
+.atlas-gantt-tools label,.atlas-graph-tools label{display:flex;align-items:center;gap:7px;font-size:13px;color:#385879}
+.atlas-gantt-tools select,.atlas-gantt-query input,.atlas-graph-tools input{min-height:38px;font-size:13px}
 .atlas-gantt-query input,.atlas-graph-tools input{width:174px}
 .atlas-gantt-tools .atlas-check{white-space:nowrap}.atlas-check input{margin:0}
 .atlas-range{font-size:10px;color:#466485;background:#e9f2fe;border-radius:7px;padding:7px 10px}
@@ -180,7 +180,7 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .atlas-gantt-axis>strong{padding:15px 10px}.atlas-gantt-axis>strong:last-child{text-align:center}
 .atlas-gantt-row{min-height:49px;border-bottom:1px solid #edf0f5}
 .atlas-gantt-row:last-child{border-bottom:0}.atlas-gantt-row:hover{background:#f6faff}
-.atlas-gantt-work{border:0;border-right:1px solid #e2e8f3;background:transparent;color:#29537f;padding:8px 11px;text-align:left;font-size:11px;overflow:hidden;text-overflow:ellipsis}
+.atlas-gantt-work{border:0;border-right:1px solid #e2e8f3;background:transparent;color:#29537f;padding:8px 11px;text-align:left;font-size:13px;overflow:hidden;text-overflow:ellipsis}
 .atlas-gantt-work:hover{text-decoration:underline}
 .atlas-gantt-work small{display:block;color:#8394aa;font-size:10px;margin-top:2px}
 .atlas-gantt-track{position:relative;min-width:0}.atlas-gantt-guide{position:absolute;top:0;bottom:0;width:1px;background:#dfebf5;pointer-events:none}
@@ -198,7 +198,7 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .atlas-dependency-lines{position:absolute;top:0;left:0;pointer-events:none}
 .atlas-dependency-edge{fill:none;stroke:#7394bb;stroke-width:2}.atlas-dependency-edge.critical{stroke:#c2615b;stroke-width:2.5}
 .atlas-dependency-node{position:absolute;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:7px;border:1px solid #98b9d8;background:#f5f9ff;border-radius:10px;padding:10px 13px;text-align:left;color:#234365;box-shadow:0 3px 9px #4774991c}
-.atlas-dependency-node strong{font-size:12px;line-height:1.25;max-width:100%;overflow-wrap:anywhere}
+.atlas-dependency-node strong{font-size:13px;line-height:1.25;max-width:100%;overflow-wrap:anywhere}
 .atlas-dependency-node small{color:#6a809b;font-size:10px;line-height:1.2}
 .atlas-dependency-node.critical{border-color:#c88a87;background:#fff2f0}
 .atlas-dependency-node.done{border-color:#81b7aa;background:#ecfaf5}
