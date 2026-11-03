@@ -530,7 +530,7 @@ function App(){
    if(ctrl&&event.shiftKey&&(code==="KeyN"||code==="KeyL")){
     event.preventDefault();
     if(!ready||busyRef.current)return;
-    if(editorOpenRef.current){issue(Error("Сначала примените или закройте открытую форму."));return}
+    if(!requireClosedForm())return
     if(!project){issue(Error("Сначала откройте проект."));return}
     if(code==="KeyL"&&project.items.length<2){issue(Error("Для зависимости нужны минимум две работы."));return}
     openEditor(code==="KeyN"?"item":"dep");return;
@@ -538,7 +538,7 @@ function App(){
    if(ctrl&&!event.shiftKey&&["Digit1","Digit2","Digit3"].includes(code)){
     event.preventDefault();
     if(!ready||busyRef.current)return;
-    if(editorOpenRef.current){issue(Error("Сначала примените или закройте открытую форму."));return}
+    if(!requireClosedForm())return
     if(!project){issue(Error("Сначала откройте проект."));return}
     view(({Digit1:"work",Digit2:"timeline",Digit3:"graph"} as Record<string,Tab>)[code]);
     return;
@@ -546,7 +546,7 @@ function App(){
    if(ctrl&&!event.shiftKey&&code==="KeyN"){
     event.preventDefault();
     if(!ready||busyRef.current)return;
-    if(editorOpenRef.current){issue(Error("Сначала примените или закройте текущую форму."));return}
+    if(!requireClosedForm())return
     openEditor("new");return;
    }
    if(event.key==="Escape"){event.preventDefault();cancelEditor();return}
@@ -567,12 +567,12 @@ function App(){
   <aside className="sidebar">
    <div className="brand"><span className="logo-symbol">A</span><div><strong>Atlas</strong><small>IWXA · 0.2 Desktop</small></div></div>
    <nav className="main-nav" aria-label="Основная навигация">
-    <button disabled={!!editor} className={!active?"nav-current":""} onClick={()=>selectProject(null)}>▦ <span>Портфель проектов</span><b>{data.projects.length}</b></button>
-    <button disabled={!!editor} aria-label="Создать проект" onClick={()=>{selectProject(null);openEditor("new")}}>＋ <span>Создать проект</span></button>
+    <button className={!active?"nav-current":""} onClick={()=>selectProject(null)}>▦ <span>Портфель проектов</span><b>{data.projects.length}</b></button>
+    <button aria-label="Создать проект" onClick={()=>{selectProject(null);openEditor("new")}}>＋ <span>Создать проект</span></button>
    </nav>
    <div className="sidebar-label">Мои проекты</div>
    <div className="project-nav" aria-label="Проекты">
-    {filtered.slice(0,sidebarLimit).map((p:any)=><button disabled={!!editor} key={p.id} className={active===p.id?"nav-current":""}
+    {filtered.slice(0,sidebarLimit).map((p:any)=><button key={p.id} className={active===p.id?"nav-current":""}
       onClick={()=>selectProject(p.id)}><span className="project-indicator"/><span className="project-name">{p.name}</span></button>)}
     {filtered.length>sidebarLimit&&<button type="button"
      onClick={()=>setSidebarLimit(n=>Math.min(filtered.length,n+120))}>
@@ -671,7 +671,7 @@ function App(){
      <h1>{project.name}</h1><p>{project.goal||"Цель пока не определена"}</p></div>
      <div className="button-row"><Badge>{statuses[project.status]||project.status}</Badge><Action onClick={()=>openEditor("project-edit")}>Редактировать проект</Action></div>
     </div>
-    <nav className="tabbar" aria-label="Представления проекта">{tabs.map(t=><button disabled={!!editor} key={t.key}
+    <nav className="tabbar" aria-label="Представления проекта">{tabs.map(t=><button key={t.key}
       title={t.key==="work"?"Ctrl+1":t.key==="timeline"?"Ctrl+2":t.key==="graph"?"Ctrl+3":undefined}
       className={tab===t.key?"selected":""} onClick={()=>view(t.key)}>{t.title}</button>)}</nav>
     {tab==="overview"&&<>

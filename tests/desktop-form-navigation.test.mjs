@@ -12,8 +12,9 @@ test("all project, tab and editor navigation preserves unapplied forms",()=>{
  assert.match(ui,/const openEditorFor=\(projectId:string,action:string\)=>\{\s*if\(!requireClosedForm\(\)\|\|busyRef\.current\)return/);
  assert.match(ui,/const view=\(tabId:Tab\)=>\{\s*if\(!requireClosedForm\(\)\)return/);
  assert.match(ui,/if\(result\.projectId\)selectProject\(result\.projectId,true\)/);
- assert.match(ui,/disabled=\{!!editor\} key=\{t\.key\}/);
- assert.match(ui,/disabled=\{!!editor\} key=\{p\.id\}/);
+ assert.match(ui,/<nav className="tabbar"[^>]*>\{tabs\.map\(t=><button key=\{t\.key\}/);
+ assert.match(ui,/filtered\.slice\(0,sidebarLimit\)\.map\(\(p:any\)=><button key=\{p\.id\}/);
+ assert.doesNotMatch(ui,/<button disabled=\{!!editor\} key=\{(?:t|p)\.key\}/);
 });
 
 test("native import, export and background mutations cannot discard an open form",()=>{
@@ -43,4 +44,13 @@ test("JSON preview guards a draft until human approval and native generation rec
  assert.match(ui,/Заменить портфель в черновике/);
  assert.match(ui,/Отменить импорт/);
  assert.doesNotMatch(ui,/confirmAction\("Заменить текущий портфель импортированным JSON/);
+});
+
+
+test("R3 keyboard and sidebar navigation allow untouched forms, block changed fields",()=>{
+ assert.match(ui,/if\(!editorDirtyRef\.current\)\{setEditor\(null\);return true;\}/);
+ const handlers=ui.slice(ui.indexOf(" const key=(event:KeyboardEvent)=>"),ui.indexOf('window.addEventListener("keydown",key)'));
+ assert.equal((handlers.match(/if\(!requireClosedForm\(\)\)return/g)||[]).length,3);
+ assert.doesNotMatch(handlers,/if\(editorOpenRef\.current\)\{issue\(Error\("Сначала примените или закройте/);
+ assert.match(ui,/onClick=\{\(\)=>selectProject\(null\)\}/);
 });
