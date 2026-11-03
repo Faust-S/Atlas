@@ -21,7 +21,8 @@ test("user sees explicit native revision selection and must confirm replacement"
  assert.match(ui,/invoke<HistoryEntry\[\]>\("atlas_list_history",\{expectedGeneration:generation\}\)/);
  assert.match(ui,/invoke<OpenResult>\("atlas_restore_history"/);
  assert.match(ui,/expectedGeneration:generation,historyGeneration:item\.generation/);
- assert.match(ui,/Текущая редакция останется в истории/);
+ assert.match(ui,/Текущая редакция \{data\.revision\}/);
+ assert.match(ui,/\{data\.projects\.length\} проектов\) останется в истории/);
  assert.match(ui,/latestSnapshot\.current=checked/);
  assert.match(ui,/saved\.current=snapshotText\(checked\)/);
  assert.match(ui,/setSavedVersions\(null\)/);
