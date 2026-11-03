@@ -162,3 +162,11 @@ test("R3 fullscreen workspace remains within the installed window and supports E
  assert.match(css,/position:fixed;inset:10px;z-index:900/);
  assert.match(css,/\.atlas-dag-panel\.is-expanded \.atlas-dependency-scroll/);
 });
+
+test("fullscreen views release overlay before invoking project/work editors",()=>{
+ const ts=readFileSync(new URL("../desktop/src/ProjectVisuals.tsx",import.meta.url),"utf8");
+ assert.match(ts,/onClick=\{\(\)=>\{setExpanded\(false\);onEditDates\(\)\}\}/);
+ assert.match(ts,/onClick=\{\(\)=>\{setExpanded\(false\);onOpenProject\(origin\.id\)\}\}/);
+ assert.equal((ts.match(/setExpanded\(false\);onOpenWork\(row\.id\)/g)||[]).length,2);
+ assert.match(ts,/setExpanded\(false\);onOpenWork\(node\.id\)/);
+});
