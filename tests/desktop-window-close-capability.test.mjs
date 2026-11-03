@@ -74,3 +74,16 @@ test("Windows installed GUI saves using the visible control rather than unverifi
  assert.doesNotMatch(windowsTest,/SendWait\('\^s'\)/);
  assert.match(windowsTest,/Wait-AtlasState \$attempt/);
 });
+
+test("installed qualification navigates real tabs and creates work/dependencies through visible controls",()=>{
+ assert.match(windowsTest,/function Click-AtlasAt\(/);
+ assert.match(windowsTest,/function Click-AtlasTab\(/);
+ assert.match(windowsTest,/function Click-AtlasWorkAction\(/);
+ assert.match(windowsTest,/Click-AtlasTab \$process 'work'/);
+ assert.match(windowsTest,/Click-AtlasTab \$process 'timeline'/);
+ assert.match(windowsTest,/Click-AtlasTab \$process 'graph'/);
+ assert.match(windowsTest,/Click-AtlasWorkAction \$process 'work'/);
+ assert.match(windowsTest,/Click-AtlasWorkAction \$process 'dependency'/);
+ assert.match(windowsTest,/Capture-AtlasView 'installed-work-table'/);
+ assert.doesNotMatch(windowsTest,/SendWait\('\^1'\)|SendWait\('\^2'\)|SendWait\('\^3'\)/);
+});

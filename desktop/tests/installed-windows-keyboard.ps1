@@ -129,8 +129,45 @@ function Wait-AtlasTitle([System.Diagnostics.Process]$process,[string]$marker) {
     Capture-AtlasView 'installed-title-mismatch'
     throw "Active installed view was not shown: $marker (window title=$($process.MainWindowTitle))"
 }
+function Click-AtlasAt([System.Diagnostics.Process]$process,[int]$cssX,[int]$cssY) {
+    Activate-Atlas $process
+    $handle=$process.MainWindowHandle
+    $rect=[AtlasWindowsInput+Rect]::new()
+    if (![AtlasWindowsInput]::GetWindowRect($handle,[ref]$rect)) {
+        throw 'Cannot measure installed Atlas window for visible action'
+    }
+    $dpi=[AtlasWindowsInput]::GetDpiForWindow($handle)
+    $scale=if ($dpi -gt 0) { [double]$dpi / 96.0 } else { 1.0 }
+    $x=$rect.Left + [int][Math]::Round($cssX * $scale)
+    $y=$rect.Top + [int][Math]::Round($cssY * $scale)
+    if (![AtlasWindowsInput]::SetCursorPos($x,$y)) { throw 'Cannot move pointer to visible Atlas action' }
+    Start-Sleep -Milliseconds 220
+    [AtlasWindowsInput]::mouse_event(0x0002,0,0,0,[UIntPtr]::Zero)
+    [AtlasWindowsInput]::mouse_event(0x0004,0,0,0,[UIntPtr]::Zero)
+}
+function Click-AtlasTab([System.Diagnostics.Process]$process,[string]$name) {
+    # The screenshot-qualified tabstrip sits under the project heading.
+    # Coordinates are within the real window at its minimum hosted 1024px width.
+    $x=switch ($name) {
+        'work' { 330 }
+        'timeline' { 478 }
+        'graph' { 570 }
+        default { throw 'Unsupported view tab' }
+    }
+    Click-AtlasAt $process $x 338
+}
+function Click-AtlasWorkAction([System.Diagnostics.Process]$process,[string]$kind) {
+    # Work action toolbar is right-aligned inside the first table surface.
+    # Captured screenshot on failure provides evidence if the layout changes.
+    $x=switch ($kind) {
+        'work' { 680 }
+        'dependency' { 905 }
+        default { throw 'Unsupported work action' }
+    }
+    Click-AtlasAt $process $x 419
+}
 function Send-AtlasWork([string]$name, [System.Diagnostics.Process]$process) {
-    [System.Windows.Forms.SendKeys]::SendWait('^+n')
+    Click-AtlasWorkAction $process 'work'
     Wait-AtlasTitle $process 'Форма: Новая работа'
     [System.Windows.Forms.SendKeys]::SendWait($name)
     Start-Sleep -Milliseconds 250
@@ -243,13 +280,14 @@ try {
             if ($attempt -eq 1) {
                 Start-Sleep -Milliseconds 1400
                 Activate-Atlas $process
-                [System.Windows.Forms.SendKeys]::SendWait('^1')
+                Click-AtlasTab $process 'work'
                 Wait-AtlasTitle $process 'Таблица'
+                Capture-AtlasView 'installed-work-table'
                 Send-AtlasWork 'AtlasWorkAlpha' $process
                 Send-AtlasWork 'AtlasWorkBeta' $process
                 # The shared editor defaults to two different works: Alpha -> Beta.
                 # Do not depend on browser-specific TAB/DOWN select behaviour.
-                [System.Windows.Forms.SendKeys]::SendWait('^+l')
+                Click-AtlasWorkAction $process 'dependency'
                 Wait-AtlasTitle $process 'Форма: Добавить зависимость'
                 [System.Windows.Forms.SendKeys]::SendWait('^{ENTER}')
                 Wait-AtlasTitle $process 'Таблица · Не сохранено'
@@ -257,10 +295,10 @@ try {
                 $saved=Wait-AtlasDAG $names[0] $saved.generation
                 Start-Sleep -Milliseconds 1350
                 Activate-Atlas $process
-                [System.Windows.Forms.SendKeys]::SendWait('^2')
+                Click-AtlasTab $process 'timeline'
                 Wait-AtlasTitle $process 'График'
                 Capture-AtlasView 'installed-gantt'
-                [System.Windows.Forms.SendKeys]::SendWait('^3')
+                Click-AtlasTab $process 'graph'
                 Wait-AtlasTitle $process 'Зависимости'
                 Capture-AtlasView 'installed-dag'
                 $original = $saved
