@@ -190,6 +190,24 @@ function Click-AtlasCreateProject([System.Diagnostics.Process]$process) {
     [AtlasWindowsInput]::mouse_event(0x0002,0,0,0,[UIntPtr]::Zero)
     [AtlasWindowsInput]::mouse_event(0x0004,0,0,0,[UIntPtr]::Zero)
 }
+function Click-AtlasSave([System.Diagnostics.Process]$process) {
+    # Use the actual right-aligned Save button, not an accelerator intercepted
+    # by WebView2 or lost by hosted keyboard delivery.
+    Activate-Atlas $process
+    $handle = $process.MainWindowHandle
+    $rect = [AtlasWindowsInput+Rect]::new()
+    if (![AtlasWindowsInput]::GetWindowRect($handle,[ref]$rect)) {
+        throw 'Cannot locate native Atlas window for Save control'
+    }
+    $dpi = [AtlasWindowsInput]::GetDpiForWindow($handle)
+    $scale = if ($dpi -gt 0) { [double]$dpi / 96.0 } else { 1.0 }
+    $x = $rect.Right - [int][Math]::Round(191 * $scale)
+    $y = $rect.Top + [int][Math]::Round(61 * $scale)
+    if (![AtlasWindowsInput]::SetCursorPos($x,$y)) { throw 'Cannot move pointer to Save control' }
+    Start-Sleep -Milliseconds 200
+    [AtlasWindowsInput]::mouse_event(0x0002,0,0,0,[UIntPtr]::Zero)
+    [AtlasWindowsInput]::mouse_event(0x0004,0,0,0,[UIntPtr]::Zero)
+}
 function Send-AtlasProject([string]$name, [System.Diagnostics.Process]$process) {
     # Verify React really opened its editor before entering project data.
     Click-AtlasCreateProject $process
@@ -199,8 +217,8 @@ function Send-AtlasProject([string]$name, [System.Diagnostics.Process]$process) 
     [System.Windows.Forms.SendKeys]::SendWait('^{ENTER}')
     # The app must first apply the form and select the named draft.
     Wait-AtlasTitle $process ($name + ' — Обзор · Не сохранено')
-    # Ctrl+S then uses Tauri atlas_commit and an independent native readback.
-    [System.Windows.Forms.SendKeys]::SendWait('^s')
+    # Visible action -> Rust atlas_commit -> independent native readback.
+    Click-AtlasSave $process
 }
 $original = $null
 $forcedCloseAttempts = @()
@@ -235,7 +253,7 @@ try {
                 Wait-AtlasTitle $process 'Форма: Добавить зависимость'
                 [System.Windows.Forms.SendKeys]::SendWait('^{ENTER}')
                 Wait-AtlasTitle $process 'Таблица · Не сохранено'
-                [System.Windows.Forms.SendKeys]::SendWait('^s')
+                Click-AtlasSave $process
                 $saved=Wait-AtlasDAG $names[0] $saved.generation
                 Start-Sleep -Milliseconds 1350
                 Activate-Atlas $process
