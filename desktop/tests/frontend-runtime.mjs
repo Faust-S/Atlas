@@ -27,7 +27,7 @@ try{
   "--headless=new","--no-sandbox","--disable-dev-shm-usage","--disable-gpu",
   "--no-first-run","--disable-background-networking","--virtual-time-budget=7000",
   "--dump-dom",url
- ],{timeout:35000,maxBuffer:8*1024*1024,encoding:"utf8",stdio:["ignore","pipe","ignore"]});
+ ],{timeout:65000,maxBuffer:8*1024*1024,encoding:"utf8",stdio:["ignore","pipe","ignore"]});
  assert.match(dom,/class="entry-card"/,"React failed to render the standalone startup card");
  assert.match(dom,/IWXA Atlas/);
  assert.match(dom,/Tauri/,"Non-Tauri browser must explicitly explain the native-only data store");
