@@ -904,21 +904,31 @@ function App(){
 function AmendmentForecast({state,projectId,changeId,onApply,canApply,onError}:{
  state:Atlas;projectId:string;changeId:string;onApply:()=>void;canApply:boolean;onError:(e:unknown)=>void
 }){
+ const [projectLimit,setProjectLimit]=useState(40);
+ const [resourceLimit,setResourceLimit]=useState(30);
  let result:any;
  try{result=previewPlanAmendment(state,projectId,changeId)}catch(e){
   return <p className="error" role="alert">Сценарий не может быть применён: {deepFreezeError(e)}</p>
  }
  return <div className="forecast">
   <h4>Последствия относительно текущего плана</h4>
-  <p className="minor">Это предварительная оценка, не разрешение на изменение. Проектов по цепочке: {result.affected}.</p>
+  <p className="minor">Это предварительная оценка, не разрешение на изменение. Проектов по цепочке: {result.affected}.
+   Строк последствий: {result.rows.length}. Ресурсов: {result.resourceRows.length}.</p>
   <div className="table-scroll"><table><thead><tr><th>Проект</th><th>Финиш до</th><th>Финиш после</th><th>Риск срока до/после</th></tr></thead>
-   <tbody>{result.rows.slice(0,40).map((r:any)=><tr key={r.id}><td>{r.name}</td>
+   <tbody>{result.rows.slice(0,projectLimit).map((r:any)=><tr key={r.id}><td>{r.name}</td>
     <td>{readable(r.beforeFinish)}</td><td>{readable(r.afterFinish)}</td>
     <td>{r.beforeSlip??"?"} / {r.afterSlip??"?"}</td></tr>)}</tbody></table></div>
+  <p className="minor">Показано {Math.min(projectLimit,result.rows.length)} из {result.rows.length} проектов.</p>
+  {result.rows.length>projectLimit&&<Action onClick={()=>setProjectLimit(n=>Math.min(result.rows.length,n+40))}>
+   Показать ещё проекты ({result.rows.length-projectLimit})</Action>}
   {result.resourceRows.length>0&&<div className="table-scroll"><h4>Последствия для ресурсов</h4>
    <table><thead><tr><th>Ресурс</th><th>Максимум до / после</th><th>Дни перегрузки</th></tr></thead><tbody>
-    {result.resourceRows.slice(0,30).map((r:any)=><tr key={r.id}><td>{r.label}</td><td>{r.beforeMaxLoad}% / {r.afterMaxLoad}%</td>
-     <td>{r.beforeOverload} / {r.afterOverload}</td></tr>)}</tbody></table></div>}
+    {result.resourceRows.slice(0,resourceLimit).map((r:any)=><tr key={r.id}><td>{r.label}</td><td>{r.beforeMaxLoad}% / {r.afterMaxLoad}%</td>
+     <td>{r.beforeOverload} / {r.afterOverload}</td></tr>)}</tbody></table>
+   <p className="minor">Показано {Math.min(resourceLimit,result.resourceRows.length)} из {result.resourceRows.length} ресурсов.</p>
+   {result.resourceRows.length>resourceLimit&&<Action onClick={()=>setResourceLimit(n=>Math.min(result.resourceRows.length,n+30))}>
+    Показать ещё ресурсы ({result.resourceRows.length-resourceLimit})</Action>}
+  </div>}
   {canApply&&<Action onClick={onApply} primary>Применить утверждённый план</Action>}
  </div>;
 }

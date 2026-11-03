@@ -126,3 +126,14 @@ test('desktop workbench actually mounts existing Gantt/DAG and preserves real ed
  assert.doesNotMatch(entry,/className="graph-list"/);
  assert.doesNotMatch(entry,/className="timeline-line"/);
 });
+
+test("R3 impact preview exposes all affected projects and resources",()=>{
+ const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ assert.match(ui,/const \[projectLimit,setProjectLimit\]=useState\(40\)/);
+ assert.match(ui,/const \[resourceLimit,setResourceLimit\]=useState\(30\)/);
+ assert.match(ui,/result\.rows\.slice\(0,projectLimit\)/);
+ assert.match(ui,/result\.resourceRows\.slice\(0,resourceLimit\)/);
+ assert.match(ui,/Показать ещё проекты/);
+ assert.match(ui,/Показать ещё ресурсы/);
+ assert.match(ui,/Строк последствий: \{result\.rows\.length\}/);
+});

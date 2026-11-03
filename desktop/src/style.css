@@ -1,4 +1,4 @@
-:root{font:13px/1.5 "Segoe UI Variable","Segoe UI",system-ui,sans-serif;color:#20324e;background:#192740;
+:root{font:14px/1.5 "Segoe UI Variable","Segoe UI",system-ui,sans-serif;color:#20324e;background:#192740;
  --ink:#1b2d49;--muted:#607590;--line:#dbe4f0;--strong:#284b80;--blue:#326fe3;--card:#fff;
  --sidebar:#27384f;--soft:#eff4fb;--red:#a33c49;--green:#227a5e;--radius:12px}
 *{box-sizing:border-box}html,body,#root{margin:0;min-height:100%;width:100%}button,input,select,textarea{font:inherit}button{cursor:pointer}
