@@ -136,6 +136,16 @@ export function validate(s){
 }
 function change(s,fn){validate(s);const next=structuredClone(s);fn(next);next.revision++;validate(next);return next}
 function project(s,id){const p=s.projects.find(x=>x.id===id);if(!p)throw Error("Unknown project");return p}
+export function removeProject(s,id){return change(s,x=>{
+ if(!x.projects.some(p=>p.id===id))throw Error("Unknown project");
+ // Retained plan-review decisions and proposals can refer across projects.
+ // Reject instead of silently erasing another project's decision history.
+ if(x.projects.some(p=>p.id!==id&&(p.decisions||[]).some(d=>
+    d.kind==="plan_review"&&d.upstreamProjectId===id)))
+   throw Error("Проект упоминается в решениях других проектов. Сначала разрешите связанные решения.");
+ x.portfolioLinks=(x.portfolioLinks||[]).filter(l=>l.from!==id&&l.to!==id);
+ x.projects=x.projects.filter(p=>p.id!==id);
+})}
 export function createProject(s,data){
  const name=nonempty(data.name,"Project name");
  if((data.goal!==undefined&&typeof data.goal!=="string")||

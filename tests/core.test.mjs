@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {empty,validate,createProject,editProject,createStage,editStage,removeStage,createItem,editItem,removeItem,connect,disconnect,createRisk,editRisk,createDecision,attach,observe,summary,serialize,deserialize} from "../src/core.mjs";
+import {empty,validate,createProject,editProject,removeProject,createStage,editStage,removeStage,createItem,editItem,removeItem,connect,disconnect,createRisk,editRisk,createDecision,attach,observe,summary,serialize,deserialize} from "../src/core.mjs";
 import {scheduleProject} from "../src/planning.mjs";
 const make=()=>createProject(empty(),{name:"Research",type:"research",goal:"Complete study"});
 test("independent project",()=>{const r=make();assert.equal(r.state.projects[0].name,"Research");assert.equal(r.state.revision,1)});
@@ -101,4 +101,17 @@ test("R2 links must be removed before deleting work",()=>{
  const cut=disconnect(linked,p.id,a.id,b.id),clean=removeItem(cut,p.id,a.id);
  assert.equal(clean.projects[0].items.length,1);
  assert.equal(scheduleProject(clean.projects[0]).rows.length,1);
+});
+
+test("R2 deleting a project removes links but preserves unrelated projects",()=>{
+ const a=make(),b=createProject(a.state,{name:"Other",type:"team"});
+ const connected=structuredClone(b.state);
+ connected.portfolioLinks=[{id:"link-one",kind:"blocks",from:a.id,to:b.id,note:"Delivery"}];
+ const snapshot=serialize(connected);
+ const removed=removeProject(connected,a.id);
+ assert.equal(removed.projects.length,1);
+ assert.equal(removed.projects[0].id,b.id);
+ assert.equal(removed.portfolioLinks.length,0);
+ assert.equal(serialize(connected),snapshot);
+ assert.deepEqual(deserialize(serialize(removed)),removed);
 });

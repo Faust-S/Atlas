@@ -2,7 +2,8 @@ import React,{useEffect,useMemo,useRef,useState} from "react";
 import {createRoot} from "react-dom/client";
 import {invoke,isTauri} from "@tauri-apps/api/core";
 import {getCurrentWindow} from "@tauri-apps/api/window";
-import {empty,deserialize,serialize,editItem,removeStage,removeItem,disconnect} from "../../src/core.mjs";
+import {empty,deserialize,serialize,editItem,removeStage,removeItem,disconnect,removeProject as dropProject} from "../../src/core.mjs";
+import {removePortfolioLink} from "../../src/portfolio.mjs";
 import {editorSpec,applyEditor,editorSelectionFields} from "../../src/editor.mjs";
 import {compareProject,decideChange} from "../../src/trace.mjs";
 import {projectImpact} from "../../src/impact.mjs";
@@ -123,6 +124,8 @@ function App(){
  const [generation,setGeneration]=useState("none");
  const [active,setActive]=useState<string|null>(null),[tab,setTab]=useState<Tab>("overview");
  const [search,setSearch]=useState(""),[editor,setEditor]=useState<Editor|null>(null);
+ const [portfolioStatus,setPortfolioStatus]=useState("all");
+ const [boardLimits,setBoardLimits]=useState<Record<string,number>>({});
  const [message,setMessage]=useState(""),[error,setError]=useState("");
  const [inspector,setInspector]=useState(true),[recovery,setRecovery]=useState(false);
  const [closeGuard,setCloseGuard]=useState(false);
@@ -172,8 +175,11 @@ function App(){
  const reality=useMemo(()=>project?compareProject(project):null,[project]);
  const impact=useMemo(()=>project?projectImpact(project):null,[project]);
  const projected=active?dates.byId.get(active):null;
- const filtered=useMemo(()=>data.projects.filter((p:any)=>p.name.toLowerCase().includes(search.toLowerCase())||
-  p.goal?.toLowerCase().includes(search.toLowerCase())),[data,search]);
+ const filtered=useMemo(()=>data.projects.filter((p:any)=>
+  (portfolioStatus==="all"||portfolioStatus==="active"&&["active","planned","paused"].includes(p.status)||
+   portfolioStatus==="finished"&&["completed","cancelled"].includes(p.status))&&
+  (p.name.toLowerCase().includes(search.toLowerCase())||p.goal?.toLowerCase().includes(search.toLowerCase()))),
+  [data,search,portfolioStatus]);
  const filteredWork=useMemo(()=>{
   if(!project)return [];
   const query=workQuery.trim().toLocaleLowerCase("ru-RU");
@@ -459,6 +465,23 @@ function App(){
   if(!confirmAction("Удалить работу? Сначала удалите связи и плановые корректировки."))return;
   try{mutate(removeItem(data,project.id,id),"Работа удалена. Сохраните изменение.");}catch(e){issue(e)}
  };
+ const removePortfolioDependency=(id:string)=>{
+  if(!requireClosedForm()||busyRef.current)return;
+  if(!confirmAction("Удалить межпроектную зависимость? План будет пересчитан."))return;
+  try{mutate(removePortfolioLink(data,id),"Связь проектов удалена. Сохраните изменение.");}catch(e){issue(e)}
+ };
+ const removeProject=(id:string)=>{
+  if(!requireClosedForm()||busyRef.current)return;
+  const subject=data.projects.find((p:any)=>p.id===id);if(!subject)return;
+  const linked=(data.portfolioLinks||[]).filter((l:any)=>l.from===id||l.to===id).length;
+  if(!confirmAction("Удалить «"+subject.name+"» с "+subject.items.length+" работами, "+
+   subject.stages.length+" этапами, "+subject.risks.length+" рисками и историей? "+
+   "Связей с другими проектами: "+linked+". Они будут удалены. "+
+   "В прежнюю сохранённую редакцию можно вернуться через историю."))return;
+  try{mutate(dropProject(data,id),"Проект удалён из черновика. Сохраните изменение.");
+   if(active===id)selectProject(null,true);
+  }catch(e){issue(e)}
+ };
  const quickWork=(id:string,state:string)=>{
   if(!project||!requireClosedForm()||busyRef.current)return;
   try{mutate(editItem(data,project.id,id,{state}),"Состояние работы изменено в черновике.")}
@@ -571,12 +594,17 @@ function App(){
     <section className="surface">
      <div className="section-heading"><div><h2>Проекты и последствия</h2><p>Перейдите к проекту, чтобы увидеть точные причины и объекты.</p></div>
       {data.projects.length>1&&<Action onClick={()=>openEditor("portfolio-link")}>Связать проекты</Action>}</div>
-     {filtered.length?<div className="table-scroll"><table><thead><tr><th>Проект</th><th>Состояние</th><th>Требует внимания</th><th>Расчётный срок</th><th>Риск срока</th></tr></thead>
+     <div className="filter-row"><label>Показывать <select value={portfolioStatus} onChange={ev=>{setPortfolioStatus(ev.target.value);setPortfolioLimit(150)}}>
+      <option value="active">Активные и запланированные</option><option value="all">Все проекты</option>
+      <option value="finished">Завершённые и отменённые</option>
+     </select></label></div>
+     {filtered.length?<div className="table-scroll"><table><thead><tr><th>Проект</th><th>Состояние</th><th>Требует внимания</th><th>Расчётный срок</th><th>Риск срока</th><th>Действия</th></tr></thead>
       <tbody>{filtered.slice(0,portfolioLimit).map((p:any)=>{
        const imp=projectImpact(p),row=dates.byId.get(p.id);
        return <tr key={p.id}><td><button className="text-link" onClick={()=>selectProject(p.id)}>{p.name}</button><small>{p.goal||"Цель не задана"}</small></td>
         <td><Badge>{statuses[p.status]||p.status}</Badge></td><td>{imp.attention} требований · {imp.sourceIssues.length} источников</td>
-        <td title={row?.notes?.join("; ")||""}>{projectedFinishLabel(row)}</td><td>{row?.deadlineSlipDays==null?"Неизвестно":row.deadlineSlipDays+" дн."}</td></tr>;
+        <td title={row?.notes?.join("; ")||""}>{projectedFinishLabel(row)}</td><td>{row?.deadlineSlipDays==null?"Неизвестно":row.deadlineSlipDays+" дн."}</td>
+        <td><Action onClick={()=>removeProject(p.id)}>Удалить</Action></td></tr>;
       })}</tbody></table></div>:<Fallback message={data.projects.length?"По запросу проекты не найдены. Измените поиск, чтобы увидеть остальные.":"Здесь появятся проекты. Создайте первый проект, определите результат и сохраните его на диск."}/>}
      {filtered.length>0&&<p className="minor">Показано {Math.min(filtered.length,portfolioLimit)} из {filtered.length} проектов по текущему поиску.</p>}
      {filtered.length>portfolioLimit&&<Action onClick={()=>setPortfolioLimit(n=>Math.min(filtered.length,n+150))}>Показать ещё проекты</Action>}
@@ -618,9 +646,9 @@ function App(){
     </section>
     <section className="surface">
      <button className="text-link" onClick={()=>setShowDetails(!showDetails)}>{showDetails?"Скрыть":"Показать"} межпроектные зависимости</button>
-     {showDetails&&<div className="table-scroll"><table><thead><tr><th>От проекта</th><th>К проекту</th><th>Условие</th></tr></thead><tbody>
+     {showDetails&&<div className="table-scroll"><table><thead><tr><th>От проекта</th><th>К проекту</th><th>Условие</th><th>Действие</th></tr></thead><tbody>
       {(data.portfolioLinks||[]).map((l:any)=><tr key={l.id}><td>{data.projects.find((p:any)=>p.id===l.from)?.name}</td>
-       <td>{data.projects.find((p:any)=>p.id===l.to)?.name}</td><td>{l.note||"Зависимость"}</td></tr>)}</tbody></table></div>}
+       <td>{data.projects.find((p:any)=>p.id===l.to)?.name}</td><td>{l.note||"Зависимость"}</td><td><Action onClick={()=>removePortfolioDependency(l.id)}>Удалить связь</Action></td></tr>)}</tbody></table></div>}
     </section>
    </>:<>
     <div className="page-heading"><div><small><button className="breadcrumb" onClick={()=>selectProject(null)}>Портфель</button> / {project.type}</small>
@@ -692,12 +720,14 @@ function App(){
     </section>}
     {tab==="board"&&<div className="board">
      {Object.entries(workStatuses).map(([key,title])=><section className="board-column" key={key}><h3>{String(title)} <small>{project.items.filter((w:any)=>w.state===key).length}</small></h3>
-      {project.items.filter((w:any)=>w.state===key).slice(0,60).map((w:any)=><div className="board-card" key={w.id}><strong>{w.title}</strong><small>{w.assignee||"Нет ответственного"} · {w.estimateDays??1} дн.</small>
+      {project.items.filter((w:any)=>w.state===key).slice(0,boardLimits[key]||60).map((w:any)=><div className="board-card" key={w.id}><strong>{w.title}</strong><small>{w.assignee||"Нет ответственного"} · {w.estimateDays??1} дн.</small>
        <div className="board-actions"><select aria-label={"Состояние "+w.title} value={w.state} onChange={e=>quickWork(w.id,e.target.value)}>
         {Object.entries(workStatuses).map(([v,title])=><option key={v} value={v}>{String(title)}</option>)}</select>
         <button onClick={()=>openEditor("work:"+w.id)}>Детали</button></div></div>)}
-       {project.items.filter((w:any)=>w.state===key).length>60&&
-        <p className="minor">Показаны первые 60 из {project.items.filter((w:any)=>w.state===key).length} работ. Откройте таблицу для остальных.</p>}
+       {project.items.filter((w:any)=>w.state===key).length>(boardLimits[key]||60)&&
+        <Action onClick={()=>setBoardLimits(prev=>({...prev,[key]:(prev[key]||60)+60}))}>
+         Показать ещё карточки ({project.items.filter((w:any)=>w.state===key).length-(boardLimits[key]||60)})
+        </Action>}
       </section>)}
     </div>}
     {tab==="timeline"&&(plan?
