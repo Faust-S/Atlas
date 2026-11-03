@@ -21,6 +21,7 @@ import "./style.css";
 
 type Atlas = any;
 type HistoryEntry = {generation:string;revision:number;projects:number};
+type ImportPreview = {snapshot:Atlas;originalRevision:number;expectedGeneration:string;startedWith:Atlas;summary:any};
 type OpenResult = {generation:string;snapshot:Atlas;restoredFromBackup:boolean;needsConfirmation:boolean};
 type Field = {name:string;label:string;value?:string;required?:boolean;type:string;options?:{value:string;label:string}[]};
 type Editor = {action:string;spec:{title:string;hint?:string;fields:Field[]}};
@@ -139,7 +140,9 @@ function App(){
  const [historyType,setHistoryType]=useState("all");
  const [historyLimit,setHistoryLimit]=useState(120);
  const [savedVersions,setSavedVersions]=useState<HistoryEntry[]|null>(null);
+ const [pendingImport,setPendingImport]=useState<ImportPreview|null>(null);
  const savedVersionsOpenRef=useRef(false);savedVersionsOpenRef.current=savedVersions!==null;
+ const pendingImportOpenRef=useRef(false);pendingImportOpenRef.current=pendingImport!==null;
  const [resourceLimit,setResourceLimit]=useState(40);
  const [reviewLimit,setReviewLimit]=useState(20);
  const [sourceLimit,setSourceLimit]=useState(15);
@@ -184,6 +187,10 @@ function App(){
  // Open forms keep local, unapplied input state. A project/tab change or
  // competing action must never unmount that form without explicit cancellation.
  const requireClosedForm=()=>{
+  if(pendingImport!==null){
+   issue(Error("Закройте предпросмотр импорта перед продолжением работы."));
+   return false;
+  }
   if(savedVersions!==null){
    issue(Error("Закройте просмотр сохранённых редакций перед продолжением работы."));
    return false;
@@ -202,6 +209,11 @@ function App(){
   let unlisten:undefined|(()=>void);
   getCurrentWindow().onCloseRequested(event=>{
    if(allowCloseRef.current)return;
+   if(pendingImportOpenRef.current){
+    event.preventDefault();
+    if(!busyRef.current)setPendingImport(null);
+    return;
+   }
    if(savedVersionsOpenRef.current){
     // Alt+F4 first closes the history modal, never dismisses the app while
     // a selected generation is being read or restored.
@@ -273,6 +285,10 @@ function App(){
   }catch(e){issue(e)}
  };
  const save=async():Promise<boolean>=>{
+  if(pendingImportOpenRef.current||savedVersionsOpenRef.current){
+   issue(Error("Закройте диалог импорта или истории прежде чем сохранять портфель."));
+   return false;
+  }
   if(editorOpenRef.current){
    issue(Error("Открытая форма ещё не применена. Нажмите Ctrl+Enter, затем Ctrl+S для записи на диск."));
    return false;
@@ -337,12 +353,28 @@ function App(){
    const head=await invoke<OpenResult>("atlas_open");
    if(head.needsConfirmation||head.generation!==generation)
     throw Error("Нативный портфель изменился во время импорта. Сначала откройте актуальную редакцию.");
-   const {snapshot:next,originalRevision}=prepareImportedSnapshot(startedWith,imported);
-   if(!confirmAction("Заменить текущий портфель импортированным JSON? Предыдущая сохранённая редакция останется в истории Atlas."))return;
-   if(latestSnapshot.current!==startedWith||dirtyRef.current||editorOpenRef.current)
-    throw Error("Портфель или форма изменились до подтверждения импорта. Изменения не перезаписаны.");
-   mutate(next,"Архив загружен в черновик (исходная редакция "+originalRevision+"). Нажмите «Сохранить» для переноса в нативное хранилище.");
-   selectProject(null);
+   const {snapshot:next,originalRevision,summary}=prepareImportedSnapshot(startedWith,imported);
+   // A chosen file is not permission to replace the user's portfolio.
+   // Keep the fully validated candidate separate until explicit approval.
+   setPendingImport({snapshot:next,originalRevision,summary,startedWith,expectedGeneration:generation});
+   setMessage("");setError("");
+  }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
+ };
+ const applyPendingImport=async()=>{
+  const candidate=pendingImport;
+  if(!candidate||busyRef.current||dirtyRef.current||editorOpenRef.current)return;
+  busyRef.current=true;setBusy(true);
+  try{
+   const head=await invoke<OpenResult>("atlas_open");
+   // The chooser and preview may outlive a competing native write.
+   if(head.needsConfirmation||head.generation!==candidate.expectedGeneration)
+    throw Error("Портфель на диске изменился. Импорт отменён; закройте предпросмотр и откройте актуальные данные.");
+   if(latestSnapshot.current!==candidate.startedWith||dirtyRef.current||editorOpenRef.current)
+    throw Error("Черновик изменился после предпросмотра. Импорт не применён.");
+   setPendingImport(null);
+   mutate(candidate.snapshot,"Импортированная редакция "+candidate.originalRevision+
+    " применена к черновику. Для записи на диск нажмите «Сохранить».");
+   selectProject(null,true);
   }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
  };
  const showNativeHistory=async()=>{
@@ -424,8 +456,14 @@ function App(){
  useEffect(()=>{
   const key=(event:KeyboardEvent)=>{
    const ctrl=event.ctrlKey||event.metaKey,code=event.code;
-   // A native history selector is modal: keyboard shortcuts must not change
-   // the portfolio underneath a pending recovery decision.
+   // Both the import preview and native history are modal.
+   if(pendingImport!==null){
+    if(event.key==="Escape"&&!busyRef.current){
+     event.preventDefault();setPendingImport(null);return;
+    }
+    if(ctrl||event.key==="Escape")event.preventDefault();
+    return;
+   }
    if(savedVersions!==null){
     if(event.key==="Escape"&&!busyRef.current){
      event.preventDefault();setSavedVersions(null);return;
@@ -497,7 +535,7 @@ function App(){
     <div className="toolbar-actions">
      <Badge tone={editor||dirty?"warning":persisted?"good":"neutral"}>{editor?"Форма не применена":dirty?"Не сохранено":persisted?"Сохранено":"Новый портфель"}</Badge>
      <Action onClick={()=>void save()} primary disabled={!dirty||busy||!!editor} title={editor?"Сначала примените открытую форму":"Ctrl+S"}>Сохранить</Action>
-     <Action onClick={()=>void importJson()} disabled={busy||!!editor}>Открыть JSON</Action>
+     <Action onClick={()=>void importJson()} disabled={busy||!!editor||pendingImport!==null}>Открыть JSON</Action>
      <Action onClick={()=>void exportJson()} disabled={busy||dirty||!!editor||!persisted}>Резервная копия</Action>
      <Action onClick={()=>void showNativeHistory()} disabled={busy||dirty||!!editor||!persisted||savedVersions!==null}>Версии на диске</Action>
      <button disabled={!!editor} className="icon-button inspector-button" title="Инспектор" onClick={()=>setInspector(!inspector)}>◧</button>
@@ -742,6 +780,34 @@ function App(){
      {!project.sources.length&&<Fallback message="Источников нет. Добавьте публичный репозиторий или ссылку на внешний источник."/>}
     </section>}
    </>}
+   {pendingImport!==null&&<div className="atlas-close-overlay">
+    <section className="atlas-close-dialog" role="dialog" aria-modal="true" aria-labelledby="atlas-import-preview-title">
+     <h2 id="atlas-import-preview-title">Проверка импорта JSON 0.1</h2>
+     <p>Это полная замена портфеля, не объединение. JSON проверен Atlas и ещё не изменил текущие данные.</p>
+     <p className="minor">Редакция архива: {pendingImport.originalRevision}. Подтверждение изменит только черновик.</p>
+     <div className="table-scroll"><table><thead><tr><th>Показатель</th><th>Сейчас</th><th>После импорта</th></tr></thead><tbody>
+      {([["projects","Проекты"],["works","Работы"],["findings","Факты"],["decisions","Решения"],["changes","Предложения"],["sources","Источники"],["links","Связи проектов"]] as const).map(([key,label])=>
+       <tr key={key}><td>{label}</td><td>{pendingImport.summary.current[key]}</td><td>{pendingImport.summary.incoming[key]}</td></tr>)}
+     </tbody></table></div>
+     <p><strong>Исключено:</strong> {pendingImport.summary.removed} проектов.
+      <strong> Добавлено:</strong> {pendingImport.summary.added}.
+      <strong> Совпадают по ID:</strong> {pendingImport.summary.matchingIds} (их данные заменятся содержимым архива).</p>
+     {pendingImport.summary.removed>0&&<p className="atlas-schedule-warning">Будут исключены:
+      {pendingImport.summary.removedExamples.join(", ")}
+      {pendingImport.summary.removed>pendingImport.summary.removedExamples.length?" и другие.":"."}
+     </p>}
+     {pendingImport.summary.added>0&&<p className="minor">Новые проекты: {pendingImport.summary.addedExamples.join(", ")}
+      {pendingImport.summary.added>pendingImport.summary.addedExamples.length?" и другие.":"."}</p>}
+     {pendingImport.summary.incoming.projects===0&&<p className="atlas-schedule-warning">
+      Внимание: архив пуст. После сохранения все текущие проекты исчезнут из активного портфеля.
+     </p>}
+     <p className="minor">После нативного сохранения прежняя редакция останется в разделе «Версии на диске».</p>
+     <div className="button-row">
+      <Action disabled={busy} onClick={()=>setPendingImport(null)}>Отменить импорт</Action>
+      <Action primary disabled={busy} onClick={()=>void applyPendingImport()}>Заменить портфель в черновике</Action>
+     </div>
+    </section>
+   </div>}
    {savedVersions!==null&&<div className="atlas-close-overlay">
     <section className="atlas-close-dialog" role="dialog" aria-modal="true" aria-labelledby="atlas-versions-title">
      <h2 id="atlas-versions-title">Предыдущие редакции Atlas</h2>

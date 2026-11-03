@@ -27,12 +27,22 @@ test("desktop 0.1 JSON import keeps IDs, work DAG, sources, evidence, decisions,
  const imported=JSON.parse(serialize(legacy));
  const current=createProject(empty(),{name:"Existing local portfolio"}).state;
  const oldCurrent=serialize(current),oldLegacy=serialize(legacy);
- const {snapshot,originalRevision}=prepareImportedSnapshot(current,imported,"2026-11-02T00:00:00.000Z");
+ const {snapshot,originalRevision,summary}=prepareImportedSnapshot(current,imported,"2026-11-02T00:00:00.000Z");
  assert.equal(originalRevision,legacy.revision);
  assert.equal(snapshot.revision,Math.max(current.revision,legacy.revision)+1);
  assert.deepEqual(snapshot.projects,legacy.projects);
  assert.deepEqual(snapshot.portfolioLinks,legacy.portfolioLinks);
  assert.deepEqual(snapshot.importProvenance.previous,legacy.importProvenance);
+ assert.equal(summary.current.projects,1);
+ assert.equal(summary.incoming.projects,2);
+ assert.equal(summary.incoming.works,2);
+ assert.equal(summary.incoming.decisions,1);
+ assert.equal(summary.incoming.findings,1);
+ assert.equal(summary.incoming.links,1);
+ assert.equal(summary.removed,1);
+ assert.equal(summary.added,2);
+ assert.equal(summary.matchingIds,0);
+ assert.deepEqual(summary.removedExamples,["Existing local portfolio"]);
  assert.deepEqual(deserialize(JSON.stringify(snapshot)),snapshot);
  assert.equal(serialize(current),oldCurrent);
  assert.equal(serialize(legacy),oldLegacy);
@@ -44,6 +54,8 @@ test("invalid 0.1 JSON cannot replace valid native portfolio draft",()=>{
  assert.equal(serialize(current),saved);
  const prepared=prepareImportedSnapshot(current,empty());
  assert.equal(prepared.snapshot.revision,current.revision+1);
+ assert.equal(prepared.summary.incoming.projects,0);
+ assert.equal(prepared.summary.removed,1);
  assert.equal(serialize(current),saved);
 });
 test("desktop has recoverable lists and rejects import on stale native or edited draft",()=>{
@@ -53,4 +65,21 @@ test("desktop has recoverable lists and rejects import on stale native or edited
  assert.match(ui,/filteredWork\.slice\(0,workLimit\)/);
  assert.match(ui,/latestSnapshot\.current!==startedWith\|\|dirtyRef\.current/);
  assert.match(ui,/head\.generation!==generation/);
+});
+
+
+test("preview of 130-project import is bounded, accurate and non-mutating",()=>{
+ let incoming=empty();
+ for(let i=0;i<130;i++)incoming=createProject(incoming,{name:"Project "+i}).state;
+ const current=createProject(empty(),{name:"Existing local data"}).state;
+ const before=serialize(current),archive=serialize(incoming);
+ const result=prepareImportedSnapshot(current,incoming,"2026-11-03T00:00:00.000Z");
+ assert.equal(result.summary.incoming.projects,130);
+ assert.equal(result.summary.added,130);
+ assert.equal(result.summary.removed,1);
+ assert.equal(result.summary.addedExamples.length,6);
+ assert.equal(result.summary.removedExamples.length,1);
+ assert.equal(result.snapshot.projects.length,130);
+ assert.equal(serialize(current),before);
+ assert.equal(serialize(incoming),archive);
 });

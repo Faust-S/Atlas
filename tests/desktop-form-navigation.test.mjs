@@ -25,7 +25,22 @@ test("native import, export and background mutations cannot discard an open form
   const span=ui.slice(ui.indexOf(" const "+name+"="),ui.indexOf("};",ui.indexOf(" const "+name+"=")));
   assert.match(span,/requireClosedForm\(\)/,name+" must protect the open editor");
  }
- assert.match(ui,/disabled=\{busy\|\|!!editor\}>Открыть JSON/);
+ assert.match(ui,/disabled=\{busy\|\|!!editor\|\|pendingImport!==null\}>Открыть JSON/);
  assert.match(ui,/disabled=\{busy\|\|dirty\|\|!!editor\|\|!persisted\}>Резервная копия/);
  assert.match(ui,/disabled=\{!!editor\} className="icon-button inspector-button"/);
+});
+
+test("JSON preview guards a draft until human approval and native generation recheck",()=>{
+ assert.match(ui,/setPendingImport\(\{snapshot:next,originalRevision,summary,startedWith,expectedGeneration:generation\}\)/);
+ assert.match(ui,/const applyPendingImport=async\(\)=>/);
+ assert.match(ui,/head\.needsConfirmation\|\|head\.generation!==candidate\.expectedGeneration/);
+ assert.match(ui,/latestSnapshot\.current!==candidate\.startedWith/);
+ assert.match(ui,/mutate\(candidate\.snapshot/);
+ assert.match(ui,/selectProject\(null,true\)/);
+ assert.match(ui,/if\(pendingImportOpenRef\.current\)/);
+ assert.match(ui,/if\(pendingImport!==null\)/);
+ assert.match(ui,/aria-labelledby="atlas-import-preview-title"/);
+ assert.match(ui,/Заменить портфель в черновике/);
+ assert.match(ui,/Отменить импорт/);
+ assert.doesNotMatch(ui,/confirmAction\("Заменить текущий портфель импортированным JSON/);
 });
