@@ -200,11 +200,23 @@ def find_edit(label,timeout=18):
     while time.monotonic()<end:
         try:
             for element in window.descendants():
-                if element.element_info.control_type=="Edit" and element.element_info.name.strip()==label:
+                # HTML input[type=number] is exposed as Spinner/SpinButton
+                # by WebView2 UI Automation, unlike text inputs (Edit).
+                if (element.element_info.control_type in ("Edit","Spinner","SpinButton")
+                    and element.element_info.name.strip()==label):
                     return element
         except Exception:
             pass
         time.sleep(.3)
+    options=[]
+    for element in window.descendants():
+        try:
+            name=(element.element_info.name or "").strip()
+            if label in name:
+                options.append((element.element_info.control_type,name,element.is_visible(),element.is_enabled()))
+        except Exception:
+            pass
+    print("ATLAS_GUI_FIELD_CONTROL_CANDIDATES "+repr(options[:15]),flush=True)
     ui_diagnostic("missing-editor-field")
     raise RuntimeError("GUI form field not accessible: "+label)
 
