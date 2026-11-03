@@ -27,8 +27,51 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # One-shot R6.5 migration: generate genuine lockfiles using npm and Cargo
+  # on a hosted runner, then commit the two resolved manifests to THIS branch.
+  # Never fabricate lockfile versions or modify main/release branches.
+  dependency-locks:
+    if: github.event_name == 'push' && contains(github.event.head_commit.message, '[generate-locks]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout working branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Resolve exact npm lockfile from package manifest
+        working-directory: desktop
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+      - name: Set up Rust stable
+        uses: dtolnay/rust-toolchain@stable
+      - name: Resolve exact Cargo lockfile from current Rust manifest
+        run: cargo generate-lockfile --manifest-path desktop/src-tauri/Cargo.toml
+      - name: Verify npm and Cargo can read their lockfiles
+        run: |
+          node -e "const a=require('./desktop/package-lock.json');if(a.name!=='iwxa-atlas-desktop'||!a.packages)throw Error('Invalid npm lock')"
+          cargo metadata --manifest-path desktop/src-tauri/Cargo.toml --locked --format-version 1 --no-deps > /dev/null
+      - name: Commit resolved dependency versions to feature branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add desktop/package-lock.json desktop/src-tauri/Cargo.lock
+          if git diff --cached --quiet; then
+            echo "ATLAS_LOCKFILES_ALREADY_PINNED"
+          else
+            git commit -m "chore(R6): pin npm and Cargo dependencies [desktop-accept]"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+            echo "ATLAS_LOCKFILES_COMMITTED"
+          fi
+
   frontend:
-    if: github.event_name == 'workflow_dispatch' || (contains(github.event.head_commit.message, '[desktop-accept]') || contains(github.event.head_commit.message, '[windows-accept]'))
+    # Every changed desktop/core revision must run the real Node/Vite suite.
+    # The expensive installed Windows GUI gate remains opt-in per SHA.
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
