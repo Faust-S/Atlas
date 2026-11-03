@@ -65,3 +65,8 @@ test("R3 compact Windows layout exposes an inspector drawer without covering sta
  assert.match(ui,/window\.innerWidth>1220/);
  assert.match(ui,/aria-label="Скрыть инспектор"/);
 });
+
+test("Escape is scoped to an open editor and does not consume fullscreen graph Escape",()=>{
+ assert.match(ui,/if\(event\.key==="Escape"&&editorOpenRef\.current\)\{event\.preventDefault\(\);cancelEditor\(\);return\}/);
+ assert.doesNotMatch(ui,/if\(event\.key==="Escape"\)\{event\.preventDefault\(\);cancelEditor\(\);return\}/);
+});

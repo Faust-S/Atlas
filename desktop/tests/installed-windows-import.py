@@ -32,7 +32,8 @@ def native_data():
 
 def shot(name):
     try:
-        window.capture_as_image().save(OUT/("installed-import-"+name+".png"))
+        from PIL import ImageGrab
+        ImageGrab.grab().save(OUT/("installed-import-"+name+".png"))
         print("ATLAS_IMPORT_GUI_SCREENSHOT "+name,flush=True)
     except Exception as exc:
         print("ATLAS_IMPORT_SCREENSHOT_UNAVAILABLE "+str(exc),flush=True)
@@ -53,6 +54,42 @@ def click_button(title):
     control=find_button(title)
     control.click_input()
     time.sleep(.4)
+
+def choose_json_file(path):
+    # Hosted Windows may expose a classic IFileDialog to Win32, but not UIA.
+    # Enumerate actual top-level windows instead of guessing an inaccessible
+    # UI Automation class. Record candidates when the native dialog is absent.
+    deadline=time.monotonic()+25
+    seen=[]
+    while time.monotonic()<deadline:
+        matches=[]
+        seen=[]
+        for backend in ("win32","uia"):
+            try:
+                for item in Desktop(backend=backend).windows():
+                    try:
+                        if not item.is_visible():
+                            continue
+                        name=item.window_text()
+                        kind=item.class_name()
+                        seen.append(backend+":"+kind+":"+name[:100])
+                        if kind=="#32770" or name.strip().lower() in ("open","открыть","open file","выберите файл"):
+                            matches.append((backend,item))
+                    except Exception:
+                        pass
+            except Exception as exc:
+                seen.append(backend+" error="+str(exc)[:100])
+        if matches:
+            backend,dialog=matches[0]
+            print("ATLAS_IMPORT_PICKER_FOUND backend="+backend+" class="+str(dialog.class_name())+
+                  " title="+repr(dialog.window_text()),flush=True)
+            dialog.set_focus()
+            keyboard.send_keys("%n")
+            keyboard.send_keys(str(path),with_spaces=True)
+            keyboard.send_keys("{ENTER}")
+            return
+        time.sleep(.4)
+    raise RuntimeError("No visible native JSON file picker; windows="+repr(seen[:35]))
 
 def boot():
     global process,window
@@ -99,13 +136,7 @@ try:
     phase="open-file-dialog"
     boot()
     click_button("Открыть JSON")
-    dialog=Desktop(backend="uia").window(class_name="#32770")
-    dialog.wait("visible",timeout=20)
-    dialog.set_focus()
-    # Standard Windows IFileDialog: Alt+N focuses the File name edit field.
-    keyboard.send_keys("%n")
-    keyboard.send_keys(str(ARCHIVE),with_spaces=True)
-    keyboard.send_keys("{ENTER}")
+    choose_json_file(ARCHIVE)
     phase="human-import-preview"
     find_button("Заменить портфель в черновике",timeout=30)
     shot("preview")

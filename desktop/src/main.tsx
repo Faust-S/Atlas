@@ -559,7 +559,7 @@ function App(){
     if(!requireClosedForm())return
     openEditor("new");return;
    }
-   if(event.key==="Escape"){event.preventDefault();cancelEditor();return}
+   if(event.key==="Escape"&&editorOpenRef.current){event.preventDefault();cancelEditor();return}
    if(ctrl&&!event.shiftKey&&code==="KeyK"){event.preventDefault();document.getElementById("atlas-search")?.focus()}
   };
   window.addEventListener("keydown",key);return ()=>window.removeEventListener("keydown",key);
