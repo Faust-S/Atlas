@@ -73,3 +73,11 @@ test("installed backup chooses a path without short-name SendKeys Enter alias",(
  assert.match(script,/Unsafe SendKeys path/);
  assert.doesNotMatch(script,/exported=Path\(tempfile\.gettempdir\(\)\)/);
 });
+
+test("installed file chooser rejects unrelated System Properties dialogs",()=>{
+ const driver=readFileSync(new URL("../desktop/tests/installed-windows-import.py",import.meta.url),"utf8");
+ assert.match(driver,/def choose_json_file\(path,save=False\):/);
+ assert.match(driver,/if name\.strip\(\)==expected_title and kind=="#32770"/);
+ assert.match(driver,/choose_json_file\(exported,save=True\)/);
+ assert.doesNotMatch(driver,/if kind=="#32770" or name\.strip\(\)\.lower\(\)/);
+});

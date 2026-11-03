@@ -137,10 +137,12 @@ def confirm_import_draft():
     ui_diagnostic("confirm-no-draft")
     raise RuntimeError("Import confirmation did not change React draft; inspect UI alert and button state")
 
-def choose_json_file(path):
-    # Hosted Windows may expose a classic IFileDialog to Win32, but not UIA.
-    # Enumerate actual top-level windows instead of guessing an inaccessible
-    # UI Automation class. Record candidates when the native dialog is absent.
+def choose_json_file(path,save=False):
+    # Hosted Windows may have unrelated #32770 dialogs (e.g. System
+    # Properties). Only the actual Atlas picker title is acceptable.
+    # The genuine title works with both Win32 and UIA backends.
+    expected_title="Сохранить резервную копию Atlas JSON" if save else "Открыть архив Atlas JSON"
+    # Enumerate actual top-level windows and record diagnostics.
     deadline=time.monotonic()+25
     seen=[]
     while time.monotonic()<deadline:
@@ -155,7 +157,7 @@ def choose_json_file(path):
                         name=item.window_text()
                         kind=item.class_name()
                         seen.append(backend+":"+kind+":"+name[:100])
-                        if kind=="#32770" or name.strip().lower() in ("open","открыть","open file","выберите файл"):
+                        if name.strip()==expected_title and kind=="#32770":
                             matches.append((backend,item))
                     except Exception:
                         pass
@@ -174,7 +176,8 @@ def choose_json_file(path):
             keyboard.send_keys("{ENTER}")
             return
         time.sleep(.4)
-    raise RuntimeError("No visible native JSON file picker; windows="+repr(seen[:35]))
+    raise RuntimeError("No Atlas JSON picker with title "+repr(expected_title)+
+                       "; windows="+repr(seen[:35]))
 
 
 def activate_button(title,timeout=25):
@@ -410,7 +413,7 @@ try:
     assert not any(char in str(exported) for char in "~+^%{}"), "Unsafe SendKeys path; use literal input"
     assert not exported.exists()
     click_button("Резервная копия")
-    choose_json_file(exported)
+    choose_json_file(exported,save=True)
     deadline=time.monotonic()+20
     while not exported.is_file() and time.monotonic()<deadline:
         time.sleep(.3)
