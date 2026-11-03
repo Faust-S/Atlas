@@ -82,11 +82,19 @@ function Metric({value,label,note}:{value:number|string;label:string;note?:strin
  return <div className="metric"><small>{label}</small><strong>{value}</strong>{note&&<small>{note}</small>}</div>;
 }
 function Fallback({message}:{message:string}){return <div className="empty">{message}</div>}
-function EditorPanel({editor,onSubmit,onCancel,busy}:{editor:Editor;onSubmit:(event:React.FormEvent<HTMLFormElement>)=>void;onCancel:()=>void;busy:boolean}){
+function EditorPanel({editor,onSubmit,onCancel,onDirtyChange,busy}:{
+ editor:Editor;onSubmit:(event:React.FormEvent<HTMLFormElement>)=>void;
+ onCancel:()=>void;onDirtyChange:(changed:boolean)=>void;busy:boolean
+}){
  const [fields,setFields]=useState<Record<string,string>>({});
  useEffect(()=>{
   setFields(Object.fromEntries(editor.spec.fields.map(f=>[f.name,String(f.value??"")])));
+  onDirtyChange(false);
  },[editor.action,editor.spec]);
+ const updateFields=(next:Record<string,string>)=>{
+  onDirtyChange(editor.spec.fields.some(f=>String(f.value??"")!==(next[f.name]??"")));
+  setFields(next);
+ };
  return <section className="editor-panel" aria-label="Редактирование">
   <div className="section-heading"><div><small>Изменение данных</small><h2>{editor.spec.title}</h2></div>
    <button className="icon-button" onClick={onCancel} aria-label="Закрыть редактор">×</button></div>
@@ -101,17 +109,17 @@ function EditorPanel({editor,onSubmit,onCancel,busy}:{editor:Editor;onSubmit:(ev
     {f.type==="select"?
       <select name={f.name} aria-label={f.label} autoFocus={index===0} required={f.required!==false}
        value={fields[f.name]??""}
-        onChange={event=>setFields(previous=>editorSelectionFields(editor.spec,previous,f.name,event.target.value))}>
+        onChange={event=>updateFields(editorSelectionFields(editor.spec,fields,f.name,event.target.value))}>
        {(f.options||[]).map(o=><option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
       :f.type==="textarea"?
       <textarea rows={3} name={f.name} aria-label={f.label} autoFocus={index===0} required={f.required!==false}
-       value={fields[f.name]??""} onChange={event=>setFields({...fields,[f.name]:event.target.value})}/>
+       value={fields[f.name]??""} onChange={event=>updateFields({...fields,[f.name]:event.target.value})}/>
       :<input type={f.type||"text"} name={f.name} aria-label={f.label} autoFocus={index===0} required={f.required!==false}
        min={f.type==="number"?(f.name==="allocationPct"||f.name==="capacityPct"?1:0):undefined}
        max={f.type==="number"?(f.name==="allocationPct"?100:f.name==="capacityPct"?1000:36500):undefined}
        step={f.type==="number"?"1":undefined}
-       value={fields[f.name]??""} onChange={event=>setFields({...fields,[f.name]:event.target.value})}/>
+       value={fields[f.name]??""} onChange={event=>updateFields({...fields,[f.name]:event.target.value})}/>
     }
    </label>)}
    <div className="form-footer"><Action onClick={onCancel}>Отмена</Action><button className="action-button primary" disabled={busy} type="submit" title="Ctrl+Enter">Применить к черновику</button></div>
@@ -157,6 +165,7 @@ function App(){
  const dirty=ready&&dataSignature!==saved.current;
  const persisted=generation!=="none";
  const dirtyRef=useRef(false),busyRef=useRef(false),editorOpenRef=useRef(false);
+ const editorDirtyRef=useRef(false);
  dirtyRef.current=dirty;busyRef.current=busy;editorOpenRef.current=!!editor;
  const native=isTauri();
  const dates=useMemo(()=>portfolioSchedule(data),[data]);
@@ -202,6 +211,7 @@ function App(){
    return false;
   }
   if(!editorOpenRef.current)return true;
+  if(!editorDirtyRef.current){setEditor(null);return true;}
   issue(Error("Открытая форма содержит неприменённые данные. Примените её (Ctrl+Enter) или нажмите «Отмена» перед переходом."));
   return false;
  };
@@ -227,7 +237,7 @@ function App(){
     if(!busyRef.current)setSavedVersions(null);
     return;
    }
-   if(dirtyRef.current||busyRef.current||editorOpenRef.current){
+   if(dirtyRef.current||busyRef.current||editorDirtyRef.current){
     event.preventDefault();
     setCloseGuard(true);
    }
@@ -276,6 +286,10 @@ function App(){
    setEditor({action,spec:editorSpec(p,action,data)});setInspector(true);setError("");
   }catch(e){issue(e)}
  };
+ const cancelEditor=()=>{
+  if(editorDirtyRef.current&&!confirmAction("Отказаться от введённых изменений формы?"))return;
+  editorDirtyRef.current=false;setEditor(null);
+ };
  const submit=(event:React.FormEvent<HTMLFormElement>)=>{
   event.preventDefault();
   if(!editor||busy)return;
@@ -287,7 +301,7 @@ function App(){
    const result=applyEditor(data,formProject,editor.action,form);
    mutate(result.state,"Изменение внесено в черновик. Для записи на диск нажмите «Сохранить».");
    if(result.projectId)selectProject(result.projectId,true);
-   setEditor(null);
+   editorDirtyRef.current=false;setEditor(null);
   }catch(e){issue(e)}
  };
  const save=async():Promise<boolean>=>{
@@ -533,7 +547,7 @@ function App(){
     if(editorOpenRef.current){issue(Error("Сначала примените или закройте текущую форму."));return}
     openEditor("new");return;
    }
-   if(event.key==="Escape"){setEditor(null)}
+   if(event.key==="Escape"){event.preventDefault();cancelEditor();return}
    if(ctrl&&!event.shiftKey&&code==="KeyK"){event.preventDefault();document.getElementById("atlas-search")?.focus()}
   };
   window.addEventListener("keydown",key);return ()=>window.removeEventListener("keydown",key);
@@ -884,7 +898,8 @@ function App(){
     <span>Готовность определяется доказательствами и решениями, не количеством коммитов.</span></footer>
   </main>
   {inspector&&<aside className="inspector">
-   {editor?<EditorPanel key={editor.action} editor={editor} onSubmit={submit} onCancel={()=>setEditor(null)} busy={busy}/>:
+   {editor?<EditorPanel key={editor.action} editor={editor} onSubmit={submit}
+    onCancel={cancelEditor} onDirtyChange={changed=>{editorDirtyRef.current=changed}} busy={busy}/>:
    <section><div className="section-heading"><h2>Инспектор</h2><button className="icon-button" aria-label="Скрыть инспектор" onClick={()=>setInspector(false)}>×</button></div>
     <div className="inspector-block"><small>Текущий контекст</small><strong>{project?.name||"Портфель проектов"}</strong>
      <p>{project?.goal||"Выберите проект для работы с планом, доказательствами и изменениями."}</p></div>
