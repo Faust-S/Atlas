@@ -19,7 +19,7 @@ test("Tauri close-requested path can destroy only the authorized main window",()
  assert.ok(!capability.permissions.some(p=>/^(fs|shell|http|process|opener):/.test(p)));
 });
 test("React guards dirty drafts and forms, explicit close still uses granted Tauri command",()=>{
- assert.match(app,/if\(dirtyRef\.current\|\|busyRef\.current\|\|editorOpenRef\.current\)/);
+ assert.match(app,/if\(dirtyRef\.current\|\|busyRef\.current\|\|editorDirtyRef\.current\)/);
  assert.match(app,/event\.preventDefault\(\)/);
  assert.match(app,/setCloseGuard\(true\)/);
  assert.match(app,/aria-modal="true"/);

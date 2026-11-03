@@ -44,3 +44,11 @@ test("graph modes never promote a task completion to certified readiness",()=>{
  assert.doesNotMatch(renderDependencyGraph(p),/сертифицирован/);
  assert.throws(()=>renderDependencyGraph(p,{mode:"oops"}),/filter/);
 });
+
+test("R2 portfolio dependency editor preselects different project IDs",()=>{
+ const first=createProject(empty(),{name:"A"}),second=createProject(first.state,{name:"B"});
+ const spec=editorSpec(null,"portfolio-link",second.state);
+ assert.equal(spec.fields[0].value,first.id);
+ assert.equal(spec.fields[1].value,second.id);
+ assert.notEqual(spec.fields[0].value,spec.fields[1].value);
+});

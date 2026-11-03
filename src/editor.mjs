@@ -46,7 +46,7 @@ export function editorSpec(project,action,snapshot=null){
   const projects=snapshot?.projects||[];
   if(projects.length<2)throw Error("Для связи нужны минимум два проекта");
   const options=projects.map(p=>option(p.id,p.name));
-  return {title:"Межпроектная зависимость",hint:"Первый проект предоставляет результат, необходимый второму. Связь плановая, а не подтверждение релиза.",fields:[choice("from","Предшествующий проект",options),choice("to","Зависимый проект",options,projects[1].id),field("note","Условие или результат зависимости","textarea","",false)]};
+  return {title:"Межпроектная зависимость",hint:"Первый проект предоставляет результат, необходимый второму. Связь плановая, а не подтверждение релиза.",fields:[choice("from","Предшествующий проект",options,projects[0].id),choice("to","Зависимый проект",options,projects[1].id),field("note","Условие или результат зависимости","textarea","",false)]};
  }
 
  if(action.startsWith("plan-review:")){
