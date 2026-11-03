@@ -135,6 +135,11 @@ jobs:
           node tests/fixtures/desktop-portfolio-120.mjs | Out-File -FilePath "$env:RUNNER_TEMP\\atlas-r5.json" -Encoding utf8
           if (!(Test-Path "$env:RUNNER_TEMP\\atlas-r5.json")) { throw 'R5 snapshot missing' }
           "ATLAS_R5_PORTFOLIO_JSON=$env:RUNNER_TEMP\\atlas-r5.json" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Generate existing domain route for installed GUI human-review scenario
+        shell: pwsh
+        run: |
+          node tests/fixtures/desktop-release-route.mjs | Out-File -FilePath "$env:RUNNER_TEMP\\atlas-release-route.json" -Encoding utf8
+          "ATLAS_GUI_ROUTE_JSON=$env:RUNNER_TEMP\\atlas-release-route.json" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Qualify 120-project 20-edit native persistence workload
         shell: pwsh
         run: cargo test --release --locked --manifest-path desktop/src-tauri/Cargo.toml --lib native_r5_scale_and_incremental_readback -- --nocapture
@@ -191,9 +196,9 @@ jobs:
       - name: Check installed GUI import script syntax
         shell: pwsh
         run: python -m py_compile desktop/tests/installed-windows-import.py
-      - name: Qualify installed legacy 0.1 import and 120-project GUI persistence/restart
+      - name: Qualify installed legacy import, R5, backup/restore and human planning workflow
         shell: pwsh
-        timeout-minutes: 8
+        timeout-minutes: 12
         run: python desktop/tests/installed-windows-import.py
       - name: Retain installed Gantt and DAG visual evidence
         if: always()

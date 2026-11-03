@@ -176,6 +176,74 @@ def choose_json_file(path):
         time.sleep(.4)
     raise RuntimeError("No visible native JSON file picker; windows="+repr(seen[:35]))
 
+
+def activate_button(title,timeout=25):
+    element=find_button(title,timeout=timeout)
+    try:
+        window.set_focus()
+        element.set_focus()
+        keyboard.send_keys("{ENTER}")
+        print("ATLAS_GUI_ACTION_ENTER "+title,flush=True)
+    except Exception as exc:
+        if not element.is_visible() or not element.is_enabled():
+            ui_diagnostic("unreachable-"+title[:24])
+            raise RuntimeError("Control not reachable: "+title) from exc
+        element.click_input()
+        print("ATLAS_GUI_ACTION_CLICK "+title,flush=True)
+    time.sleep(.5)
+
+def find_edit(label,timeout=18):
+    end=time.monotonic()+timeout
+    while time.monotonic()<end:
+        try:
+            for element in window.descendants():
+                if element.element_info.control_type=="Edit" and element.element_info.name.strip()==label:
+                    return element
+        except Exception:
+            pass
+        time.sleep(.3)
+    ui_diagnostic("missing-editor-field")
+    raise RuntimeError("GUI form field not accessible: "+label)
+
+def enter_editor_value(label,value):
+    element=find_edit(label)
+    element.set_focus()
+    keyboard.send_keys("^a")
+    keyboard.send_keys(value,with_spaces=True)
+    time.sleep(.2)
+    print("ATLAS_GUI_FIELD_FILLED "+label,flush=True)
+
+def submit_editor():
+    keyboard.send_keys("^{ENTER}")
+    end=time.monotonic()+16
+    while time.monotonic()<end:
+        try:
+            if not any(x.element_info.control_type=="Button" and
+                       x.element_info.name.strip()=="Применить к черновику"
+                       for x in window.descendants()):
+                print("ATLAS_GUI_EDITOR_APPLIED_PASS",flush=True)
+                return
+        except Exception:
+            pass
+        time.sleep(.3)
+    ui_diagnostic("editor-not-applied")
+    raise RuntimeError("Editor submission has not closed the form")
+
+def save_and_verify(predicate,label,old_gen):
+    activate_button("Сохранить")
+    deadline=time.monotonic()+40
+    while time.monotonic()<deadline:
+        try:
+            h,projects=native_data()
+            if h["generation"]!=old_gen and predicate(h,projects):
+                print(label+" generation="+h["generation"],flush=True)
+                return h,projects
+        except (OSError,ValueError,KeyError,AssertionError):
+            pass
+        time.sleep(.35)
+    ui_diagnostic("no-commit-"+label[:20])
+    raise RuntimeError("GUI Ctrl+S/save did not persist: "+label)
+
 def boot():
     global process,window
     process=subprocess.Popen([str(APP)],env={**os.environ,"ATLAS_CI_RENDERER_PROBE":"1"})
@@ -411,6 +479,121 @@ try:
     assert sorted(p["id"] for p in again)==legacy_ids
     shot("history-restored-reopened")
     print("ATLAS_INSTALLED_GUI_HISTORY_RESTART_PASS projects=2",flush=True)
+    stop()
+
+    # User route G11: importing a synthetic pre-observation is only the setup.
+    # Subsequent review, human decision, proposal, approval and amendment
+    # MUST be entered through actual installed WebView2 controls.
+    phase="gui-full-route-import"
+    route_file=Path(os.environ["ATLAS_GUI_ROUTE_JSON"])
+    baseline_route=json.loads(route_file.read_text(encoding="utf-8-sig"))
+    assert len(baseline_route["projects"])==2
+    boot()
+    activate_button("Открыть JSON")
+    choose_json_file(route_file)
+    confirm_import_draft()
+    before_route,_=native_data()
+    route_ids=sorted(x["id"] for x in baseline_route["projects"])
+    route_head,stored=save_and_verify(
+        lambda h,projects: sorted(p["id"] for p in projects)==route_ids,
+        "ATLAS_GUI_ROUTE_IMPORT_READBACK_PASS",before_route["generation"])
+    root_id=baseline_route["projects"][0]["id"]
+    source_initial=next(p for p in stored if p["id"]==root_id)
+    assert len(source_initial["findings"])==1
+    assert source_initial["items"][0]["estimateDays"]==2
+
+    phase="gui-full-route-recheck"
+    activate_button("ATLAS_RELEASE_02_UPSTREAM")
+    activate_button("План / факт")
+    activate_button("Повторно проверить")
+    enter_editor_value("Что именно перепроверено на этой ревизии?","Retested the upstream release on the latest branch")
+    submit_editor()
+    after_recheck,stored=save_and_verify(lambda h,projects:
+        len(next(p for p in projects if p["id"]==root_id)["findings"])==2,
+        "ATLAS_GUI_ROUTE_SHA_RECHECK_PASS",route_head["generation"])
+    checked=next(p for p in stored if p["id"]==root_id)
+    assert checked["findings"][-1]["revision"]=="b"*40
+    assert checked["findings"][-1]["reviewOfFindingId"]==source_initial["findings"][0]["id"]
+
+    phase="gui-full-route-decision"
+    activate_button("▦ Портфель проектов 2")
+    activate_button("Рассмотреть план")
+    control=None
+    for x in window.descendants():
+        if x.element_info.control_type=="ComboBox" and x.element_info.name.strip()=="Что делать с текущим планом?":
+            control=x
+            break
+    if control is None:
+        ui_diagnostic("plan-decision-selector-missing")
+        raise RuntimeError("Human plan-decision control missing")
+    control.set_focus()
+    keyboard.send_keys("{HOME}{DOWN}")
+    enter_editor_value("Основание решения (не менее восьми символов)",
+                       "Fresh source revision requires an explicit release plan update")
+    submit_editor()
+    after_decision,stored=save_and_verify(lambda h,projects: any(
+        d.get("kind")=="plan_review" and d.get("outcome")=="revise"
+        for d in next(p for p in projects if p["id"]==root_id)["decisions"]),
+        "ATLAS_GUI_ROUTE_HUMAN_DECISION_PASS",after_recheck["generation"])
+
+    phase="gui-full-route-proposal"
+    activate_button("▦ Портфель проектов 2")
+    activate_button("Предложить изменение")
+    enter_editor_value("Что изменить в плане?","ATLAS_RELEASE_02_REVISE")
+    enter_editor_value("Предлагаемое изменение и причины",
+                       "Extend the upstream validation work for current SHA")
+    submit_editor()
+    after_proposal,stored=save_and_verify(lambda h,projects: any(
+        x["title"]=="ATLAS_RELEASE_02_REVISE"
+        for x in next(p for p in projects if p["id"]==root_id)["changes"]),
+        "ATLAS_GUI_ROUTE_PROPOSAL_PASS",after_decision["generation"])
+    proposed=next(x for x in next(p for p in stored if p["id"]==root_id)["changes"]
+                  if x["title"]=="ATLAS_RELEASE_02_REVISE")
+    assert proposed["status"]=="proposed"
+
+    phase="gui-full-route-amendment"
+    activate_button("Изменить работу")
+    enter_editor_value("Новая оценка, календарных дней","6")
+    submit_editor()
+    after_amend,stored=save_and_verify(lambda h,projects: any(
+        c.get("planAmendments") and
+        c["id"]==proposed["id"]
+        for c in next(p for p in projects if p["id"]==root_id)["changes"]),
+        "ATLAS_GUI_ROUTE_AMENDMENT_DRAFT_PASS",after_proposal["generation"])
+    assert next(p for p in stored if p["id"]==root_id)["items"][0]["estimateDays"]==2
+
+    phase="gui-full-route-approval"
+    activate_button("Решение")
+    enter_editor_value("Почему принято это решение?",
+                       "Human approved the explicit change after reviewing the impact")
+    submit_editor()
+    after_approval,stored=save_and_verify(lambda h,projects: any(
+        c["id"]==proposed["id"] and c["status"]=="approved"
+        for c in next(p for p in projects if p["id"]==root_id)["changes"]),
+        "ATLAS_GUI_ROUTE_APPROVAL_PASS",after_amend["generation"])
+    assert next(p for p in stored if p["id"]==root_id)["items"][0]["estimateDays"]==2
+
+    phase="gui-full-route-apply"
+    activate_button("Сценарий до / после")
+    activate_button("Применить утверждённый план")
+    keyboard.send_keys("{ENTER}")
+    time.sleep(.4)
+    applied_head,stored=save_and_verify(lambda h,projects:
+        next(p for p in projects if p["id"]==root_id)["items"][0]["estimateDays"]==6,
+        "ATLAS_GUI_ROUTE_PLAN_APPLIED_PASS",after_approval["generation"])
+    root_final=next(p for p in stored if p["id"]==root_id)
+    assert root_final["changes"][0].get("planAppliedAt")
+    assert any(d.get("kind")=="plan_application" for d in root_final["decisions"])
+    assert len(stored)==2 and any(x["id"]==baseline_route["projects"][1]["id"] for x in stored)
+    shot("route-applied")
+    stop()
+    phase="gui-full-route-restart"
+    boot()
+    final_head,final_projects=native_data()
+    assert final_head["generation"]==applied_head["generation"]
+    assert sorted(p["id"] for p in final_projects)==route_ids
+    assert next(p for p in final_projects if p["id"]==root_id)["items"][0]["estimateDays"]==6
+    print("ATLAS_INSTALLED_G11_GUI_RESTART_PASS projects=2",flush=True)
     stop()
 except Exception as exc:
     print("ATLAS_INSTALLED_LEGACY_01_GUI_HOLD phase="+phase+" reason="+repr(exc),flush=True)
