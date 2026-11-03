@@ -50,10 +50,48 @@ def find_button(title,timeout=30):
         time.sleep(.4)
     raise RuntimeError("UIA button unavailable: "+title)
 
-def click_button(title):
-    control=find_button(title)
-    control.click_input()
-    time.sleep(.4)
+def ui_diagnostic(label):
+    shot(label)
+    try:
+        controls=[]
+        for element in window.descendants():
+            name=str(element.element_info.name or "").strip()
+            kind=str(element.element_info.control_type)
+            if name and kind in ("Button","Text","Edit"):
+                controls.append({"kind":kind,"name":name[:90],
+                    "enabled":bool(element.is_enabled()),
+                    "visible":bool(element.is_visible())})
+            if len(controls)>=90:
+                break
+        print("ATLAS_IMPORT_UI_STATE "+label+" "+json.dumps(controls,ensure_ascii=False),flush=True)
+    except Exception as exc:
+        print("ATLAS_IMPORT_UI_DIAGNOSTIC_ERROR "+str(exc),flush=True)
+    try:
+        manifest,projects=native_data()
+        print("ATLAS_IMPORT_NATIVE_STATE "+label+" generation="+str(manifest.get("generation"))+
+              " revision="+str(manifest.get("revision"))+
+              " projects="+str(len(projects))+
+              " names="+repr([p.get("name") for p in projects[:5]]),flush=True)
+    except Exception as exc:
+        print("ATLAS_IMPORT_NATIVE_DIAGNOSTIC_ERROR "+str(exc),flush=True)
+
+def click_button(title,timeout=35):
+    deadline=time.monotonic()+timeout
+    last=None
+    while time.monotonic()<deadline:
+        try:
+            control=find_button(title,timeout=2)
+            if control.is_visible() and control.is_enabled():
+                control.click_input()
+                print("ATLAS_IMPORT_VISIBLE_BUTTON_CLICK "+title,flush=True)
+                time.sleep(.45)
+                return
+            last="Button found but not enabled/visible"
+        except Exception as exc:
+            last=str(exc)[:140]
+        time.sleep(.4)
+    ui_diagnostic("button-unavailable")
+    raise RuntimeError("Installed GUI button not actionable: "+title+" / "+str(last))
 
 def choose_json_file(path):
     # Hosted Windows may expose a classic IFileDialog to Win32, but not UIA.
@@ -142,7 +180,9 @@ try:
     shot("preview")
     click_button("Заменить портфель в черновике")
     phase="save-imported-draft"
-    click_button("Сохранить")
+    # Async native generation guard and React transition must finish before
+    # Save becomes enabled. Never click a disabled background toolbar action.
+    click_button("Сохранить",timeout=35)
     deadline=time.monotonic()+40
     imported=None
     while time.monotonic()<deadline:
@@ -155,6 +195,7 @@ try:
             pass
         time.sleep(.35)
     if imported is None:
+        ui_diagnostic("legacy-save-no-readback")
         raise RuntimeError("The imported legacy JSON was not committed through the installed GUI")
     current,projects=imported
     first=next(p for p in projects if p["name"]=="ATLAS_LEGACY_01_RESEARCH")

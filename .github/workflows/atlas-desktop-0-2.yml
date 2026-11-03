@@ -187,10 +187,13 @@ jobs:
           "ATLAS_LEGACY_ARCHIVE=$env:RUNNER_TEMP\\atlas-legacy-0-1.json" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Install independent Windows UI Automation driver for legacy file dialog
         shell: pwsh
-        run: python -m pip install pywinauto==0.6.9
+        run: python -m pip install pywinauto==0.6.9 pillow==11.3.0
+      - name: Check installed GUI import script syntax
+        shell: pwsh
+        run: python -m py_compile desktop/tests/installed-windows-import.py
       - name: Import genuine 0.1 archive through installed EXE dialog and save/readback
         shell: pwsh
-        timeout-minutes: 4
+        timeout-minutes: 5
         run: python desktop/tests/installed-windows-import.py
       - name: Retain installed Gantt and DAG visual evidence
         if: always()
