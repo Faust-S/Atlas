@@ -106,11 +106,11 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
     </div><strong>Дл.</strong>
    </div>
    {displayed.map((row:any)=><div className="atlas-gantt-row" key={row.id}>
-    <button className="atlas-gantt-work" title={row.title} onClick={()=>{setExpanded(false);onOpenWork(row.id)}}>>{trim(row.title,65)}
+    <button className="atlas-gantt-work" title={row.title} onClick={()=>{setExpanded(false);onOpenWork(row.id)}}>{trim(row.title,65)}
      <small>{statusName[row.state]||row.state}{row.critical?' · критическая':''}</small></button>
     <div className="atlas-gantt-track">
      {guide(row.id)}
-     {row.visible&&<button type="button" onClick={()=>{setExpanded(false);onOpenWork(row.id)}}>
+     {row.visible&&<button type="button" onClick={()=>{setExpanded(false);onOpenWork(row.id)}}
       title={row.title+' · '+row.dateStart+' → '+row.dateFinish+' · '+row.durationDays+' дн. · '+(statusName[row.state]||row.state)}
       aria-label={'Открыть работу '+row.title}
       className={'atlas-gantt-bar'+(row.isMilestone?' is-milestone':'')+(row.critical?' is-critical':'')+(row.state==='done'?' is-done':'')+(row.state==='blocked'?' is-blocked':'')}
@@ -171,7 +171,7 @@ export function ProjectDependencyDiagram({schedule,onOpenWork}:{schedule:CPM;onO
         markerEnd={edge.critical?'url(#atlas-dag-critical-arrow)':'url(#atlas-dag-arrow)'}/>)}
       </svg>
       {display.nodes.map((node:any)=><button key={node.id} type="button" title={node.title}
-       onClick={()=>{setExpanded(false);onOpenWork(node.id)}}>
+       onClick={()=>{setExpanded(false);onOpenWork(node.id)}}
        className={'atlas-dependency-node'+(node.critical?' critical':'')+(node.state==='done'?' done':'')+(activeMatch?.id===node.id?' focused':'')}
        style={{left:node.x,top:node.y,width:node.width,height:node.height}}>
        <strong>{trim(node.title,66)}</strong><small>{statusName[node.state]||node.state}
