@@ -66,3 +66,10 @@ test("history remains navigable for many archived versions, backup shows exact d
  assert.match(driver,/ATLAS_BACKUP_PATH_READBACK/);
  assert.match(driver,/ATLAS_BACKUP_VISIBLE_WINDOWS/);
 });
+
+test("installed backup chooses a path without short-name SendKeys Enter alias",()=>{
+ const script=readFileSync(new URL("../desktop/tests/installed-windows-import.py",import.meta.url),"utf8");
+ assert.match(script,/exported=Path\(os\.environ\["RUNNER_TEMP"\]\)/);
+ assert.match(script,/Unsafe SendKeys path/);
+ assert.doesNotMatch(script,/exported=Path\(tempfile\.gettempdir\(\)\)/);
+});

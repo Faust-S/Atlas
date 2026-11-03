@@ -273,9 +273,12 @@ function App(){
   setWorkFilter("all");setWorkQuery("");setWorkSort("title");setWorkLimit(200);
   setHistoryQuery("");setHistoryType("all");setHistoryLimit(120);setRecheckLimit(25);
  };
- const openProjectTab=(id:string,tabId:Tab)=>{
+ const openProjectTab=(id:string,tabId:Tab,changeId:string|null=null)=>{
   if(!requireClosedForm())return;
   selectProject(id);setTab(tabId);
+  // Jump straight to the concrete, still-unapplied planning forecast.
+  // This is navigation only; human approval and application stay separate.
+  if(tabId==="changes"&&changeId)setForecastId(changeId);
  };
  const openEditor=(action:string,projectId?:string)=>{
   if(!requireClosedForm()||busyRef.current)return;
@@ -648,7 +651,7 @@ function App(){
        <div className="button-row">
         {["needs_decision","deferred"].includes(r.state)&&<Action onClick={()=>openEditorFor(r.projectId,planReviewAction(r.rootProjectId,r.findingId,r.projectId,r.revision))}>Рассмотреть план</Action>}
         {r.state==="needs_proposal"&&r.decision&&<Action onClick={()=>openEditorFor(r.projectId,planProposalAction(r.projectId,r.decision.id))}>Предложить изменение</Action>}
-        {["proposal_open","plan_pending"].includes(r.state)&&<Action onClick={()=>openProjectTab(r.projectId,"changes")}>{r.state==="plan_pending"?"Применить утверждённый план":"Открыть заявку"}</Action>}
+        {["proposal_open","plan_pending"].includes(r.state)&&<Action onClick={()=>openProjectTab(r.projectId,"changes",r.proposal?.id||null)}>{r.state==="plan_pending"?"Показать сценарий плана":"Открыть заявку"}</Action>}
         {r.state==="source_hold"&&<Action onClick={()=>openProjectTab(r.rootProjectId,"sources")}>Сверить Git-источник</Action>}
         <Action onClick={()=>selectProject(r.projectId)}>Открыть</Action>
        </div></div>)}

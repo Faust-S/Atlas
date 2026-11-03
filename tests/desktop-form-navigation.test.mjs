@@ -70,3 +70,11 @@ test("Escape is scoped to an open editor and does not consume fullscreen graph E
  assert.match(ui,/if\(event\.key==="Escape"&&editorOpenRef\.current\)\{event\.preventDefault\(\);cancelEditor\(\);return\}/);
  assert.doesNotMatch(ui,/if\(event\.key==="Escape"\)\{event\.preventDefault\(\);cancelEditor\(\);return\}/);
 });
+
+test("review queue opens its associated forecast instead of leaving user to locate a change",()=>{
+ assert.match(ui,/const openProjectTab=\(id:string,tabId:Tab,changeId:string\|null=null\)=>/);
+ assert.match(ui,/if\(tabId==="changes"&&changeId\)setForecastId\(changeId\)/);
+ assert.match(ui,/openProjectTab\(r\.projectId,"changes",r\.proposal\?\.id\|\|null\)/);
+ assert.match(ui,/Показать сценарий плана/);
+ assert.match(ui,/canApply=\{\["approved","in_progress"\]\.includes\(c\.status\)\}/);
+});

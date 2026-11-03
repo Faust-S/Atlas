@@ -4,7 +4,7 @@ Uses Windows file picker and existing public GUI actions, then checks the
 single Rust atlas-store-v1 data root. No test-only product commands or files
 are written into the app store by this script.
 """
-import json, os, subprocess, sys, tempfile, time
+import json, os, subprocess, sys, time
 from pathlib import Path
 
 import pywinauto
@@ -333,7 +333,13 @@ try:
     # A genuine external backup must be produced by the installed GUI's
     # system save picker. It must be a readable atlas.project/1 snapshot.
     phase="gui-backup-export"
-    exported=Path(tempfile.gettempdir())/("atlas-0-2-gui-backup-"+str(os.getpid())+".json")
+    # On hosted Windows tempfile.gettempdir() may use 8.3 paths such as
+    # RUNNER~1. pywinauto.send_keys treats ~ as Enter and would accidentally
+    # save C:\\Users\\RUNNER.json instead of the requested file.
+    # RUNNER_TEMP is the existing full-length CI output directory, shared
+    # with the authentic 0.1 and 120-project JSON fixtures.
+    exported=Path(os.environ["RUNNER_TEMP"])/("atlas-0-2-gui-backup-"+str(os.getpid())+".json")
+    assert not any(char in str(exported) for char in "~+^%{}"), "Unsafe SendKeys path; use literal input"
     assert not exported.exists()
     click_button("Резервная копия")
     choose_json_file(exported)
