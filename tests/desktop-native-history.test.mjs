@@ -52,3 +52,17 @@ test("history restoration uses an explicit nonblocking in-dialog selection",()=>
  assert.match(driver,/ATLAS_INSTALLED_GUI_HISTORY_RESTORE_READBACK_PASS/);
  assert.match(driver,/ATLAS_INSTALLED_GUI_HISTORY_RESTART_PASS/);
 });
+
+test("history remains navigable for many archived versions, backup shows exact destination",()=>{
+ const source=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ const rustSource=readFileSync(new URL("../desktop/src-tauri/src/lib.rs",import.meta.url),"utf8");
+ const driver=readFileSync(new URL("../desktop/tests/installed-windows-import.py",import.meta.url),"utf8");
+ assert.match(source,/savedVersions\.slice\(0,nativeHistoryLimit\)\.map/);
+ assert.match(source,/Показать ещё редакции/);
+ assert.match(source,/setNativeHistoryLimit\(40\)/);
+ assert.match(rustSource,/Резервная копия Atlas сохранена: \{\}/);
+ assert.match(rustSource,/selected\.display\(\)/);
+ assert.match(driver,/keyboard\.send_keys\("\^a"\)/);
+ assert.match(driver,/ATLAS_BACKUP_PATH_READBACK/);
+ assert.match(driver,/ATLAS_BACKUP_VISIBLE_WINDOWS/);
+});

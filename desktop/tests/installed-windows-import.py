@@ -167,6 +167,9 @@ def choose_json_file(path):
                   " title="+repr(dialog.window_text()),flush=True)
             dialog.set_focus()
             keyboard.send_keys("%n")
+            # Save As pre-populates atlas-backup.json. Replace that entire
+            # suggested filename, rather than appending to it.
+            keyboard.send_keys("^a")
             keyboard.send_keys(str(path),with_spaces=True)
             keyboard.send_keys("{ENTER}")
             return
@@ -337,7 +340,22 @@ try:
     deadline=time.monotonic()+20
     while not exported.is_file() and time.monotonic()<deadline:
         time.sleep(.3)
-    assert exported.is_file(), "Installed GUI did not create chosen JSON backup"
+    if not exported.is_file():
+        # Distinguish a Windows Save As driver problem from a Tauri export
+        # error. Surface the actual UI message, visible dialogs and nearby
+        # filenames instead of incorrectly blaming the native store.
+        recent=[str(p) for p in exported.parent.glob("atlas*backup*.json")]
+        print("ATLAS_BACKUP_EXPECTED_PATH "+str(exported),flush=True)
+        print("ATLAS_BACKUP_PRESENT_CANDIDATES "+repr(recent[:20]),flush=True)
+        seen=[]
+        for backend in ("win32","uia"):
+            for dialog in Desktop(backend=backend).windows():
+                if dialog.is_visible():
+                    seen.append(backend+":"+dialog.class_name()+":"+dialog.window_text()[:120])
+        print("ATLAS_BACKUP_VISIBLE_WINDOWS "+repr(seen[:40]),flush=True)
+        ui_diagnostic("backup-export-missing")
+        raise RuntimeError("Installed GUI did not create backup at the selected path")
+    print("ATLAS_BACKUP_PATH_READBACK "+str(exported),flush=True)
     backup=json.loads(exported.read_text(encoding="utf-8-sig"))
     assert sorted(p["id"] for p in backup["projects"])==expected_ids
     assert sum(len(p["items"]) for p in backup["projects"])==expected_works

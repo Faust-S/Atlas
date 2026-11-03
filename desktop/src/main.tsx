@@ -153,6 +153,7 @@ function App(){
  const [historyType,setHistoryType]=useState("all");
  const [historyLimit,setHistoryLimit]=useState(120);
  const [savedVersions,setSavedVersions]=useState<HistoryEntry[]|null>(null);
+ const [nativeHistoryLimit,setNativeHistoryLimit]=useState(40);
  const [selectedHistory,setSelectedHistory]=useState<HistoryEntry|null>(null);
  const [pendingImport,setPendingImport]=useState<ImportPreview|null>(null);
  const savedVersionsOpenRef=useRef(false);savedVersionsOpenRef.current=savedVersions!==null;
@@ -415,7 +416,7 @@ function App(){
   busyRef.current=true;setBusy(true);
   try{
    const entries=await invoke<HistoryEntry[]>("atlas_list_history",{expectedGeneration:generation});
-   setSelectedHistory(null);setSavedVersions(entries);setMessage("");setError("");
+   setSelectedHistory(null);setNativeHistoryLimit(40);setSavedVersions(entries);setMessage("");setError("");
   }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
  };
  const restoreHistoricalVersion=async(item:HistoryEntry)=>{
@@ -921,11 +922,14 @@ function App(){
       <p>Версии получены из нативного хранилища. Восстановление создаёт новую сохранённую редакцию,
        не изменяет архивный оригинал и сохраняет текущий портфель в истории.</p>
       {savedVersions.length?<div className="table-scroll"><table><thead><tr><th>Редакция</th><th>Проекты</th><th>Действие</th></tr></thead><tbody>
-       {savedVersions.map(item=><tr key={item.generation}><td>{item.revision}</td><td>{item.projects}</td><td>
+       {savedVersions.slice(0,nativeHistoryLimit).map(item=><tr key={item.generation}><td>{item.revision}</td><td>{item.projects}</td><td>
         <Action disabled={busy} onClick={()=>{setSelectedHistory(item);setError("")}}>
          {selectedHistory?.generation===item.generation?"Выбрано":"Выбрать редакцию"}</Action>
        </td></tr>)}
       </tbody></table></div>:<p className="minor">Предыдущих редакций ещё нет. Они появляются после повторных сохранений.</p>}
+      {savedVersions.length>0&&<p className="minor">Показано {Math.min(savedVersions.length,nativeHistoryLimit)} из {savedVersions.length} сохранённых редакций.</p>}
+      {savedVersions.length>nativeHistoryLimit&&<Action disabled={busy} onClick={()=>setNativeHistoryLimit(n=>Math.min(savedVersions.length,n+40))}>
+       Показать ещё редакции ({savedVersions.length-nativeHistoryLimit})</Action>}
       {error&&<p className="alert error" role="alert">Не удалось восстановить: {error}</p>}
      </div>
      <div className="atlas-history-actions">

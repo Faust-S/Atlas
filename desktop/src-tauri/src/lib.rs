@@ -396,7 +396,9 @@ fn atlas_export_json(app:AppHandle, expected_generation:String)->Result<String,S
         return Err("Разрешён только файл .json".into());
     }
     export_root(&path_for(&app)?,&expected_generation,&selected)?;
-    Ok(format!("Резервная копия сохранена для редакции {}",expected_generation))
+    // A real destination is more useful to the user than the opaque store
+    // generation. Report success only after an atomic exported file exists.
+    Ok(format!("Резервная копия Atlas сохранена: {}",selected.display()))
 }
 #[tauri::command]
 fn atlas_select_import(app:AppHandle)->Result<Option<Value>,String>{
