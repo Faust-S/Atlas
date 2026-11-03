@@ -176,9 +176,24 @@ try:
     click_button("Открыть JSON")
     choose_json_file(ARCHIVE)
     phase="human-import-preview"
-    find_button("Заменить портфель в черновике",timeout=30)
+    confirm=find_button("Заменить портфель в черновике",timeout=30)
+    # The actual installed viewport must expose the confirmation, rather
+    # than leaving an enabled button out of sight under a tall preview.
+    deadline=time.monotonic()+8
+    while time.monotonic()<deadline and (not confirm.is_visible() or not confirm.is_enabled()):
+        time.sleep(.3)
+        confirm=find_button("Заменить портфель в черновике",timeout=2)
+    if not confirm.is_visible() or not confirm.is_enabled():
+        ui_diagnostic("confirm-outside-viewport")
+        raise RuntimeError("Legacy import confirmation cannot be reached in the installed viewport")
+    print("ATLAS_IMPORT_CONFIRM_VISIBLE_PASS",flush=True)
     shot("preview")
     click_button("Заменить портфель в черновике")
+    # Approval changes the React draft only; persistence still needs Save.
+    after_preview,still_on_disk=native_data()
+    assert after_preview["generation"]==baseline["generation"]
+    assert sorted(p["id"] for p in still_on_disk)==sorted(p["id"] for p in original)
+    print("ATLAS_IMPORT_PRE_SAVE_NATIVE_UNCHANGED_PASS",flush=True)
     phase="save-imported-draft"
     # Async native generation guard and React transition must finish before
     # Save becomes enabled. Never click a disabled background toolbar action.

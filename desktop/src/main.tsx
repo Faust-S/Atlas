@@ -880,8 +880,9 @@ function App(){
     </section>}
    </>}
    {pendingImport!==null&&<div className="atlas-close-overlay">
-    <section className="atlas-close-dialog" role="dialog" aria-modal="true" aria-labelledby="atlas-import-preview-title">
-     <h2 id="atlas-import-preview-title">Проверка импорта JSON 0.1</h2>
+    <section className="atlas-close-dialog atlas-import-dialog" role="dialog" aria-modal="true" aria-labelledby="atlas-import-preview-title">
+     <div className="atlas-import-body">
+      <h2 id="atlas-import-preview-title">Проверка импорта JSON 0.1</h2>
      <p>Это полная замена портфеля, не объединение. JSON проверен Atlas и ещё не изменил текущие данные.</p>
      <p className="minor">Редакция архива: {pendingImport.originalRevision}. Подтверждение изменит только черновик.</p>
      <div className="table-scroll"><table><thead><tr><th>Показатель</th><th>Сейчас</th><th>После импорта</th></tr></thead><tbody>
@@ -901,7 +902,8 @@ function App(){
       Внимание: архив пуст. После сохранения все текущие проекты исчезнут из активного портфеля.
      </p>}
      <p className="minor">После нативного сохранения прежняя редакция останется в разделе «Версии на диске».</p>
-     <div className="button-row">
+     </div>
+     <div className="button-row atlas-import-actions">
       <Action disabled={busy} onClick={()=>setPendingImport(null)}>Отменить импорт</Action>
       <Action primary disabled={busy} onClick={()=>void applyPendingImport()}>Заменить портфель в черновике</Action>
      </div>

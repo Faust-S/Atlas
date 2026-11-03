@@ -83,3 +83,17 @@ test("preview of 130-project import is bounded, accurate and non-mutating",()=>{
  assert.equal(serialize(current),before);
  assert.equal(serialize(incoming),archive);
 });
+
+test("installed JSON import preview keeps confirmation visible while details scroll",()=>{
+ const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ const css=readFileSync(new URL("../desktop/src/style.css",import.meta.url),"utf8");
+ const acceptance=readFileSync(new URL("../desktop/tests/installed-windows-import.py",import.meta.url),"utf8");
+ assert.match(ui,/className="atlas-close-dialog atlas-import-dialog"/);
+ assert.match(ui,/className="atlas-import-body"/);
+ assert.match(ui,/className="button-row atlas-import-actions"/);
+ assert.match(css,/\.atlas-import-dialog\{[^}]*display:flex;flex-direction:column;overflow:hidden/);
+ assert.match(css,/\.atlas-import-body\{[^}]*min-height:0;overflow-y:auto/);
+ assert.match(css,/\.atlas-import-actions\{[^}]*flex:0 0 auto/);
+ assert.match(acceptance,/ATLAS_IMPORT_CONFIRM_VISIBLE_PASS/);
+ assert.match(acceptance,/ATLAS_IMPORT_PRE_SAVE_NATIVE_UNCHANGED_PASS/);
+});
