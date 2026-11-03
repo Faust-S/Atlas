@@ -57,3 +57,12 @@ test("Windows qualification uses only installed NSIS GUI, not redundant standalo
  assert.match(pipeline,/name: Install this exact Windows build using NSIS/);
  assert.match(pipeline,/name: Exercise installed React forms save close and reopen/);
 });
+
+test("installed Windows project creation uses the visible GUI action, not an intercepted browser accelerator",()=>{
+ assert.match(windowsTest,/function Click-AtlasCreateProject\(/);
+ assert.match(windowsTest,/GetWindowRect\(\$handle,\[ref\]\$rect\)/);
+ assert.match(windowsTest,/GetDpiForWindow\(\$handle\)/);
+ assert.match(windowsTest,/mouse_event\(0x0002/);
+ assert.match(windowsTest,/Click-AtlasCreateProject \$process\s*Wait-AtlasTitle \$process 'Форма: Новый проект'/);
+ assert.doesNotMatch(windowsTest,/SendWait\('\^n'\)/);
+});

@@ -7,6 +7,12 @@ Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
 public static class AtlasWindowsInput {
+    [StructLayout(LayoutKind.Sequential)]
+    public struct Rect { public int Left, Top, Right, Bottom; }
+    [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hWnd, out Rect rect);
+    [DllImport("user32.dll")] public static extern uint GetDpiForWindow(IntPtr hWnd);
+    [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
+    [DllImport("user32.dll")] public static extern void mouse_event(uint flags, uint dx, uint dy, uint data, UIntPtr extraInfo);
     [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
     [DllImport("user32.dll")] public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
     [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
@@ -165,10 +171,28 @@ function Capture-AtlasView([string]$name) {
         Write-Warning "Installed screenshot unavailable: $($_.Exception.Message)"
     }
 }
+function Click-AtlasCreateProject([System.Diagnostics.Process]$process) {
+    # The installed screenshot confirms a stable sidebar action at CSS x~105/y~214.
+    # The WebView2 runtime or hosted SendKeys may consume Ctrl+N before React.
+    # Qualify the real on-screen user action instead of relying on that shortcut.
+    Activate-Atlas $process
+    $handle = $process.MainWindowHandle
+    $rect = [AtlasWindowsInput+Rect]::new()
+    if (![AtlasWindowsInput]::GetWindowRect($handle,[ref]$rect)) {
+        throw 'Installed Atlas window bounds are unavailable for visible project button'
+    }
+    $dpi = [AtlasWindowsInput]::GetDpiForWindow($handle)
+    $scale = if ($dpi -gt 0) { [double]$dpi / 96.0 } else { 1.0 }
+    $x = $rect.Left + [int][Math]::Round(104 * $scale)
+    $y = $rect.Top + [int][Math]::Round(214 * $scale)
+    if (![AtlasWindowsInput]::SetCursorPos($x,$y)) { throw 'Cannot move pointer to visible project creation action' }
+    Start-Sleep -Milliseconds 200
+    [AtlasWindowsInput]::mouse_event(0x0002,0,0,0,[UIntPtr]::Zero)
+    [AtlasWindowsInput]::mouse_event(0x0004,0,0,0,[UIntPtr]::Zero)
+}
 function Send-AtlasProject([string]$name, [System.Diagnostics.Process]$process) {
-    # The native-open receipt alone does not mean the React workbench is
-    # ready to receive keystrokes. Verify the actual rendered editor title.
-    [System.Windows.Forms.SendKeys]::SendWait('^n')
+    # Verify React really opened its editor before entering project data.
+    Click-AtlasCreateProject $process
     Wait-AtlasTitle $process 'Форма: Новый проект'
     [System.Windows.Forms.SendKeys]::SendWait($name)
     Start-Sleep -Milliseconds 250
