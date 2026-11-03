@@ -7,7 +7,7 @@ test("R3 tracks changed fields and asks before discarding unsaved form input",()
  assert.match(ui,/onDirtyChange\(editor\.spec\.fields\.some/);
  assert.match(ui,/if\(!editorDirtyRef\.current\)\{\s*setEditor\(null\);\s*if\(window\.innerWidth<=1220\)setInspector\(false\);\s*return true;/);
  assert.match(ui,/if\(editorDirtyRef\.current&&!confirmAction\("Отказаться от введённых изменений формы\?"\)\)return/);
- assert.match(ui,/if\(event\.key==="Escape"\)\{event\.preventDefault\(\);cancelEditor\(\);return\}/);
+ assert.match(ui,/if\(event\.key==="Escape"&&editorOpenRef\.current\)\{event\.preventDefault\(\);cancelEditor\(\);return\}/);
  assert.match(ui,/onCancel=\{cancelEditor\} onDirtyChange=/);
 });
 
