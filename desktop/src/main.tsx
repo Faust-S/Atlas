@@ -173,6 +173,13 @@ function App(){
  },[project,workFilter,workQuery]);
  const mutate=(next:Atlas,notice:string)=>{latestSnapshot.current=next;setData(next);setMessage(notice);setError("");};
  const issue=(e:unknown)=>{setError(deepFreezeError(e));setMessage("");};
+ // Open forms keep local, unapplied input state. A project/tab change or
+ // competing action must never unmount that form without explicit cancellation.
+ const requireClosedForm=()=>{
+  if(!editorOpenRef.current)return true;
+  issue(Error("Открытая форма содержит неприменённые данные. Примените её (Ctrl+Enter) или нажмите «Отмена» перед переходом."));
+  return false;
+ };
  useEffect(()=>{
   if(!native){setError("Нативный Atlas 0.2 запускается как установленное приложение Tauri. Для работы с данными откройте его через собственное окно Windows.");return}
   invoke<OpenResult>("atlas_open").then(result=>{
@@ -204,12 +211,15 @@ function App(){
   void getCurrentWindow().setTitle("IWXA Atlas — "+subject+" — "+display+suffix)
    .catch(error=>console.warn("Atlas native window title unavailable",error));
  },[native,ready,project?.name,tab,editor?.spec.title,dirty]);
- const selectProject=(id:string|null)=>{
-  setActive(id);setTab("overview");setEditor(null);setForecastId(null);setMessage("");
+ const selectProject=(id:string|null,afterSubmit=false)=>{
+  if(!afterSubmit&&!requireClosedForm())return;
+  setActive(id);setTab("overview");setEditor(null);setForecastId(null);
+  if(!afterSubmit)setMessage("");
   setWorkFilter("all");setWorkQuery("");setWorkLimit(200);
   setHistoryQuery("");setHistoryType("all");setHistoryLimit(120);setRecheckLimit(25);
  };
  const openEditor=(action:string,projectId?:string)=>{
+  if(!requireClosedForm()||busyRef.current)return;
   try{
    const p=data.projects.find((x:any)=>x.id===(projectId??active))||null;
    const spec=editorSpec(p,action,data);
@@ -217,6 +227,7 @@ function App(){
   }catch(e){issue(e)}
  };
  const openEditorFor=(projectId:string,action:string)=>{
+  if(!requireClosedForm()||busyRef.current)return;
   try{
    const p=data.projects.find((x:any)=>x.id===projectId);
    if(!p)throw Error("Проект для решения не найден");
@@ -234,7 +245,7 @@ function App(){
    decodeURIComponent(editor.action.split(":")[1]||""):active;
    const result=applyEditor(data,formProject,editor.action,form);
    mutate(result.state,"Изменение внесено в черновик. Для записи на диск нажмите «Сохранить».");
-   if(result.projectId)selectProject(result.projectId);
+   if(result.projectId)selectProject(result.projectId,true);
    setEditor(null);
   }catch(e){issue(e)}
  };
@@ -281,7 +292,7 @@ function App(){
   if(done&&latestSnapshot.current===data&&!editorOpenRef.current)await closeWindow();
  };
  const exportJson=async()=>{
-  if(busyRef.current||!ready)return;
+  if(!requireClosedForm()||busyRef.current||!ready)return;
   if(dirty){issue(Error("Сначала сохраните изменения, затем создайте резервную копию."));return}
   busyRef.current=true;setBusy(true);
   try{
@@ -290,7 +301,7 @@ function App(){
   }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
  };
  const importJson=async()=>{
-  if(busyRef.current||!ready)return;
+  if(!requireClosedForm()||busyRef.current||!ready)return;
   if(dirty){issue(Error("Сначала сохраните изменения или отмените их перед импортом."));return}
   busyRef.current=true;setBusy(true);
   try{
@@ -298,15 +309,15 @@ function App(){
    const imported=await invoke<Atlas|null>("atlas_select_import");
    if(!imported)return;
    // The file chooser can outlive the local draft from which it was opened.
-   if(latestSnapshot.current!==startedWith||dirtyRef.current)
-    throw Error("Портфель изменился во время выбора файла. Импорт отменён, текущий черновик сохранён.");
+   if(latestSnapshot.current!==startedWith||dirtyRef.current||editorOpenRef.current)
+    throw Error("Портфель или открытая форма изменились во время выбора файла. Импорт отменён, текущие данные не заменены.");
    const head=await invoke<OpenResult>("atlas_open");
    if(head.needsConfirmation||head.generation!==generation)
     throw Error("Нативный портфель изменился во время импорта. Сначала откройте актуальную редакцию.");
    const {snapshot:next,originalRevision}=prepareImportedSnapshot(startedWith,imported);
    if(!confirmAction("Заменить текущий портфель импортированным JSON? Предыдущая сохранённая редакция останется в истории Atlas."))return;
-   if(latestSnapshot.current!==startedWith||dirtyRef.current)
-    throw Error("Портфель изменился до подтверждения импорта. Изменения не перезаписаны.");
+   if(latestSnapshot.current!==startedWith||dirtyRef.current||editorOpenRef.current)
+    throw Error("Портфель или форма изменились до подтверждения импорта. Изменения не перезаписаны.");
    mutate(next,"Архив загружен в черновик (исходная редакция "+originalRevision+"). Нажмите «Сохранить» для переноса в нативное хранилище.");
    selectProject(null);
   }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
@@ -322,7 +333,7 @@ function App(){
   }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
  };
  const syncPublic=async(source?:{projectId:string;sourceId:string})=>{
-  if(busyRef.current)return;
+  if(!requireClosedForm()||busyRef.current)return;
   if(!confirmAction("Запросить публичные сведения GitHub? Наблюдение не подтверждает готовность проекта."))return;
   busyRef.current=true;setBusy(true);
   try{
@@ -336,22 +347,23 @@ function App(){
   }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
  };
  const applyAmendment=(changeId:string)=>{
-  if(!project)return;
+  if(!project||!requireClosedForm()||busyRef.current)return;
   if(!confirmAction("Применить утверждённые корректировки плана? Действие будет записано в историю решений."))return;
   try{mutate(applyPlanAmendment(data,project.id,changeId).state,"План изменён в черновике. Сохраните новую редакцию.");setForecastId(null)}
   catch(e){issue(e)}
  };
  const removeAmendment=(changeId:string,key:string)=>{
-  if(!project)return;
+  if(!project||!requireClosedForm()||busyRef.current)return;
   try{mutate(removePlanAmendment(data,project.id,changeId,key).state,"Корректировка удалена из черновика.")}
   catch(e){issue(e)}
  };
  const quickWork=(id:string,state:string)=>{
-  if(!project)return;
+  if(!project||!requireClosedForm()||busyRef.current)return;
   try{mutate(editItem(data,project.id,id,{state}),"Состояние работы изменено в черновике.")}
   catch(e){issue(e)}
  };
  const view=(tabId:Tab)=>{
+  if(!requireClosedForm())return;
   setTab(tabId);setEditor(null);setForecastId(null);
  };
  useEffect(()=>{
@@ -399,12 +411,12 @@ function App(){
   <aside className="sidebar">
    <div className="brand"><span className="logo-symbol">A</span><div><strong>Atlas</strong><small>IWXA · 0.2 Desktop</small></div></div>
    <nav className="main-nav" aria-label="Основная навигация">
-    <button className={!active?"nav-current":""} onClick={()=>selectProject(null)}>▦ <span>Портфель проектов</span><b>{data.projects.length}</b></button>
-    <button aria-label="Создать проект" onClick={()=>{selectProject(null);openEditor("new")}}>＋ <span>Создать проект</span></button>
+    <button disabled={!!editor} className={!active?"nav-current":""} onClick={()=>selectProject(null)}>▦ <span>Портфель проектов</span><b>{data.projects.length}</b></button>
+    <button disabled={!!editor} aria-label="Создать проект" onClick={()=>{selectProject(null);openEditor("new")}}>＋ <span>Создать проект</span></button>
    </nav>
    <div className="sidebar-label">Мои проекты</div>
    <div className="project-nav" aria-label="Проекты">
-    {filtered.slice(0,sidebarLimit).map((p:any)=><button key={p.id} className={active===p.id?"nav-current":""}
+    {filtered.slice(0,sidebarLimit).map((p:any)=><button disabled={!!editor} key={p.id} className={active===p.id?"nav-current":""}
       onClick={()=>selectProject(p.id)}><span className="project-indicator"/><span className="project-name">{p.name}</span></button>)}
     {filtered.length>sidebarLimit&&<button type="button"
      onClick={()=>setSidebarLimit(n=>Math.min(filtered.length,n+120))}>
@@ -421,9 +433,9 @@ function App(){
     <div className="toolbar-actions">
      <Badge tone={editor||dirty?"warning":persisted?"good":"neutral"}>{editor?"Форма не применена":dirty?"Не сохранено":persisted?"Сохранено":"Новый портфель"}</Badge>
      <Action onClick={()=>void save()} primary disabled={!dirty||busy||!!editor} title={editor?"Сначала примените открытую форму":"Ctrl+S"}>Сохранить</Action>
-     <Action onClick={()=>void importJson()} disabled={busy}>Открыть JSON</Action>
-     <Action onClick={()=>void exportJson()} disabled={busy||dirty}>Резервная копия</Action>
-     <button className="icon-button inspector-button" title="Инспектор" onClick={()=>setInspector(!inspector)}>◧</button>
+     <Action onClick={()=>void importJson()} disabled={busy||!!editor}>Открыть JSON</Action>
+     <Action onClick={()=>void exportJson()} disabled={busy||dirty||!!editor||!persisted}>Резервная копия</Action>
+     <button disabled={!!editor} className="icon-button inspector-button" title="Инспектор" onClick={()=>setInspector(!inspector)}>◧</button>
     </div>
    </header>
    {error&&<div className="alert error" role="alert">{error}<button onClick={()=>setError("")} aria-label="Закрыть сообщение">×</button></div>}
@@ -495,7 +507,7 @@ function App(){
      <h1>{project.name}</h1><p>{project.goal||"Цель пока не определена"}</p></div>
      <div className="button-row"><Badge>{statuses[project.status]||project.status}</Badge><Action onClick={()=>openEditor("status")}>Изменить статус</Action></div>
     </div>
-    <nav className="tabbar" aria-label="Представления проекта">{tabs.map(t=><button key={t.key}
+    <nav className="tabbar" aria-label="Представления проекта">{tabs.map(t=><button disabled={!!editor} key={t.key}
       title={t.key==="work"?"Ctrl+1":t.key==="timeline"?"Ctrl+2":t.key==="graph"?"Ctrl+3":undefined}
       className={tab===t.key?"selected":""} onClick={()=>view(t.key)}>{t.title}</button>)}</nav>
     {tab==="overview"&&<>
