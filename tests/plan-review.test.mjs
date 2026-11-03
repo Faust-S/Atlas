@@ -117,7 +117,7 @@ test("forged plan-review references are rejected on JSON import and UI escapes p
  assert.match(html,/&lt;img/);
  assert.doesNotMatch(html,/<img/);
 });
-\n
+
 test("rejected proposal becomes actionable again instead of a dead-end",()=>{
  const f=fixture(),request=planReviewAction(f.root,f.claimId,f.child,SHA_B);
  let s=applyEditor(f.state,f.child,request,input({
