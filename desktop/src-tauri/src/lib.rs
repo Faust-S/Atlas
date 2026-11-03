@@ -717,7 +717,7 @@ mod persistence_tests{
         let read_ms=start.elapsed().as_millis();
         assert_eq!(read.snapshot,data);
         let preserved=data["projects"][119].clone();
-        let mut previous=first.generation;
+        let mut previous=first.generation.clone();
         let start=std::time::Instant::now();
         for index in 0..20usize {
             data["revision"]=serde_json::json!(index+1);
