@@ -18,6 +18,7 @@ import {ProjectGantt,ProjectDependencyDiagram} from "./ProjectVisuals";
 import {prepareImportedSnapshot} from "./import-snapshot.mjs";
 import {commitWithReadback} from "./native-save.mjs";
 import {projectHistoryRows} from "./history-view.mjs";
+import {sortWorkRows} from "./work-sorting.mjs";
 import "./style.css";
 
 type Atlas = any;
@@ -143,6 +144,7 @@ function App(){
  const [refreshReport,setRefreshReport]=useState<any>(null);
  const [forecastId,setForecastId]=useState<string|null>(null);
  const [workFilter,setWorkFilter]=useState("all"),[workQuery,setWorkQuery]=useState("");
+ const [workSort,setWorkSort]=useState("title");
  const [portfolioLimit,setPortfolioLimit]=useState(150);
  const [sidebarLimit,setSidebarLimit]=useState(120);
  const [workLimit,setWorkLimit]=useState(200);
@@ -192,11 +194,11 @@ function App(){
  const filteredWork=useMemo(()=>{
   if(!project)return [];
   const query=workQuery.trim().toLocaleLowerCase("ru-RU");
-  return project.items.filter((item:any)=>
+  return sortWorkRows(project.items.filter((item:any)=>
    (workFilter==="all"||item.state===workFilter)&&
    (!query||item.title.toLocaleLowerCase("ru-RU").includes(query)||
-    String(item.assignee||"").toLocaleLowerCase("ru-RU").includes(query)));
- },[project,workFilter,workQuery]);
+    String(item.assignee||"").toLocaleLowerCase("ru-RU").includes(query))),workSort);
+ },[project,workFilter,workQuery,workSort]);
  const mutate=(next:Atlas,notice:string)=>{latestSnapshot.current=next;setData(next);setMessage(notice);setError("");};
  const issue=(e:unknown)=>{setError(deepFreezeError(e));setMessage("");};
  // Open forms keep local, unapplied input state. A project/tab change or
@@ -262,7 +264,7 @@ function App(){
   if(!afterSubmit&&!requireClosedForm())return;
   setActive(id);setTab("overview");setEditor(null);setForecastId(null);
   if(!afterSubmit)setMessage("");
-  setWorkFilter("all");setWorkQuery("");setWorkLimit(200);
+  setWorkFilter("all");setWorkQuery("");setWorkSort("title");setWorkLimit(200);
   setHistoryQuery("");setHistoryType("all");setHistoryLimit(120);setRecheckLimit(25);
  };
  const openProjectTab=(id:string,tabId:Tab)=>{
@@ -721,7 +723,12 @@ function App(){
      <div className="filter-row"><label>Состояние <select value={workFilter} onChange={e=>{setWorkFilter(e.target.value);setWorkLimit(200)}}>
       <option value="all">Все</option>{Object.entries(workStatuses).map(([v,k])=><option value={v} key={v}>{String(k)}</option>)}</select></label>
       <label>Найти работу <input type="search" value={workQuery} aria-label="Найти работу"
-       placeholder="Название или ответственный" onChange={e=>{setWorkQuery(e.target.value);setWorkLimit(200)}}/></label></div>
+       placeholder="Название или ответственный" onChange={e=>{setWorkQuery(e.target.value);setWorkLimit(200)}}/></label>
+      <label>Сортировка <select aria-label="Сортировка работ" value={workSort} onChange={e=>{setWorkSort(e.target.value);setWorkLimit(200)}}>
+       <option value="title">По названию</option><option value="dueDate">По сроку</option>
+       <option value="priority">По приоритету</option><option value="estimateDays">По длительности</option>
+       <option value="state">По состоянию</option>
+      </select></label></div>
      <div className="table-scroll"><table><thead><tr><th>Работа</th><th>Состояние</th><th>Длительность</th><th>Ответственный</th><th>Срок</th><th>Изменить</th></tr></thead>
       <tbody>{filteredWork.slice(0,workLimit).map((w:any)=><tr key={w.id}>
        <td><strong>{w.title}</strong><small>{project.stages.find((s:any)=>s.id===w.stageId)?.name||"Без этапа"}</small></td>
