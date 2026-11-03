@@ -102,8 +102,8 @@ test('desktop workbench actually mounts existing Gantt/DAG and preserves real ed
  assert.match(entry,/onOpenProject=\{id=>selectProject\(id\)\}/);
  assert.match(component,/unavailableOrigins\.slice\(0,5\)\.map/);
  assert.match(component,/Поставка этого проекта не имеет расчётной даты/);
- assert.match(component,/onClick=\{\(\)=>onOpenProject\(origin.id\)\}/);
- assert.match(component,/onClick=\{onEditDates\}/);
+ assert.match(component,/onClick=\{\(\)=>\{setExpanded\(false\);onOpenProject\(origin.id\)\}\}/);
+ assert.match(component,/onClick=\{\(\)=>\{setExpanded\(false\);onEditDates\(\)\}\}/);
  assert.match(entry,/getCurrentWindow\(\)\.setTitle\("IWXA Atlas — "/);
  assert.match(entry,/\[native,ready,project\?\.name,tab,editor\?\.spec\.title,dirty\]/);
  assert.match(entry,/Форма: /);
