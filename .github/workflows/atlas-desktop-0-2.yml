@@ -85,7 +85,7 @@ jobs:
         run: npm test
       - name: Install desktop UI dependencies
         working-directory: desktop
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
       - name: Compile React TypeScript and Vite
         working-directory: desktop
         run: npm run build
@@ -112,11 +112,11 @@ jobs:
         shell: pwsh
         working-directory: desktop
         run: |
-          npm install --no-audit --no-fund
+          npm ci --no-audit --no-fund
           npm run desktop:build
       - name: Verify native on-disk transaction and recovery tests
         shell: pwsh
-        run: cargo test --release --manifest-path desktop/src-tauri/Cargo.toml --lib
+        run: cargo test --release --locked --manifest-path desktop/src-tauri/Cargo.toml --lib
       # Installing and exercising the exact NSIS package below already checks
       # the real window, React -> Rust IPC, save/readback and graceful exit.
       # Do not start an extra standalone process that can leave WebView2
