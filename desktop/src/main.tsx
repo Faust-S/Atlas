@@ -20,6 +20,7 @@ import {projectHistoryRows} from "./history-view.mjs";
 import "./style.css";
 
 type Atlas = any;
+type HistoryEntry = {generation:string;revision:number;projects:number};
 type OpenResult = {generation:string;snapshot:Atlas;restoredFromBackup:boolean;needsConfirmation:boolean};
 type Field = {name:string;label:string;value?:string;required?:boolean;type:string;options?:{value:string;label:string}[]};
 type Editor = {action:string;spec:{title:string;hint?:string;fields:Field[]}};
@@ -137,6 +138,7 @@ function App(){
  const [historyQuery,setHistoryQuery]=useState("");
  const [historyType,setHistoryType]=useState("all");
  const [historyLimit,setHistoryLimit]=useState(120);
+ const [savedVersions,setSavedVersions]=useState<HistoryEntry[]|null>(null);
  const [resourceLimit,setResourceLimit]=useState(40);
  const [reviewLimit,setReviewLimit]=useState(20);
  const [sourceLimit,setSourceLimit]=useState(15);
@@ -331,6 +333,35 @@ function App(){
    selectProject(null);
   }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
  };
+ const showNativeHistory=async()=>{
+  if(!requireClosedForm()||busyRef.current||!ready||dirty||!persisted)return;
+  busyRef.current=true;setBusy(true);
+  try{
+   const entries=await invoke<HistoryEntry[]>("atlas_list_history",{expectedGeneration:generation});
+   setSavedVersions(entries);setMessage("");setError("");
+  }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
+ };
+ const restoreHistoricalVersion=async(item:HistoryEntry)=>{
+  if(busyRef.current||dirtyRef.current||editorOpenRef.current)return;
+  const approved=confirmAction("Восстановить архивную редакцию "+item.revision+
+   " ("+item.projects+" проектов)?\n\nТекущая редакция останется в истории. "+
+   "Восстановленная копия станет новой редакцией. Это не автоматическое объединение портфелей.");
+  if(!approved)return;
+  busyRef.current=true;setBusy(true);
+  try{
+   const result=await invoke<OpenResult>("atlas_restore_history",{
+    expectedGeneration:generation,historyGeneration:item.generation
+   });
+   if(result.needsConfirmation)throw Error("Нативное хранилище требует отдельного восстановления");
+   const checked=deserialize(JSON.stringify(result.snapshot));
+   latestSnapshot.current=checked;
+   saved.current=snapshotText(checked);
+   setData(checked);setGeneration(result.generation);setSavedVersions(null);
+   selectProject(null);
+   setMessage("Архивная редакция "+item.revision+" восстановлена, сохранена новым поколением и перечитана.");
+   setError("");
+  }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
+ };
  const restore=async()=>{
   if(!confirmAction("Восстановить предыдущую исправную редакцию? Повреждённый индекс будет сохранён в карантине."))return;
   busyRef.current=true;setBusy(true);
@@ -444,6 +475,7 @@ function App(){
      <Action onClick={()=>void save()} primary disabled={!dirty||busy||!!editor} title={editor?"Сначала примените открытую форму":"Ctrl+S"}>Сохранить</Action>
      <Action onClick={()=>void importJson()} disabled={busy||!!editor}>Открыть JSON</Action>
      <Action onClick={()=>void exportJson()} disabled={busy||dirty||!!editor||!persisted}>Резервная копия</Action>
+     <Action onClick={()=>void showNativeHistory()} disabled={busy||dirty||!!editor||!persisted||savedVersions!==null}>Версии на диске</Action>
      <button disabled={!!editor} className="icon-button inspector-button" title="Инспектор" onClick={()=>setInspector(!inspector)}>◧</button>
     </div>
    </header>
@@ -686,6 +718,19 @@ function App(){
      {!project.sources.length&&<Fallback message="Источников нет. Добавьте публичный репозиторий или ссылку на внешний источник."/>}
     </section>}
    </>}
+   {savedVersions!==null&&<div className="atlas-close-overlay">
+    <section className="atlas-close-dialog" role="dialog" aria-modal="true" aria-labelledby="atlas-versions-title">
+     <h2 id="atlas-versions-title">Предыдущие редакции Atlas</h2>
+     <p>Версии получены из нативного хранилища. Восстановление создаёт новую сохранённую редакцию,
+      не изменяет архивный оригинал и сохраняет текущий портфель в истории.</p>
+     {savedVersions.length?<div className="table-scroll"><table><thead><tr><th>Редакция</th><th>Проекты</th><th>Действие</th></tr></thead><tbody>
+      {savedVersions.map(item=><tr key={item.generation}><td>{item.revision}</td><td>{item.projects}</td><td>
+       <Action disabled={busy} onClick={()=>void restoreHistoricalVersion(item)}>Восстановить</Action>
+      </td></tr>)}
+     </tbody></table></div>:<p className="minor">Предыдущих редакций ещё нет. Они появляются после повторных сохранений.</p>}
+     <div className="button-row"><Action disabled={busy} onClick={()=>setSavedVersions(null)}>Закрыть</Action></div>
+    </section>
+   </div>}
    {closeGuard&&<div className="atlas-close-overlay">
     <section className="atlas-close-dialog" role="dialog" aria-modal="true" aria-labelledby="atlas-close-title">
      <h2 id="atlas-close-title">Закрыть IWXA Atlas?</h2>

@@ -37,6 +37,13 @@ struct BlockRef {
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+struct HistoryEntry {
+    generation: String,
+    revision: u64,
+    projects: usize,
+}
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct OpenResult {
     generation: String,
     snapshot: Value,
@@ -433,6 +440,95 @@ fn restore_root(root:&Path)->Result<OpenResult,String>{
     Ok(OpenResult{generation,snapshot:backup.snapshot,
         restored_from_backup:true,needs_confirmation:false})
 }
+// Explicit, user-driven rollback of a healthy portfolio. Unlike repair of a
+// damaged head, this is a NEW revision using the existing native store. The
+// current head is archived by commit_root before the selected history is
+// published, so neither side of the rollback is lost.
+fn list_history_root(root: &Path, expected_generation: &str) -> Result<Vec<HistoryEntry>, String> {
+    let _guard = lock(root)?;
+    let current = load_root(root)?;
+    if current.needs_confirmation {
+        return Err("Сначала восстановите повреждённое хранилище".into());
+    }
+    if current.generation != expected_generation {
+        return Err("Портфель изменился в другом окне. Повторно откройте историю.".into());
+    }
+    let mut entries = Vec::new();
+    for path in backup_candidates(root)? {
+        let Ok(item) = read_manifest(&path) else { continue };
+        if item.generation == current.generation { continue; }
+        entries.push(HistoryEntry {
+            generation: item.generation,
+            revision: item.revision,
+            projects: item.projects.len(),
+        });
+    }
+    Ok(entries)
+}
+#[tauri::command]
+fn atlas_list_history(app: AppHandle, expected_generation: String) -> Result<Vec<HistoryEntry>, String> {
+    list_history_root(&path_for(&app)?, &expected_generation)
+}
+
+fn restore_history_root(
+    root: &Path, expected_generation: &str, history_generation: &str,
+) -> Result<OpenResult, String> {
+    // Read and verify the selected archive under the same lock as the current
+    // head. Release that lock before commit_root, which rechecks generation
+    // under its own lock and refuses any competing write.
+    let selected = {
+        let _guard = lock(root)?;
+        let current = load_root(root)?;
+        if current.needs_confirmation {
+            return Err("Сначала восстановите повреждённое хранилище".into());
+        }
+        if current.generation != expected_generation {
+            return Err("Портфель изменился в другом окне. Восстановление отменено.".into());
+        }
+        if history_generation == expected_generation {
+            return Err("Выбрана текущая редакция, восстановление не требуется".into());
+        }
+        let mut candidate = None;
+        for path in backup_candidates(root)? {
+            let Ok(manifest) = read_manifest(&path) else { continue };
+            if manifest.generation != history_generation { continue; }
+            candidate = Some(decode(root, &manifest)?);
+            break;
+        }
+        let mut snapshot = candidate.ok_or("Выбранная архивная редакция не найдена")?;
+        let current_revision = current.snapshot.get("revision").and_then(Value::as_u64)
+            .ok_or("Неизвестна редакция текущего портфеля")?;
+        let saved_revision = snapshot.get("revision").and_then(Value::as_u64)
+            .ok_or("Неизвестна редакция архивного портфеля")?;
+        let highest = current_revision.max(saved_revision);
+        if highest >= 9_007_199_254_740_991 {
+            return Err("Исчерпан номер редакции портфеля".into());
+        }
+        snapshot["revision"] = Value::from(highest + 1);
+        validate_snapshot(&snapshot)?;
+        snapshot
+    };
+    let receipt = commit_root(root, expected_generation, selected.clone())?;
+    let _guard = lock(root)?;
+    let checked = load_root(root)?;
+    if checked.needs_confirmation || checked.generation != receipt.generation
+        || checked.snapshot != selected {
+        return Err("Восстановленная редакция не совпала при чтении с диска".into());
+    }
+    Ok(OpenResult {
+        generation: receipt.generation,
+        snapshot: checked.snapshot,
+        restored_from_backup: true,
+        needs_confirmation: false,
+    })
+}
+#[tauri::command]
+fn atlas_restore_history(
+    app: AppHandle, expected_generation: String, history_generation: String,
+) -> Result<OpenResult, String> {
+    restore_history_root(&path_for(&app)?, &expected_generation, &history_generation)
+}
+
 #[tauri::command]
 fn atlas_restore_previous(app:AppHandle)->Result<OpenResult,String>{
     restore_root(&path_for(&app)?)
@@ -526,6 +622,39 @@ mod persistence_tests{
         assert!(fs::read_dir(&root.0).unwrap().any(|item|
             item.unwrap().file_name().to_string_lossy().starts_with("head-quarantine-")));
     }
+    #[test]fn healthy_history_rollback_preserves_both_editions_and_rejects_stale_generation(){
+        let root=scratch();
+        let first=commit_root(&root.0,"none",snapshot(1,&["Before import"])).unwrap();
+        let second=commit_root(&root.0,&first.generation,snapshot(2,&["After import"])).unwrap();
+        let entries=list_history_root(&root.0,&second.generation).unwrap();
+        assert_eq!(entries.len(),1);
+        assert_eq!(entries[0].generation,first.generation);
+        assert_eq!(entries[0].revision,1);
+        assert_eq!(entries[0].projects,1);
+        assert!(restore_history_root(&root.0,&first.generation,&first.generation).is_err());
+        let restored=restore_history_root(&root.0,&second.generation,&first.generation).unwrap();
+        assert_eq!(restored.snapshot["revision"],3);
+        assert_eq!(restored.snapshot["projects"][0]["name"],"Before import");
+        assert!(!restored.needs_confirmation);
+        assert_eq!(load_root(&root.0).unwrap().generation,restored.generation);
+        assert!(restore_history_root(&root.0,&second.generation,&first.generation).is_err());
+        let revisions=list_history_root(&root.0,&restored.generation).unwrap();
+        assert!(revisions.iter().any(|r| r.generation==second.generation));
+        let undone=restore_history_root(&root.0,&restored.generation,&second.generation).unwrap();
+        assert_eq!(undone.snapshot["revision"],4);
+        assert_eq!(undone.snapshot["projects"][0]["name"],"After import");
+        assert_eq!(load_root(&root.0).unwrap().generation,undone.generation);
+    }
+    #[test]fn damaged_archive_cannot_replace_healthy_portfolio(){
+        let root=scratch();
+        let first=commit_root(&root.0,"none",snapshot(1,&["Keep"])).unwrap();
+        let second=commit_root(&root.0,&first.generation,snapshot(2,&["Current"])).unwrap();
+        let archive=backup_candidates(&root.0).unwrap().into_iter()
+            .find(|p| p.to_string_lossy().contains(&first.generation)).unwrap();
+        fs::write(&archive,b"corrupt").unwrap();
+        assert!(restore_history_root(&root.0,&second.generation,&first.generation).is_err());
+        assert_eq!(load_root(&root.0).unwrap().snapshot["projects"][0]["name"],"Current");
+    }
     #[test]fn backup_export_is_atomic_no_overwrite_and_roundtrips_after_a_relaunch(){
         let root=scratch();
         let first=commit_root(&root.0,"none",snapshot(1,&["Personal","Research"])).unwrap();
@@ -567,7 +696,8 @@ pub fn run(){
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
-            atlas_open,atlas_commit,atlas_export_json,atlas_select_import,atlas_restore_previous
+            atlas_open,atlas_commit,atlas_export_json,atlas_select_import,atlas_restore_previous,
+            atlas_list_history,atlas_restore_history
         ])
         .run(tauri::generate_context!())
         .expect("IWXA Atlas desktop window could not be started");
