@@ -61,7 +61,7 @@ button{transition:background .12s ease,border-color .12s ease}a{color:#2b62b9}
 .metric{border:1px solid #d8e3f2;background:#ffffffd6;box-shadow:0 4px 11px #7e9cbd18;border-radius:12px;padding:14px 16px;
  display:grid;gap:3px;min-height:89px}
 .metric strong{font-size:25px;letter-spacing:-.8px;color:#1c3d68;line-height:1.2}
-.metric small{color:#6b7e96;font-size:11px}
+.metric small{color:#52647c;font-size:12px}
 .surface{background:#fffefa;border:1px solid #dce5f1;box-shadow:0 5px 18px #7999be12;
  padding:20px 21px;margin-bottom:15px;border-radius:var(--radius)}
 .surface h2{font-size:17px;color:#1d3858;margin:0 0 4px;line-height:1.3}
@@ -71,13 +71,13 @@ button{transition:background .12s ease,border-color .12s ease}a{color:#2b62b9}
 .section-heading .button-row{justify-content:flex-end}
 .section-heading h2{margin:0 0 5px}
 .section-heading h3{margin:0 0 5px}
-.section-heading small{display:block;font-size:11px;color:#6984a3}
-.section-heading p{margin:4px 0;color:#6a7d95}
+.section-heading small{display:block;font-size:12px;color:#4b6079}
+.section-heading p{margin:4px 0;color:#4b6079}
 .table-scroll{max-width:100%;overflow-x:auto}
 table{border-collapse:collapse;width:100%;min-width:600px;text-align:left;font-size:13px}
 th{font-size:12px;letter-spacing:.2px;font-weight:650;color:#526b8a;background:#f1f6fd}
 td,th{padding:11px 12px;border-bottom:1px solid #e2eaf4;vertical-align:middle}
-td{color:#314a68}td strong{display:block;font-size:12px;font-weight:650}td small{display:block;margin-top:4px;font-size:10px;color:#7285a1;line-height:1.4}
+td{color:#314a68}td strong{display:block;font-size:12px;font-weight:650}td small{display:block;margin-top:4px;font-size:12px;color:#4d627d;line-height:1.4}
 tbody tr:hover{background:#f6f9fe}
 .text-link{color:#235eab;font-weight:650;text-decoration:underline;border:0;background:none;padding:0;text-align:left}
 .text-link:hover{color:#10427e}
@@ -127,7 +127,7 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
  min-width:0;min-height:0;overflow-y:auto;padding:20px 16px}
 .inspector h2{margin:0;font-size:18px}
 .inspector-block{border-top:1px solid #d1e0f0;padding:15px 4px}
-.inspector-block small{display:block;color:#6982a2;font-size:11px;margin:0 0 7px}
+.inspector-block small{display:block;color:#4d627d;font-size:12px;margin:0 0 7px}
 .inspector-block strong{display:block;color:#2b4467;font-size:13px;margin-bottom:9px}
 .inspector-block p{font-size:11px;color:#667e9a;line-height:1.6;margin:7px 0}
 .editor-panel h2{font-size:16px;margin:0;color:#203b61}
@@ -139,7 +139,7 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .alert button{background:transparent;border:0;font-size:17px;color:inherit}
 .alert.error,.error{color:#8a303a;background:#fff0f1;border-color:#f0c2c7}
 .alert.notice{color:#2c6c57;background:#e7f7ed;border-color:#b8ddc8}
-.workspace-footer{display:flex;justify-content:space-between;gap:20px;padding:20px 2px 14px;flex-wrap:wrap;color:#8292a8;font-size:10px}
+.workspace-footer{display:flex;justify-content:space-between;gap:20px;padding:20px 2px 14px;flex-wrap:wrap;color:#52647c;font-size:12px}
 .entry{display:grid;place-items:center;min-height:100vh;background:linear-gradient(125deg,#253958,#43617e);padding:20px}
 .entry-card{border-radius:20px;background:#f6faff;box-shadow:0 20px 70px #08182c66;padding:36px;max-width:480px;width:100%}
 .entry-card h1{margin:12px 0}.entry-card h1 em{font-size:13px;font-style:normal;color:#4f7cae}
@@ -168,7 +168,7 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .atlas-gantt-tools .atlas-check{white-space:nowrap}.atlas-check input{margin:0}
 .atlas-range{font-size:10px;color:#466485;background:#e9f2fe;border-radius:7px;padding:7px 10px}
 .atlas-schedule-warning{border-left:3px solid #b47c2b;background:#fff6e7;color:#7b5929!important;padding:9px 12px;border-radius:5px}
-.atlas-gantt-key{display:flex;gap:14px;align-items:center;flex-wrap:wrap;color:#667c95;font-size:10px;margin:0 0 13px}
+.atlas-gantt-key{display:flex;gap:14px;align-items:center;flex-wrap:wrap;color:#4d627d;font-size:12px;margin:0 0 13px}
 .atlas-gantt-key span{display:inline-flex;align-items:center;gap:5px}
 .atlas-gantt-key i{display:inline-block;width:18px;height:9px;border-radius:3px;background:#4c8dba}
 .atlas-gantt-key .key-critical{background:#be6664}.atlas-gantt-key .key-done{background:#469882}
@@ -182,7 +182,7 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .atlas-gantt-row:last-child{border-bottom:0}.atlas-gantt-row:hover{background:#f6faff}
 .atlas-gantt-work{border:0;border-right:1px solid #e2e8f3;background:transparent;color:#29537f;padding:8px 11px;text-align:left;font-size:13px;overflow:hidden;text-overflow:ellipsis}
 .atlas-gantt-work:hover{text-decoration:underline}
-.atlas-gantt-work small{display:block;color:#8394aa;font-size:10px;margin-top:2px}
+.atlas-gantt-work small{display:block;color:#4d627d;font-size:11px;margin-top:2px}
 .atlas-gantt-track{position:relative;min-width:0}.atlas-gantt-guide{position:absolute;top:0;bottom:0;width:1px;background:#dfebf5;pointer-events:none}
 .atlas-gantt-deadline{position:absolute;top:0;bottom:0;width:2px;background:#b47539;z-index:1;opacity:.75;pointer-events:none}
 .atlas-gantt-tick{position:absolute;top:6px;transform:translateX(-50%);font-size:9px;white-space:nowrap;color:#4d6788;z-index:2}
@@ -192,14 +192,14 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .atlas-gantt-bar.is-critical{background:#be6664}.atlas-gantt-bar.is-done{background:#469882}
 .atlas-gantt-bar.is-blocked:not(.is-critical){background:#c98f4e}
 .atlas-gantt-bar.is-milestone{width:10px!important;height:10px;min-width:10px;top:20px;transform:translateX(-50%) rotate(45deg);border-radius:2px;background:#a96f38}
-.atlas-gantt-days{font-size:10px;color:#667d9b;padding:16px 5px;text-align:center}
+.atlas-gantt-days{font-size:12px;color:#4d627d;padding:16px 5px;text-align:center}
 .atlas-dependency-scroll{width:100%;max-height:68vh;overflow:auto;background:radial-gradient(#dbe5f1 0.7px,transparent 0.7px) 0 0/18px 18px;border:1px solid #d6e3f0;border-radius:11px}
 .atlas-dependency-layout{position:relative;min-height:140px}
 .atlas-dependency-lines{position:absolute;top:0;left:0;pointer-events:none}
 .atlas-dependency-edge{fill:none;stroke:#7394bb;stroke-width:2}.atlas-dependency-edge.critical{stroke:#c2615b;stroke-width:2.5}
 .atlas-dependency-node{position:absolute;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:7px;border:1px solid #98b9d8;background:#f5f9ff;border-radius:10px;padding:10px 13px;text-align:left;color:#234365;box-shadow:0 3px 9px #4774991c}
 .atlas-dependency-node strong{font-size:13px;line-height:1.25;max-width:100%;overflow-wrap:anywhere}
-.atlas-dependency-node small{color:#6a809b;font-size:10px;line-height:1.2}
+.atlas-dependency-node small{color:#4d627d;font-size:11px;line-height:1.2}
 .atlas-dependency-node.critical{border-color:#c88a87;background:#fff2f0}
 .atlas-dependency-node.done{border-color:#81b7aa;background:#ecfaf5}
 .atlas-dependency-node.focused{outline:3px solid #326fe3;outline-offset:2px}
