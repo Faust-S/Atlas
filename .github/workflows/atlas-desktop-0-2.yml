@@ -16,6 +16,7 @@ on:
       - 'desktop/vite.config.*'
       - 'desktop/tsconfig*.json'
       - 'src/**'
+      - 'tests/**'
       - '.github/workflows/atlas-desktop-0-2.yml'
   workflow_dispatch:
 
