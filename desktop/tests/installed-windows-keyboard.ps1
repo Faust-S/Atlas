@@ -160,7 +160,7 @@ function Click-AtlasWorkAction([System.Diagnostics.Process]$process,[string]$kin
     # Work action toolbar is right-aligned inside the first table surface.
     # Captured screenshot on failure provides evidence if the layout changes.
     $x=switch ($kind) {
-        'work' { 680 }
+        'work' { 747 }
         'dependency' { 905 }
         default { throw 'Unsupported work action' }
     }
