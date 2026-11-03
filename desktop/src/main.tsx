@@ -2,7 +2,7 @@ import React,{useEffect,useMemo,useRef,useState} from "react";
 import {createRoot} from "react-dom/client";
 import {invoke,isTauri} from "@tauri-apps/api/core";
 import {getCurrentWindow} from "@tauri-apps/api/window";
-import {empty,deserialize,serialize,editItem} from "../../src/core.mjs";
+import {empty,deserialize,serialize,editItem,removeStage,removeItem,disconnect} from "../../src/core.mjs";
 import {editorSpec,applyEditor,editorSelectionFields} from "../../src/editor.mjs";
 import {compareProject,decideChange} from "../../src/trace.mjs";
 import {projectImpact} from "../../src/impact.mjs";
@@ -444,6 +444,21 @@ function App(){
   try{mutate(removePlanAmendment(data,project.id,changeId,key).state,"Корректировка удалена из черновика.")}
   catch(e){issue(e)}
  };
+ const removeDependency=(from:string,to:string)=>{
+  if(!project||!requireClosedForm()||busyRef.current)return;
+  if(!confirmAction("Удалить направленную связь работ? CPM будет пересчитан."))return;
+  try{mutate(disconnect(data,project.id,from,to),"Зависимость удалена. Сохраните изменение.");}catch(e){issue(e)}
+ };
+ const removeEmptyStage=(id:string)=>{
+  if(!project||!requireClosedForm()||busyRef.current)return;
+  if(!confirmAction("Удалить пустой этап?"))return;
+  try{mutate(removeStage(data,project.id,id),"Этап удалён. Сохраните изменение.");}catch(e){issue(e)}
+ };
+ const removeWork=(id:string)=>{
+  if(!project||!requireClosedForm()||busyRef.current)return;
+  if(!confirmAction("Удалить работу? Сначала удалите связи и плановые корректировки."))return;
+  try{mutate(removeItem(data,project.id,id),"Работа удалена. Сохраните изменение.");}catch(e){issue(e)}
+ };
  const quickWork=(id:string,state:string)=>{
   if(!project||!requireClosedForm()||busyRef.current)return;
   try{mutate(editItem(data,project.id,id,{state}),"Состояние работы изменено в черновике.")}
@@ -610,7 +625,7 @@ function App(){
    </>:<>
     <div className="page-heading"><div><small><button className="breadcrumb" onClick={()=>selectProject(null)}>Портфель</button> / {project.type}</small>
      <h1>{project.name}</h1><p>{project.goal||"Цель пока не определена"}</p></div>
-     <div className="button-row"><Badge>{statuses[project.status]||project.status}</Badge><Action onClick={()=>openEditor("status")}>Изменить статус</Action></div>
+     <div className="button-row"><Badge>{statuses[project.status]||project.status}</Badge><Action onClick={()=>openEditor("project-edit")}>Редактировать проект</Action></div>
     </div>
     <nav className="tabbar" aria-label="Представления проекта">{tabs.map(t=><button disabled={!!editor} key={t.key}
       title={t.key==="work"?"Ctrl+1":t.key==="timeline"?"Ctrl+2":t.key==="graph"?"Ctrl+3":undefined}
@@ -637,9 +652,9 @@ function App(){
      <section className="surface"><div className="section-heading"><div><h2>Этапы проекта</h2>
       <p>Этапы связывают работы с принятым планом; завершение этапа не означает приёмку результата.</p></div>
       <Action onClick={()=>openEditor("stage")}>＋ Этап</Action></div>
-      {project.stages.length?<div className="table-scroll"><table><thead><tr><th>Этап</th><th>Состояние</th><th>Срок</th><th>Работ</th></tr></thead>
+      {project.stages.length?<div className="table-scroll"><table><thead><tr><th>Этап</th><th>Состояние</th><th>Срок</th><th>Работ</th><th>Действия</th></tr></thead>
        <tbody>{project.stages.map((stage:any)=><tr key={stage.id}><td>{stage.name}</td><td>{statuses[stage.status]||stage.status}</td>
-        <td>{readable(stage.dueDate)}</td><td>{project.items.filter((w:any)=>w.stageId===stage.id).length}</td></tr>)}</tbody></table></div>:
+        <td>{readable(stage.dueDate)}</td><td>{project.items.filter((w:any)=>w.stageId===stage.id).length}</td><td><Action onClick={()=>openEditor("stage-edit:"+stage.id)}>Изменить</Action><Action onClick={()=>removeEmptyStage(stage.id)}>Удалить пустой</Action></td></tr>)}</tbody></table></div>:
        <Fallback message="Добавьте этап, чтобы организовать работу проекта."/>}
      </section>
      <section className="surface"><div className="section-heading"><div><h2>Риски и решения</h2></div></div>
@@ -648,7 +663,7 @@ function App(){
       <div className="summary-line"><span>Рисков: {project.risks.length}</span><span>Решений: {project.decisions.length}</span><span>Предложений: {project.changes?.length||0}</span></div>
       <div className="split-details">
        <div><h3>Заявленные риски</h3>{project.risks.length?project.risks.slice(0,30).map((risk:any)=>
-        <div className="detail-row" key={risk.id}><span>{risk.title}</span><Badge tone={risk.status==="open"?"warning":"neutral"}>{risk.status==="open"?"Открыт":risk.status}</Badge></div>):
+        <div className="detail-row" key={risk.id}><span>{risk.title}</span><Badge tone={risk.status==="open"?"warning":"neutral"}>{risk.status==="open"?"Открыт":"Закрыт"}</Badge><Action onClick={()=>openEditor("risk-edit:"+risk.id)}>Изменить</Action></div>):
         <p className="minor">Риски ещё не внесены.</p>}
         {project.risks.length>30&&<p className="minor">Показаны 30 из {project.risks.length} рисков.</p>}</div>
        <div><h3>Последние решения</h3>{project.decisions.length?project.decisions.slice(-15).reverse().map((decision:any)=>
@@ -669,7 +684,7 @@ function App(){
       <tbody>{filteredWork.slice(0,workLimit).map((w:any)=><tr key={w.id}>
        <td><strong>{w.title}</strong><small>{project.stages.find((s:any)=>s.id===w.stageId)?.name||"Без этапа"}</small></td>
        <td><Badge>{workStatuses[w.state]}</Badge></td><td>{w.estimateDays??1} дн.</td><td>{w.assignee||"Не назначен"}</td><td>{readable(w.dueDate)}</td>
-       <td><Action onClick={()=>openEditor("work:"+w.id)}>Открыть</Action></td></tr>)}</tbody></table></div>
+       <td><Action onClick={()=>openEditor("work:"+w.id)}>Открыть</Action><Action onClick={()=>removeWork(w.id)}>Удалить</Action></td></tr>)}</tbody></table></div>
      {project.items.length>0&&<p className="minor">Показано {Math.min(filteredWork.length,workLimit)} из {filteredWork.length} работ по фильтру; всего в проекте: {project.items.length}.</p>}
      {filteredWork.length>workLimit&&<Action onClick={()=>setWorkLimit(n=>Math.min(filteredWork.length,n+200))}>Показать ещё работы</Action>}
      {project.items.length>0&&!filteredWork.length&&<Fallback message="По фильтру работ нет. Очистите поиск или измените состояние."/>}
@@ -701,7 +716,7 @@ function App(){
        <tbody>{project.dependencies.map((d:any,i:number)=><tr key={d.from+"-"+d.to+"-"+i}>
         <td>{project.items.find((w:any)=>w.id===d.from)?.title||d.from}</td>
         <td>{project.items.find((w:any)=>w.id===d.to)?.title||d.to}</td>
-        <td><Action onClick={()=>openEditor("work:"+d.to)}>Открыть работу</Action></td>
+        <td><Action onClick={()=>openEditor("work:"+d.to)}>Открыть работу</Action><Action onClick={()=>removeDependency(d.from,d.to)}>Удалить связь</Action></td>
        </tr>)}</tbody></table></div>
       {project.dependencies.length===0&&<p className="minor">Связей пока нет. Добавьте зависимости между работами для расчёта критического пути.</p>}
      </section>}

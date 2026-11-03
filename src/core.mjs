@@ -41,7 +41,10 @@ export function validate(s){
   ids.add(p.id);
   for(const k of ["stages","items","dependencies","sources","risks","decisions"])if(!Array.isArray(p[k]))throw Error("Invalid "+k);
   if(!validDate(p.startDate)||!validDate(p.dueDate)||p.startDate&&p.dueDate&&p.startDate>p.dueDate)throw Error("Invalid project dates");
-  for(const stage of p.stages)if(!validDate(stage.dueDate))throw Error("Invalid stage date");
+  for(const stage of p.stages)if(!stage||typeof stage.id!=="string"||!stage.id||
+   typeof stage.name!=="string"||!stage.name.trim()||!statuses.has(stage.status)||!validDate(stage.dueDate))throw Error("Invalid stage");
+  for(const risk of p.risks)if(!risk||typeof risk.id!=="string"||!risk.id||
+   typeof risk.title!=="string"||!risk.title.trim()||!["open","closed"].includes(risk.status))throw Error("Invalid risk");
   const itemIds=new Set(p.items.map(x=>x.id)),stageIds=new Set(p.stages.map(x=>x.id)),sourceIds=new Set(p.sources.map(x=>x.id)),targetIds=new Set((p.targets||[]).map(x=>x.id)),changeIds=new Set((p.changes||[]).map(x=>x.id));
   if(itemIds.size!==p.items.length||stageIds.size!==p.stages.length||sourceIds.size!==p.sources.length)throw Error("Duplicate ID");
   for(const x of p.items){if(!x||typeof x.id!=="string"||!x.id||typeof x.title!=="string"||!x.title.trim()||
@@ -150,11 +153,25 @@ export function editProject(s,id,patch){return change(s,x=>{const p=project(x,id
  if(p.startDate&&p.dueDate&&p.startDate>p.dueDate)throw Error("Invalid project dates");
 })}
 export function createStage(s,pid,name){const id=uid();return {id,state:change(s,x=>project(x,pid).stages.push({id,name:nonempty(name,"Stage name"),status:"planned",dueDate:null}))}}
+export function editStage(s,pid,id,patch){return change(s,x=>{
+ const stage=project(x,pid).stages.find(t=>t.id===id);if(!stage)throw Error("Unknown stage");
+ if("name" in patch)stage.name=nonempty(patch.name,"Stage name");
+ if("status" in patch){if(!statuses.has(patch.status))throw Error("Invalid stage status");stage.status=patch.status;}
+ if("dueDate" in patch)stage.dueDate=patch.dueDate||null;
+})}
+export function removeStage(s,pid,id){return change(s,x=>{
+ const p=project(x,pid);if(!p.stages.some(t=>t.id===id))throw Error("Unknown stage");
+ if(p.items.some(w=>w.stageId===id)||(p.changes||[]).some(c=>(c.planAmendments||[]).some(a=>a.kind==="new_work"&&a.stageId===id)))
+  throw Error("Этап связан с работами. Сначала переназначьте работы.");
+ p.stages=p.stages.filter(t=>t.id!==id);
+})}
 export function createItem(s,pid,data){const id=uid();return{id,state:change(s,x=>{const p=project(x,pid);
  if(data.stageId&&!p.stages.some(st=>st.id===data.stageId))throw Error("Unknown stage");
  p.items.push({id,title:nonempty(data.title,"Work title"),state:"todo",stageId:data.stageId||null,priority:"normal",assignee:String(data.assignee||""),dueDate:data.dueDate||null,resourceId:data.resourceId||null,allocationPct:data.allocationPct??100,executor:null,sourceId:null,estimateDays:1,targetIds:data.targetIds===undefined?[]:Array.isArray(data.targetIds)?[...data.targetIds]:data.targetIds,...(data.changeId?{changeId:String(data.changeId)}:{})});
 })}}
 export function editItem(s,pid,id,patch){return change(s,x=>{const item=project(x,pid).items.find(t=>t.id===id);if(!item)throw Error("Unknown item");
+ if("title" in patch)item.title=nonempty(patch.title,"Work title");
+ if("stageId" in patch)item.stageId=patch.stageId||null;
  if("state" in patch){if(!workStates.has(patch.state))throw Error("Invalid work state");item.state=patch.state;}
  if("priority" in patch){if(!priorities.has(patch.priority))throw Error("Invalid priority");item.priority=patch.priority;}
  if("assignee" in patch)item.assignee=String(patch.assignee);
@@ -166,8 +183,24 @@ export function editItem(s,pid,id,patch){return change(s,x=>{const item=project(
  if("changeId" in patch)item.changeId=patch.changeId||null;
  if("executor" in patch){const e=patch.executor;if(e&&(!["human","external-agent","iwxa-agent"].includes(e.kind)||!e.ref))throw Error("Invalid executor");item.executor=e;}
 })}
+export function removeItem(s,pid,id){return change(s,x=>{
+ const p=project(x,pid);if(!p.items.some(w=>w.id===id))throw Error("Unknown item");
+ if(p.dependencies.some(d=>d.from===id||d.to===id))throw Error("Работа связана зависимостями. Сначала удалите связи.");
+ if((p.changes||[]).some(c=>(c.planAmendments||[]).some(a=>a.kind==="work"&&a.itemId===id||a.kind==="new_work"&&a.id===id)))
+  throw Error("Работа связана с предложением изменения.");
+ p.items=p.items.filter(w=>w.id!==id);
+})}
 export function connect(s,pid,from,to){return change(s,x=>{const p=project(x,pid);if(!p.items.some(t=>t.id===from)||!p.items.some(t=>t.id===to))throw Error("Unknown work item");p.dependencies.push({from,to})})}
+export function disconnect(s,pid,from,to){return change(s,x=>{
+ const p=project(x,pid);if(!p.dependencies.some(d=>d.from===from&&d.to===to))throw Error("Unknown dependency");
+ p.dependencies=p.dependencies.filter(d=>d.from!==from||d.to!==to);
+})}
 export function createRisk(s,pid,desc){return change(s,x=>project(x,pid).risks.push({id:uid(),title:nonempty(desc,"Risk"),status:"open"}))}
+export function editRisk(s,pid,id,patch){return change(s,x=>{
+ const risk=project(x,pid).risks.find(t=>t.id===id);if(!risk)throw Error("Unknown risk");
+ if("title" in patch)risk.title=nonempty(patch.title,"Risk");
+ if("status" in patch){if(!["open","closed"].includes(patch.status))throw Error("Invalid risk status");risk.status=patch.status;}
+})}
 export function createDecision(s,pid,desc){return change(s,x=>project(x,pid).decisions.push({id:uid(),text:nonempty(desc,"Decision"),at:new Date().toISOString()}))}
 export function attach(s,pid,kind,locator){if(!kinds.has(kind))throw Error("Invalid source kind");
  const id=uid();return{id,state:change(s,x=>project(x,pid).sources.push({id,kind,locator:nonempty(locator,"Source"),status:"never",observedAt:null,summary:null,error:null}))};

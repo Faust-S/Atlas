@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {empty,validate,createProject,editProject,createStage,createItem,editItem,connect,createRisk,createDecision,attach,observe,summary,serialize,deserialize} from "../src/core.mjs";
+import {empty,validate,createProject,editProject,createStage,editStage,removeStage,createItem,editItem,removeItem,connect,disconnect,createRisk,editRisk,createDecision,attach,observe,summary,serialize,deserialize} from "../src/core.mjs";
 import {scheduleProject} from "../src/planning.mjs";
 const make=()=>createProject(empty(),{name:"Research",type:"research",goal:"Complete study"});
 test("independent project",()=>{const r=make();assert.equal(r.state.projects[0].name,"Research");assert.equal(r.state.revision,1)});
@@ -79,4 +79,26 @@ test("R1.1 rejects malformed project fields and missing work titles before seria
   assert.throws(()=>serialize(snapshot),/Invalid work item/);
  }
  assert.equal(validate(withItem.state),true);
+});
+
+test("R2 edit objects without ID loss; delete empty stage, close risk",()=>{
+ const a=make(),st=createStage(a.state,a.id,"Stage"),item=createItem(st.state,a.id,{title:"First",stageId:st.id});
+ let s=editStage(item.state,a.id,st.id,{name:"Renamed",status:"active",dueDate:"2026-12-10"});
+ s=editItem(s,a.id,item.id,{title:"Renamed work",stageId:null,dueDate:"2026-12-09"});
+ assert.equal(s.projects[0].items[0].id,item.id);
+ assert.equal(s.projects[0].stages[0].name,"Renamed");
+ s=removeStage(s,a.id,st.id);assert.equal(s.projects[0].stages.length,0);
+ s=createRisk(s,a.id,"Delay");const riskId=s.projects[0].risks[0].id;
+ s=editRisk(s,a.id,riskId,{title:"Modified",status:"closed"});
+ assert.equal(s.projects[0].risks[0].status,"closed");
+ assert.deepEqual(deserialize(serialize(s)),s);
+});
+test("R2 links must be removed before deleting work",()=>{
+ const p=make(),a=createItem(p.state,p.id,{title:"A"}),b=createItem(a.state,p.id,{title:"B"});
+ const linked=connect(b.state,p.id,a.id,b.id),saved=serialize(linked);
+ assert.throws(()=>removeItem(linked,p.id,a.id),/Сначала удалите связи/);
+ assert.equal(serialize(linked),saved);
+ const cut=disconnect(linked,p.id,a.id,b.id),clean=removeItem(cut,p.id,a.id);
+ assert.equal(clean.projects[0].items.length,1);
+ assert.equal(scheduleProject(clean.projects[0]).rows.length,1);
 });
