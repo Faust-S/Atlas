@@ -29,6 +29,8 @@ test("native import, export and background mutations cannot discard an open form
  assert.match(ui,/disabled=\{busy\|\|!!editor\|\|pendingImport!==null\}>Открыть JSON/);
  assert.match(ui,/disabled=\{busy\|\|dirty\|\|!!editor\|\|!persisted\}>Резервная копия/);
  assert.match(ui,/disabled=\{!!editor\} className="icon-button inspector-button"/);
+ assert.match(ui,/useState\(\(\)=>window\.innerWidth>1220\)/);
+ assert.match(ui,/aria-label=\{inspector\?"Скрыть инспектор":"Показать инспектор"\}/);
 });
 
 test("JSON preview guards a draft until human approval and native generation recheck",()=>{
@@ -53,4 +55,13 @@ test("R3 keyboard and sidebar navigation allow untouched forms, block changed fi
  assert.equal((handlers.match(/if\(!requireClosedForm\(\)\)return/g)||[]).length,3);
  assert.doesNotMatch(handlers,/if\(editorOpenRef\.current\)\{issue\(Error\("Сначала примените или закройте/);
  assert.match(ui,/onClick=\{\(\)=>selectProject\(null\)\}/);
+});
+
+test("R3 compact Windows layout exposes an inspector drawer without covering startup workspace",()=>{
+ const css=readFileSync(new URL("../desktop/src/style.css",import.meta.url),"utf8");
+ assert.match(css,/@media\(max-width:1220px\)/);
+ assert.match(css,/\.app-shell \.inspector\{display:block;position:fixed/);
+ assert.doesNotMatch(css,/\.app-shell\.editor-active \.inspector\{display:block/);
+ assert.match(ui,/window\.innerWidth>1220/);
+ assert.match(ui,/aria-label="Скрыть инспектор"/);
 });

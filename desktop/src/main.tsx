@@ -136,7 +136,7 @@ function App(){
  const [portfolioStatus,setPortfolioStatus]=useState("all");
  const [boardLimits,setBoardLimits]=useState<Record<string,number>>({});
  const [message,setMessage]=useState(""),[error,setError]=useState("");
- const [inspector,setInspector]=useState(true),[recovery,setRecovery]=useState(false);
+ const [inspector,setInspector]=useState(()=>window.innerWidth>1220),[recovery,setRecovery]=useState(false);
  const [closeGuard,setCloseGuard]=useState(false);
  const allowCloseRef=useRef(false);
  const saved=useRef<string>(snapshotText(empty()));
@@ -596,7 +596,8 @@ function App(){
      <Action onClick={()=>void importJson()} disabled={busy||!!editor||pendingImport!==null}>Открыть JSON</Action>
      <Action onClick={()=>void exportJson()} disabled={busy||dirty||!!editor||!persisted}>Резервная копия</Action>
      <Action onClick={()=>void showNativeHistory()} disabled={busy||dirty||!!editor||!persisted||savedVersions!==null}>Версии на диске</Action>
-     <button disabled={!!editor} className="icon-button inspector-button" title="Инспектор" onClick={()=>setInspector(!inspector)}>◧</button>
+     <button disabled={!!editor} className="icon-button inspector-button" aria-label={inspector?"Скрыть инспектор":"Показать инспектор"}
+      title="Инспектор" onClick={()=>setInspector(!inspector)}>◧</button>
     </div>
    </header>
    {error&&<div className="alert error" role="alert">{error}<button onClick={()=>setError("")} aria-label="Закрыть сообщение">×</button></div>}

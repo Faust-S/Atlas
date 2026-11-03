@@ -207,11 +207,11 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 
 /* An editor must remain usable on compact standalone Windows; inspector becomes a drawer. */
 @media(max-width:1220px){
- .app-shell.editor-active .inspector{display:block;position:fixed;z-index:30;top:0;right:0;bottom:0;width:min(400px,calc(100vw - 28px));max-width:100%;
+ .app-shell .inspector{display:block;position:fixed;z-index:30;top:0;right:0;bottom:0;width:min(400px,calc(100vw - 28px));max-width:100%;
   box-shadow:-14px 0 36px #17335c44;background:#f7faff;overflow-y:auto}
 }
 @media(max-width:560px){
- .app-shell.editor-active .inspector{width:min(400px,calc(100vw - 12px))}
+ .app-shell .inspector{width:min(400px,calc(100vw - 12px))}
 }
 
 /* Close guard avoids a blocking browser confirm inside WebView2 close events. */
