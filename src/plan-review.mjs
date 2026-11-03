@@ -9,7 +9,9 @@ const escape=x=>String(x??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">"
 const choices=new Set(["keep","revise","defer"]);
 const statusText={needs_decision:"Ожидает решения",deferred:"Отложено человеком",
  kept:"План сохранён по решению",needs_proposal:"Нужна заявка на изменение",
- proposal_open:"Заявка на изменение создана",source_hold:"Требуется сверить источник"};
+ proposal_open:"Заявка ожидает дальнейшего решения",
+ plan_pending:"Утверждённые корректировки ожидают применения",
+ plan_applied:"Корректировки применены",source_hold:"Требуется сверить источник"};
 const assessmentText={unknown:"Нет сведений",stale:"Сведения устарели",conflict:"Противоречие",
  gap_reported:"Отсутствует (заявлено)",partial_reported:"Частично (заявлено)",
  implemented_claim:"Реализовано (заявлено)",test_claim:"Протестировано (заявлено)",
@@ -66,11 +68,18 @@ export function planReviewQueue(snapshot,{now=new Date().toISOString(),maxAgeMs=
      d.reviewRevision===claim.revision);
     const decision=decisions.at(-1)||null;
     const proposals=decision?(project.changes||[]).filter(c=>c.planReviewDecisionId===decision.id):[];
-    const proposal=proposals.at(-1)||null;
+    // A rejected/deferred proposal is not an active plan. The human may
+    // create a replacement from the same SHA-pinned decision.
+    const activeProposal=proposals.findLast(c=>
+     ["proposed","approved","in_progress","implemented"].includes(c.status))||null;
+    const proposal=activeProposal||proposals.at(-1)||null;
     const approvedChanges=(project.changes||[]).filter(c=>["approved","in_progress","implemented"].includes(c.status));
     const openWork=project.items.filter(w=>w.state!=="done").length;
     const state=!currentRevision?"source_hold":decision?.outcome==="keep"?"kept":
-     decision?.outcome==="revise"?(proposal?"proposal_open":"needs_proposal"):
+     decision?.outcome==="revise"?
+      (!activeProposal?"needs_proposal":activeProposal.planAppliedAt?"plan_applied":
+       ["approved","in_progress","implemented"].includes(activeProposal.status)&&
+       activeProposal.planAmendments?.length?"plan_pending":"proposal_open"):
      decision?.outcome==="defer"?"deferred":"needs_decision";
     rows.push({
      rootProjectId:root.id,rootProjectName:root.name,
@@ -86,7 +95,7 @@ export function planReviewQueue(snapshot,{now=new Date().toISOString(),maxAgeMs=
    }
   }
  }
- const attention=rows.filter(r=>!["kept","proposal_open"].includes(r.state));
+ const attention=rows.filter(r=>!["kept","proposal_open","plan_applied"].includes(r.state));
  return {rows,attention,totals:{
   events:new Set(rows.map(r=>JSON.stringify([r.rootProjectId,r.findingId]))).size,
   affected:rows.length,projects:new Set(rows.map(r=>r.projectId)).size,
@@ -96,7 +105,9 @@ export function planReviewQueue(snapshot,{now=new Date().toISOString(),maxAgeMs=
   deferred:rows.filter(r=>r.state==="deferred").length,
   needsProposal:rows.filter(r=>r.state==="needs_proposal").length,
   kept:rows.filter(r=>r.state==="kept").length,
-  proposalOpen:rows.filter(r=>r.state==="proposal_open").length
+  proposalOpen:rows.filter(r=>r.state==="proposal_open").length,
+  planPending:rows.filter(r=>r.state==="plan_pending").length,
+  planApplied:rows.filter(r=>r.state==="plan_applied").length
  },warning:"Impact is a planning reason for human review, not a finding of loss, verified readiness or permission to change the plan"};
 }
 export function planReviewContext(snapshot,request,options={}){
@@ -104,7 +115,7 @@ export function planReviewContext(snapshot,request,options={}){
   r.rootProjectId===request.rootProjectId&&r.findingId===request.findingId&&
   r.projectId===request.projectId&&r.revision===request.revision);
  if(!row||row.sourceState!=="current_revision")throw Error("Нужна новая сверка актуальной Git-ревизии");
- if(row.state==="kept"||row.state==="needs_proposal"||row.state==="proposal_open")
+ if(row.state==="kept"||row.decision?.outcome==="revise")
   throw Error("Решение по этой проверке уже принято");
  return row;
 }
@@ -148,6 +159,8 @@ function renderRows(rows,{limit=45,esc=escape}={}){
    action='<button data-action="'+esc(planReviewAction(row.rootProjectId,row.findingId,row.projectId,row.revision))+'">Рассмотреть план</button>';
   if(row.state==="needs_proposal")
    action='<button data-action="'+esc(planProposalAction(row.projectId,row.decision.id))+'">Предложить изменение</button>';
+  if(row.state==="plan_pending")
+   action='<span class="muted">Открыть проект → Изменения → Сценарий до / после → Применить</span>';
   const decision=row.decision?'<small>Решение: '+esc(row.decision.text)+
    ' · '+esc(row.decision.at||"")+'</small>':"";
   const route=row.path.length>1?' · '+esc(row.path.length-1)+' переход(ов) по зависимости':"";

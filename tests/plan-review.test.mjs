@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {empty,createProject,attach,observe,serialize,deserialize} from "../src/core.mjs";
 import {addTarget,recordFinding,planChange,decideChange} from "../src/trace.mjs";
 import {addPortfolioLink} from "../src/portfolio.mjs";
+import {addPlanWork,applyPlanAmendment} from "../src/plan-amendment.mjs";
 import {planReviewQueue,planReviewAction,planProposalAction,decidePlanReview,renderPortfolioPlanReviews} from "../src/plan-review.mjs";
 import {editorSpec,applyEditor} from "../src/editor.mjs";
 
@@ -115,4 +116,51 @@ test("forged plan-review references are rejected on JSON import and UI escapes p
  const html=renderPortfolioPlanReviews(escaped);
  assert.match(html,/&lt;img/);
  assert.doesNotMatch(html,/<img/);
+});
+\n
+test("rejected proposal becomes actionable again instead of a dead-end",()=>{
+ const f=fixture(),request=planReviewAction(f.root,f.claimId,f.child,SHA_B);
+ let s=applyEditor(f.state,f.child,request,input({
+  outcome:"revise",rationale:"Review must be extended after SHA update"
+ })).state;
+ const decision=s.projects[1].decisions.at(-1);
+ const propose=planProposalAction(f.child,decision.id);
+ s=applyEditor(s,f.child,propose,input({title:"Rework test plan",description:"Need new verification"})).state;
+ const oldId=s.projects[1].changes.at(-1).id;
+ s=decideChange(s,f.child,oldId,{status:"rejected",rationale:"Scope was not acceptable"}).state;
+ const current=planReviewQueue(s),row=current.rows.find(r=>r.projectId===f.child);
+ assert.equal(row.state,"needs_proposal");
+ assert.equal(current.totals.needsProposal,1);
+ assert.match(editorSpec(s.projects[1],propose,s).title,/Изменение плана/);
+ s=applyEditor(s,f.child,propose,input({title:"Replacement",description:"Revised scope proposal"})).state;
+ assert.equal(s.projects[1].changes.length,2);
+ assert.equal(planReviewQueue(s).rows.find(r=>r.projectId===f.child).state,"proposal_open");
+});
+
+test("approved concrete amendments stay visible until separate human application",()=>{
+ const f=fixture(),request=planReviewAction(f.root,f.claimId,f.child,SHA_B);
+ let s=applyEditor(f.state,f.child,request,input({
+  outcome:"revise",rationale:"Need a new independent verification milestone"
+ })).state;
+ const decision=s.projects[1].decisions.at(-1);
+ s=applyEditor(s,f.child,planProposalAction(f.child,decision.id),input({
+  title:"Add validation",description:"Introduce downstream validation work"
+ })).state;
+ const id=s.projects[1].changes.at(-1).id;
+ s=addPlanWork(s,f.child,id,{title:"Validate rollout",estimateDays:2}).state;
+ s=decideChange(s,f.child,id,{status:"approved",rationale:"Approved the concrete validation addition"}).state;
+ const before=planReviewQueue(s);
+ assert.equal(before.rows.find(r=>r.projectId===f.child).state,"plan_pending");
+ assert.equal(before.totals.planPending,1);
+ assert.equal(s.projects[1].items.length,0);
+ assert.match(renderPortfolioPlanReviews(s),/Утверждённые корректировки ожидают применения/);
+ assert.throws(()=>decidePlanReview(s,{rootProjectId:f.root,findingId:f.claimId,projectId:f.child,revision:SHA_B},
+  {outcome:"keep",rationale:"Do not override approval"}),/уже принято/);
+ s=applyPlanAmendment(s,f.child,id).state;
+ const after=planReviewQueue(s);
+ assert.equal(after.rows.find(r=>r.projectId===f.child).state,"plan_applied");
+ assert.equal(after.totals.planApplied,1);
+ assert.equal(after.totals.planPending,0);
+ assert.equal(s.projects[1].items.length,1);
+ assert.ok(s.projects[1].changes[0].planAppliedAt);
 });

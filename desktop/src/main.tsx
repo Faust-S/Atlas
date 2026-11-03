@@ -38,6 +38,11 @@ const evidence:any={unknown:"Не установлено",conflict:"Против
  acceptance_claim:"Заявлена приёмка"};
 const decisionStatus:any={proposed:"Предложено",approved:"Утверждено",in_progress:"В работе",
  implemented:"Реализовано (заявлено)",deferred:"Отложено",rejected:"Отклонено"};
+const planReviewStatus:Record<string,string>={
+ needs_decision:"Ожидает решения",deferred:"Решение отложено",
+ needs_proposal:"Нужно новое предложение",source_hold:"Обновить Git-источник",
+ proposal_open:"Предложение на рассмотрении",plan_pending:"План утверждён, требуется применение"
+};
 function readable(date?:string|null){return date?date.slice(0,10):"Не задано"}
 const confirmAction=(question:string)=>window.confirm(question);
 // Rust serde_json normalizes object key order; compare structural content on readback.
@@ -153,7 +158,7 @@ function App(){
  // The full review queue remains available in large portfolios. Rendering
  // is paged; records never disappear silently after an arbitrary first page.
  const reviewRows=useMemo(()=>reviews.rows.filter((r:any)=>
-  ["needs_decision","deferred","needs_proposal","source_hold"].includes(r.state)),[reviews]);
+  ["needs_decision","deferred","needs_proposal","source_hold","proposal_open","plan_pending"].includes(r.state)),[reviews]);
  const recheckRows=useMemo(()=>active?rechecks.rows.filter((r:any)=>r.projectId===active):[],[rechecks,active]);
  const history=useMemo(()=>project?projectHistoryRows(project,{kind:historyType,query:historyQuery}):[],
   [project,historyType,historyQuery]);
@@ -217,6 +222,10 @@ function App(){
   if(!afterSubmit)setMessage("");
   setWorkFilter("all");setWorkQuery("");setWorkLimit(200);
   setHistoryQuery("");setHistoryType("all");setHistoryLimit(120);setRecheckLimit(25);
+ };
+ const openProjectTab=(id:string,tabId:Tab)=>{
+  if(!requireClosedForm())return;
+  selectProject(id);setTab(tabId);
  };
  const openEditor=(action:string,projectId?:string)=>{
   if(!requireClosedForm()||busyRef.current)return;
@@ -464,17 +473,19 @@ function App(){
      {filtered.length>portfolioLimit&&<Action onClick={()=>setPortfolioLimit(n=>Math.min(filtered.length,n+150))}>Показать ещё проекты</Action>}
     </section>
     <section className="surface">
-     <div className="section-heading"><div><h2>Решения после изменения фактов</h2><p>Новые факты не меняют план автоматически.</p></div></div>
+     <div className="section-heading"><div><h2>Решения и изменения по новым фактам</h2><p>От перепроверки Git SHA до предложения и отдельного применения утверждённого плана. Новые факты сами план не меняют.</p></div></div>
      {reviewRows.slice(0,reviewLimit).map((r:any,i:number)=>
-      <div className="attention-row" key={r.projectId+"-"+i}><div><strong>{r.projectName}</strong><small>{r.targetTitle||"Пересмотр плана"} · {r.state}</small></div>
+      <div className="attention-row" key={r.projectId+"-"+i}><div><strong>{r.projectName}</strong><small>{r.targetTitle||"Пересмотр плана"} · {planReviewStatus[r.state]||r.state}{r.proposal?" · «"+r.proposal.title+"»":""}</small></div>
        <div className="button-row">
         {["needs_decision","deferred"].includes(r.state)&&<Action onClick={()=>openEditorFor(r.projectId,planReviewAction(r.rootProjectId,r.findingId,r.projectId,r.revision))}>Рассмотреть план</Action>}
         {r.state==="needs_proposal"&&r.decision&&<Action onClick={()=>openEditorFor(r.projectId,planProposalAction(r.projectId,r.decision.id))}>Предложить изменение</Action>}
+        {["proposal_open","plan_pending"].includes(r.state)&&<Action onClick={()=>openProjectTab(r.projectId,"changes")}>{r.state==="plan_pending"?"Применить утверждённый план":"Открыть заявку"}</Action>}
+        {r.state==="source_hold"&&<Action onClick={()=>openProjectTab(r.rootProjectId,"sources")}>Сверить Git-источник</Action>}
         <Action onClick={()=>selectProject(r.projectId)}>Открыть</Action>
        </div></div>)}
      {reviewRows.length>0&&<p className="minor">Показано {Math.min(reviewLimit,reviewRows.length)} из {reviewRows.length} записей, требующих внимания.</p>}
      {reviewRows.length>reviewLimit&&<Action onClick={()=>setReviewLimit(n=>Math.min(reviewRows.length,n+20))}>Показать ещё решения ({reviewRows.length-reviewLimit})</Action>}
-     {!reviewRows.length&&<p className="minor">Сейчас нет записей, требующих нового решения или сверки. Это не подтверждение завершения проектов.</p>}
+     {!reviewRows.length&&<p className="minor">Сейчас нет открытых пересмотров и заявок по перепроверенным Git-ревизиям. Это не подтверждение завершения проектов.</p>}
     </section>
     <section className="surface">
      <div className="section-heading"><div><h2>Плановые ресурсы</h2><p>Ресурсы объединяются только по явному назначению, не по имени человека.</p></div>
