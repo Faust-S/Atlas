@@ -34,3 +34,20 @@ test("user sees explicit native revision selection and must confirm replacement"
  assert.match(ui,/setSavedVersions\(null\);return/);
  assert.match(ui,/if\(savedVersions===null\|\|!savedVersions\.some\(row=>row\.generation===item\.generation\)/);
 });
+
+test("history restoration uses an explicit nonblocking in-dialog selection",()=>{
+ const source=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ const css=readFileSync(new URL("../desktop/src/style.css",import.meta.url),"utf8");
+ const driver=readFileSync(new URL("../desktop/tests/installed-windows-import.py",import.meta.url),"utf8");
+ assert.match(source,/selectedHistory\?\.generation!==item\.generation/);
+ assert.match(source,/Восстановить выбранную редакцию/);
+ assert.match(source,/Выбрать редакцию/);
+ assert.match(source,/className="atlas-close-dialog atlas-history-dialog"/);
+ assert.match(source,/Текущая редакция \{data\.revision\}/);
+ assert.doesNotMatch(source,/const approved=confirmAction\("Восстановить архивную редакцию/);
+ assert.match(css,/\.atlas-history-body\{[^}]*overflow-y:auto/);
+ assert.match(css,/\.atlas-history-actions\{[^}]*flex:0 0 auto/);
+ assert.match(driver,/ATLAS_INSTALLED_GUI_BACKUP_EXPORT_PASS/);
+ assert.match(driver,/ATLAS_INSTALLED_GUI_HISTORY_RESTORE_READBACK_PASS/);
+ assert.match(driver,/ATLAS_INSTALLED_GUI_HISTORY_RESTART_PASS/);
+});

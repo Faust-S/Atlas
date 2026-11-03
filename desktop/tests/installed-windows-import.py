@@ -327,6 +327,66 @@ try:
     boot_ms=round((time.monotonic()-t0)*1000)
     shot("large-reopened")
     print("ATLAS_INSTALLED_R5_GUI_REOPEN_PASS projects=120 works=1200 startupMs="+str(boot_ms),flush=True)
+    # A genuine external backup must be produced by the installed GUI's
+    # system save picker. It must be a readable atlas.project/1 snapshot.
+    phase="gui-backup-export"
+    exported=Path(tempfile.gettempdir())/("atlas-0-2-gui-backup-"+str(os.getpid())+".json")
+    assert not exported.exists()
+    click_button("Резервная копия")
+    choose_json_file(exported)
+    deadline=time.monotonic()+20
+    while not exported.is_file() and time.monotonic()<deadline:
+        time.sleep(.3)
+    assert exported.is_file(), "Installed GUI did not create chosen JSON backup"
+    backup=json.loads(exported.read_text(encoding="utf-8-sig"))
+    assert sorted(p["id"] for p in backup["projects"])==expected_ids
+    assert sum(len(p["items"]) for p in backup["projects"])==expected_works
+    assert sum(len(p["dependencies"]) for p in backup["projects"])==expected_links
+    unchanged,_=native_data()
+    assert unchanged["generation"]==large_head["generation"], "Backup unexpectedly changed native generation"
+    print("ATLAS_INSTALLED_GUI_BACKUP_EXPORT_PASS projects=120 works=1200",flush=True)
+
+    # Native history must offer the prior real 0.1 portfolio and restore it
+    # by an explicit user selection, then preserve the R5 head in history.
+    phase="gui-history-list"
+    click_button("Версии на диске")
+    selection=find_button("Выбрать редакцию",timeout=25)
+    if not selection.is_visible() or not selection.is_enabled():
+        ui_diagnostic("history-selection-unavailable")
+        raise RuntimeError("History entry selection inaccessible in installed GUI")
+    selection.set_focus()
+    keyboard.send_keys("{ENTER}")
+    print("ATLAS_INSTALLED_HISTORY_SELECTION_VISIBLE_PASS",flush=True)
+    phase="gui-history-confirm"
+    click_button("Восстановить выбранную редакцию",timeout=25)
+    deadline=time.monotonic()+45
+    historical=None
+    legacy_ids=sorted(p["id"] for p in legacy["projects"])
+    while time.monotonic()<deadline:
+        try:
+            h,p=native_data()
+            if h["generation"]!=large_head["generation"] and sorted(x["id"] for x in p)==legacy_ids:
+                historical=(h,p)
+                break
+        except (OSError,ValueError,KeyError):
+            pass
+        time.sleep(.35)
+    if historical is None:
+        ui_diagnostic("history-restore-no-readback")
+        raise RuntimeError("Installed history action did not restore the previous legacy portfolio")
+    history_head,old_projects=historical
+    assert history_head["revision"]>large_head["revision"]
+    assert any(large_head["generation"] in path.name for path in (ROOT/"history").glob("*.json"))
+    assert any(p["name"]=="ATLAS_LEGACY_01_RESEARCH" for p in old_projects)
+    print("ATLAS_INSTALLED_GUI_HISTORY_RESTORE_READBACK_PASS projects=2",flush=True)
+    stop()
+    phase="gui-history-restart"
+    boot()
+    restored_after,again=native_data()
+    assert restored_after["generation"]==history_head["generation"]
+    assert sorted(p["id"] for p in again)==legacy_ids
+    shot("history-restored-reopened")
+    print("ATLAS_INSTALLED_GUI_HISTORY_RESTART_PASS projects=2",flush=True)
     stop()
 except Exception as exc:
     print("ATLAS_INSTALLED_LEGACY_01_GUI_HOLD phase="+phase+" reason="+repr(exc),flush=True)

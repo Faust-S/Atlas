@@ -153,6 +153,7 @@ function App(){
  const [historyType,setHistoryType]=useState("all");
  const [historyLimit,setHistoryLimit]=useState(120);
  const [savedVersions,setSavedVersions]=useState<HistoryEntry[]|null>(null);
+ const [selectedHistory,setSelectedHistory]=useState<HistoryEntry|null>(null);
  const [pendingImport,setPendingImport]=useState<ImportPreview|null>(null);
  const savedVersionsOpenRef=useRef(false);savedVersionsOpenRef.current=savedVersions!==null;
  const pendingImportOpenRef=useRef(false);pendingImportOpenRef.current=pendingImport!==null;
@@ -414,16 +415,15 @@ function App(){
   busyRef.current=true;setBusy(true);
   try{
    const entries=await invoke<HistoryEntry[]>("atlas_list_history",{expectedGeneration:generation});
-   setSavedVersions(entries);setMessage("");setError("");
+   setSelectedHistory(null);setSavedVersions(entries);setMessage("");setError("");
   }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
  };
  const restoreHistoricalVersion=async(item:HistoryEntry)=>{
   if(savedVersions===null||!savedVersions.some(row=>row.generation===item.generation)||
+   selectedHistory?.generation!==item.generation||
    busyRef.current||dirtyRef.current||editorOpenRef.current)return;
-  const approved=confirmAction("Восстановить архивную редакцию "+item.revision+
-   " ("+item.projects+" проектов)?\n\nТекущая редакция останется в истории. "+
-   "Восстановленная копия станет новой редакцией. Это не автоматическое объединение портфелей.");
-  if(!approved)return;
+  // The selected revision is reviewed and explicitly confirmed inside the
+  // version dialog; no blocking WebView2 JavaScript confirm is required.
   busyRef.current=true;setBusy(true);
   try{
    const result=await invoke<OpenResult>("atlas_restore_history",{
@@ -436,7 +436,7 @@ function App(){
    setData(checked);setGeneration(result.generation);setSavedVersions(null);
    // React state updates asynchronously. Navigation after an explicitly
    // confirmed restore must not use the prior modal-guard render closure.
-   selectProject(null,true);
+   selectProject(null,true);setSelectedHistory(null);
    setMessage("Архивная редакция "+item.revision+" восстановлена, сохранена новым поколением и перечитана.");
    setError("");
   }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
@@ -915,16 +915,29 @@ function App(){
     </section>
    </div>}
    {savedVersions!==null&&<div className="atlas-close-overlay">
-    <section className="atlas-close-dialog" role="dialog" aria-modal="true" aria-labelledby="atlas-versions-title">
-     <h2 id="atlas-versions-title">Предыдущие редакции Atlas</h2>
-     <p>Версии получены из нативного хранилища. Восстановление создаёт новую сохранённую редакцию,
-      не изменяет архивный оригинал и сохраняет текущий портфель в истории.</p>
-     {savedVersions.length?<div className="table-scroll"><table><thead><tr><th>Редакция</th><th>Проекты</th><th>Действие</th></tr></thead><tbody>
-      {savedVersions.map(item=><tr key={item.generation}><td>{item.revision}</td><td>{item.projects}</td><td>
-       <Action disabled={busy} onClick={()=>void restoreHistoricalVersion(item)}>Восстановить</Action>
-      </td></tr>)}
-     </tbody></table></div>:<p className="minor">Предыдущих редакций ещё нет. Они появляются после повторных сохранений.</p>}
-     <div className="button-row"><Action disabled={busy} onClick={()=>setSavedVersions(null)}>Закрыть</Action></div>
+    <section className="atlas-close-dialog atlas-history-dialog" role="dialog" aria-modal="true" aria-labelledby="atlas-versions-title">
+     <div className="atlas-history-body">
+      <h2 id="atlas-versions-title">Предыдущие редакции Atlas</h2>
+      <p>Версии получены из нативного хранилища. Восстановление создаёт новую сохранённую редакцию,
+       не изменяет архивный оригинал и сохраняет текущий портфель в истории.</p>
+      {savedVersions.length?<div className="table-scroll"><table><thead><tr><th>Редакция</th><th>Проекты</th><th>Действие</th></tr></thead><tbody>
+       {savedVersions.map(item=><tr key={item.generation}><td>{item.revision}</td><td>{item.projects}</td><td>
+        <Action disabled={busy} onClick={()=>{setSelectedHistory(item);setError("")}}>
+         {selectedHistory?.generation===item.generation?"Выбрано":"Выбрать редакцию"}</Action>
+       </td></tr>)}
+      </tbody></table></div>:<p className="minor">Предыдущих редакций ещё нет. Они появляются после повторных сохранений.</p>}
+      {error&&<p className="alert error" role="alert">Не удалось восстановить: {error}</p>}
+     </div>
+     <div className="atlas-history-actions">
+      {selectedHistory&&<p role="status">Выбрана редакция <strong>{selectedHistory.revision}</strong>
+       ({selectedHistory.projects} проектов). Текущая редакция {data.revision}
+       ({data.projects.length} проектов) останется в истории. Это замена портфеля, не объединение.</p>}
+      <div className="button-row">
+       <Action autoFocus disabled={busy} onClick={()=>{setSavedVersions(null);setSelectedHistory(null)}}>Закрыть</Action>
+       {selectedHistory&&<Action primary disabled={busy} onClick={()=>void restoreHistoricalVersion(selectedHistory)}>
+        Восстановить выбранную редакцию</Action>}
+      </div>
+     </div>
     </section>
    </div>}
    {closeGuard&&<div className="atlas-close-overlay">
