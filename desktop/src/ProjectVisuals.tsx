@@ -1,4 +1,4 @@
-import React,{useMemo,useState} from 'react';
+import React,{useEffect,useMemo,useState} from 'react';
 import {dependencyDiagram,ganttViewport,ganttFocusOffset} from './visual-layout.mjs';
 
 type CPM={durationDays:number;rows:Array<{id:string;title:string;earlyStart:number;earlyFinish:number;durationDays:number;critical:boolean;state:string;predecessors:string[];blockedBy:string[];floatDays:number}>};
@@ -18,6 +18,13 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
  const [matchIndex,setMatchIndex]=useState(0);
  const [criticalOnly,setCriticalOnly]=useState(false);
  const [visibleLimit,setVisibleLimit]=useState(160);
+ const [expanded,setExpanded]=useState(false);
+ useEffect(()=>{
+  if(!expanded)return;
+  const close=(event:KeyboardEvent)=>{if(event.key==='Escape'){event.preventDefault();setExpanded(false)}};
+  window.addEventListener('keydown',close);
+  return ()=>window.removeEventListener('keydown',close);
+ },[expanded]);
  const view=useMemo(()=>ganttViewport(schedule,{scale,offset,startDate:projectStart,dueDate:projectDue} as any),
   [schedule,scale,offset,projectStart,projectDue]);
  const matching=view.rows.filter((r:any)=>(!criticalOnly||r.critical)&&r.title.toLocaleLowerCase('ru-RU').includes(query.trim().toLocaleLowerCase('ru-RU')));
@@ -41,11 +48,14 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
   {view.ticks.map((tick:any)=><span className="atlas-gantt-guide" aria-hidden="true" key={key+'-tick-'+tick.day} style={{left:tick.positionPct+'%'}}/>)}
   {view.deadline&&<span className="atlas-gantt-deadline" aria-hidden="true" title={'Контрольный срок: '+view.deadline.label} style={{left:view.deadline.positionPct+'%'}}/>}
  </>;
- return <section className="surface atlas-gantt-panel">
+ return <section className={'surface atlas-gantt-panel'+(expanded?' is-expanded':'')} role={expanded?'dialog':undefined}
+  aria-label={expanded?'Развёрнутый график CPM':undefined} aria-modal={expanded?'true':undefined}>
   <div className="section-heading"><div><h2>План-график CPM</h2>
    <p>Расчётная длительность и критический путь по календарным дням. Состояния работ — заявления, а не фактическая приёмка.</p></div>
    <div className="button-row"><span className="status-chip">{schedule.rows.length} работ · {schedule.durationDays} дн.</span>
-    <button type="button" className="action-button" onClick={onEditDates}>Плановые даты</button></div></div>
+    <button type="button" className="action-button" onClick={onEditDates}>Плановые даты</button>
+    <button type="button" className="action-button" aria-expanded={expanded}
+     onClick={()=>setExpanded(v=>!v)}>{expanded?'Свернуть график':'Развернуть график'}</button></div></div>
   <div className="atlas-gantt-tools">
    <label>Масштаб <select value={scale} onChange={e=>{setScale(e.target.value as Mode);setOffset(0);setVisibleLimit(160)}}>
     <option value="fit">Весь проект</option><option value="30">30 дней</option><option value="90">90 дней</option>
@@ -128,11 +138,21 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
 export function ProjectDependencyDiagram({schedule,onOpenWork}:{schedule:CPM;onOpenWork:(id:string)=>void}){
  const [query,setQuery]=useState('');
  const [matchIndex,setMatchIndex]=useState(0);
+ const [expanded,setExpanded]=useState(false);
+ useEffect(()=>{
+  if(!expanded)return;
+  const close=(event:KeyboardEvent)=>{if(event.key==='Escape'){event.preventDefault();setExpanded(false)}};
+  window.addEventListener('keydown',close);
+  return ()=>window.removeEventListener('keydown',close);
+ },[expanded]);
  const matches=useMemo(()=>query.trim()?schedule.rows.filter(row=>row.title.toLocaleLowerCase('ru-RU').includes(query.trim().toLocaleLowerCase('ru-RU'))):[],[schedule,query]);
  const activeMatch=matches[Math.min(matchIndex,Math.max(0,matches.length-1))];
  const display=useMemo(()=>dependencyDiagram(schedule,{limit:80,focusId:activeMatch?.id||null} as any),[schedule,activeMatch?.id]);
- return <>
-  <div className="atlas-graph-tools"><label>Найти работу <input type="search" value={query} placeholder="Название или фрагмент" onChange={e=>{setQuery(e.target.value);setMatchIndex(0)}}/></label>
+ return <div className={'atlas-dag-panel'+(expanded?' is-expanded':'')} role={expanded?'dialog':undefined}
+  aria-label={expanded?'Развёрнутый граф зависимостей':undefined} aria-modal={expanded?'true':undefined}>
+  <div className="atlas-graph-tools">
+   <button type="button" className="action-button" aria-expanded={expanded}
+    onClick={()=>setExpanded(v=>!v)}>{expanded?'Свернуть граф':'Развернуть граф'}</button><label>Найти работу <input type="search" value={query} placeholder="Название или фрагмент" onChange={e=>{setQuery(e.target.value);setMatchIndex(0)}}/></label>
    {!!query.trim()&&<><span className="atlas-range">{matches.length?String(Math.min(matchIndex+1,matches.length))+' из '+matches.length+' совпадений':'Нет совпадений'}</span>
     <button type="button" className="action-button" disabled={matchIndex<=0} onClick={()=>setMatchIndex(i=>Math.max(0,i-1))}>←</button>
     <button type="button" className="action-button" disabled={matchIndex>=matches.length-1} onClick={()=>setMatchIndex(i=>Math.min(matches.length-1,i+1))}>→</button>
@@ -161,5 +181,5 @@ export function ProjectDependencyDiagram({schedule,onOpenWork}:{schedule:CPM;onO
     </div>
     {display.partial&&<p className="minor">Визуально показано {display.shown} из {display.total} работ. {activeMatch?'Это окружение выбранной работы (до двух связей в каждую сторону).':'Для большого проекта найдите работу, чтобы увидеть её окружение.'} Полный список связей находится в таблице ниже.</p>}
    </>}
- </>;
+ </div>;
 }

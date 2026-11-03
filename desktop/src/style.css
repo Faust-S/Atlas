@@ -219,3 +219,19 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .atlas-close-dialog{width:min(560px,100%);max-height:calc(100vh - 48px);overflow:auto;background:#fff;color:#203752;border:1px solid #b3c6de;border-radius:16px;box-shadow:0 18px 70px #10243f55;padding:26px}
 .atlas-close-dialog h2{margin:0 0 12px;font-size:21px}.atlas-close-dialog p{line-height:1.6}
 .atlas-close-dialog .button-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}
+
+/* Desktop analysis mode: use the whole application viewport for complex data,
+   without a second window, renderer, graph engine or saved state. */
+.atlas-gantt-panel.is-expanded,.atlas-dag-panel.is-expanded{
+ position:fixed;inset:10px;z-index:900;margin:0;padding:22px;
+ max-height:calc(100vh - 20px);overflow:auto;background:#fff;
+ border:1px solid #b9cce4;border-radius:12px;
+ box-shadow:0 16px 75px #10213f55;
+}
+.atlas-gantt-panel.is-expanded .atlas-gantt-scroller{
+ min-height:180px;max-height:max(180px,calc(100vh - 330px));
+}
+.atlas-dag-panel.is-expanded .atlas-dependency-scroll{
+ min-height:180px;max-height:max(180px,calc(100vh - 210px));
+}
+.atlas-dag-panel.is-expanded .atlas-graph-tools{position:sticky;top:0;background:#fff;z-index:5;padding:8px 0}

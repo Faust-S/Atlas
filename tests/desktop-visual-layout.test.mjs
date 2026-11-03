@@ -147,3 +147,18 @@ test("R4 plan amendments show concrete before/after changes and allow removal be
  assert.match(ui,/if\(!confirmAction\("Убрать выбранную корректировку/);
  assert.match(ui,/Применить утверждённый план/);
 });
+
+test("R3 fullscreen workspace remains within the installed window and supports Escape",()=>{
+ const ts=readFileSync(new URL("../desktop/src/ProjectVisuals.tsx",import.meta.url),"utf8");
+ const css=readFileSync(new URL("../desktop/src/style.css",import.meta.url),"utf8");
+ assert.match(ts,/Развернуть график/);
+ assert.match(ts,/Свернуть график/);
+ assert.match(ts,/Развернуть граф/);
+ assert.match(ts,/Свернуть граф/);
+ assert.match(ts,/aria-expanded=\{expanded\}/);
+ assert.match(ts,/role=\{expanded\?'dialog':undefined\}/);
+ assert.equal((ts.match(/if\(event\.key==='Escape'\)/g)||[]).length,2);
+ assert.match(css,/\.atlas-gantt-panel\.is-expanded,\.atlas-dag-panel\.is-expanded/);
+ assert.match(css,/position:fixed;inset:10px;z-index:900/);
+ assert.match(css,/\.atlas-dag-panel\.is-expanded \.atlas-dependency-scroll/);
+});
