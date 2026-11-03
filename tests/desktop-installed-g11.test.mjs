@@ -16,3 +16,11 @@ test("installed G11 scenario uses genuine forms, separate approval and actual st
  assert.match(workflow,/Generate existing domain route for installed GUI human-review scenario/);
  assert.match(ui,/Изменения/);
 });
+
+test("final installed G09 Gantt/DAG keyboard expand and Escape gate",()=>{
+ assert.match(script,/ATLAS_INSTALLED_G09_GANTT_EXPAND_ESCAPE_PASS/);
+ assert.match(script,/ATLAS_INSTALLED_G09_DAG_EXPAND_ESCAPE_PASS/);
+ assert.match(script,/ATLAS_INSTALLED_G09_NAVIGATION_DATA_UNCHANGED_PASS/);
+ assert.match(script,/find_button\("Развернуть график",timeout=12\)/);
+ assert.match(script,/find_button\("Развернуть граф",timeout=12\)/);
+});

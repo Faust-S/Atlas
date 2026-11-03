@@ -609,6 +609,35 @@ try:
     assert sorted(p["id"] for p in final_projects)==route_ids
     assert next(p for p in final_projects if p["id"]==root_id)["items"][0]["estimateDays"]==6
     print("ATLAS_INSTALLED_G11_GUI_RESTART_PASS projects=2",flush=True)
+
+    # G09 real installed visual interactions, using existing Gantt / DAG.
+    phase="gui-gantt-controls"
+    activate_button("ATLAS_RELEASE_02_UPSTREAM")
+    activate_button("График")
+    activate_button("Развернуть график")
+    expanded_gantt=find_button("Свернуть график",timeout=12)
+    assert expanded_gantt.is_enabled() and expanded_gantt.is_visible()
+    shot("gantt-expanded")
+    keyboard.send_keys("{ESC}")
+    restored_gantt=find_button("Развернуть график",timeout=12)
+    assert restored_gantt.is_visible()
+    print("ATLAS_INSTALLED_G09_GANTT_EXPAND_ESCAPE_PASS",flush=True)
+
+    phase="gui-dag-controls"
+    activate_button("Зависимости")
+    activate_button("Развернуть граф")
+    expanded_dag=find_button("Свернуть граф",timeout=12)
+    assert expanded_dag.is_enabled() and expanded_dag.is_visible()
+    shot("dag-expanded")
+    keyboard.send_keys("{ESC}")
+    restored_dag=find_button("Развернуть граф",timeout=12)
+    assert restored_dag.is_visible()
+    print("ATLAS_INSTALLED_G09_DAG_EXPAND_ESCAPE_PASS",flush=True)
+    # Graph navigation must never mutate the native head or planning decisions.
+    nav_head,nav_projects=native_data()
+    assert nav_head["generation"]==final_head["generation"]
+    assert sorted(p["id"] for p in nav_projects)==route_ids
+    print("ATLAS_INSTALLED_G09_NAVIGATION_DATA_UNCHANGED_PASS",flush=True)
     stop()
 except Exception as exc:
     print("ATLAS_INSTALLED_LEGACY_01_GUI_HOLD phase="+phase+" reason="+repr(exc),flush=True)

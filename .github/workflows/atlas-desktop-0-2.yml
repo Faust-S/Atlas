@@ -212,3 +212,106 @@ jobs:
       # This is a GUI acceptance attempt, not a release PASS until the logs
       # prove both installed processes committed and reread the same project.
 
+
+  # Release exactly the same immutable SHA and NSIS artifact qualified above.
+  # This runs ONLY when the final candidate commit carries [release-final].
+  publish-0-2-0:
+    if: github.event_name == 'push' && contains(github.event.head_commit.message, '[release-final]')
+    needs: [frontend, native-windows]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout qualified final SHA
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+          fetch-depth: 0
+      - name: Set up release metadata Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Download exact NSIS package from this qualifying run
+        uses: actions/download-artifact@v4
+        with:
+          name: iwxa-atlas-0-2-windows-nsis-candidate
+          path: release-assets
+      - name: Verify immutable release identity and calculate SHA-256
+        id: verify-release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = "work/2026-11-02-atlas-desktop-0.2"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          node -e 'for(const [path,expected] of [["./desktop/package.json","0.2.0"],["./desktop/src-tauri/tauri.conf.json","0.2.0"]]) {let v=require(path).version;if(v!==expected)throw Error(path+": "+v)}'
+          grep -q '^version = "0.2.0"$' desktop/src-tauri/Cargo.toml
+          test -f docs/ATLAS_0_2_0_RELEASE_GATES_RU.md
+          test -f docs/ATLAS_0_2_0_RELEASE_NOTES_RU.md
+          if git ls-remote --exit-code --heads origin release/0.2 >/dev/null; then
+            echo "release/0.2 already exists; never overwrite" >&2; exit 1
+          fi
+          if git ls-remote --exit-code --tags origin v0.2.0 >/dev/null; then
+            echo "v0.2.0 already exists; never overwrite" >&2; exit 1
+          fi
+          mapfile -d '' packages < <(find release-assets -type f -name '*0.2.0*setup.exe' -print0)
+          test "${#packages[@]}" -eq 1
+          installer="${packages[0]}"
+          test -s "$installer"
+          sha256sum "$installer" | sed 's#  release-assets/#  #' > SHA256SUMS.txt
+          echo "ATLAS_RELEASE_INSTALLER=$(basename "$installer")"
+          cat SHA256SUMS.txt
+          cp docs/ATLAS_0_2_0_RELEASE_NOTES_RU.md RELEASE_BODY.md
+          cat >> RELEASE_BODY.md <<'GATES'
+          
+          ## Матрица G01–G12 на едином релизном SHA
+          
+          Успех этого workflow означает, что frontend и native-windows завершились SUCCESS **на том же исходном коммите**, а все адресные установленные GUI-проверки возвратили код 0.
+          
+          | Gate | Результат и основание |
+          |---|---|
+          | G01 | PASS — Node, TypeScript/Vite, Rust |
+          | G02 | PASS — сборка и установка настоящего NSIS |
+          | G03 | PASS — автономный установленный WebView2/Tauri |
+          | G04 | PASS — проект, работы, зависимости и базовый GUI |
+          | G05 | PASS — native readback, закрытие и полный перезапуск |
+          | G06 | PASS — настоящий JSON 0.1 через GUI |
+          | G07 | PASS — внешний JSON backup через Windows picker |
+          | G08 | PASS — история, восстановление и перезапуск |
+          | G09 | PASS — CPM и взаимодействия Gantt/DAG, визуальные артефакты Windows |
+          | G10 | PASS — 120 проектов, 1 200 работ, 300 + 40 зависимостей |
+          | G11 | PASS — SHA/recheck → решение → proposal → approval → plan → save/restart через установленный GUI |
+          | G12 | PASS — зафиксированные SHA/TREE, тег, release branch, NSIS и SHA-256, проверяемые в GitHub Release |
+          
+          Артефакты экранов и подробные квитанции — в Windows workflow, ссылка указана ниже.
+          GATES
+          {
+            printf '\n## Независимые идентификаторы выпуска\n\n'
+            printf -- '- Commit: `%s`\n' "$GITHUB_SHA"
+            printf -- '- TREE: `%s`\n' "$(git rev-parse HEAD^{tree})"
+            printf -- '- Windows qualification: https://github.com/%s/actions/runs/%s\n' "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID"
+            printf -- '- NSIS installer: `%s` (%s bytes)\n' "$(basename "$installer")" "$(stat -c %s "$installer")"
+            printf -- '- Node: 22; Cargo MSVC build, Rust minimum version: %s\n' "$(grep '^rust-version' desktop/src-tauri/Cargo.toml | cut -d '"' -f2)"
+            printf '\n## SHA-256\n\n```text\n'
+            cat SHA256SUMS.txt
+            printf '```\n'
+          } >> RELEASE_BODY.md
+      - name: Create immutable release branch, annotated tag and GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git push origin "$GITHUB_SHA:refs/heads/release/0.2"
+          git tag -a v0.2.0 "$GITHUB_SHA" -m "IWXA Atlas 0.2.0 — qualified Windows release"
+          git push origin refs/tags/v0.2.0
+          gh release create v0.2.0 release-assets/*0.2.0*setup.exe SHA256SUMS.txt \
+            --verify-tag --title "IWXA Atlas 0.2.0 — Windows Desktop" \
+            --notes-file RELEASE_BODY.md
+          test "$(git ls-remote origin refs/heads/release/0.2 | cut -f1)" = "$GITHUB_SHA"
+          gh release view v0.2.0 --json assets,url,tagName
+          echo "ATLAS_0_2_RELEASE_PUBLISHED_PASS"
