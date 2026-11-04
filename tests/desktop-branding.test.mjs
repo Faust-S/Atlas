@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import {createHash} from "node:crypto";
 import {readFileSync} from "node:fs";
 
 const read=(path)=>readFileSync(new URL(path,import.meta.url));
@@ -8,37 +9,45 @@ const ui=read("../desktop/src/main.tsx").toString("utf8");
 const styles=read("../desktop/src/style.css").toString("utf8");
 const html=read("../desktop/index.html").toString("utf8");
 const ico=read("../desktop/src-tauri/icons/icon.ico");
+const gitBlobSha=(value)=>{
+ const bytes=Buffer.isBuffer(value)?value:Buffer.from(value);
+ return createHash("sha1").update("blob "+bytes.length+"\0").update(bytes).digest("hex");
+};
 
-test("Atlas patch reuses the Agent IWXA monogram with a blue background",()=>{
- assert.match(svg,/fill="#3F96ED"/);
- assert.match(svg,/x="13" y="13" width="7" height="38"/);
- assert.match(svg,/M29 14 L51 50 M51 14 L29 50/);
+test("SVG is byte-identical to Agent branding except green replaced by blue",()=>{
+ const restored=svg.replace("#3F96ED","#B6F24B");
+ assert.equal(gitBlobSha(restored),"9a331ea8bb87e99a59f8716500540dd1e093905d");
+ assert.equal((svg.match(/#3F96ED/g)||[]).length,1);
  assert.equal((ui.match(/src="\/atlas-mark\.svg"/g)||[]).length,3);
  assert.doesNotMatch(ui,/<span className="logo-symbol">A<\/span>/);
  assert.match(styles,/\.logo-symbol\{display:block;width:44px/);
  assert.match(html,/rel="icon" type="image\/svg\+xml" href="\/atlas-mark\.svg"/);
 });
 
-test("Windows icon is valid multiresolution ICO with blue Atlas identity",()=>{
+test("Windows ICO is exact Agent icon with only background RGB recolored",()=>{
+ assert.equal(ico.length,16958);
  assert.equal(ico.readUInt16LE(0),0);
  assert.equal(ico.readUInt16LE(2),1);
- const count=ico.readUInt16LE(4);
- assert.equal(count,6);
- const sizes=[];
- for(let i=0;i<count;i++){
-  const e=6+i*16,size=ico[e]||256,bytes=ico.readUInt32LE(e+8),offset=ico.readUInt32LE(e+12);
-  sizes.push(size);
-  assert.ok(offset+bytes<=ico.length);
-  assert.equal(ico.readUInt32LE(offset),40);
-  assert.equal(ico.readUInt32LE(offset+4),size);
-  assert.equal(ico.readUInt32LE(offset+8),size*2);
-  assert.equal(ico.readUInt16LE(offset+14),32);
-  if(size===64){
-   const x=23,y=32,pixel=offset+40+((size-1-y)*size+x)*4;
-   assert.deepEqual([...ico.subarray(pixel,pixel+4)],[237,150,63,255]);
-  }
+ assert.equal(ico.readUInt16LE(4),1);
+ assert.equal(ico[6],64);
+ assert.equal(ico[7],64);
+ const offset=ico.readUInt32LE(18);
+ assert.equal(offset,22);
+ assert.equal(ico.readUInt32LE(offset),40);
+ assert.equal(ico.readUInt16LE(offset+14),32);
+ const restored=Buffer.from(ico);
+ let blue=0,black=0,transparent=0;
+ for(let n=0;n<4096;n++){
+  const i=offset+40+n*4;
+  const [b,g,r,a]=[ico[i],ico[i+1],ico[i+2],ico[i+3]];
+  if(r===63&&g===150&&b===237&&a===255){
+   restored[i]=75;restored[i+1]=242;restored[i+2]=182;blue++;
+  }else if(r===5&&g===7&&b===13&&a===255)black++;
+  else if(r===0&&g===0&&b===0&&a===0)transparent++;
+  else assert.fail("Unexpected Atlas pixel at "+n+": "+[r,g,b,a].join(","));
  }
- assert.deepEqual(sizes,[16,24,32,48,64,128]);
+ assert.deepEqual({blue,black,transparent},{blue:3106,black:866,transparent:124});
+ assert.equal(gitBlobSha(restored),"31fc05cae8a4cc69ccadcbc3dba31c85a3f9b709");
 });
 
 test("candidate identity uses 0.2.1 without mutating tagged 0.2.0",()=>{
