@@ -43,6 +43,13 @@ jobs:
           ref: 52229f4e9f0d41ff835bad3e9f1f722a84599ff8
           path: center-public
           persist-credentials: false
+      - name: Checkout canonical Atlas core pinned by Center
+        uses: actions/checkout@v4
+        with:
+          repository: Faust-S/Atlas
+          ref: e5cc6ff593aa12eec3da8e8940ad5af5819b66fd
+          path: center-public/vendor/atlas
+          persist-credentials: false
       - name: Qualify Atlas project/work and stale revision with real Center sources
         run: node tests/atlas-center-interop.mjs
       - name: Install pinned desktop frontend
