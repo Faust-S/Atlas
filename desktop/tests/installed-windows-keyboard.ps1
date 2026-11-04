@@ -295,6 +295,19 @@ try {
                 $saved=Wait-AtlasDAG $names[0] $saved.generation
                 Start-Sleep -Milliseconds 1350
                 Activate-Atlas $process
+                # Real installed WebView2: open ProjectRef from the saved native
+                # generation, prove the dialog rendered through native HWND,
+                # and ensure this read-only handoff did not advance the Store.
+                [System.Windows.Forms.SendKeys]::SendWait('^%p')
+                Wait-AtlasTitle $process 'Ссылка на проект'
+                Capture-AtlasView 'installed-saved-project-reference'
+                $afterReference = Get-AtlasSnapshot
+                if ($null -eq $afterReference -or $afterReference.generation -ne $saved.generation) {
+                    throw 'Opening a ProjectRef preview unexpectedly modified native Atlas state'
+                }
+                [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
+                Wait-AtlasTitle $process 'Таблица'
+                Write-Output 'ATLAS_INSTALLED_SAVED_PROJECT_REF_DIALOG_PASS'
                 Click-AtlasTab $process 'timeline'
                 Wait-AtlasTitle $process 'График'
                 Capture-AtlasView 'installed-gantt'

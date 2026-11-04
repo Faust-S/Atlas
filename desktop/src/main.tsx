@@ -160,6 +160,7 @@ function App(){
  const [selectedHistory,setSelectedHistory]=useState<HistoryEntry|null>(null);
  const [pendingImport,setPendingImport]=useState<ImportPreview|null>(null);
  const [savedRefPreview,setSavedRefPreview]=useState<SavedRefPreview|null>(null);
+ const savedRefOpenRef=useRef(false);savedRefOpenRef.current=savedRefPreview!==null;
  const savedVersionsOpenRef=useRef(false);savedVersionsOpenRef.current=savedVersions!==null;
  const pendingImportOpenRef=useRef(false);pendingImportOpenRef.current=pendingImport!==null;
  const [resourceLimit,setResourceLimit]=useState(40);
@@ -258,6 +259,12 @@ function App(){
   let unlisten:undefined|(()=>void);
   getCurrentWindow().onCloseRequested(event=>{
    if(allowCloseRef.current)return;
+   if(savedRefOpenRef.current){
+    // Alt+F4 dismisses a reference preview before closing the app.
+    event.preventDefault();
+    if(!busyRef.current)setSavedRefPreview(null);
+    return;
+   }
    if(pendingImportOpenRef.current){
     event.preventDefault();
     if(!busyRef.current)setPendingImport(null);
@@ -286,11 +293,12 @@ function App(){
   // Also lets installed-Windows acceptance distinguish a rendered React form
   // from the earlier Rust atlas_open receipt without UIA or CDP.
   const editTitle=editor?.spec.title;
-  const suffix=editTitle?" · Форма: "+String(editTitle).replace(/\s+/g," ").trim().slice(0,70):
+  const suffix=savedRefPreview?" · "+savedRefPreview.label:
+   editTitle?" · Форма: "+String(editTitle).replace(/\s+/g," ").trim().slice(0,70):
    dirty?" · Не сохранено":"";
   void getCurrentWindow().setTitle("IWXA Atlas — "+subject+" — "+display+suffix)
    .catch(error=>console.warn("Atlas native window title unavailable",error));
- },[native,ready,project?.name,tab,editor?.spec.title,dirty]);
+ },[native,ready,project?.name,tab,editor?.spec.title,dirty,savedRefPreview?.label]);
  const selectProject=(id:string|null,afterSubmit=false)=>{
   if(!afterSubmit&&!requireClosedForm())return;
   setActive(id);setTab("overview");setEditor(null);setForecastId(null);
@@ -574,7 +582,19 @@ function App(){
     if(ctrl||event.key==="Escape")event.preventDefault();
     return;
    }
+   if(savedRefPreview!==null){
+    if(event.key==="Escape"&&!busyRef.current){
+     event.preventDefault();setSavedRefPreview(null);return;
+    }
+    if(ctrl||event.key==="Escape"){event.preventDefault();return}
+   }
    // Physical keys retain shortcuts when the UI keyboard layout is changed.
+   if(ctrl&&event.altKey&&!event.shiftKey&&code==="KeyP"){
+    event.preventDefault();
+    if(!ready||busyRef.current||!project)return;
+    void showSavedReference(project.id);
+    return;
+   }
    if(ctrl&&!event.shiftKey&&code==="KeyS"){event.preventDefault();void save();return}
    if(ctrl&&event.shiftKey&&(code==="KeyN"||code==="KeyL")){
     event.preventDefault();
@@ -719,7 +739,7 @@ function App(){
    </>:<>
     <div className="page-heading"><div><small><button className="breadcrumb" onClick={()=>selectProject(null)}>Портфель</button> / {project.type}</small>
      <h1>{project.name}</h1><p>{project.goal||"Цель пока не определена"}</p></div>
-     <div className="button-row"><Badge>{statuses[project.status]||project.status}</Badge><Action disabled={busy||dirty||!persisted||!!editor} onClick={()=>showSavedReference(project.id)} title="Только сохранённая редакция">Ссылка на проект</Action><Action onClick={()=>openEditor("project-edit")}>Редактировать проект</Action></div>
+     <div className="button-row"><Badge>{statuses[project.status]||project.status}</Badge><Action disabled={busy||dirty||!persisted||!!editor} onClick={()=>showSavedReference(project.id)} title="Ctrl+Alt+P · Только сохранённая редакция">Ссылка на проект</Action><Action onClick={()=>openEditor("project-edit")}>Редактировать проект</Action></div>
     </div>
     <nav className="tabbar" aria-label="Представления проекта">{tabs.map(t=><button key={t.key}
       title={t.key==="work"?"Ctrl+1":t.key==="timeline"?"Ctrl+2":t.key==="graph"?"Ctrl+3":undefined}

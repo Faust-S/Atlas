@@ -58,3 +58,16 @@ test("standalone development UI identifies 0.3 rather than the frozen release",(
  assert.match(ui,/Нативный Atlas 0\.3 запускается как установленное приложение Tauri/);
  assert.doesNotMatch(ui,/Нативный Atlas 0\.2 запускается как установленное приложение Tauri/);
 });
+
+test("saved-reference modal has native title and keyboard/close protection",()=>{
+ const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ const windows=readFileSync(new URL("../desktop/tests/installed-windows-keyboard.ps1",import.meta.url),"utf8");
+ assert.match(ui,/const savedRefOpenRef=useRef\(false\)/);
+ assert.match(ui,/if\(savedRefOpenRef\.current\)\{[\s\S]*?event\.preventDefault\(\)/);
+ assert.match(ui,/const suffix=savedRefPreview\?" · "\+savedRefPreview\.label/);
+ assert.match(ui,/if\(savedRefPreview!==null\)\{[\s\S]*?event\.key==="Escape"/);
+ assert.match(ui,/if\(ctrl&&event\.altKey&&!event\.shiftKey&&code==="KeyP"\)/);
+ assert.match(windows,/ATLAS_INSTALLED_SAVED_PROJECT_REF_DIALOG_PASS/);
+ assert.match(windows,/Wait-AtlasTitle \$process 'Ссылка на проект'/);
+ assert.match(windows,/afterReference\.generation -ne \$saved\.generation/);
+});
