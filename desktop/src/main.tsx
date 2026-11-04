@@ -65,7 +65,7 @@ class AtlasRenderBoundary extends React.Component<{children:React.ReactNode},{fa
  render(){
   if(this.state.failure){
    return <main className="entry"><div className="entry-card">
-    <span className="logo-symbol">A</span><h1>Atlas: ошибка интерфейса</h1>
+    <img className="logo-symbol" src="/atlas-mark.svg" alt="" aria-hidden="true" /><h1>Atlas: ошибка интерфейса</h1>
     <p role="alert" className="error">Ошибка при отображении: {this.state.failure}</p>
     <p>Сохранённые данные не изменены. Закройте и повторно откройте программу; при повторении ошибки сохраните это сообщение для диагностики.</p>
    </div></main>;
@@ -573,7 +573,7 @@ function App(){
   window.addEventListener("keydown",key);return ()=>window.removeEventListener("keydown",key);
  });
  if(!ready)return <main className="entry">
-  <div className="entry-card"><span className="logo-symbol">A</span><h1>IWXA Atlas <em>0.2</em></h1>
+  <div className="entry-card"><img className="logo-symbol" src="/atlas-mark.svg" alt="" aria-hidden="true" /><h1>IWXA Atlas <em>0.2.1</em></h1>
    <p>{recovery?"Найдена предыдущая исправная версия портфеля. Восстановление выполняется только по вашему решению.":"Самостоятельное локальное приложение для Windows. Данные принадлежат пользователю."}</p>
    {error&&<p role="alert" className="error">{error}</p>}
    {recovery&&<Action onClick={()=>void restore()} primary disabled={busy}>Восстановить сохранённую версию</Action>}
@@ -583,7 +583,7 @@ function App(){
  </main>;
  return <div className={"app-shell"+(inspector?"":" no-inspector")+(editor?" editor-active":"")}>
   <aside className="sidebar">
-   <div className="brand"><span className="logo-symbol">A</span><div><strong>Atlas</strong><small>IWXA · 0.2 Desktop</small></div></div>
+   <div className="brand"><img className="logo-symbol" src="/atlas-mark.svg" alt="" aria-hidden="true" /><div><strong>Atlas</strong><small>IWXA · 0.2.1 Desktop</small></div></div>
    <nav className="main-nav" aria-label="Основная навигация">
     <button className={!active?"nav-current":""} onClick={()=>selectProject(null)}>▦ <span>Портфель проектов</span><b>{data.projects.length}</b></button>
     <button aria-label="Создать проект" onClick={()=>{selectProject(null);openEditor("new")}}>＋ <span>Создать проект</span></button>
