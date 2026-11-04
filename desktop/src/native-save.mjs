@@ -31,3 +31,22 @@ export async function commitWithReadback({invoke,expectedGeneration,snapshot,sig
  }
  return {generation:opened.generation,projectBlocksWritten:receipt?.projectBlocksWritten??null,reconciled:!receipt};
 }
+
+// Verify a saved reference against the native head immediately before handing
+// it to another product. No write or new store; the other host must independently
+// recheck currentness when consuming the reference.
+export async function readSavedSnapshotForReference({
+ invoke,expectedGeneration,snapshot,signature,readValidated
+}){
+ if(typeof expectedGeneration!=="string"||expectedGeneration==="none")
+  throw Error("Сначала сохраните портфель перед передачей ссылки.");
+ const opened=await invoke("atlas_open");
+ if(!opened||opened.needsConfirmation)
+  throw Error("Нативное хранилище требует восстановления. Ссылка не сформирована.");
+ if(opened.generation!==expectedGeneration)
+  throw Error("Портфель на диске изменился. Ссылка не сформирована; откройте актуальную редакцию.");
+ const checked=readValidated(opened.snapshot);
+ if(signature(checked)!==signature(snapshot))
+  throw Error("Данные на диске отличаются от открытого портфеля. Ссылка не сформирована.");
+ return checked;
+}

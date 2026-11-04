@@ -41,3 +41,14 @@ test("desktop exposes saved references only after persistence and without false 
  assert.match(ui,/не пакет \.iwxa/);
  assert.match(ui,/не подтверждение подключения Agent или Center/);
 });
+
+test("handoff GUI reopens exact native snapshot and exports existing JSON for Center",()=>{
+ const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ assert.match(ui,/const showSavedReference=async\(projectId:string,workId\?:string\)=>/);
+ assert.match(ui,/readSavedSnapshotForReference\(\{/);
+ assert.match(ui,/expectedGeneration,snapshot:startedWith,signature:snapshotText/);
+ assert.match(ui,/latestSnapshot\.current!==startedWith\|\|dirtyRef\.current/);
+ assert.match(ui,/onClick=\{\(\)=>void exportJson\("center"\)\}/);
+ assert.match(ui,/Admin Center откройте раздел/);
+ assert.match(ui,/Это снимок, а не синхронизация/);
+});

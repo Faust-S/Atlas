@@ -17,7 +17,7 @@ import {planPublicRefresh,reconcilePublicSources,publicSourceQueue} from "../../
 import {sourceReview} from "../../src/source-review.mjs";
 import {ProjectGantt,ProjectDependencyDiagram} from "./ProjectVisuals";
 import {prepareImportedSnapshot} from "./import-snapshot.mjs";
-import {commitWithReadback} from "./native-save.mjs";
+import {commitWithReadback,readSavedSnapshotForReference} from "./native-save.mjs";
 import {projectHistoryRows} from "./history-view.mjs";
 import {sortWorkRows} from "./work-sorting.mjs";
 import {createAtlasSavedRef} from "../../src/project-host-port.mjs";
@@ -208,13 +208,25 @@ function App(){
  },[project,workFilter,workQuery,workSort]);
  const mutate=(next:Atlas,notice:string)=>{setSavedRefPreview(null);latestSnapshot.current=next;setData(next);setMessage(notice);setError("");};
  const issue=(e:unknown)=>{setError(deepFreezeError(e));setMessage("");};
- const showSavedReference=(projectId:string,workId?:string)=>{
-  if(busyRef.current||!requireClosedForm())return;
+ const showSavedReference=async(projectId:string,workId?:string)=>{
+  if(busyRef.current||!ready||!requireClosedForm())return;
+  const startedWith=latestSnapshot.current,expectedGeneration=generation;
+  // Ref previews cannot silently use a changed native head from a second
+  // instance, even when React's local draft still says "Сохранено".
+  if(!persisted||dirty){issue(Error("Сначала сохраните текущую редакцию."));return;}
+  busyRef.current=true;setBusy(true);
   try{
-   const ref=createAtlasSavedRef(data,{projectId,...(workId?{workId}:{})},{persisted,dirty});
-   setSavedRefPreview({label:workId?"Ссылка на работу":"Ссылка на проект",json:JSON.stringify(ref,null,2),revision:ref.revision,generation});
+   const checked=await readSavedSnapshotForReference({
+    invoke,expectedGeneration,snapshot:startedWith,signature:snapshotText,
+    readValidated:(raw:Atlas)=>deserialize(JSON.stringify(raw))
+   });
+   if(latestSnapshot.current!==startedWith||dirtyRef.current||editorOpenRef.current)
+    throw Error("Черновик изменился во время проверки. Ссылка не сформирована.");
+   const ref=createAtlasSavedRef(checked,{projectId,...(workId?{workId}:{})},{persisted:true,dirty:false});
+   setSavedRefPreview({label:workId?"Ссылка на работу":"Ссылка на проект",
+    json:JSON.stringify(ref,null,2),revision:ref.revision,generation:expectedGeneration});
    setError("");
-  }catch(e){issue(e)}
+  }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
  };
  // Open forms keep local, unapplied input state. A project/tab change or
  // competing action must never unmount that form without explicit cancellation.
@@ -376,13 +388,19 @@ function App(){
   const done=await save();
   if(done&&latestSnapshot.current===data&&!editorOpenRef.current)await closeWindow();
  };
- const exportJson=async()=>{
+ const exportJson=async(mode:"backup"|"center"="backup")=>{
   if(!requireClosedForm()||busyRef.current||!ready)return;
-  if(dirty){issue(Error("Сначала сохраните изменения, затем создайте резервную копию."));return}
+  if(dirty){issue(Error("Сначала сохраните изменения, затем экспортируйте портфель."));return}
   busyRef.current=true;setBusy(true);
   try{
+   // Use the same native atomic Atlas JSON export already accepted in 0.2.
+   // Center imports a user-selected snapshot, not a live connection or grant.
    const result=await invoke<string>("atlas_export_json",{expectedGeneration:generation});
-   setMessage(result);setError("");
+   if(mode==="center"){
+    setSavedRefPreview(null);
+    setMessage(result+" В Admin Center откройте раздел «Планы Atlas» → «Открыть портфель Atlas» и выберите этот JSON. Это снимок, а не синхронизация.");
+   }else setMessage(result);
+   setError("");
   }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
  };
  const importJson=async()=>{
@@ -936,7 +954,11 @@ function App(){
       <textarea className="atlas-ref-text" aria-label="Сохранённая ссылка Atlas" readOnly
        rows={5} value={savedRefPreview.json} onFocus={event=>event.currentTarget.select()}/>
      </label>
-     <div className="button-row"><Action autoFocus onClick={()=>setSavedRefPreview(null)}>Закрыть</Action></div>
+     <p className="minor">Для привязки в Admin Center откройте тот же сохранённый JSON-портфель. Центр сверяет ID и редакцию файла; самостоятельный Atlas не подключается к организации автоматически.</p>
+     <div className="button-row">
+      <Action onClick={()=>void exportJson("center")} disabled={busy}>JSON для Admin Center</Action>
+      <Action autoFocus onClick={()=>setSavedRefPreview(null)}>Закрыть</Action>
+     </div>
     </section>
    </div>}
    {pendingImport!==null&&<div className="atlas-close-overlay">

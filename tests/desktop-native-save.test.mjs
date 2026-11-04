@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {deserialize} from '../src/core.mjs';
-import {commitWithReadback} from '../desktop/src/native-save.mjs';
+import {commitWithReadback,readSavedSnapshotForReference} from '../desktop/src/native-save.mjs';
 
 const sort=v=>Array.isArray(v)?v.map(sort):v&&typeof v==='object'?
  Object.fromEntries(Object.keys(v).sort().map(k=>[k,sort(v[k])])):v;
@@ -77,4 +77,25 @@ test('React signature is memoized by domain data, not by tab or input renders',(
  assert.match(ui,/const startedWith=latestSnapshot\.current/);
  assert.match(ui,/const startedSignature=snapshotText\(startedWith\)/);
  assert.match(ui,/saved\.current=startedSignature/);
+});
+
+test('saved WorkRef native recheck only reads, accepts value-preserving Rust key ordering',async()=>{
+ let reads=0;
+ const checked=await readSavedSnapshotForReference({...base,expectedGeneration:'generation-2',
+  invoke:async command=>{assert.equal(command,'atlas_open');reads++;return {
+   generation:'generation-2',needsConfirmation:false,
+   snapshot:{projects:[],revision:2,schema:'atlas.project/1'}};
+  }});
+ assert.equal(reads,1);
+ assert.deepEqual(checked,snapshot);
+});
+test('saved WorkRef refuses stale disk head, corrupt readback and recovery',async()=>{
+ await assert.rejects(readSavedSnapshotForReference({...base,expectedGeneration:'generation-2',
+  invoke:async()=>({generation:'generation-3',needsConfirmation:false,snapshot})}),/Портфель на диске изменился/);
+ await assert.rejects(readSavedSnapshotForReference({...base,expectedGeneration:'generation-2',
+  invoke:async()=>({generation:'generation-2',needsConfirmation:false,snapshot:prior})}),/Данные на диске отличаются/);
+ await assert.rejects(readSavedSnapshotForReference({...base,expectedGeneration:'generation-2',
+  invoke:async()=>({generation:'generation-2',needsConfirmation:true,snapshot})}),/требует восстановления/);
+ await assert.rejects(readSavedSnapshotForReference({...base,expectedGeneration:'none',
+  invoke:async()=>{throw Error('Should never call native');}}),/Сначала сохраните/);
 });
