@@ -1,16 +1,44 @@
-name: Atlas manual checks
+name: Atlas tests and desktop build
+
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - work/2026-11-04-atlas-0-3
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'desktop/src/**'
+      - 'desktop/public/**'
+      - 'desktop/package.json'
+      - 'desktop/package-lock.json'
+      - '.github/workflows/manual-check.yml'
+
 permissions:
   contents: read
+
+concurrency:
+  group: atlas03-frontend-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   unit-tests:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: npm test
-      - run: node --check src/app.mjs
+      - name: Existing Atlas and new 0.3 regression suite
+        run: npm test
+      - name: Validate source syntax
+        run: |
+          node --check src/app.mjs
+          node --check src/project-host-port.mjs
+      - name: Install pinned desktop frontend
+        working-directory: desktop
+        run: npm ci --no-audit --no-fund
+      - name: Verify production desktop build
+        working-directory: desktop
+        run: npm run build
