@@ -19,6 +19,7 @@ import {prepareImportedSnapshot} from "./import-snapshot.mjs";
 import {commitWithReadback} from "./native-save.mjs";
 import {projectHistoryRows} from "./history-view.mjs";
 import {sortWorkRows} from "./work-sorting.mjs";
+import {createAtlasSavedRef} from "../../src/project-host-port.mjs";
 import "./style.css";
 
 type Atlas = any;
@@ -27,6 +28,7 @@ type ImportPreview = {snapshot:Atlas;originalRevision:number;expectedGeneration:
 type OpenResult = {generation:string;snapshot:Atlas;restoredFromBackup:boolean;needsConfirmation:boolean};
 type Field = {name:string;label:string;value?:string;required?:boolean;type:string;options?:{value:string;label:string}[]};
 type Editor = {action:string;spec:{title:string;hint?:string;fields:Field[]}};
+type SavedRefPreview = {label:string;json:string;revision:string;generation:string};
 type Tab = "overview"|"work"|"board"|"timeline"|"graph"|"reality"|"changes"|"resources"|"history"|"sources";
 const tabs:{key:Tab;title:string}[]=[
  {key:"overview",title:"Обзор"},{key:"work",title:"Таблица"},{key:"board",title:"Доска"},
@@ -156,6 +158,7 @@ function App(){
  const [nativeHistoryLimit,setNativeHistoryLimit]=useState(40);
  const [selectedHistory,setSelectedHistory]=useState<HistoryEntry|null>(null);
  const [pendingImport,setPendingImport]=useState<ImportPreview|null>(null);
+ const [savedRefPreview,setSavedRefPreview]=useState<SavedRefPreview|null>(null);
  const savedVersionsOpenRef=useRef(false);savedVersionsOpenRef.current=savedVersions!==null;
  const pendingImportOpenRef=useRef(false);pendingImportOpenRef.current=pendingImport!==null;
  const [resourceLimit,setResourceLimit]=useState(40);
@@ -201,8 +204,16 @@ function App(){
    (!query||item.title.toLocaleLowerCase("ru-RU").includes(query)||
     String(item.assignee||"").toLocaleLowerCase("ru-RU").includes(query))),workSort);
  },[project,workFilter,workQuery,workSort]);
- const mutate=(next:Atlas,notice:string)=>{latestSnapshot.current=next;setData(next);setMessage(notice);setError("");};
+ const mutate=(next:Atlas,notice:string)=>{setSavedRefPreview(null);latestSnapshot.current=next;setData(next);setMessage(notice);setError("");};
  const issue=(e:unknown)=>{setError(deepFreezeError(e));setMessage("");};
+ const showSavedReference=(projectId:string,workId?:string)=>{
+  if(busyRef.current||!requireClosedForm())return;
+  try{
+   const ref=createAtlasSavedRef(data,{projectId,...(workId?{workId}:{})},{persisted,dirty});
+   setSavedRefPreview({label:workId?"Ссылка на работу":"Ссылка на проект",json:JSON.stringify(ref,null,2),revision:ref.revision,generation});
+   setError("");
+  }catch(e){issue(e)}
+ };
  // Open forms keep local, unapplied input state. A project/tab change or
  // competing action must never unmount that form without explicit cancellation.
  const requireClosedForm=()=>{
@@ -688,7 +699,7 @@ function App(){
    </>:<>
     <div className="page-heading"><div><small><button className="breadcrumb" onClick={()=>selectProject(null)}>Портфель</button> / {project.type}</small>
      <h1>{project.name}</h1><p>{project.goal||"Цель пока не определена"}</p></div>
-     <div className="button-row"><Badge>{statuses[project.status]||project.status}</Badge><Action onClick={()=>openEditor("project-edit")}>Редактировать проект</Action></div>
+     <div className="button-row"><Badge>{statuses[project.status]||project.status}</Badge><Action disabled={busy||dirty||!persisted||!!editor} onClick={()=>showSavedReference(project.id)} title="Только сохранённая редакция">Ссылка на проект</Action><Action onClick={()=>openEditor("project-edit")}>Редактировать проект</Action></div>
     </div>
     <nav className="tabbar" aria-label="Представления проекта">{tabs.map(t=><button key={t.key}
       title={t.key==="work"?"Ctrl+1":t.key==="timeline"?"Ctrl+2":t.key==="graph"?"Ctrl+3":undefined}
@@ -752,7 +763,7 @@ function App(){
       <tbody>{filteredWork.slice(0,workLimit).map((w:any)=><tr key={w.id}>
        <td><strong>{w.title}</strong><small>{project.stages.find((s:any)=>s.id===w.stageId)?.name||"Без этапа"}</small></td>
        <td><Badge>{workStatuses[w.state]}</Badge></td><td>{w.estimateDays??1} дн.</td><td>{w.assignee||"Не назначен"}</td><td>{readable(w.dueDate)}</td>
-       <td><Action onClick={()=>openEditor("work:"+w.id)}>Открыть</Action><Action onClick={()=>removeWork(w.id)}>Удалить</Action></td></tr>)}</tbody></table></div>
+       <td><Action onClick={()=>openEditor("work:"+w.id)}>Открыть</Action><Action disabled={busy||dirty||!persisted||!!editor} onClick={()=>showSavedReference(project.id,w.id)} title="Только сохранённая редакция">Ссылка</Action><Action onClick={()=>removeWork(w.id)}>Удалить</Action></td></tr>)}</tbody></table></div>
      {project.items.length>0&&<p className="minor">Показано {Math.min(filteredWork.length,workLimit)} из {filteredWork.length} работ по фильтру; всего в проекте: {project.items.length}.</p>}
      {filteredWork.length>workLimit&&<Action onClick={()=>setWorkLimit(n=>Math.min(filteredWork.length,n+200))}>Показать ещё работы</Action>}
      {project.items.length>0&&!filteredWork.length&&<Fallback message="По фильтру работ нет. Очистите поиск или измените состояние."/>}
@@ -887,6 +898,18 @@ function App(){
      {!project.sources.length&&<Fallback message="Источников нет. Добавьте публичный репозиторий или ссылку на внешний источник."/>}
     </section>}
    </>}
+   {savedRefPreview!==null&&savedRefPreview.generation===generation&&savedRefPreview.revision===String(data.revision)&&!dirty&&<div className="atlas-close-overlay">
+    <section className="atlas-close-dialog" role="dialog" aria-modal="true" aria-labelledby="atlas-saved-ref-title">
+     <h2 id="atlas-saved-ref-title">{savedRefPreview.label}</h2>
+     <p>Ссылка на сохранённую редакцию {savedRefPreview.revision} локального Atlas. Это не пакет .iwxa,
+      не поручение и не подтверждение подключения Agent или Center.</p>
+     <label className="atlas-ref-label">Скопируйте выбранный объект ProjectRef / WorkRef
+      <textarea className="atlas-ref-text" aria-label="Сохранённая ссылка Atlas" readOnly
+       rows={5} value={savedRefPreview.json} onFocus={event=>event.currentTarget.select()}/>
+     </label>
+     <div className="button-row"><Action autoFocus onClick={()=>setSavedRefPreview(null)}>Закрыть</Action></div>
+    </section>
+   </div>}
    {pendingImport!==null&&<div className="atlas-close-overlay">
     <section className="atlas-close-dialog atlas-import-dialog" role="dialog" aria-modal="true" aria-labelledby="atlas-import-preview-title">
      <div className="atlas-import-body">

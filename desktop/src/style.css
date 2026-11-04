@@ -260,3 +260,10 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
  min-height:180px;max-height:max(180px,calc(100vh - 210px));
 }
 .atlas-dag-panel.is-expanded .atlas-graph-tools{position:sticky;top:0;background:#fff;z-index:5;padding:8px 0}
+
+/* Atlas 0.3: read-only local ProjectRef/WorkRef preview, no connector dependency. */
+.atlas-ref-label{display:block;font-size:12px;font-weight:600;color:#284563;margin:13px 0}
+.atlas-ref-text{display:block;width:100%;box-sizing:border-box;min-height:110px;margin-top:8px;
+ font:12px/1.55 Consolas,"Courier New",monospace;resize:vertical;border:1px solid #b9cfe9;
+ color:#243f65;background:#f7faff;border-radius:8px;padding:12px;overflow-wrap:anywhere}
+.atlas-ref-text:focus{outline:2px solid #4586d9;outline-offset:1px}

@@ -27,6 +27,20 @@ const assertRevision=(snapshot,ref)=>{
 const permitted=async (authorize,ctx)=>{
  if(await authorize(ctx)!==true)failure("ATLAS_HOST_AUTHORIZATION_DENIED");
 };
+// Produce only the existing ProjectRef/WorkRef fields, not a new package format.
+// The desktop caller MUST prove that this exact snapshot was saved and reread.
+export function createAtlasSavedRef(snapshot,{projectId,workId}={},{
+ persisted=false,dirty=true
+}={}){
+ if(!persisted||dirty)failure("ATLAS_REF_REQUIRES_SAVED_REVISION");
+ validate(snapshot);
+ const id=stringId(projectId,"PROJECT_ID"),p=projectFrom(snapshot,id);
+ const revision=String(snapshot.revision);
+ if(workId===undefined)return Object.freeze({projectId:id,revision});
+ const wid=stringId(workId,"WORK_ID");
+ if(!p.items.some(item=>item.id===wid))failure("ATLAS_WORK_NOT_FOUND");
+ return Object.freeze({projectId:id,workId:wid,revision});
+}
 // Authorization is always delegated to the actual host. It is not a grant.
 export function createAtlasProjectReadPort({openSnapshot,authorize}={}){
  if(typeof openSnapshot!=="function"||typeof authorize!=="function")failure("ATLAS_HOST_BOUNDARY_REQUIRED");
