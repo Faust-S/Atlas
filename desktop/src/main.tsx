@@ -14,6 +14,7 @@ import {planReviewQueue,planReviewAction,planProposalAction} from "../../src/pla
 import {revisionReview,recheckAction} from "../../src/revision-review.mjs";
 import {previewPlanAmendment,applyPlanAmendment,removePlanAmendment} from "../../src/plan-amendment.mjs";
 import {planPublicRefresh,reconcilePublicSources,publicSourceQueue} from "../../src/public-refresh.mjs";
+import {sourceReview} from "../../src/source-review.mjs";
 import {ProjectGantt,ProjectDependencyDiagram} from "./ProjectVisuals";
 import {prepareImportedSnapshot} from "./import-snapshot.mjs";
 import {commitWithReadback} from "./native-save.mjs";
@@ -164,6 +165,7 @@ function App(){
  const [resourceLimit,setResourceLimit]=useState(40);
  const [reviewLimit,setReviewLimit]=useState(20);
  const [sourceLimit,setSourceLimit]=useState(15);
+ const [sourceRowLimits,setSourceRowLimits]=useState<Record<string,number>>({});
  const [recheckLimit,setRecheckLimit]=useState(25);
  const project=data.projects.find((p:any)=>p.id===active)||null;
  // Canonical snapshot text is expensive for large portfolios: compute only
@@ -892,9 +894,36 @@ function App(){
     {tab==="sources"&&<section className="surface"><div className="section-heading"><div><h2>Связанные источники</h2>
      <p>Только публичные сведения GitHub доступны напрямую. Иные источники остаются ссылками до подключения разрешённого адаптера.</p></div>
      <Action onClick={()=>openEditor("source")} primary>＋ Источник</Action></div>
-     {(project.sources||[]).map((s:any)=><div className="attention-row" key={s.id}><div><strong>{s.kind}: {s.locator}</strong>
-      <small>{s.status==="ok"?"Наблюдался":"Не подтверждён"} · {s.observedAt||"Дата неизвестна"} · {s.error||""}</small></div>
-      {["github","github_owner"].includes(s.kind)&&<Action onClick={()=>void syncPublic({projectId:project.id,sourceId:s.id})} disabled={busy}>Сверить</Action>}</div>)}
+     {(project.sources||[]).map((s:any)=>{
+      const review=sourceReview(s,{limit:sourceRowLimits[s.id]||12});
+      return <div className="atlas-source-review" key={s.id}>
+       <div className="attention-row"><div><strong>{s.kind}: {s.locator}</strong>
+        <small>{review.status} · Попытка: {review.lastAttempt||"не выполнялась"}</small>
+        {review.lastSuccess&&<small>Последнее успешное наблюдение: {review.lastSuccess}</small>}
+        {review.error&&<small className="atlas-source-error">{review.error}</small>}
+       </div>
+       {review.supported&&<Action onClick={()=>void syncPublic({projectId:project.id,sourceId:s.id})} disabled={busy}>Сверить</Action>}
+       </div>
+       {review.supported&&<div className="atlas-source-details">
+        <p className="minor">{review.comparison==="COMPARABLE"
+          ?`Изменения GitHub: ${review.total}. Изменено: ${review.totals.changed} · Добавлено: ${review.totals.added} · Удалено: ${review.totals.removed} · Переименовано: ${review.totals.renamed}.`
+          :review.comparison==="BASELINE"?"Первое наблюдение: сравнение с предыдущей редакцией отсутствует."
+          :"Сравнение редакций недоступно: отсутствуют два полных наблюдения."}
+        </p>
+        {review.previousObservation&&<p className="minor">Предыдущее наблюдение сохранено, но последняя сверка завершилась ошибкой.</p>}
+        {review.rows.length>0&&<div className="table-scroll"><table className="atlas-source-table"><thead><tr>
+         <th>Изменение</th><th>Объект</th><th>Предыдущий SHA</th><th>Новый SHA</th>
+        </tr></thead><tbody>{review.rows.map((row:any,i:number)=><tr key={i}>
+         <td>{row.kind}</td><td>{row.title}</td><td className="mono">{row.before||"—"}</td>
+         <td className="mono">{row.after||"—"}</td>
+        </tr>)}</tbody></table></div>}
+        {review.remaining>0&&<Action onClick={()=>setSourceRowLimits(prev=>({...prev,[s.id]:Math.min(review.total,(prev[s.id]||12)+24)}))}>
+         Показать ещё изменения ({review.remaining})
+        </Action>}
+        <p className="minor">Наблюдение источника не подтверждает готовность проекта, выполнение работы или приёмку результата.</p>
+       </div>}
+      </div>
+     })}
      {!project.sources.length&&<Fallback message="Источников нет. Добавьте публичный репозиторий или ссылку на внешний источник."/>}
     </section>}
    </>}

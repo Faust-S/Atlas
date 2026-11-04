@@ -267,3 +267,11 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
  font:12px/1.55 Consolas,"Courier New",monospace;resize:vertical;border:1px solid #b9cfe9;
  color:#243f65;background:#f7faff;border-radius:8px;padding:12px;overflow-wrap:anywhere}
 .atlas-ref-text:focus{outline:2px solid #4586d9;outline-offset:1px}
+
+/* Read-only version comparison, presented inside the existing Source tab. */
+.atlas-source-review{border-top:1px solid #dce6f1;padding:1px 0 7px}
+.atlas-source-review .attention-row{border-top:none}
+.atlas-source-details{padding:0 5px 9px;max-width:100%}
+.atlas-source-details .atlas-source-table{min-width:480px}
+.atlas-source-details .atlas-source-table td{overflow-wrap:anywhere}
+.atlas-source-error{color:#a6323d!important}
