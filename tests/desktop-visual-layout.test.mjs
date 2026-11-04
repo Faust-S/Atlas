@@ -105,7 +105,7 @@ test('desktop workbench actually mounts existing Gantt/DAG and preserves real ed
  assert.match(component,/onClick=\{\(\)=>\{setExpanded\(false\);onOpenProject\(origin.id\)\}\}/);
  assert.match(component,/onClick=\{\(\)=>\{setExpanded\(false\);onEditDates\(\)\}\}/);
  assert.match(entry,/getCurrentWindow\(\)\.setTitle\("IWXA Atlas — "/);
- assert.match(entry,/\[native,ready,project\?\.name,tab,editor\?\.spec\.title,dirty\]/);
+ assert.match(entry,/\[native,ready,project\?\.name,tab,editor\?\.spec\.title,dirty,savedRefPreview\?\.label\]/);
  assert.match(entry,/Форма: /);
  assert.match(entry,/Не сохранено/);
  assert.match(entry,/Digit1:"work",Digit2:"timeline",Digit3:"graph"/);
