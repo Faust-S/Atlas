@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - work/2026-11-02-atlas-desktop-0.2
+      - work/2026-11-04-atlas-0-2-postrelease
     paths:
       # Documentation-only desktop commits must not cancel an ongoing
       # Windows installer qualification via concurrency.cancel-in-progress.
@@ -315,3 +316,44 @@ jobs:
           test "$(git ls-remote origin refs/heads/release/0.2 | cut -f1)" = "$GITHUB_SHA"
           gh release view v0.2.0 --json assets,url,tagName
           echo "ATLAS_0_2_RELEASE_PUBLISHED_PASS"
+
+  # Post-release distribution metadata only. Does not rebuild or touch the
+  # qualified installer, its tag, the release branch or any product source.
+  repair-release-asset-name:
+    if: github.event_name == 'push' && github.ref_name == 'work/2026-11-04-atlas-0-2-postrelease' && contains(github.event.head_commit.message, '[post-release-metadata]')
+    needs: [frontend]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Reconcile published installer name and SHA256SUMS without changing release source
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          EXPECTED_COMMIT: e5cc6ff593aa12eec3da8e8940ad5af5819b66fd
+          EXPECTED_SHA256: e8a95178866ba9c6f8b0753f2c3e29e6ea59a73eda6baf467cefb0c5d9eb2ce5
+        run: |
+          set -euo pipefail
+          tag_object=$(gh api "repos/$REPO/git/ref/tags/v0.2.0" --jq '.object.sha')
+          tag_commit=$(gh api "repos/$REPO/git/tags/$tag_object" --jq '.object.sha')
+          release_commit=$(gh api "repos/$REPO/git/ref/heads/release/0.2" --jq '.object.sha')
+          test "$tag_commit" = "$EXPECTED_COMMIT"
+          test "$release_commit" = "$EXPECTED_COMMIT"
+          installer=$(gh api "repos/$REPO/releases/tags/v0.2.0" --jq '.assets[] | select(.name | endswith("setup.exe")) | .name')
+          test "$installer" = "IWXA.Atlas_0.2.0_x64-setup.exe"
+          digest=$(gh api "repos/$REPO/releases/tags/v0.2.0" --jq '.assets[] | select(.name | endswith("setup.exe")) | .digest')
+          test "$digest" = "sha256:$EXPECTED_SHA256"
+          printf '%s  %s\n' "$EXPECTED_SHA256" "$installer" > SHA256SUMS.txt
+          gh release view v0.2.0 --json body --jq '.body' > RELEASE_BODY.md
+          python3 -c 'from pathlib import Path; p=Path("RELEASE_BODY.md"); s=p.read_text(); old="IWXA Atlas_0.2.0_x64-setup.exe"; new="IWXA.Atlas_0.2.0_x64-setup.exe"; assert old in s; p.write_text(s.replace(old,new))'
+          gh release upload v0.2.0 SHA256SUMS.txt --clobber
+          gh release edit v0.2.0 --notes-file RELEASE_BODY.md
+          mkdir -p verification
+          gh release download v0.2.0 --pattern 'SHA256SUMS.txt' --dir verification
+          cmp SHA256SUMS.txt verification/SHA256SUMS.txt
+          grep -F "$installer" verification/SHA256SUMS.txt
+          test "$(gh api "repos/$REPO/git/ref/heads/release/0.2" --jq '.object.sha')" = "$EXPECTED_COMMIT"
+          test "$(gh api "repos/$REPO/git/tags/$tag_object" --jq '.object.sha')" = "$EXPECTED_COMMIT"
+          echo "ATLAS_0_2_0_RELEASE_METADATA_REPAIRED_PASS"
