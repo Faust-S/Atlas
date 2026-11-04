@@ -249,7 +249,7 @@ function App(){
   return false;
  };
  useEffect(()=>{
-  if(!native){setError("Нативный Atlas 0.2 запускается как установленное приложение Tauri. Для работы с данными откройте его через собственное окно Windows.");return}
+  if(!native){setError("Нативный Atlas 0.3 запускается как установленное приложение Tauri. Для работы с данными откройте его через собственное окно Windows.");return}
   invoke<OpenResult>("atlas_open").then(result=>{
    if(result.needsConfirmation){setRecovery(true);setError("Обнаружена повреждённая текущая редакция. Предыдущая версия доступна для явного восстановления.");return}
    const snapshot=deserialize(JSON.stringify(result.snapshot));

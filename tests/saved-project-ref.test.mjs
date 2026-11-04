@@ -52,3 +52,9 @@ test("handoff GUI reopens exact native snapshot and exports existing JSON for Ce
  assert.match(ui,/Admin Center откройте раздел/);
  assert.match(ui,/Это снимок, а не синхронизация/);
 });
+
+test("standalone development UI identifies 0.3 rather than the frozen release",()=>{
+ const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ assert.match(ui,/Нативный Atlas 0\.3 запускается как установленное приложение Tauri/);
+ assert.doesNotMatch(ui,/Нативный Atlas 0\.2 запускается как установленное приложение Tauri/);
+});
