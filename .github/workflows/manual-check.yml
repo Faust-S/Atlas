@@ -36,6 +36,15 @@ jobs:
         run: |
           node --check src/app.mjs
           node --check src/project-host-port.mjs
+      - name: Checkout actual public Admin Center contract at audited revision
+        uses: actions/checkout@v4
+        with:
+          repository: Faust-S/Center
+          ref: 52229f4e9f0d41ff835bad3e9f1f722a84599ff8
+          path: center-public
+          persist-credentials: false
+      - name: Qualify Atlas project/work and stale revision with real Center sources
+        run: node tests/atlas-center-interop.mjs
       - name: Install pinned desktop frontend
         working-directory: desktop
         run: npm ci --no-audit --no-fund
