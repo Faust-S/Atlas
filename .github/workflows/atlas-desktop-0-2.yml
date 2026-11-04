@@ -346,12 +346,12 @@ jobs:
           digest=$(gh api "repos/$REPO/releases/tags/v0.2.0" --jq '.assets[] | select(.name | endswith("setup.exe")) | .digest')
           test "$digest" = "sha256:$EXPECTED_SHA256"
           printf '%s  %s\n' "$EXPECTED_SHA256" "$installer" > SHA256SUMS.txt
-          gh release view v0.2.0 --json body --jq '.body' > RELEASE_BODY.md
+          gh release view v0.2.0 -R "$REPO" --json body --jq '.body' > RELEASE_BODY.md
           python3 -c 'from pathlib import Path; p=Path("RELEASE_BODY.md"); s=p.read_text(); old="IWXA Atlas_0.2.0_x64-setup.exe"; new="IWXA.Atlas_0.2.0_x64-setup.exe"; assert old in s; p.write_text(s.replace(old,new))'
-          gh release upload v0.2.0 SHA256SUMS.txt --clobber
-          gh release edit v0.2.0 --notes-file RELEASE_BODY.md
+          gh release upload v0.2.0 SHA256SUMS.txt -R "$REPO" --clobber
+          gh release edit v0.2.0 -R "$REPO" --notes-file RELEASE_BODY.md
           mkdir -p verification
-          gh release download v0.2.0 --pattern 'SHA256SUMS.txt' --dir verification
+          gh release download v0.2.0 -R "$REPO" --pattern 'SHA256SUMS.txt' --dir verification
           cmp SHA256SUMS.txt verification/SHA256SUMS.txt
           grep -F "$installer" verification/SHA256SUMS.txt
           test "$(gh api "repos/$REPO/git/ref/heads/release/0.2" --jq '.object.sha')" = "$EXPECTED_COMMIT"
