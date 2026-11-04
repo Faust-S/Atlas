@@ -19,7 +19,7 @@ test("all project, tab and editor navigation preserves unapplied forms",()=>{
 
 test("native import, export and background mutations cannot discard an open form",()=>{
  assert.match(ui,/const importJson=async\(\)=>\{\s*if\(!requireClosedForm\(\)\|\|busyRef\.current\|\|!ready\)return/);
- assert.match(ui,/const exportJson=async\(\)=>\{\s*if\(!requireClosedForm\(\)\|\|busyRef\.current\|\|!ready\)return/);
+ assert.match(ui,/const exportJson=async\(mode:"backup"\|"center"="backup"\)=>\{\s*if\(!requireClosedForm\(\)\|\|busyRef\.current\|\|!ready\)return/);
  assert.match(ui,/latestSnapshot\.current!==startedWith\|\|dirtyRef\.current\|\|editorOpenRef\.current/g);
  assert.match(ui,/const syncPublic=async\(source\?:\{projectId:string;sourceId:string\}\)=>\{\s*if\(!requireClosedForm\(\)\|\|busyRef\.current\)return/);
  for(const name of ["applyAmendment","removeAmendment","quickWork"]) {
