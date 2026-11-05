@@ -178,6 +178,32 @@ def fill_edit(label, value, timeout=25):
     print("ATLAS_K01_GUI_FIELD " + label, flush=True)
 
 
+def open_sources_tab():
+    # A UIA click can be delivered while the tab strip is moving after
+    # native save. A clicked control is not proof that React changed tabs.
+    for attempt in range(3):
+        tab = find_control("Button", "Источники", timeout=8)
+        if tab is None:
+            raise RuntimeError("Installed Sources tab unavailable")
+        try:
+            tab.iface_scroll_item.ScrollIntoView()
+        except Exception:
+            pass
+        if attempt == 0:
+            tab.click_input()
+        else:
+            window.set_focus()
+            tab.set_focus()
+            keyboard.send_keys("{ENTER}")
+        for _ in range(12):
+            if find_control("Text", "Связанные источники", timeout=1) is not None:
+                print("ATLAS_K01_INSTALLED_SOURCES_TAB_PASS attempt=" + str(attempt+1),flush=True)
+                return
+            time.sleep(0.2)
+    diagnostics("sources-tab-did-not-open")
+    raise RuntimeError("Installed Sources tab did not render after real user navigation")
+
+
 def select_github_source_kind():
     # A native HTML select may display its first option while the required
     # controlled value is still empty. Force an actual user change event.
@@ -253,7 +279,7 @@ def run_route():
     print("ATLAS_K01_NATIVE_PROJECT_SAVE_PASS revision=" + str(saved["revision"]), flush=True)
 
     phase = "attach-github"
-    click_button("Источники")
+    open_sources_tab()
     click_button("＋ Источник")
     select_github_source_kind()
     fill_edit("Ссылка или идентификатор источника", REPOSITORY)
@@ -321,7 +347,7 @@ def run_route():
     stop()
     boot()
     click_button(NAME)
-    click_button("Источники")
+    open_sources_tab()
     fill_edit("K01 искомая фраза", PHRASE)
     fill_edit("K01 ветка", BRANCH)
     click_button("K01: найти контекст")

@@ -170,7 +170,7 @@ function App(){
  const [sourceRowLimits,setSourceRowLimits]=useState<Record<string,number>>({});
  const [recheckLimit,setRecheckLimit]=useState(25);
  const [k01FilePath,setK01FilePath]=useState("AGENTS.md");
- const [k01Phrase,setK01Phrase]=useState("Task Discovery");
+ const [k01Phrase,setK01Phrase]=useState("Task Discovery / Activity Research / U1 / Cross-Lab");
  const [k01Branch,setK01Branch]=useState("");
  const [k01Context,setK01Context]=useState<any>(null);
  const [k01Status,setK01Status]=useState("");
