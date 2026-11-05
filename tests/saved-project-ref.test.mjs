@@ -67,7 +67,12 @@ test("saved-reference modal has native title and keyboard/close protection",()=>
  assert.match(ui,/const suffix=savedRefPreview\?" · "\+savedRefPreview\.label/);
  assert.match(ui,/if\(savedRefPreview!==null\)\{[\s\S]*?event\.key==="Escape"/);
  assert.match(ui,/if\(ctrl&&event\.altKey&&!event\.shiftKey&&code==="KeyP"\)/);
- assert.match(windows,/Click-AtlasAt \$process 755 248/);
+ // Visible button bounds from the actual installed Windows screenshot at
+ // 1024x768. Reject a click in the heading (the previous false-failure).
+ const target=windows.match(/Click-AtlasAt \\$process (\\d+) (\\d+)\\s*\\r?\\n\\s*Wait-AtlasTitle \\$process 'Ссылка на проект'/);
+ assert.ok(target,"The ProjectRef click must be immediately followed by the native title check");
+ const cssX=Number(target[1]),cssY=Number(target[2]);
+ assert.ok(cssX>=693&&cssX<=822&&cssY>=267&&cssY<=301,"ProjectRef click must hit the screenshot-confirmed button");
  assert.match(windows,/installed-before-project-ref-click/);
  assert.match(windows,/ATLAS_INSTALLED_SAVED_PROJECT_REF_DIALOG_PASS/);
  assert.match(windows,/Wait-AtlasTitle \$process 'Ссылка на проект'/);

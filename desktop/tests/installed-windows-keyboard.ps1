@@ -299,9 +299,11 @@ try {
                 # generation, prove the dialog rendered through native HWND,
                 # and ensure this read-only handoff did not advance the Store.
                 # Hosted SendKeys has previously dropped Ctrl+N/Ctrl+S.
-                # Qualify the real visible project-header button instead.
+                # Screenshot from the 1024x768 hosted Windows desktop places
+                # the button at x=693..822/y=267..301. The old y=248 hit
+                # empty heading space, so it could never open ProjectRef.
                 Capture-AtlasView 'installed-before-project-ref-click'
-                Click-AtlasAt $process 755 248
+                Click-AtlasAt $process 758 284
                 Wait-AtlasTitle $process 'Ссылка на проект'
                 Capture-AtlasView 'installed-saved-project-reference'
                 $afterReference = Get-AtlasSnapshot
