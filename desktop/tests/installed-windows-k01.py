@@ -178,6 +178,38 @@ def fill_edit(label, value, timeout=25):
     print("ATLAS_K01_GUI_FIELD " + label, flush=True)
 
 
+def select_github_source_kind():
+    # A native HTML select may display its first option while the required
+    # controlled value is still empty. Force an actual user change event.
+    kind = find_control("ComboBox", "Тип источника", timeout=18)
+    if kind is None:
+        diagnostics("source-kind-unavailable")
+        raise RuntimeError("Required source-kind selection unavailable in installed WebView2")
+    kind.set_focus()
+    try:
+        kind.select("github_owner")
+        time.sleep(0.2)
+        kind.select("github")
+    except Exception:
+        # Ordinary keyboard interaction, never injected DOM or app APIs.
+        keyboard.send_keys("{HOME}")
+        keyboard.send_keys("{DOWN}")
+        keyboard.send_keys("{HOME}")
+    time.sleep(0.3)
+    print("ATLAS_K01_GUI_SOURCE_KIND_SELECTED github", flush=True)
+
+
+def wait_editor_closed(timeout=18):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if find_control("Button", "Применить к черновику", timeout=1) is None:
+            print("ATLAS_K01_EDITOR_APPLIED_PASS", flush=True)
+            return
+        time.sleep(0.3)
+    diagnostics("source-editor-still-open")
+    raise RuntimeError("Source editor did not apply: check required field values")
+
+
 def wait_gui_text(needle, timeout=45):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
@@ -223,8 +255,20 @@ def run_route():
     phase = "attach-github"
     click_button("Источники")
     click_button("＋ Источник")
+    select_github_source_kind()
     fill_edit("Ссылка или идентификатор источника", REPOSITORY)
+    locator = find_control("Edit", "Ссылка или идентификатор источника", timeout=3)
+    if locator is None:
+        raise RuntimeError("Source locator input disappeared before submit")
+    try:
+        actual = locator.get_value()
+    except Exception:
+        actual = locator.iface_value.CurrentValue
+    if actual != REPOSITORY:
+        diagnostics("github-locator-value-mismatch")
+        raise RuntimeError("GitHub locator did not stick after native user input")
     click_button("Применить к черновику")
+    wait_editor_closed()
     click_save()
     previous = saved["generation"]
     saved, project = wait_saved(
