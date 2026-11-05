@@ -103,3 +103,42 @@ test('actual Atlas-style complete GitHub summary produces one K01 candidate', as
  assert.ok(publicReads>=2);
  assert.equal(evidenceReads,1);
 });
+
+test('exact live-style branch and unique phrase select by source type, not user phrase metadata',async()=>{
+ const project=createProject(empty(),{name:'Live-shaped source',type:'research'});
+ const attached=attach(project.state,project.id,'github',repository);
+ const liveBranch='work/2026-11-04-k01-knowledge-context-kit';
+ const liveRevision='217debaad8a17b19b7ef883eca07dccc045ec9a8';
+ const unique='Task Discovery / Activity Research / U1 / Cross-Lab';
+ const line='1. **Task Discovery / Activity Research / U1 / Cross-Lab:** synthetic context.';
+ const snapshot=serialize(observe(attached.state,project.id,attached.id,'ok',{
+  scope:'repository',repository,complete:true,branches:[liveBranch],
+  branchHeads:{[liveBranch]:liveRevision},readiness:'not_assessed',
+  provenance:{provider:'github',access:'public'},repositoryId:99
+ }));
+ let calls=0;
+ const fetcher=async url=>{
+  calls++;
+  if(url.endsWith('/repos/'+repository))
+   return {ok:true,json:async()=>({id:99,private:false,default_branch:'main'})};
+  if(url.includes('/branches?'))
+   return {ok:true,json:async()=>[{name:liveBranch,commit:{sha:liveRevision}}]};
+  if(url.includes('/contents/')){
+   assert.ok(url.includes('AGENTS.md?ref='+liveRevision));
+   return {ok:true,json:async()=>({type:'file',encoding:'base64',
+    content:Buffer.from(line+'\nOther line.').toString('base64')})};
+  }
+  throw Error('Unexpected public GitHub route');
+ };
+ const service=createAtlasK01DesktopService({
+  openSavedSnapshot:async()=>deserialize(snapshot),authorize:async()=>true,fetcher
+ });
+ const selected=await service.select({projectId:project.id,sourceId:attached.id,
+  branch:liveBranch,path:'AGENTS.md',phrase:unique,context:{workspaceId:'atlas-local'}});
+ assert.deepEqual(selected.request.terms,['github-file']);
+ assert.ok(selected.request.profile.includes(unique));
+ assert.equal(selected.projection.selected.length,1);
+ assert.equal(selected.projection.selected[0].excerpt,line);
+ assert.ok(calls>=3);
+ assert.equal((await service.revalidate(selected,{context:{workspaceId:'atlas-local'}})).allCurrent,true);
+});

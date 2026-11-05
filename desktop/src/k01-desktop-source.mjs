@@ -78,8 +78,11 @@ export function createAtlasK01DesktopService({
       if(source?.kind!=='github'||source.status!=='ok'||!commit.test(pinnedRevision??''))
         throw Error('K01: источник должен иметь сохранённую проверенную редакцию GitHub.');
       const ref={projectId,sourceId,revision:String(snapshot.revision)};
+      // Task relevance is keyed by source capability; the user phrase is an
+      // evidence-line locator, not a metadata search term. Bind it to profile
+      // so a changed phrase cannot reuse an old projection on revalidation.
       const request={taskId:'atlas:k01:'+projectId+':'+sourceId,
-        terms:[phrase],profile:'github-file:'+path,
+        terms:['github-file'],profile:'github-file:'+path+':'+phrase,
         maxTokens:240,allowInferred:false};
       const host=makeHost({branch,path,phrase,pinnedRevision});
       const projection=await host.select(ref,context,request);
