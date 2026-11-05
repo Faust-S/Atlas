@@ -204,6 +204,26 @@ def open_sources_tab():
     raise RuntimeError("Installed Sources tab did not render after real user navigation")
 
 
+def select_project_type():
+    # The first HTML select option can be visible without a committed React
+    # value on a newly mounted editor. Drive a real change to commit it.
+    kind = find_control("ComboBox", "Тип проекта", timeout=18)
+    if kind is None:
+        diagnostics("project-type-unavailable")
+        raise RuntimeError("Required project type is not accessible in installed WebView2")
+    kind.set_focus()
+    try:
+        kind.select("Команда")
+        time.sleep(0.2)
+        kind.select("Личный")
+    except Exception:
+        keyboard.send_keys("{HOME}")
+        keyboard.send_keys("{DOWN}")
+        keyboard.send_keys("{HOME}")
+    time.sleep(0.3)
+    print("ATLAS_K01_GUI_PROJECT_TYPE_SELECTED personal",flush=True)
+
+
 def select_github_source_kind():
     # A native HTML select may display its first option while the required
     # controlled value is still empty. Force an actual user change event.
@@ -298,8 +318,10 @@ def run_route():
     boot()
     phase = "create-project"
     click_button("＋ Новый проект")
+    select_project_type()
     fill_edit("Название проекта", NAME)
     click_button("Применить к черновику")
+    wait_editor_closed()
     click_save()
     saved, project = wait_saved(lambda h,p: p["name"] == NAME)
     print("ATLAS_K01_NATIVE_PROJECT_SAVE_PASS revision=" + str(saved["revision"]), flush=True)
