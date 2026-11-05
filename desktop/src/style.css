@@ -275,3 +275,11 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .atlas-source-details .atlas-source-table{min-width:480px}
 .atlas-source-details .atlas-source-table td{overflow-wrap:anywhere}
 .atlas-source-error{color:#a6323d!important}
+
+/* K01 source evidence preview; no K01-specific persistent store. */
+.atlas-k01-inputs{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin:12px 0}
+.atlas-k01-inputs label{font-size:12px;color:#284563;font-weight:600;display:grid;gap:5px}
+.atlas-k01-inputs input{width:100%;box-sizing:border-box;border:1px solid #b4c7dd;border-radius:8px;padding:9px;color:#203752;background:#fff}
+.atlas-k01-inputs input:focus{outline:2px solid #4586d9;outline-offset:1px}
+.atlas-k01-result{border:1px solid #b8cfe8;background:#f5f9ff;border-radius:10px;padding:14px;margin-top:12px;overflow-wrap:anywhere}
+.atlas-k01-result small{color:#526b86;font-size:11px;display:block;overflow-wrap:anywhere}

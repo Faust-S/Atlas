@@ -21,6 +21,7 @@ import {commitWithReadback,readSavedSnapshotForReference} from "./native-save.mj
 import {projectHistoryRows} from "./history-view.mjs";
 import {sortWorkRows} from "./work-sorting.mjs";
 import {createAtlasSavedRef} from "../../src/project-host-port.mjs";
+import {createAtlasK01DesktopService} from "./k01-desktop-source.mjs";
 import "./style.css";
 
 type Atlas = any;
@@ -168,6 +169,12 @@ function App(){
  const [sourceLimit,setSourceLimit]=useState(15);
  const [sourceRowLimits,setSourceRowLimits]=useState<Record<string,number>>({});
  const [recheckLimit,setRecheckLimit]=useState(25);
+ const [k01FilePath,setK01FilePath]=useState("AGENTS.md");
+ const [k01Phrase,setK01Phrase]=useState("Task Discovery");
+ const [k01Branch,setK01Branch]=useState("");
+ const [k01Context,setK01Context]=useState<any>(null);
+ const [k01Status,setK01Status]=useState("");
+ const [k01SourceId,setK01SourceId]=useState<string|null>(null);
  const project=data.projects.find((p:any)=>p.id===active)||null;
  // Canonical snapshot text is expensive for large portfolios: compute only
  // when domain data change, not for typing, scrolling, or tab switches.
@@ -207,7 +214,8 @@ function App(){
    (!query||item.title.toLocaleLowerCase("ru-RU").includes(query)||
     String(item.assignee||"").toLocaleLowerCase("ru-RU").includes(query))),workSort);
  },[project,workFilter,workQuery,workSort]);
- const mutate=(next:Atlas,notice:string)=>{setSavedRefPreview(null);latestSnapshot.current=next;setData(next);setMessage(notice);setError("");};
+ const mutate=(next:Atlas,notice:string)=>{setSavedRefPreview(null);setK01Context(null);setK01Status("");
+  latestSnapshot.current=next;setData(next);setMessage(notice);setError("");};
  const issue=(e:unknown)=>{setError(deepFreezeError(e));setMessage("");};
  const showSavedReference=async(projectId:string,workId?:string)=>{
   if(busyRef.current||!ready||!requireClosedForm())return;
@@ -228,6 +236,50 @@ function App(){
     json:JSON.stringify(ref,null,2),revision:ref.revision,generation:expectedGeneration});
    setError("");
   }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
+ };
+ // K01 reopens the exact native generation before selection and revalidation.
+ const k01Service=(startedWith:Atlas,expectedGeneration:string)=>
+  createAtlasK01DesktopService({
+   openSavedSnapshot:()=>readSavedSnapshotForReference({
+    invoke,expectedGeneration,snapshot:startedWith,signature:snapshotText,
+    readValidated:(raw:Atlas)=>deserialize(JSON.stringify(raw))
+   }),
+   authorize:async({context}:any)=>native&&context?.workspaceId==="atlas-local",
+   fetcher:globalThis.fetch.bind(globalThis)
+  });
+ const inspectK01=async(sourceId:string,branch:string)=>{
+  if(busyRef.current||!ready||!persisted||dirty||!requireClosedForm()){
+   issue(Error("K01: сохраните проект и закройте форму перед исследованием источника."));return;
+  }
+  const startedWith=latestSnapshot.current,expectedGeneration=generation;
+  busyRef.current=true;setBusy(true);setK01Context(null);setK01Status("");
+  try{
+   const found=await k01Service(startedWith,expectedGeneration).select({
+    projectId:active,sourceId,branch,path:k01FilePath.trim(),phrase:k01Phrase.trim(),
+    context:{workspaceId:"atlas-local"}
+   });
+   if(latestSnapshot.current!==startedWith||dirtyRef.current)
+    throw Error("K01: проект изменился во время исследования.");
+   setK01Context({...found,projectId:active,generation:expectedGeneration});
+   setK01SourceId(sourceId);
+   setK01Status("Свидетельство отобрано. Перед использованием проверьте его повторно.");
+  }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
+ };
+ const recheckK01=async()=>{
+  if(!k01Context||busyRef.current||!ready||!persisted||dirty||!requireClosedForm())return;
+  const startedWith=latestSnapshot.current;
+  busyRef.current=true;setBusy(true);
+  try{
+   if(k01Context.generation!==generation||k01Context.projectId!==active)
+    throw Error("K01: сохранённая редакция Atlas изменилась.");
+   const result=await k01Service(startedWith,generation).revalidate(k01Context,{context:{workspaceId:"atlas-local"}});
+   if(latestSnapshot.current!==startedWith||dirtyRef.current)
+    throw Error("K01: проект изменился во время повторной проверки.");
+   setK01Status(result.allCurrent?
+    "Актуальность подтверждена на момент проверки. Это не подтверждение выполнения задачи.":
+    "Контекст устарел или источник недоступен: "+result.failures.map((f:any)=>f.reason).join(", "));
+  }catch(e){setK01Status("Контекст не подтверждён: "+deepFreezeError(e))}
+  finally{busyRef.current=false;setBusy(false)}
  };
  // Open forms keep local, unapplied input state. A project/tab change or
  // competing action must never unmount that form without explicit cancellation.
@@ -932,6 +984,22 @@ function App(){
     {tab==="sources"&&<section className="surface"><div className="section-heading"><div><h2>Связанные источники</h2>
      <p>Только публичные сведения GitHub доступны напрямую. Иные источники остаются ссылками до подключения разрешённого адаптера.</p></div>
      <Action onClick={()=>openEditor("source")} primary>＋ Источник</Action></div>
+     <div className="atlas-k01-inputs">
+      <label>Путь к файлу GitHub
+       <input value={k01FilePath} onChange={event=>setK01FilePath(event.target.value)}
+        placeholder="AGENTS.md" maxLength={160} aria-label="K01 файл GitHub"/>
+      </label>
+      <label>Точная фраза в одной строке
+       <input value={k01Phrase} onChange={event=>setK01Phrase(event.target.value)}
+        placeholder="Task Discovery" maxLength={100} aria-label="K01 искомая фраза"/>
+      </label>
+      <label>Ветка (пусто = первая сохранённая)
+       <input value={k01Branch} onChange={event=>setK01Branch(event.target.value)}
+        placeholder="main" maxLength={160} aria-label="K01 ветка"/>
+      </label>
+     </div>
+     <p className="minor">K01 извлекает одну подтверждённую строку публичного GitHub-файла.
+      Данные остаются только в памяти интерфейса и не изменяют проект.</p>
      {(project.sources||[]).map((s:any)=>{
       const review=sourceReview(s,{limit:sourceRowLimits[s.id]||12});
       return <div className="atlas-source-review" key={s.id}>
@@ -941,6 +1009,10 @@ function App(){
         {review.error&&<small className="atlas-source-error">{review.error}</small>}
        </div>
        {review.supported&&<Action onClick={()=>void syncPublic({projectId:project.id,sourceId:s.id})} disabled={busy}>Сверить</Action>}
+       {s.kind==="github"&&s.status==="ok"&&s.summary?.complete===true&&
+        <Action disabled={busy||dirty||!persisted||!!editor}
+         onClick={()=>void inspectK01(s.id,k01Branch.trim()||Object.keys(s.summary?.branchHeads||{})[0]||"")}>
+         K01: найти контекст</Action>}
        </div>
        {review.supported&&<div className="atlas-source-details">
         <p className="minor">{review.comparison==="COMPARABLE"
@@ -962,6 +1034,18 @@ function App(){
        </div>}
       </div>
      })}
+     {k01Context&&k01Context.projectId===project.id&&
+      <div className="atlas-k01-result" role="region" aria-label="K01 свидетельство">
+       <h3>K01 · источник {k01SourceId}</h3>
+       <p className="minor">Файл: {k01Context.path} · ветка: {k01Context.branch} · редакция: {k01Context.pinnedRevision.slice(0,12)}</p>
+       <p>{k01Context.projection.selected[0]?.excerpt}</p>
+       <small>Provenance: {k01Context.projection.selected[0]?.evidenceRef} · SHA-256:
+        {k01Context.projection.selected[0]?.sha256}</small>
+       <div className="button-row"><Action disabled={busy||dirty||!persisted}
+         onClick={()=>void recheckK01()}>Повторно проверить</Action>
+        <Action disabled={busy} onClick={()=>{setK01Context(null);setK01Status("");}}>Закрыть контекст</Action></div>
+      </div>}
+     {k01Status&&<p className="minor" role="status">{k01Status}</p>}
      {!project.sources.length&&<Fallback message="Источников нет. Добавьте публичный репозиторий или ссылку на внешний источник."/>}
     </section>}
    </>}
