@@ -26,7 +26,7 @@ $exe = $env:ATLAS_INSTALLED_EXE
 if (!$exe -or !(Test-Path -LiteralPath $exe)) { throw 'Installed Atlas executable not found' }
 $store = Join-Path $env:LOCALAPPDATA 'ru.iwxa.atlas\atlas-store-v1'
 $manifestPath = Join-Path $store 'head.json'
-if (Test-Path -LiteralPath $manifestPath) {
+if ((Test-Path -LiteralPath $manifestPath) -and $env:ATLAS_U05_APPEND_PROJECT -ne '1') {
     throw 'Windows qualification runner is not a fresh profile; will not overwrite existing Atlas data'
 }
 $names = @('AtlasGUIFirstSave', 'AtlasGUIAfterRestart')
@@ -256,6 +256,48 @@ function Send-AtlasProject([string]$name, [System.Diagnostics.Process]$process) 
     Wait-AtlasTitle $process ($name + ' — Обзор · Не сохранено')
     # Visible action -> Rust atlas_commit -> independent native readback.
     Click-AtlasSave $process
+}
+# U05 reuse of the same installed Atlas GUI actions: after Center persisted
+# its link, perform a genuine new owner revision through Atlas's visible
+# Create Project and Save controls. This is never a direct storage write.
+if ($env:ATLAS_U05_APPEND_PROJECT -eq '1') {
+    $previous=Get-AtlasSnapshot
+    if ($null -eq $previous -or $previous.projects.Count -ne 2 -or
+        @($previous.projects | ForEach-Object { $_.name }) -notcontains $names[0] -or
+        @($previous.projects | ForEach-Object { $_.name }) -notcontains $names[1]) {
+        throw 'U05_APPEND_EXPECTED_INSTALLED_ATLAS_OWNER_STATE_MISSING'
+    }
+    $revisionName='U05AfterCenterLink'
+    $process=Start-Process -FilePath $exe -PassThru
+    try {
+        Wait-AtlasOpen $process
+        Activate-Atlas $process
+        Wait-AtlasTitle $process 'Портфель — Обзор'
+        Send-AtlasProject $revisionName $process
+        $revised=Wait-AtlasState 3 @($names[0],$names[1],$revisionName)
+        if ($revised.generation -eq $previous.generation -or
+            $revised.revision -le $previous.revision) {
+            throw 'U05_ATLAS_GUI_OWNER_REVISION_NOT_ADVANCED'
+        }
+        Start-Sleep -Milliseconds 1300
+        Activate-Atlas $process
+        [System.Windows.Forms.SendKeys]::SendWait('%{F4}')
+        if (!$process.WaitForExit(4500)) {
+            $process.Refresh()
+            $handle=$process.MainWindowHandle
+            if ($handle -eq [IntPtr]::Zero -or
+                ![AtlasWindowsInput]::PostMessage($handle,0x0010,[IntPtr]::Zero,[IntPtr]::Zero) -or
+                !$process.WaitForExit(7500)) {
+                throw 'U05_ATLAS_GUI_OWNER_CLOSE_NOT_CONFIRMED'
+            }
+        }
+        Write-Output "U05_ATLAS_GUI_OWNER_REVISION_ADVANCED_PASS old=$($previous.revision) new=$($revised.revision)"
+    } finally {
+        $process.Refresh()
+        if (!$process.HasExited) {Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue}
+        Remove-Item Env:ATLAS_CI_RENDERER_PROBE -ErrorAction SilentlyContinue
+    }
+    return
 }
 $original = $null
 $forcedCloseAttempts = @()
