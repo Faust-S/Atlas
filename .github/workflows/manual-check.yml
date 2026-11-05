@@ -10,6 +10,7 @@ on:
       - 'src/**'
       - 'tests/**'
       - 'desktop/src/**'
+      - 'desktop/tests/**'
       - 'desktop/public/**'
       - 'desktop/package.json'
       - 'desktop/package-lock.json'
