@@ -125,6 +125,191 @@ function Wait-Text([string]$value) {
   Screenshot 'missing-text'
   throw "Installed Center did not render expected text: $value"
 }
+function Wait-AtlasRevisionMetric([string]$expected) {
+  # "Редакция" and the integer are separate UIA Text nodes in Center.
+  for ($i=0; $i -lt 65; $i++) {
+    $all=(Center-Root).FindAll([System.Windows.Automation.TreeScope]::Descendants,
+      [System.Windows.Automation.Condition]::TrueCondition)
+    $names=[System.Collections.Generic.List[string]]::new()
+    foreach ($element in $all) {
+      try {
+        if ($element.Current.ControlType -eq [System.Windows.Automation.ControlType]::Text) {
+          $value=[string]$element.Current.Name
+          if (![string]::IsNullOrWhiteSpace($value)) { $names.Add($value.Trim()) }
+        }
+      } catch {}
+    }
+    for ($index=0; $index -lt $names.Count; $index++) {
+      if ($names[$index] -ne 'Редакция') { continue }
+      for ($offset=1; $offset -le 5 -and ($index+$offset) -lt $names.Count; $offset++) {
+        if ($names[$index+$offset] -eq $expected) {
+          Write-Output "ATLAS_CENTER_TWO_INSTALLED_GUI_REVISION_METRIC_PASS revision=$expected"
+          return
+        }
+      }
+    }
+    Start-Sleep -Milliseconds 350
+  }
+  $preview=@($names | Where-Object {$_ -match 'Редакц|Atlas|^[0-9]+
+  if (!(Test-Path -LiteralPath $path) -or $path -match '[+^%~{}()]') {
+    throw "Invalid installed Atlas export path: $path"
+  }
+  $handle=$process.MainWindowHandle
+  Click-UIA 'Открыть портфель Atlas'
+  $dialog=''
+  for ($i=0;$i -lt 80;$i++) {
+    $foreground=[AtlasCenterNativeWin]::GetForegroundWindow()
+    if ($foreground -ne [IntPtr]::Zero -and $foreground -ne $handle) {
+      $buffer=[System.Text.StringBuilder]::new(512)
+      [void][AtlasCenterNativeWin]::GetWindowText($foreground,$buffer,$buffer.Capacity)
+      $dialog=$buffer.ToString()
+      if ($dialog -match '(Open|Открыть|Choose|Выбор)') { break }
+    }
+    Start-Sleep -Milliseconds 250
+  }
+  if ($dialog -notmatch '(Open|Открыть|Choose|Выбор)') {
+    Screenshot 'file-open-missing'
+    throw "Center GUI import did not open a native file chooser: $dialog"
+  }
+  [System.Windows.Forms.SendKeys]::SendWait('%n')
+  Start-Sleep -Milliseconds 200
+  [System.Windows.Forms.SendKeys]::SendWait('^a')
+  [System.Windows.Forms.SendKeys]::SendWait($path)
+  Start-Sleep -Milliseconds 200
+  [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+  # Center's import-success notice is visible in the real installed GUI.
+  # The revision metric is below the fold and renders separate span/strong nodes.
+  $exported=Get-Content -LiteralPath $path -Raw | ConvertFrom-Json -Depth 100
+  $expectedCount=@($exported.projects).Count
+  Wait-Text ("Портфель Atlas прочитан: $expectedCount проектов")
+  Wait-AtlasRevisionMetric $expectedRevision
+  Wait-Text 'AtlasGUIFirstSave'
+  Screenshot ('imported-'+$expectedRevision)
+  Write-Output "ATLAS_CENTER_TWO_INSTALLED_GUI_FILE_IMPORT_PASS revision=$expectedRevision"
+}
+function Read-ManagerDraft {
+  for ($i=0;$i -lt 80;$i++) {
+    if (Test-Path -LiteralPath $localDraft) {
+      try { return (Get-Content -LiteralPath $localDraft -Raw | ConvertFrom-Json -Depth 100) }
+      catch {}
+    }
+    Start-Sleep -Milliseconds 350
+  }
+  throw 'Installed Center native manager draft readback unavailable'
+}
+function Assert-WorkBinding($expectedRevision) {
+  # The native write is async. Await the exact saved WorkRef revision instead
+  # of accepting the previous file still visible immediately after a click.
+  $state=$null
+  for($i=0;$i -lt 80;$i++) {
+    $candidate=Read-ManagerDraft
+    if(@($candidate.organizations).Count -eq 1 -and
+        @($candidate.organizations[0].assignments).Count -eq 1 -and
+        [string]$candidate.organizations[0].assignments[0].atlasRef.revision -eq [string]$expectedRevision) {
+      $state=$candidate
+      break
+    }
+    Start-Sleep -Milliseconds 200
+  }
+  if($null -eq $state){throw "Center draft readback never reached WorkRef revision $expectedRevision"}
+  if (@($state.organizations).Count -ne 1) { throw 'Center did not persist one organization' }
+  $org=$state.organizations[0]
+  if (@($org.workspaces).Count -ne 1 -or @($org.assignments).Count -ne 1) {
+    throw 'Center persisted neither workspace nor assignment'
+  }
+  $projectRef=$org.workspaces[0].atlasRef
+  $workRef=$org.assignments[0].atlasRef
+  if ($projectRef.projectId -ne $first[0].id -or $workRef.projectId -ne $first[0].id -or
+      $workRef.workId -ne $work[0].id -or
+      [string]$workRef.revision -ne [string]$expectedRevision) {
+    throw 'Center draft lost the exact Atlas ProjectRef/WorkRef/revision'
+  }
+  if ($org.assignments[0].status -ne 'DRAFT') { throw 'Center assignment must remain DRAFT' }
+  return $state
+}
+function Close-Center {
+  $process.Refresh()
+  if ($process.HasExited -or $process.MainWindowHandle -eq [IntPtr]::Zero) {
+    throw 'Center process not open for graceful shutdown'
+  }
+  if (![AtlasCenterNativeWin]::PostMessage($process.MainWindowHandle,0x0010,
+    [IntPtr]::Zero,[IntPtr]::Zero)) { throw 'Failed to post native Center WM_CLOSE' }
+  if (!$process.WaitForExit(9000)) { throw 'Center GUI did not close cleanly' }
+  Write-Output 'ATLAS_CENTER_TWO_INSTALLED_GUI_CLOSE_PASS'
+}
+try {
+  $installer=Get-ChildItem -LiteralPath 'center-public/src-tauri/target/release/bundle/nsis' -Filter '*.exe' |
+    Select-Object -First 1
+  if (!$installer) { throw 'Existing Center NSIS installer missing after build' }
+  $setup=Start-Process -FilePath $installer.FullName -ArgumentList '/S' -PassThru
+  if (!$setup.WaitForExit(120000) -or $setup.ExitCode -ne 0) {
+    throw 'Existing Center NSIS installer did not complete'
+  }
+  if (!(Test-Path -LiteralPath $exe)) { throw 'Installed Admin Center executable not found' }
+  if (Test-Path -LiteralPath $localDraft) { throw 'Center manager draft not clean before E2E' }
+  Write-Output 'ATLAS_CENTER_TWO_INSTALLED_NSIS_PASS'
+  Start-Center
+  Type-UIA 'Название' 'AtlasExternalCenterOrg'
+  Click-UIA 'Создать черновик организации'
+  Click-UIA 'Планы Atlas'
+  Type-UIA 'Название рабочей области' 'AtlasExternalWorkspace'
+  Click-UIA 'Добавить'
+  Import-AtlasFile $originalPath ([string]$original.revision)
+  Click-UIA 'Связать с планом'
+  Click-UIA 'Подготовить поручение: AtlasWorkBeta' $true
+  Type-UIA 'Что нужно сделать' 'AtlasExternalWorkAssignment'
+  Type-UIA 'Критерии приёмки' 'VerifiedExternalResult'
+  Click-UIA 'Сохранить черновик'
+  Click-UIA 'Сохранить на компьютере'
+  $saved=Assert-WorkBinding ([string]$original.revision)
+  Write-Output 'ATLAS_CENTER_TWO_INSTALLED_GUI_PROJECT_WORK_DRAFT_PASS'
+  Close-Center
+  Start-Center
+  Click-UIA 'Поручения' $true
+  Click-UIA 'AtlasExternalWorkAssignment' $true
+  Wait-Text 'Источник Atlas не открыт'
+  Click-UIA 'Закрыть редактор'
+  Click-UIA 'Планы Atlas'
+  Import-AtlasFile $updatedPath ([string]$updated.revision)
+  Wait-Text 'Редакция плана изменилась'
+  $unchanged=Assert-WorkBinding ([string]$original.revision)
+  Write-Output 'ATLAS_CENTER_TWO_INSTALLED_GUI_STALE_WORKREF_PASS'
+  Click-UIA 'Поручения' $true
+  Click-UIA 'AtlasExternalWorkAssignment' $true
+  Wait-Text 'План Atlas изменился'
+  Click-UIA 'Привязать к открытой редакции плана'
+  Wait-Text ('редакция '+[string]$updated.revision)
+  Click-UIA 'Сохранить черновик'
+  Click-UIA 'Сохранить на компьютере'
+  $refreshed=Assert-WorkBinding ([string]$updated.revision)
+  if ($refreshed.organizations[0].assignments[0].id -ne
+      $saved.organizations[0].assignments[0].id) {
+    throw 'Explicit WorkRef refresh unexpectedly created a new assignment'
+  }
+  Write-Output 'ATLAS_CENTER_TWO_INSTALLED_GUI_EXPLICIT_REFRESH_PASS'
+  Close-Center
+  Start-Center
+  Click-UIA 'Поручения' $true
+  Click-UIA 'AtlasExternalWorkAssignment' $true
+  $reopened=Assert-WorkBinding ([string]$updated.revision)
+  Screenshot 'refreshed-after-restart'
+  Write-Output 'ATLAS_CENTER_TWO_INSTALLED_GUI_RESTART_READBACK_PASS'
+  Close-Center
+} catch {
+  Write-Output "ATLAS_CENTER_TWO_INSTALLED_GUI_FAIL $($_.Exception.Message)"
+  Screenshot 'failed'
+  throw
+} finally {
+  if ($null -ne $process) {
+    $process.Refresh()
+    if (!$process.HasExited) { Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue }
+  }
+}
+}) | Select-Object -First 28
+  Write-Output "ATLAS_CENTER_REVISION_UIA_DIAGNOSTIC sample=$($preview -join ' | ')"
+  Screenshot 'revision-metric-missing'
+  throw "Center opened JSON but revision metric $expected was not exposed by UIA"
+}
 function Import-AtlasFile([string]$path,[string]$expectedRevision) {
   if (!(Test-Path -LiteralPath $path) -or $path -match '[+^%~{}()]') {
     throw "Invalid installed Atlas export path: $path"

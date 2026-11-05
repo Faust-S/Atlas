@@ -94,4 +94,7 @@ test("two installed applications reuse the existing Center and explicit stale Wo
  assert.match(script,/Import-AtlasFile \$updatedPath/);
  assert.match(workflow,/run: \.\/desktop\/tests\/installed-center-e2e\.ps1/);
  assert.match(workflow,/ref: 164c67849d709f6fae2f39666d6870d37fe12670/);
+ assert.match(script,/Wait-AtlasRevisionMetric \$expectedRevision/);
+ assert.match(script,/ATLAS_CENTER_TWO_INSTALLED_GUI_REVISION_METRIC_PASS/);
+ assert.doesNotMatch(script,/Wait-Text \('редакция '\+\$expectedRevision\)/);
 });
