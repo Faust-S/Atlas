@@ -98,3 +98,12 @@ test("two installed applications reuse the existing Center and explicit stale Wo
  assert.match(script,/ATLAS_CENTER_TWO_INSTALLED_GUI_REVISION_METRIC_PASS/);
  assert.doesNotMatch(script,/Wait-Text \('редакция '\+\$expectedRevision\)/);
 });
+
+test("Windows 0.3 qualification runs the existing native R5 fixture rather than claiming a GUI load test",()=>{
+ const yaml=readFileSync(new URL("../.github/workflows/atlas-0-2-1-branding.yml",import.meta.url),"utf8");
+ assert.match(yaml,/Native Atlas R5 120-project persistence and 20 incremental revisions/);
+ assert.match(yaml,/node tests\/fixtures\/desktop-portfolio-120\.mjs/);
+ assert.match(yaml,/ATLAS_R5_PORTFOLIO_JSON/);
+ assert.match(yaml,/native_r5_scale_and_incremental_readback/);
+ assert.match(yaml,/--exact --nocapture/);
+});
