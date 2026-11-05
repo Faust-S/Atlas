@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - work/2026-11-04-atlas-0-3
+      - work/2026-11-05-atlas-k01-context-host
     paths:
       - 'src/**'
       - 'tests/**'
@@ -36,6 +37,21 @@ jobs:
         run: |
           node --check src/app.mjs
           node --check src/project-host-port.mjs
+      - name: Checkout pinned public K01 implementation
+        uses: actions/checkout@v4
+        with:
+          repository: Faust-S/knowledge
+          ref: 217debaad8a17b19b7ef883eca07dccc045ec9a8
+          path: k01-public
+          persist-credentials: false
+          sparse-checkout: |
+            package.json
+            modules/k01-context
+      - name: Install K01 host-only dependency for integration test
+        working-directory: k01-public
+        run: npm install --no-audit --no-fund --ignore-scripts
+      - name: Run real K01 and Atlas host integration
+        run: node tests/k01-real-consumer.test.mjs
       - name: Checkout actual public Admin Center contract at audited revision
         uses: actions/checkout@v4
         with:
