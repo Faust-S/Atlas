@@ -76,6 +76,9 @@ jobs:
         run: npm install --no-audit --no-fund --ignore-scripts
       - name: Run real K01 and Atlas host integration
         run: node tests/k01-real-consumer.test.mjs
+      - name: Install pinned desktop frontend and K01 dependency
+        working-directory: desktop
+        run: npm ci --no-audit --no-fund
       - name: Existing Atlas and new 0.3 regression suite
         run: npm test
       - name: Validate source syntax
@@ -98,9 +101,6 @@ jobs:
           persist-credentials: false
       - name: Qualify Atlas project/work and stale revision with real Center sources
         run: node tests/atlas-center-interop.mjs
-      - name: Install pinned desktop frontend
-        working-directory: desktop
-        run: npm ci --no-audit --no-fund
       - name: Verify production desktop build
         working-directory: desktop
         run: npm run build
