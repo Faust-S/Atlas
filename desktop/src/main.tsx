@@ -246,7 +246,7 @@ function App(){
    }),
    authorize:async({context}:any)=>native&&context?.workspaceId==="atlas-local",
    fetcher:globalThis.fetch.bind(globalThis)
-  });
+  } as any);
  const inspectK01=async(sourceId:string,branch:string)=>{
   if(busyRef.current||!ready||!persisted||dirty||!requireClosedForm()){
    issue(Error("K01: сохраните проект и закройте форму перед исследованием источника."));return;
