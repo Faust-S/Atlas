@@ -59,7 +59,7 @@ jobs:
           $fixture = Join-Path $env:RUNNER_TEMP 'atlas-r5-portfolio-120.json'
           node tests/fixtures/desktop-portfolio-120.mjs | Set-Content -LiteralPath $fixture -Encoding utf8
           $env:ATLAS_R5_PORTFOLIO_JSON = $fixture
-          cargo test --release --locked --manifest-path desktop/src-tauri/Cargo.toml --lib native_r5_scale_and_incremental_readback -- --exact --nocapture
+          cargo test --release --locked --manifest-path desktop/src-tauri/Cargo.toml --lib persistence_tests::native_r5_scale_and_incremental_readback -- --exact --nocapture
       - name: Install candidate, verify executable and icon
         shell: pwsh
         run: |

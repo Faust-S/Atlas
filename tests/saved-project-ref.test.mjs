@@ -104,6 +104,6 @@ test("Windows 0.3 qualification runs the existing native R5 fixture rather than 
  assert.match(yaml,/Native Atlas R5 120-project persistence and 20 incremental revisions/);
  assert.match(yaml,/node tests\/fixtures\/desktop-portfolio-120\.mjs/);
  assert.match(yaml,/ATLAS_R5_PORTFOLIO_JSON/);
- assert.match(yaml,/native_r5_scale_and_incremental_readback/);
+ assert.match(yaml,/persistence_tests::native_r5_scale_and_incremental_readback/);
  assert.match(yaml,/--exact --nocapture/);
 });
