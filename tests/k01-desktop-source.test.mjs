@@ -63,3 +63,43 @@ test('reject ambiguous/unavailable source, invalid path and bad query',async()=>
  await assert.rejects(f.service.select({...f.args,phrase:''}),/точную фразу/);
  await assert.rejects(f.service.select({...f.args,branch:'missing'}),/проверенную редакцию/);
 });
+
+test('actual Atlas-style complete GitHub summary produces one K01 candidate', async () => {
+ const project=createProject(empty(),{name:'Source completeness',type:'research'});
+ const attached=attach(project.state,project.id,'github',repository);
+ const fullSummary={
+  scope:'repository',repository,repositoryId:456,defaultBranch:branch,
+  complete:true,branches:[branch],branchHeads:{[branch]:old},
+  observedAt:'2026-11-05T11:00:00.000Z',
+  provenance:{provider:'github',access:'public',endpoint:'https://api.github.com/repos/'+repository},
+  readiness:'not_assessed'
+ };
+ const saved=serialize(observe(attached.state,project.id,attached.id,'ok',fullSummary));
+ let nativeReads=0,publicReads=0,evidenceReads=0;
+ const fetcher=async url=>{
+  publicReads++;
+  if(url.endsWith('/repos/'+repository))
+   return {ok:true,json:async()=>({id:456,private:false,default_branch:branch})};
+  if(url.includes('/branches?'))
+   return {ok:true,json:async()=>[{name:branch,commit:{sha:old}}]};
+  if(url.includes('/contents/')){
+   evidenceReads++;
+   return {ok:true,json:async()=>({type:'file',encoding:'base64',content:data})};
+  }
+  throw Error('Unexpected Github route');
+ };
+ const service=createAtlasK01DesktopService({
+  openSavedSnapshot:async()=>{nativeReads++;return deserialize(saved)},
+  authorize:async()=>true,fetcher
+ });
+ const selected=await service.select({
+  projectId:project.id,sourceId:attached.id,branch,
+  path:'AGENTS.md',phrase,context:{workspaceId:'atlas-local'}
+ });
+ assert.equal(selected.projection.selected.length,1);
+ assert.equal(selected.projection.omissions.length,0);
+ assert.equal(selected.projection.selected[0].excerpt,'Delivery: 8 working days.');
+ assert.ok(nativeReads>=2);
+ assert.ok(publicReads>=2);
+ assert.equal(evidenceReads,1);
+});
