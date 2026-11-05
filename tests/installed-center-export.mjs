@@ -52,3 +52,30 @@ console.log("ATLAS_INSTALLED_GUI_TO_REAL_CENTER_IMPORT_PASS",JSON.stringify({
  projectRefExact:true,workRefExact:true,centerDraftReadback:true,orgCopiesProjectStore:false,
  t3GrantIssued:false,centerGuiTested:false,liveConnection:false
 }));
+
+const updatedPath=process.env.ATLAS_GUI_CENTER_EXPORT_UPDATED;
+assert.ok(updatedPath&&updatedPath.endsWith(".json"),"Second installed GUI export is required");
+const newRaw=readFileSync(updatedPath,"utf8");
+const updatedSnapshot=JSON.parse(newRaw);
+assert.equal(updatedSnapshot.schema,"atlas.project/1");
+assert.ok(updatedSnapshot.revision>snapshot.revision,"New GUI save must advance portfolio revision");
+assert.equal(updatedSnapshot.projects.length,2);
+const retained=updatedSnapshot.projects.find(p=>p.id===project.id);
+assert.ok(retained,"Old project ID must survive a different portfolio edit");
+assert.equal(retained.items.length,2);
+assert.deepEqual(retained.dependencies,project.dependencies);
+assert.deepEqual(retained.items.map(i=>i.id),project.items.map(i=>i.id));
+const updatedView=readAtlasPortfolio(newRaw);
+assert.equal(updatedView.revision,String(updatedSnapshot.revision));
+assert.equal(atlasLinkReadback(updatedView,projectRef),"SOURCE_REVISION_CHANGED");
+assert.equal(atlasWorkReadback(updatedView,workRef),"SOURCE_REVISION_CHANGED");
+assert.deepEqual(restored.organizations[0].assignments[0].atlasRef,workRef);
+const currentRef=linkableAtlasWork(updatedView,project.id,project.items[1].id);
+assert.equal(atlasWorkReadback(updatedView,currentRef),"SOURCE_REVISION_MATCHES");
+assert.equal(currentRef.revision,String(updatedSnapshot.revision));
+console.log("ATLAS_INSTALLED_GUI_TO_REAL_CENTER_STALE_PASS",JSON.stringify({
+ oldRevision:view.revision,newRevision:updatedView.revision,
+ sameProjectId:true,sameWorkId:true,dependencyRetained:true,
+ oldRefStale:true,storedDraftUnchanged:true,updatedRefCurrent:true,
+ t3Issued:false,centerGuiTested:false,liveSync:false
+}));

@@ -77,6 +77,8 @@ test("saved-reference modal has native title and keyboard/close protection",()=>
  assert.match(windows,/ATLAS_INSTALLED_SAVED_PROJECT_REF_DIALOG_PASS/);
  assert.match(windows,/Export-AtlasSavedJsonForCenter \$process \$saved \$names\[0\]/);
  assert.match(windows,/ATLAS_INSTALLED_GUI_CENTER_JSON_EXPORT_PASS/);
+ assert.match(windows,/ATLAS_INSTALLED_GUI_CENTER_UPDATED_EDITION_PASS/);
+ assert.match(windows,/atlas-center-gui-export-updated\.json/);
  assert.match(windows,/Wait-AtlasTitle \$process 'Ссылка на проект'/);
  assert.match(windows,/afterReference\.generation -ne \$saved\.generation/);
 });

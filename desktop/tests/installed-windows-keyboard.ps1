@@ -247,10 +247,14 @@ function Click-AtlasSave([System.Diagnostics.Process]$process) {
     [AtlasWindowsInput]::mouse_event(0x0002,0,0,0,[UIntPtr]::Zero)
     [AtlasWindowsInput]::mouse_event(0x0004,0,0,0,[UIntPtr]::Zero)
 }
-function Export-AtlasSavedJsonForCenter([System.Diagnostics.Process]$process, $saved, [string]$projectName) {
+function Export-AtlasSavedJsonForCenter([System.Diagnostics.Process]$process, $saved, [string]$projectName,
+    [string]$outputName='atlas-center-gui-export.json', [string]$activeView='Таблица') {
     # Real Windows user action -> native Tauri Save As -> atomic JSON export.
     # No synthetic CLI export, competing Store, or automatic Center authority.
-    $target = Join-Path $env:GITHUB_WORKSPACE 'atlas-center-gui-export.json'
+    if ($outputName -notin @('atlas-center-gui-export.json','atlas-center-gui-export-updated.json')) {
+        throw 'Unexpected Atlas GUI export qualification file name'
+    }
+    $target = Join-Path $env:GITHUB_WORKSPACE $outputName
     if (Test-Path -LiteralPath $target) { throw 'Center export already exists in the qualification workspace' }
     if ($target -match '[+^%~{}()]') { throw 'Export path contains Windows SendKeys metacharacters' }
     Activate-Atlas $process
@@ -300,7 +304,7 @@ function Export-AtlasSavedJsonForCenter([System.Diagnostics.Process]$process, $s
     $matched = @($snapshot.projects | Where-Object { $_.name -eq $projectName })
     if ($snapshot.schema -ne 'atlas.project/1' -or
         [long]$snapshot.revision -ne $saved.revision -or
-        @($snapshot.projects).Count -ne 1 -or $matched.Count -ne 1 -or
+        @($snapshot.projects).Count -ne $saved.projects.Count -or $matched.Count -ne 1 -or
         [string]$matched[0].id -ne [string]$saved.projects[0].id -or
         @($matched[0].items).Count -ne 2 -or @($matched[0].dependencies).Count -ne 1 -or
         @($matched[0].items | Where-Object { $_.title -eq 'AtlasWorkAlpha' }).Count -ne 1 -or
@@ -311,7 +315,8 @@ function Export-AtlasSavedJsonForCenter([System.Diagnostics.Process]$process, $s
     if ($null -eq $after -or $after.generation -ne $saved.generation) {
         throw 'Atlas native generation changed during read-only export'
     }
-    $expectedTitle = "IWXA Atlas — $projectName — Таблица"
+    $activeProject = [string]$saved.projects[$saved.projects.Count-1].name
+    $expectedTitle = "IWXA Atlas — $activeProject — $activeView"
     $actualTitle = ''
     for ($i=0; $i -lt 50; $i++) {
         $process.Refresh()
@@ -323,8 +328,10 @@ function Export-AtlasSavedJsonForCenter([System.Diagnostics.Process]$process, $s
         Capture-AtlasView 'installed-center-export-modal-stuck'
         throw "JSON was written but Atlas GUI did not return to project: $actualTitle"
     }
-    "ATLAS_GUI_CENTER_EXPORT=$target" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-    Write-Output "ATLAS_INSTALLED_GUI_CENTER_JSON_EXPORT_PASS revision=$($saved.revision) projects=1 works=2 dependencies=1 generationUnchanged=true"
+    if ($outputName -eq 'atlas-center-gui-export.json') { $variable = 'ATLAS_GUI_CENTER_EXPORT' }
+    else { $variable = 'ATLAS_GUI_CENTER_EXPORT_UPDATED' }
+    "$variable=$target" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+    Write-Output "ATLAS_INSTALLED_GUI_CENTER_JSON_EXPORT_PASS revision=$($saved.revision) projects=$($saved.projects.Count) works=2 dependencies=1 generationUnchanged=true output=$outputName"
 }
 
 function Send-AtlasProject([string]$name, [System.Diagnostics.Process]$process) {
@@ -417,6 +424,15 @@ try {
                 if (@($saved.projects | ForEach-Object { $_.id }) -notcontains $original.projects[0].id) {
                     throw 'Existing project ID was not preserved through the GUI relaunch'
                 }
+                # A real subsequent save advances the authoritative portfolio
+                # revision while preserving the old WorkRef target. Export that
+                # edition through the same installed GUI and native Save As.
+                Start-Sleep -Milliseconds 1350
+                Activate-Atlas $process
+                Click-AtlasAt $process 758 284
+                Wait-AtlasTitle $process 'Ссылка на проект'
+                Export-AtlasSavedJsonForCenter $process $saved $names[0] 'atlas-center-gui-export-updated.json' 'Обзор'
+                Write-Output 'ATLAS_INSTALLED_GUI_CENTER_UPDATED_EDITION_PASS'
             }
             Write-Output "ATLAS_INSTALLED_GUI_COMMIT_READBACK_PASS attempt=$attempt projects=$($saved.projects.Count)"
             # The disk manifest appears as soon as Rust publishes the write.
