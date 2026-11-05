@@ -67,6 +67,8 @@ test("saved-reference modal has native title and keyboard/close protection",()=>
  assert.match(ui,/const suffix=savedRefPreview\?" · "\+savedRefPreview\.label/);
  assert.match(ui,/if\(savedRefPreview!==null\)\{[\s\S]*?event\.key==="Escape"/);
  assert.match(ui,/if\(ctrl&&event\.altKey&&!event\.shiftKey&&code==="KeyP"\)/);
+ assert.match(windows,/Click-AtlasAt \\$process 755 248/);
+ assert.match(windows,/installed-before-project-ref-click/);
  assert.match(windows,/ATLAS_INSTALLED_SAVED_PROJECT_REF_DIALOG_PASS/);
  assert.match(windows,/Wait-AtlasTitle \$process 'Ссылка на проект'/);
  assert.match(windows,/afterReference\.generation -ne \$saved\.generation/);

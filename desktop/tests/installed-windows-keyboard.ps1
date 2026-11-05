@@ -298,7 +298,10 @@ try {
                 # Real installed WebView2: open ProjectRef from the saved native
                 # generation, prove the dialog rendered through native HWND,
                 # and ensure this read-only handoff did not advance the Store.
-                [System.Windows.Forms.SendKeys]::SendWait('^%p')
+                # Hosted SendKeys has previously dropped Ctrl+N/Ctrl+S.
+                # Qualify the real visible project-header button instead.
+                Capture-AtlasView 'installed-before-project-ref-click'
+                Click-AtlasAt $process 755 248
                 Wait-AtlasTitle $process 'Ссылка на проект'
                 Capture-AtlasView 'installed-saved-project-reference'
                 $afterReference = Get-AtlasSnapshot

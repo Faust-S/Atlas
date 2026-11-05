@@ -78,6 +78,14 @@ jobs:
         shell: pwsh
         timeout-minutes: 5
         run: ./desktop/tests/installed-windows-keyboard.ps1
+      - name: Retain installed GUI screenshot evidence on success or failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas-installed-gui-evidence
+          path: desktop/tests/visual-evidence/*.png
+          if-no-files-found: warn
+          retention-days: 3
       - name: Retain candidate installer (not a release)
         uses: actions/upload-artifact@v4
         with:
