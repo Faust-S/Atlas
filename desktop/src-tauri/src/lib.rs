@@ -302,6 +302,19 @@ fn backup_open(root:&Path)->Result<OpenResult,String>{
     }
     Err("Основной индекс повреждён; исправная резервная редакция не найдена. Исходные файлы сохранены.".into())
 }
+// U05: cross-product read of the genuine Atlas Desktop owner store.
+// Unlike lock(), this does not create directories, lock files, a manifest,
+// project blocks or any second store. The shared file lock coordinates with
+// Atlas Desktop's exclusive writer lock on the very same existing file.
+fn read_root_readonly(root: &Path) -> Result<OpenResult, String> {
+    if !root.join("head.json").is_file() {
+        return Err("ATLAS_PUBLIC_SOURCE_NOT_FOUND".into());
+    }
+    let lock_file = File::open(root.join("atlas.lock"))
+        .map_err(|_| "ATLAS_PUBLIC_LOCK_NOT_FOUND".to_string())?;
+    FileExt::lock_shared(&lock_file).map_err(|e| err("Блокировка чтения Atlas", e))?;
+    load_root(root)
+}
 fn load_root(root:&Path)->Result<OpenResult,String>{
     match current(root) {
         Ok(Some(m))=>match decode(&root,&m){
@@ -740,6 +753,36 @@ mod persistence_tests{
         assert_eq!(load_root(&root.0).unwrap().generation,previous);
         println!("ATLAS_R5_NATIVE_STORE_PASS projects=120 works=1200 workLinks=300 portfolioLinks=40 findings=200 decisions=100 edits=20 firstWriteMs={} firstReadMs={} updatesMs={}",
             first_ms,read_ms,updates_ms);
+    }
+    #[test]fn u05_readonly_owner_observation_does_not_create_or_modify_source() {
+        let root=scratch();
+        assert!(read_root_readonly(&root.0).is_err());
+        assert!(!root.0.join("atlas.lock").exists());
+        assert!(!root.0.join("head.json").exists());
+        let first=commit_root(&root.0,"none",snapshot(1,&["Canonical"])).unwrap();
+        let head_before=fs::read(root.0.join("head.json")).unwrap();
+        let blocks_before=fs::read_dir(root.0.join("blocks")).unwrap().count();
+        let history_before=fs::read_dir(root.0.join("history")).unwrap().count();
+        let opened=read_root_readonly(&root.0).unwrap();
+        assert_eq!(opened.generation,first.generation);
+        assert_eq!(opened.snapshot["revision"],1);
+        assert!(!opened.needs_confirmation);
+        let next=commit_root(&root.0,&first.generation,snapshot(2,&["Updated"])).unwrap();
+        let observed=read_root_readonly(&root.0).unwrap();
+        assert_eq!(observed.generation,next.generation);
+        assert_eq!(observed.snapshot["revision"],2);
+        assert_ne!(observed.generation,opened.generation);
+        assert_eq!(fs::read_dir(root.0.join("blocks")).unwrap().count(),blocks_before+1);
+        assert_eq!(fs::read_dir(root.0.join("history")).unwrap().count(),history_before+1);
+        assert_ne!(fs::read(root.0.join("head.json")).unwrap(),head_before);
+        // Reading the canonical source has no side effects on its manifest.
+        let after_read=fs::read(root.0.join("head.json")).unwrap();
+        let again=read_root_readonly(&root.0).unwrap();
+        assert_eq!(again.generation,observed.generation);
+        assert_eq!(fs::read(root.0.join("head.json")).unwrap(),after_read);
+        fs::remove_file(root.0.join("atlas.lock")).unwrap();
+        assert!(read_root_readonly(&root.0).is_err());
+        assert!(!root.0.join("atlas.lock").exists());
     }
     #[test]fn invalid_root_and_missing_backup_never_return_empty_portfolio(){
         let root=scratch();
