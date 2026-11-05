@@ -773,7 +773,9 @@ mod persistence_tests{
         assert_eq!(observed.snapshot["revision"],2);
         assert_ne!(observed.generation,opened.generation);
         assert_eq!(fs::read_dir(root.0.join("blocks")).unwrap().count(),blocks_before+1);
-        assert_eq!(fs::read_dir(root.0.join("history")).unwrap().count(),history_before+1);
+        // First commit already archives its manifest. A subsequent commit
+        // must reuse that archive rather than duplicate the same generation.
+        assert_eq!(fs::read_dir(root.0.join("history")).unwrap().count(),history_before);
         assert_ne!(fs::read(root.0.join("head.json")).unwrap(),head_before);
         // Reading the canonical source has no side effects on its manifest.
         let after_read=fs::read(root.0.join("head.json")).unwrap();
