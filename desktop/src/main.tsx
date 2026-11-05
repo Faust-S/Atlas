@@ -275,10 +275,11 @@ function App(){
    const result=await k01Service(startedWith,generation).revalidate(k01Context,{context:{workspaceId:"atlas-local"}});
    if(latestSnapshot.current!==startedWith||dirtyRef.current)
     throw Error("K01: проект изменился во время повторной проверки.");
+   if(!result.allCurrent)setK01Context(null);
    setK01Status(result.allCurrent?
     "Актуальность подтверждена на момент проверки. Это не подтверждение выполнения задачи.":
     "Контекст устарел или источник недоступен: "+result.failures.map((f:any)=>f.reason).join(", "));
-  }catch(e){setK01Status("Контекст не подтверждён: "+deepFreezeError(e))}
+  }catch(e){setK01Context(null);setK01Status("Контекст не подтверждён: "+deepFreezeError(e))}
   finally{busyRef.current=false;setBusy(false)}
  };
  // Open forms keep local, unapplied input state. A project/tab change or
@@ -353,7 +354,7 @@ function App(){
  },[native,ready,project?.name,tab,editor?.spec.title,dirty,savedRefPreview?.label]);
  const selectProject=(id:string|null,afterSubmit=false)=>{
   if(!afterSubmit&&!requireClosedForm())return;
-  setActive(id);setTab("overview");setEditor(null);setForecastId(null);
+  setK01Context(null);setK01Status("");setActive(id);setTab("overview");setEditor(null);setForecastId(null);
   if(!afterSubmit)setMessage("");
   setWorkFilter("all");setWorkQuery("");setWorkSort("title");setWorkLimit(200);
   setHistoryQuery("");setHistoryType("all");setHistoryLimit(120);setRecheckLimit(25);
@@ -986,15 +987,15 @@ function App(){
      <Action onClick={()=>openEditor("source")} primary>＋ Источник</Action></div>
      <div className="atlas-k01-inputs">
       <label>Путь к файлу GitHub
-       <input value={k01FilePath} onChange={event=>setK01FilePath(event.target.value)}
+       <input value={k01FilePath} onChange={event=>{setK01FilePath(event.target.value);setK01Context(null);setK01Status("");}}
         placeholder="AGENTS.md" maxLength={160} aria-label="K01 файл GitHub"/>
       </label>
       <label>Точная фраза в одной строке
-       <input value={k01Phrase} onChange={event=>setK01Phrase(event.target.value)}
+       <input value={k01Phrase} onChange={event=>{setK01Phrase(event.target.value);setK01Context(null);setK01Status("");}}
         placeholder="Task Discovery" maxLength={100} aria-label="K01 искомая фраза"/>
       </label>
       <label>Ветка (пусто = первая сохранённая)
-       <input value={k01Branch} onChange={event=>setK01Branch(event.target.value)}
+       <input value={k01Branch} onChange={event=>{setK01Branch(event.target.value);setK01Context(null);setK01Status("");}}
         placeholder="main" maxLength={160} aria-label="K01 ветка"/>
       </label>
      </div>

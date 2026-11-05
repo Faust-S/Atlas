@@ -23,3 +23,12 @@ test('K01 is a pinned Git dependency, not a copied library or mutable branch',()
  assert.equal(lock.packages[''].dependencies['@iwxa/k01-context'],pin);
  assert.ok(lock.packages['node_modules/@iwxa/k01-context']);
 });
+
+test("K01 invalidation clears outdated evidence from UI",()=>{
+ assert.match(ui,/if\(!result\.allCurrent\)setK01Context\(null\)/);
+ assert.ok(ui.includes('setK01Context(null);setK01Status("Контекст не подтверждён:'));
+ for(const name of ["setK01FilePath","setK01Phrase","setK01Branch"]) {
+  assert.ok(ui.includes(name+"(event.target.value);setK01Context(null);"));
+ }
+ assert.ok(ui.includes('setK01Context(null);setK01Status("");setActive(id);'));
+});
