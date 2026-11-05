@@ -82,3 +82,16 @@ test("saved-reference modal has native title and keyboard/close protection",()=>
  assert.match(windows,/Wait-AtlasTitle \$process 'Ссылка на проект'/);
  assert.match(windows,/afterReference\.generation -ne \$saved\.generation/);
 });
+
+test("two installed applications reuse the existing Center and explicit stale WorkRef refresh",()=>{
+ const script=readFileSync(new URL("../desktop/tests/installed-center-e2e.ps1",import.meta.url),"utf8");
+ const workflow=readFileSync(new URL("../.github/workflows/atlas-0-2-1-branding.yml",import.meta.url),"utf8");
+ assert.match(script,/ATLAS_CENTER_TWO_INSTALLED_GUI_FILE_IMPORT_PASS/);
+ assert.match(script,/ATLAS_CENTER_TWO_INSTALLED_GUI_STALE_WORKREF_PASS/);
+ assert.match(script,/ATLAS_CENTER_TWO_INSTALLED_GUI_EXPLICIT_REFRESH_PASS/);
+ assert.match(script,/ATLAS_CENTER_TWO_INSTALLED_GUI_RESTART_READBACK_PASS/);
+ assert.match(script,/Import-AtlasFile \$originalPath/);
+ assert.match(script,/Import-AtlasFile \$updatedPath/);
+ assert.match(workflow,/run: \.\/desktop\/tests\/installed-center-e2e\.ps1/);
+ assert.match(workflow,/ref: 164c67849d709f6fae2f39666d6870d37fe12670/);
+});

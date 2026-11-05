@@ -83,7 +83,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: Faust-S/Center
-          ref: 52229f4e9f0d41ff835bad3e9f1f722a84599ff8
+          ref: 164c67849d709f6fae2f39666d6870d37fe12670
           path: center-public
           persist-credentials: false
       - name: Checkout exact canonical Atlas core used by Center
@@ -98,6 +98,19 @@ jobs:
         if: github.ref_name == 'work/2026-11-04-atlas-0-3'
         shell: pwsh
         run: node tests/installed-center-export.mjs
+      - name: Build existing Center offline Windows installer for two-app GUI test
+        if: github.ref_name == 'work/2026-11-04-atlas-0-3'
+        working-directory: center-public
+        shell: pwsh
+        timeout-minutes: 14
+        run: |
+          npm install --no-audit --no-fund
+          npm run desktop:build
+      - name: Qualify two installed applications and stale WorkRef in real Center GUI
+        if: github.ref_name == 'work/2026-11-04-atlas-0-3'
+        shell: pwsh
+        timeout-minutes: 7
+        run: ./desktop/tests/installed-center-e2e.ps1
       - name: Retain installed GUI screenshot evidence on success or failure
         if: always()
         uses: actions/upload-artifact@v4
