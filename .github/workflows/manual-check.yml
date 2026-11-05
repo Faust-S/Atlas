@@ -31,12 +31,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Existing Atlas and new 0.3 regression suite
-        run: npm test
-      - name: Validate source syntax
-        run: |
-          node --check src/app.mjs
-          node --check src/project-host-port.mjs
       - name: Checkout pinned public K01 implementation
         uses: actions/checkout@v4
         with:
@@ -52,6 +46,12 @@ jobs:
         run: npm install --no-audit --no-fund --ignore-scripts
       - name: Run real K01 and Atlas host integration
         run: node tests/k01-real-consumer.test.mjs
+      - name: Existing Atlas and new 0.3 regression suite
+        run: npm test
+      - name: Validate source syntax
+        run: |
+          node --check src/app.mjs
+          node --check src/project-host-port.mjs
       - name: Checkout actual public Admin Center contract at audited revision
         uses: actions/checkout@v4
         with:
