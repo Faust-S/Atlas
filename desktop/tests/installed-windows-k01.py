@@ -334,7 +334,11 @@ def run_route():
     fill_edit("K01 ветка", BRANCH)
     click_button("K01: найти контекст")
     wait_gui_text("Свидетельство отобрано")
+    # The installed UI must render the actual selected public evidence,
+    # not only a generic success notice.
+    wait_gui_text("1. **Task Discovery / Activity Research / U1 / Cross-Lab:**")
     wait_gui_text("Provenance: line:")
+    print("ATLAS_K01_INSTALLED_EVIDENCE_TEXT_PASS",flush=True)
     screenshot("current-context")
     click_button("Повторно проверить")
     wait_gui_text("Актуальность подтверждена")
