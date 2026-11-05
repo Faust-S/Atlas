@@ -78,6 +78,26 @@ jobs:
         shell: pwsh
         timeout-minutes: 5
         run: ./desktop/tests/installed-windows-keyboard.ps1
+      - name: Checkout real Center consumer at audited revision
+        if: github.ref_name == 'work/2026-11-04-atlas-0-3'
+        uses: actions/checkout@v4
+        with:
+          repository: Faust-S/Center
+          ref: 52229f4e9f0d41ff835bad3e9f1f722a84599ff8
+          path: center-public
+          persist-credentials: false
+      - name: Checkout exact canonical Atlas core used by Center
+        if: github.ref_name == 'work/2026-11-04-atlas-0-3'
+        uses: actions/checkout@v4
+        with:
+          repository: Faust-S/Atlas
+          ref: e5cc6ff593aa12eec3da8e8940ad5af5819b66fd
+          path: center-public/vendor/atlas
+          persist-credentials: false
+      - name: Import actual installed GUI JSON using real Center source
+        if: github.ref_name == 'work/2026-11-04-atlas-0-3'
+        shell: pwsh
+        run: node tests/installed-center-export.mjs
       - name: Retain installed GUI screenshot evidence on success or failure
         if: always()
         uses: actions/upload-artifact@v4

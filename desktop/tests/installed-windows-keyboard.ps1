@@ -16,6 +16,8 @@ public static class AtlasWindowsInput {
     [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
     [DllImport("user32.dll")] public static extern bool ShowWindowAsync(IntPtr hWnd, int nCmdShow);
     [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    public static extern int GetWindowText(IntPtr hWnd, System.Text.StringBuilder text, int maxCount);
     [DllImport("user32.dll", EntryPoint="PostMessageW", SetLastError=true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool PostMessage(IntPtr hwnd, uint message, IntPtr wParam, IntPtr lParam);
@@ -245,6 +247,86 @@ function Click-AtlasSave([System.Diagnostics.Process]$process) {
     [AtlasWindowsInput]::mouse_event(0x0002,0,0,0,[UIntPtr]::Zero)
     [AtlasWindowsInput]::mouse_event(0x0004,0,0,0,[UIntPtr]::Zero)
 }
+function Export-AtlasSavedJsonForCenter([System.Diagnostics.Process]$process, $saved, [string]$projectName) {
+    # Real Windows user action -> native Tauri Save As -> atomic JSON export.
+    # No synthetic CLI export, competing Store, or automatic Center authority.
+    $target = Join-Path $env:GITHUB_WORKSPACE 'atlas-center-gui-export.json'
+    if (Test-Path -LiteralPath $target) { throw 'Center export already exists in the qualification workspace' }
+    if ($target -match '[+^%~{}()]') { throw 'Export path contains Windows SendKeys metacharacters' }
+    Activate-Atlas $process
+    $appHandle = $process.MainWindowHandle
+    Capture-AtlasView 'installed-center-before-export'
+    # Installed ProjectRef screenshot: button occupies x=269..437, y=546..582.
+    Click-AtlasAt $process 350 563
+    $dialogTitle = ''
+    for ($i=0; $i -lt 80; $i++) {
+        $foreground = [AtlasWindowsInput]::GetForegroundWindow()
+        if ($foreground -ne [IntPtr]::Zero -and $foreground -ne $appHandle) {
+            $titleText = [System.Text.StringBuilder]::new(512)
+            [void][AtlasWindowsInput]::GetWindowText($foreground,$titleText,$titleText.Capacity)
+            if ($titleText.ToString() -match '(Atlas JSON|Save As|Сохранить)') {
+                $dialogTitle = $titleText.ToString()
+                break
+            }
+        }
+        Start-Sleep -Milliseconds 250
+    }
+    if (!$dialogTitle) {
+        Capture-AtlasView 'installed-center-save-dialog-missing'
+        throw 'ProjectRef JSON action did not open the expected native Save As dialog'
+    }
+    Write-Output "ATLAS_INSTALLED_CENTER_NATIVE_SAVE_DIALOG_PASS title=$dialogTitle"
+    Capture-AtlasView 'installed-center-save-dialog'
+    # The English common dialog uses Alt+N for "File name". Avoid an 8.3
+    # path containing ~, which SendKeys would interpret as Enter.
+    [System.Windows.Forms.SendKeys]::SendWait('%n')
+    Start-Sleep -Milliseconds 200
+    [System.Windows.Forms.SendKeys]::SendWait('^a')
+    [System.Windows.Forms.SendKeys]::SendWait($target)
+    Start-Sleep -Milliseconds 200
+    [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+    $snapshot = $null
+    for ($i=0; $i -lt 100; $i++) {
+        Start-Sleep -Milliseconds 300
+        if (Test-Path -LiteralPath $target) {
+            $snapshot = Get-Content -LiteralPath $target -Raw -ErrorAction Stop | ConvertFrom-Json -Depth 100
+            break
+        }
+    }
+    if ($null -eq $snapshot) {
+        Capture-AtlasView 'installed-center-export-missing'
+        throw 'Installed Atlas did not write user-selected JSON via its native save dialog'
+    }
+    $matched = @($snapshot.projects | Where-Object { $_.name -eq $projectName })
+    if ($snapshot.schema -ne 'atlas.project/1' -or
+        [long]$snapshot.revision -ne $saved.revision -or
+        @($snapshot.projects).Count -ne 1 -or $matched.Count -ne 1 -or
+        [string]$matched[0].id -ne [string]$saved.projects[0].id -or
+        @($matched[0].items).Count -ne 2 -or @($matched[0].dependencies).Count -ne 1 -or
+        @($matched[0].items | Where-Object { $_.title -eq 'AtlasWorkAlpha' }).Count -ne 1 -or
+        @($matched[0].items | Where-Object { $_.title -eq 'AtlasWorkBeta' }).Count -ne 1) {
+        throw 'Exported GUI JSON differs from native saved project, revision, works or dependency'
+    }
+    $after = Get-AtlasSnapshot
+    if ($null -eq $after -or $after.generation -ne $saved.generation) {
+        throw 'Atlas native generation changed during read-only export'
+    }
+    $expectedTitle = "IWXA Atlas — $projectName — Таблица"
+    $actualTitle = ''
+    for ($i=0; $i -lt 50; $i++) {
+        $process.Refresh()
+        $actualTitle = $process.MainWindowTitle
+        if ($actualTitle -eq $expectedTitle) { break }
+        Start-Sleep -Milliseconds 250
+    }
+    if ($actualTitle -ne $expectedTitle) {
+        Capture-AtlasView 'installed-center-export-modal-stuck'
+        throw "JSON was written but Atlas GUI did not return to project: $actualTitle"
+    }
+    "ATLAS_GUI_CENTER_EXPORT=$target" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+    Write-Output "ATLAS_INSTALLED_GUI_CENTER_JSON_EXPORT_PASS revision=$($saved.revision) projects=1 works=2 dependencies=1 generationUnchanged=true"
+}
+
 function Send-AtlasProject([string]$name, [System.Diagnostics.Process]$process) {
     # Verify React really opened its editor before entering project data.
     Click-AtlasCreateProject $process
@@ -313,6 +395,10 @@ try {
                 [System.Windows.Forms.SendKeys]::SendWait('{ESC}')
                 Wait-AtlasTitle $process 'Таблица'
                 Write-Output 'ATLAS_INSTALLED_SAVED_PROJECT_REF_DIALOG_PASS'
+                # Exercise the native Save As route from this same saved ProjectRef.
+                Click-AtlasAt $process 758 284
+                Wait-AtlasTitle $process 'Ссылка на проект'
+                Export-AtlasSavedJsonForCenter $process $saved $names[0]
                 Click-AtlasTab $process 'timeline'
                 Wait-AtlasTitle $process 'График'
                 Capture-AtlasView 'installed-gantt'
