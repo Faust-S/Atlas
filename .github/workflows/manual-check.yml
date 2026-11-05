@@ -106,3 +106,59 @@ jobs:
         run: npm run build
       - name: Verify packaged K01 module is present in compiled WebView assets
         run: node desktop/tests/k01-webview-bundle.mjs
+
+  # Opt-in real installed Windows acceptance on this K01 feature branch only.
+  # Reuses the existing Atlas 0.3 workflow and is gated by the tested Linux SHA.
+  native-k01-windows:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[k01-windows]')
+    needs: unit-tests
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build exact K01-enabled Windows NSIS package
+        working-directory: desktop
+        shell: pwsh
+        run: |
+          npm ci --no-audit --no-fund
+          npm run desktop:build
+      - name: Install this exact NSIS package on the hosted Windows desktop
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $installer=Get-ChildItem desktop/src-tauri/target/release/bundle/nsis -Filter '*.exe' | Select-Object -First 1
+          if (!$installer) { throw 'Atlas K01 NSIS installer is missing' }
+          $p=Start-Process -FilePath $installer.FullName -ArgumentList '/S' -PassThru
+          try { $p | Wait-Process -Timeout 95 -ErrorAction Stop }
+          catch {
+            if (!$p.HasExited) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue }
+            throw 'Atlas K01 NSIS silent installation exceeded timeout'
+          }
+          $p.Refresh()
+          if ($p.ExitCode -ne 0) { throw "Atlas NSIS installer exit code $($p.ExitCode)" }
+          $exe=Join-Path $env:LOCALAPPDATA 'IWXA Atlas\iwxa-atlas-desktop.exe'
+          if (!(Test-Path -LiteralPath $exe)) { throw "Atlas K01 installed executable missing: $exe" }
+          "ATLAS_INSTALLED_EXE=$exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Output 'ATLAS_K01_INSTALLED_NSIS_PASS'
+      - name: Install existing Windows GUI automation dependencies
+        shell: pwsh
+        run: python -m pip install pywinauto==0.6.9 pillow==11.3.0
+      - name: Check Windows K01 GUI acceptance driver syntax
+        shell: pwsh
+        run: python -m py_compile desktop/tests/installed-windows-k01.py
+      - name: Exercise installed K01 GUI with public GitHub and cold restart
+        shell: pwsh
+        timeout-minutes: 12
+        run: python desktop/tests/installed-windows-k01.py
+      - name: Retain installed K01 GUI evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas03-k01-installed-windows-evidence
+          path: desktop/tests/visual-evidence/installed-k01-*.png
+          if-no-files-found: ignore
+          retention-days: 3
