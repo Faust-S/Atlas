@@ -23,7 +23,37 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  k01-generate-lock-once:
+    if: github.event_name == 'push' && contains(github.event.head_commit.message, '[k01-lock]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Resolve locked K01 Git dependency from its pinned public commit
+        working-directory: desktop
+        run: |
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          npm ci --ignore-scripts --no-audit --no-fund
+      - name: Commit exact npm-generated lockfile in this feature branch only
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add desktop/package-lock.json
+          if git diff --cached --quiet; then
+            echo "ATLAS_K01_LOCK_ALREADY_PINNED"
+          else
+            git commit -m "chore(atlas03-k01): pin npm-generated K01 dependency lock"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
   unit-tests:
+    if: ${{ !contains(github.event.head_commit.message, '[k01-lock]') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

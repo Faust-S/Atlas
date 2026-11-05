@@ -12,6 +12,7 @@
     "desktop:build": "tauri build"
   },
   "dependencies": {
+    "@iwxa/k01-context": "git+https://github.com/Faust-S/knowledge.git#217debaad8a17b19b7ef883eca07dccc045ec9a8",
     "@tauri-apps/api": "2.12.3",
     "react": "19.2.0",
     "react-dom": "19.2.0"
