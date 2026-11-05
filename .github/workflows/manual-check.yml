@@ -104,3 +104,5 @@ jobs:
       - name: Verify production desktop build
         working-directory: desktop
         run: npm run build
+      - name: Verify packaged K01 module is present in compiled WebView assets
+        run: node desktop/tests/k01-webview-bundle.mjs

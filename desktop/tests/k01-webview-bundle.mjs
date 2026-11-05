@@ -1,0 +1,12 @@
+import {readFileSync,readdirSync} from 'node:fs';
+import {join} from 'node:path';
+import assert from 'node:assert/strict';
+const root=new URL('../dist/assets/',import.meta.url);
+const files=readdirSync(root).filter(name=>name.endsWith('.js'));
+assert.ok(files.length>0,'Vite JavaScript assets absent');
+const content=files.map(name=>readFileSync(new URL(name,root),'utf8')).join('\n');
+assert.match(content,/K01: найти контекст/,'Sources user action absent from compiled WebView frontend');
+assert.match(content,/K01: сохранённая редакция Atlas изменилась/,'native revision recheck absent from compiled frontend');
+assert.match(content,/file-line/,'versioned K01 evidence adapter absent from compiled frontend');
+assert.match(content,/sha256/,'SHA-256 provenance absent from compiled frontend');
+process.stdout.write('ATLAS_K01_COMPILED_WEBVIEW_MODULE_PASS\n');
