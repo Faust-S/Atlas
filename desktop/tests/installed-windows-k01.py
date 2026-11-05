@@ -257,6 +257,32 @@ def wait_gui_text(needle, timeout=45):
     raise RuntimeError("Installed GUI did not render expected text " + needle)
 
 
+def bring_k01_result_into_view():
+    # On 1024x768 hosted WebView2, evidence detail is below the source row.
+    # Actual keyboard focus/navigation scrolls the installed UI; no DOM/CDP.
+    button = find_control("Button", "K01: найти контекст", timeout=8)
+    if button is None:
+        diagnostics("k01-select-button-not-found")
+        raise RuntimeError("K01 source action missing before evidence inspection")
+    button.set_focus()
+    keyboard.send_keys("{TAB}")
+    for attempt in range(12):
+        try:
+            nodes = window.descendants()
+            labels = [(item.element_info.name or "") for item in nodes]
+            if any("Provenance:" in label for label in labels) and \
+               any("SHA-256:" in label for label in labels) and \
+               any("line:" in label for label in labels):
+                print("ATLAS_K01_INSTALLED_PROVENANCE_VISIBLE_PASS attempt=" + str(attempt+1), flush=True)
+                return
+        except Exception:
+            pass
+        keyboard.send_keys("{PGDN}")
+        time.sleep(0.4)
+    diagnostics("k01-provenance-below-viewport")
+    raise RuntimeError("Installed WebView2 evidence provenance unavailable after keyboard scrolling")
+
+
 def click_save():
     click_button("Сохранить")
 
@@ -337,7 +363,7 @@ def run_route():
     # The installed UI must render the actual selected public evidence,
     # not only a generic success notice.
     wait_gui_text("1. **Task Discovery / Activity Research / U1 / Cross-Lab:**")
-    wait_gui_text("Provenance: line:")
+    bring_k01_result_into_view()
     print("ATLAS_K01_INSTALLED_EVIDENCE_TEXT_PASS",flush=True)
     screenshot("current-context")
     click_button("Повторно проверить")
@@ -356,6 +382,7 @@ def run_route():
     fill_edit("K01 ветка", BRANCH)
     click_button("K01: найти контекст")
     wait_gui_text("Свидетельство отобрано")
+    bring_k01_result_into_view()
     click_button("Повторно проверить")
     wait_gui_text("Актуальность подтверждена")
     reopened, project2 = saved_state()
