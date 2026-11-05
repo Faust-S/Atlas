@@ -1,7 +1,8 @@
 // Atlas 0.3 optional K01 desktop consumer. Public GitHub read-only sources.
 // Canonical Atlas persistence and permissions remain the host's responsibility.
 import {selectContext,revalidateProjection} from '@iwxa/k01-context';
-import {createAtlasProjectObservationPort,atlasProjectSourceRef} from '@iwxa/k01-context/atlas-project-source';
+import {atlasProjectSourceRef} from '@iwxa/k01-context/atlas-project-source';
+import {createAtlasPublicRepoObservationPort} from '@iwxa/k01-context/atlas-public-source';
 import {observePublicRepo} from '../../src/github-public.mjs';
 import {createAtlasK01ContextHost} from '../../src/k01-context-host.mjs';
 
@@ -48,13 +49,16 @@ export function createAtlasK01DesktopService({
   const k01={selectContext,revalidateProjection,atlasProjectSourceRef};
   const makeHost=({branch,path,phrase,pinnedRevision})=>createAtlasK01ContextHost({
     k01,openSavedSnapshot,authorize,
-    observationPort:async ({projectId,sourceId,source,sourceRef})=>{
+    observationPort:async ({source,sourceRef})=>{
+      // Atlas host validates persisted ProjectRef, source identity, authority
+      // and current native generation before and after every K01 invocation.
+      // Repeating that read inside the source adapter can suppress otherwise
+      // valid candidates. Keep K01 focused on public source revision/evidence.
       if(source.kind!=='github'||source.summary?.complete!==true||
          !Object.hasOwn(source.summary.branchHeads??{},branch))
         throw Error('K01: выбранная ветка отсутствует в сохранённом источнике.');
-      return createAtlasProjectObservationPort({
-        projectId,sourceId,repository:source.locator,branch,
-        getSnapshot:openSavedSnapshot,
+      return createAtlasPublicRepoObservationPort({
+        sourceRef,repository:source.locator,branch,
         pinnedItems:[{id:'file-line',type:'github-file',sourceRef,revision:pinnedRevision,
           epistemic:'observed',estimatedTokens:160,keywords:[phrase]}],
         observeRepository:async ({repository})=>observePublicRepo(repository,fetcher,{maxPages:10}),
