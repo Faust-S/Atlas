@@ -130,9 +130,9 @@ function EditorPanel({editor,onSubmit,onCancel,onDirtyChange,busy}:{
  </section>
 }
 export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
- const invoke:typeof nativeInvoke=host
-  ? <T,>(command:string,args?:Record<string,unknown>)=>invokeAtlasHost<T>(host,command,args)
-  : nativeInvoke;
+ const invoke=<T,>(command:string,args?:Record<string,unknown>):Promise<T>=>host
+  ? invokeAtlasHost<T>(host,command,args)
+  : nativeInvoke<T>(command,args);
  const embedded=Boolean(host);
  const [data,setData]=useState<Atlas>(()=>empty());
  const [ready,setReady]=useState(false),[busy,setBusy]=useState(false);
