@@ -29,7 +29,7 @@ test("native import, export and background mutations cannot discard an open form
  assert.match(ui,/disabled=\{busy\|\|!!editor\|\|pendingImport!==null\}>Открыть JSON/);
  assert.match(ui,/disabled=\{busy\|\|dirty\|\|!!editor\|\|!persisted\}>Резервная копия/);
  assert.match(ui,/disabled=\{!!editor\} className="icon-button inspector-button"/);
- assert.match(ui,/useState\(\(\)=>window\.innerWidth>1220\)/);
+ assert.match(ui,/useState\(\(\)=>!host&&window\.innerWidth>1220\)/);
  assert.match(ui,/aria-label=\{inspector\?"Скрыть инспектор":"Показать инспектор"\}/);
 });
 
@@ -50,7 +50,7 @@ test("JSON preview guards a draft until human approval and native generation rec
 
 
 test("R3 keyboard and sidebar navigation allow untouched forms, block changed fields",()=>{
- assert.match(ui,/if\(!editorDirtyRef\.current\)\{\s*setEditor\(null\);\s*if\(window\.innerWidth<=1220\)setInspector\(false\);\s*return true;/);
+ assert.match(ui,/if\(!editorDirtyRef\.current\)\{\s*setEditor\(null\);\s*if\(embedded\|\|window\.innerWidth<=1220\)setInspector\(false\);\s*return true;/);
  const handlers=ui.slice(ui.indexOf(" const key=(event:KeyboardEvent)=>"),ui.indexOf('window.addEventListener("keydown",key)'));
  assert.equal((handlers.match(/if\(!requireClosedForm\(\)\)return/g)||[]).length,3);
  assert.doesNotMatch(handlers,/if\(editorOpenRef\.current\)\{issue\(Error\("Сначала примените или закройте/);
