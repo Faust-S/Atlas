@@ -1,6 +1,5 @@
 import React,{useEffect,useMemo,useRef,useState} from "react";
-import {createRoot} from "react-dom/client";
-import {invoke,isTauri} from "@tauri-apps/api/core";
+import {invoke as nativeInvoke,isTauri} from "@tauri-apps/api/core";
 import {getCurrentWindow} from "@tauri-apps/api/window";
 import {empty,deserialize,serialize,editItem,removeStage,removeItem,disconnect,removeProject as dropProject} from "../../src/core.mjs";
 import {removePortfolioLink} from "../../src/portfolio.mjs";
@@ -21,7 +20,7 @@ import {commitWithReadback,readSavedSnapshotForReference} from "./native-save.mj
 import {projectHistoryRows} from "./history-view.mjs";
 import {sortWorkRows} from "./work-sorting.mjs";
 import {createAtlasSavedRef} from "../../src/project-host-port.mjs";
-import "./style.css";
+import {invokeAtlasHost,type AtlasEmbeddedHost} from "./embedded-host";
 
 type Atlas = any;
 type HistoryEntry = {generation:string;revision:number;projects:number};
@@ -130,7 +129,11 @@ function EditorPanel({editor,onSubmit,onCancel,onDirtyChange,busy}:{
   </form>
  </section>
 }
-function App(){
+export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
+ const invoke:typeof nativeInvoke=host
+  ? <T,>(command:string,args?:Record<string,unknown>)=>invokeAtlasHost<T>(host,command,args)
+  : nativeInvoke;
+ const embedded=Boolean(host);
  const [data,setData]=useState<Atlas>(()=>empty());
  const [ready,setReady]=useState(false),[busy,setBusy]=useState(false);
  const [generation,setGeneration]=useState("none");
@@ -177,7 +180,7 @@ function App(){
  const dirtyRef=useRef(false),busyRef=useRef(false),editorOpenRef=useRef(false);
  const editorDirtyRef=useRef(false);
  dirtyRef.current=dirty;busyRef.current=busy;editorOpenRef.current=!!editor;
- const native=isTauri();
+ const native=embedded||isTauri();
  const dates=useMemo(()=>portfolioSchedule(data),[data]);
  const resources=useMemo(()=>portfolioResources(data,{schedule:dates} as any),[data,dates]);
  const reviews=useMemo(()=>planReviewQueue(data),[data]);
@@ -224,6 +227,7 @@ function App(){
    if(latestSnapshot.current!==startedWith||dirtyRef.current||editorOpenRef.current)
     throw Error("Черновик изменился во время проверки. Ссылка не сформирована.");
    const ref=createAtlasSavedRef(checked,{projectId,...(workId?{workId}:{})},{persisted:true,dirty:false});
+   host?.onSelection?.({projectId,workId:workId??null,revision:ref.revision});
    setSavedRefPreview({label:workId?"Ссылка на работу":"Ссылка на проект",
     json:JSON.stringify(ref,null,2),revision:ref.revision,generation:expectedGeneration});
    setError("");
@@ -257,6 +261,7 @@ function App(){
    setData(snapshot);saved.current=snapshotText(snapshot);setGeneration(result.generation);setReady(true);
   }).catch(issue);
   let unlisten:undefined|(()=>void);
+  if(embedded)return;
   getCurrentWindow().onCloseRequested(event=>{
    if(allowCloseRef.current)return;
    if(savedRefOpenRef.current){
@@ -283,10 +288,10 @@ function App(){
    }
   }).then(fn=>{unlisten=fn}).catch(issue);
   return ()=>{unlisten?.()};
- },[native]);
+ },[native,embedded]);
  // Keep the system window title synchronized with the React project/view.
  useEffect(()=>{
-  if(!native||!ready)return;
+  if(!native||!ready||embedded)return;
   const subject=String(project?.name||"Портфель").replace(/\s+/g," ").trim().slice(0,84);
   const display=project?(tabs.find(t=>t.key===tab)?.title||"Обзор"):"Обзор";
   // Show an open form and an unsaved draft in the native taskbar/title bar.
@@ -298,9 +303,10 @@ function App(){
    dirty?" · Не сохранено":"";
   void getCurrentWindow().setTitle("IWXA Atlas — "+subject+" — "+display+suffix)
    .catch(error=>console.warn("Atlas native window title unavailable",error));
- },[native,ready,project?.name,tab,editor?.spec.title,dirty,savedRefPreview?.label]);
+ },[native,embedded,ready,project?.name,tab,editor?.spec.title,dirty,savedRefPreview?.label]);
  const selectProject=(id:string|null,afterSubmit=false)=>{
   if(!afterSubmit&&!requireClosedForm())return;
+  host?.onSelection?.({projectId:id,workId:null,revision:String(latestSnapshot.current.revision)});
   setActive(id);setTab("overview");setEditor(null);setForecastId(null);
   if(!afterSubmit)setMessage("");
   setWorkFilter("all");setWorkQuery("");setWorkSort("title");setWorkLimit(200);
@@ -381,11 +387,14 @@ function App(){
     "Запись найдена и сверена с диском после потери ответа нативной команды.":
     "Сохранено и перечитано с диска. Новых файлов проектов: "+result.projectBlocksWritten+".";
    setMessage(notice+(changedWhileSaving?" Изменения, внесённые во время записи, ещё не сохранены.":""));
+   host?.onReadback?.({generation:result.generation,revision:String(startedWith.revision),
+    projectId:active,dirty:changedWhileSaving});
    setError("");
    return !changedWhileSaving;
   }catch(e){issue(e);return false}finally{busyRef.current=false;setBusy(false)}
  };
  const closeWindow=async()=>{
+  if(embedded){issue(Error("Закрытие встроенной поверхности выполняет Personal Agent через U04."));return}
   // Existing allow-close capability; explicit user intent bypasses only the
   // close warning, not any native write or permission boundary.
   allowCloseRef.current=true;
@@ -632,7 +641,7 @@ function App(){
    {native&&!recovery&&!error&&<p className="minor">Открытие нативного хранилища…</p>}
   </div>
  </main>;
- return <div className={"app-shell"+(inspector?"":" no-inspector")+(editor?" editor-active":"")}>
+ return <div className={"app-shell"+(inspector?"":" no-inspector")+(editor?" editor-active":"")+(embedded?" atlas-embedded":"")}>
   <aside className="sidebar">
    <div className="brand"><img className="logo-symbol" src="/atlas-mark.svg" alt="" aria-hidden="true" /><div><strong>Atlas</strong><small>IWXA · 0.3 Development</small></div></div>
    <nav className="main-nav" aria-label="Основная навигация">
@@ -649,7 +658,7 @@ function App(){
     </button>}
     {!filtered.length&&<small className="nav-hint">Проекты не найдены</small>}
    </div>
-   <div className="sidebar-foot"><div className="foot-title">Локальная работа</div><p>Без Agent и сервера. Данные сохраняются по вашей команде.</p><small>Схема: atlas.project/1</small></div>
+   <div className="sidebar-foot"><div className="foot-title">{embedded?"Atlas в Personal Agent":"Локальная работа"}</div><p>{embedded?"Полный интерфейс Atlas. Хранилище принадлежит Atlas; команды разрешает host.":"Без Agent и сервера. Данные сохраняются по вашей команде."}</p><small>Схема: atlas.project/1</small></div>
   </aside>
   <main className="workspace">
    <header className="commandbar">
@@ -1108,4 +1117,4 @@ function AmendmentForecast({state,projectId,changeId,onApply,canApply,onError}:{
   {canApply&&<Action onClick={onApply} primary>Применить утверждённый план</Action>}
  </div>;
 }
-createRoot(document.getElementById("root")!).render(<AtlasRenderBoundary><App/></AtlasRenderBoundary>);
+export {AtlasRenderBoundary};
