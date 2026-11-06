@@ -18,7 +18,8 @@ test("SVG is byte-identical to Agent branding except green replaced by blue",()=
  const restored=svg.replace("#3F96ED","#B6F24B");
  assert.equal(gitBlobSha(restored),"9a331ea8bb87e99a59f8716500540dd1e093905d");
  assert.equal((svg.match(/#3F96ED/g)||[]).length,1);
- assert.equal((ui.match(/src=\{logoUrl\}/g)||[]).length,3);
+ assert.equal((ui.match(/src=\{logoUrl\}/g)||[]).length,2);
+ assert.match(ui,/src=\{this\.props\.logoUrl\?\?"\/atlas-mark\.svg"\}/);
  assert.match(ui,/host\?\.assetUrl\?\?"\/atlas-mark\.svg"/);
  assert.doesNotMatch(ui,/<span className="logo-symbol">A<\/span>/);
  assert.match(styles,/\.logo-symbol\{display:block;width:44px/);

@@ -56,7 +56,7 @@ const stable=(value:any):any=>Array.isArray(value)?value.map(stable):
  value&&typeof value==="object"?Object.fromEntries(Object.keys(value).sort().map(k=>[k,stable(value[k])])):value;
 const snapshotText=(v:Atlas)=>JSON.stringify(stable(v));
 const deepFreezeError=(e:unknown)=>e instanceof Error?e.message:String(e);
-class AtlasRenderBoundary extends React.Component<{children:React.ReactNode},{failure:string|null}>{
+class AtlasRenderBoundary extends React.Component<{children:React.ReactNode;logoUrl?:string},{failure:string|null}>{
  state:{failure:string|null}={failure:null};
  static getDerivedStateFromError(error:unknown){
   return {failure:error instanceof Error?error.message:String(error)};
@@ -67,7 +67,7 @@ class AtlasRenderBoundary extends React.Component<{children:React.ReactNode},{fa
  render(){
   if(this.state.failure){
    return <main className="entry"><div className="entry-card">
-    <img className="logo-symbol" src={logoUrl} alt="" aria-hidden="true" /><h1>Atlas: ошибка интерфейса</h1>
+    <img className="logo-symbol" src={this.props.logoUrl??"/atlas-mark.svg"} alt="" aria-hidden="true" /><h1>Atlas: ошибка интерфейса</h1>
     <p role="alert" className="error">Ошибка при отображении: {this.state.failure}</p>
     <p>Сохранённые данные не изменены. Закройте и повторно откройте программу; при повторении ошибки сохраните это сообщение для диагностики.</p>
    </div></main>;

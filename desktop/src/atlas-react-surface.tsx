@@ -14,6 +14,6 @@ export function mountAtlasSurface(target:HTMLElement,host:AtlasEmbeddedHost):()=
  const region=document.createElement("div");
  region.className="atlas-host-root";shadow.append(region);
  const root:Root=createRoot(region);
- root.render(<AtlasRenderBoundary><AtlasWorkspace host={host}/></AtlasRenderBoundary>);
+ root.render(<AtlasRenderBoundary logoUrl={host.assetUrl}><AtlasWorkspace host={host}/></AtlasRenderBoundary>);
  return ()=>{root.unmount();region.remove();style.remove();};
 }
