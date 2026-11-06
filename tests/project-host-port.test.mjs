@@ -49,3 +49,19 @@ test("unavailable optional Agent/Center does not affect offline Atlas snapshot",
  assert.throws(()=>createAtlasProjectReadPort({openSnapshot:()=>f.state}),/ATLAS_HOST_BOUNDARY_REQUIRED/);
  assert.equal(serialize(f.state),persisted);
 });
+
+test("P04 observes current Atlas revision without rewriting old ProjectRef/WorkRef",async()=>{
+ const f=fixture(),reference=Object.freeze({projectId:f.projectId,workId:f.workId,revision:String(f.state.revision)});
+ const port=createAtlasProjectReadPort({openSnapshot:()=>f.state,authorize:()=>true});
+ const original=await port.observeRevision(reference,{workspaceId:"personal"});
+ assert.equal(original.status,"SOURCE_REVISION_MATCHES");
+ f.state=editProject(f.state,f.projectId,{name:"Changed in canonical Atlas"});
+ const outdated=await port.observeRevision(reference,{workspaceId:"personal"});
+ assert.equal(outdated.status,"SOURCE_REVISION_CHANGED");
+ assert.equal(outdated.currentRevision,String(f.state.revision));
+ assert.equal(reference.revision,original.ref.revision);
+ assert.equal((await port.observeRevision({...reference,workId:"removed"},{workspaceId:"personal"})).status,"WORK_MISSING_IN_SOURCE");
+ assert.equal((await port.observeRevision({...reference,projectId:"missing"},{workspaceId:"personal"})).status,"PROJECT_MISSING_IN_SOURCE");
+ const blocked=createAtlasProjectReadPort({openSnapshot:()=>f.state,authorize:()=>false});
+ await assert.rejects(blocked.observeRevision(reference,{workspaceId:"personal"}),/ATLAS_HOST_AUTHORIZATION_DENIED/);
+});

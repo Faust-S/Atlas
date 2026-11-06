@@ -55,6 +55,18 @@ export function createAtlasProjectReadPort({openSnapshot,authorize}={}){
    return Object.freeze({ref:r,name:p.name,status:p.status,goal:p.goal??"",owner:p.owner??"",dueDate:p.dueDate??null,
     workCount:p.items.length,blockedCount:p.items.filter(i=>i.state==="blocked").length});
   },
+  // Observation is not permission to use or refresh a stale reference.
+  // Keep the original ref immutable even when Atlas has a newer revision.
+  async observeRevision(ref,context){
+   const r=normalizeRef(ref,Boolean(ref?.workId));
+   await permitted(authorize,{context,kind:"revision",ref:r});
+   const snapshot=await current();
+   const project=snapshot.projects.find(p=>p.id===r.projectId);
+   const status=!project?"PROJECT_MISSING_IN_SOURCE":
+    r.workId&&!project.items.some(item=>item.id===r.workId)?"WORK_MISSING_IN_SOURCE":
+    String(snapshot.revision)!==r.revision?"SOURCE_REVISION_CHANGED":"SOURCE_REVISION_MATCHES";
+   return Object.freeze({ref:r,currentRevision:String(snapshot.revision),status});
+  },
   async work(ref,context){
    const r=normalizeRef(ref,true);
    await permitted(authorize,{context,kind:"work",ref:r});
