@@ -11,6 +11,7 @@ export const ATLAS_HOST_COMMANDS:ReadonlySet<string>=new Set<AtlasHostCommand>([
 export interface AtlasEmbeddedHost {
  invoke:<T>(command:AtlasHostCommand,args?:AtlasHostArgs)=>Promise<T>;
  authorizeCommand:(command:AtlasHostCommand,args?:AtlasHostArgs)=>Promise<boolean>|boolean;
+ assetUrl?:string; // Host-served Atlas logo; standalone keeps its existing public asset
  onSelection?:(ref:{projectId:string|null;workId:string|null;revision:string})=>void;
  onReadback?:(result:{generation:string;revision:string;projectId:string|null;dirty:boolean})=>void;
 }

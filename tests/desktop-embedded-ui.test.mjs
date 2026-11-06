@@ -22,3 +22,8 @@ test("host uses isolated CSS and cannot mutate host window title or close it",()
  assert.match(main,/if\(embedded\)\{issue\(Error\("Закрытие встроенной поверхности/);
  assert.match(css,/\.atlas-host-root \.app-shell\.atlas-embedded/);
 });
+
+test("host supplies Atlas logo asset URL without changing standalone branding",()=>{
+ assert.match(main,/const logoUrl=host\?\.assetUrl\?\?"\/atlas-mark\.svg"/);
+ assert.equal((main.match(/src=\{logoUrl\}/g)||[]).length,3);
+});
