@@ -134,6 +134,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   ? invokeAtlasHost<T>(host,command,args)
   : nativeInvoke<T>(command,args);
  const embedded=Boolean(host);
+ const rootRef=useRef<HTMLDivElement|null>(null);
  const logoUrl=host?.assetUrl??"/atlas-mark.svg";
  const [data,setData]=useState<Atlas>(()=>empty());
  const [ready,setReady]=useState(false),[busy,setBusy]=useState(false);
@@ -143,7 +144,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const [portfolioStatus,setPortfolioStatus]=useState("all");
  const [boardLimits,setBoardLimits]=useState<Record<string,number>>({});
  const [message,setMessage]=useState(""),[error,setError]=useState("");
- const [inspector,setInspector]=useState(()=>window.innerWidth>1220),[recovery,setRecovery]=useState(false);
+ const [inspector,setInspector]=useState(()=>!host&&window.innerWidth>1220),[recovery,setRecovery]=useState(false);
  const [closeGuard,setCloseGuard]=useState(false);
  const allowCloseRef=useRef(false);
  const saved=useRef<string>(snapshotText(empty()));
@@ -181,6 +182,10 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const dirtyRef=useRef(false),busyRef=useRef(false),editorOpenRef=useRef(false);
  const editorDirtyRef=useRef(false);
  dirtyRef.current=dirty;busyRef.current=busy;editorOpenRef.current=!!editor;
+ // The host can prevent U04 detachment while the Atlas draft is unsaved.
+ useEffect(()=>{
+  host?.onStateChange?.({ready,dirty,formOpen:!!editor,busy,revision:String(data.revision),generation});
+ },[host,ready,dirty,editor,busy,data.revision,generation]);
  const native=embedded||isTauri();
  const dates=useMemo(()=>portfolioSchedule(data),[data]);
  const resources=useMemo(()=>portfolioResources(data,{schedule:dates} as any),[data,dates]);
@@ -248,7 +253,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   if(!editorOpenRef.current)return true;
   if(!editorDirtyRef.current){
    setEditor(null);
-   if(window.innerWidth<=1220)setInspector(false);
+   if(embedded||window.innerWidth<=1220)setInspector(false);
    return true;
   }
   issue(Error("Открытая форма содержит неприменённые данные. Примените её (Ctrl+Enter) или нажмите «Отмена» перед переходом."));
@@ -340,7 +345,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const cancelEditor=()=>{
   if(editorDirtyRef.current&&!confirmAction("Отказаться от введённых изменений формы?"))return;
   editorDirtyRef.current=false;setEditor(null);
-  if(window.innerWidth<=1220)setInspector(false);
+  if(embedded||window.innerWidth<=1220)setInspector(false);
  };
  const submit=(event:React.FormEvent<HTMLFormElement>)=>{
   event.preventDefault();
@@ -354,7 +359,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    mutate(result.state,"Изменение внесено в черновик. Для записи на диск нажмите «Сохранить».");
    if(result.projectId)selectProject(result.projectId,true);
    editorDirtyRef.current=false;setEditor(null);
-   if(window.innerWidth<=1220)setInspector(false);
+   if(embedded||window.innerWidth<=1220)setInspector(false);
   }catch(e){issue(e)}
  };
  const save=async():Promise<boolean>=>{
@@ -576,6 +581,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  };
  useEffect(()=>{
   const key=(event:KeyboardEvent)=>{
+   // Agent retains its own shortcuts unless keyboard focus is inside Atlas.
+   // composedPath sees Shadow DOM descendants even after event retargeting.
+   if(embedded && (!rootRef.current || !event.composedPath().includes(rootRef.current)))return;
    const ctrl=event.ctrlKey||event.metaKey,code=event.code;
    // Both the import preview and native history are modal.
    if(pendingImport!==null){
@@ -629,7 +637,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     openEditor("new");return;
    }
    if(event.key==="Escape"&&editorOpenRef.current){event.preventDefault();cancelEditor();return}
-   if(ctrl&&!event.shiftKey&&code==="KeyK"){event.preventDefault();document.getElementById("atlas-search")?.focus()}
+   if(ctrl&&!event.shiftKey&&code==="KeyK"){event.preventDefault();rootRef.current?.querySelector<HTMLInputElement>("#atlas-search")?.focus()}
   };
   window.addEventListener("keydown",key);return ()=>window.removeEventListener("keydown",key);
  });
@@ -642,7 +650,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    {native&&!recovery&&!error&&<p className="minor">Открытие нативного хранилища…</p>}
   </div>
  </main>;
- return <div className={"app-shell"+(inspector?"":" no-inspector")+(editor?" editor-active":"")+(embedded?" atlas-embedded":"")}>
+ return <div ref={rootRef} className={"app-shell"+(inspector?"":" no-inspector")+(editor?" editor-active":"")+(embedded?" atlas-embedded":"")}>
   <aside className="sidebar">
    <div className="brand"><img className="logo-symbol" src={logoUrl} alt="" aria-hidden="true" /><div><strong>Atlas</strong><small>IWXA · 0.3 Development</small></div></div>
    <nav className="main-nav" aria-label="Основная навигация">

@@ -28,3 +28,17 @@ test("host supplies Atlas logo asset URL without changing standalone branding",(
  assert.equal((main.match(/src=\{logoUrl\}/g)||[]).length,2);
  assert.match(surface,/AtlasRenderBoundary logoUrl=\{host\.assetUrl\}/);
 });
+
+test("embedded keyboard events are scoped to the Atlas Shadow DOM; Agent shortcuts remain outside",()=>{
+ assert.match(main,/event\.composedPath\(\)\.includes\(rootRef\.current\)/);
+ assert.match(main,/rootRef\.current\?\.querySelector<HTMLInputElement>\("#atlas-search"\)/);
+ assert.match(main,/useState\(\(\)=>!host&&window\.innerWidth>1220\)/);
+});
+test("same host surface can remount without overriding a foreign ShadowRoot",()=>{
+ assert.match(surface,/ownedTargets=new WeakSet<HTMLElement>/);
+ assert.match(surface,/activeTargets=new WeakSet<HTMLElement>/);
+ assert.match(surface,/target\.shadowRoot&&!ownedTargets\.has\(target\)/);
+ assert.match(surface,/if\(detached\)return;/);
+ assert.match(main,/host\?\.onStateChange\?\./);
+ assert.match(css,/@container atlas-panel \(max-width: 650px\)/);
+});

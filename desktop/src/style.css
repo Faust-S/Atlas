@@ -282,3 +282,19 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .atlas-host-root .app-shell.atlas-embedded{height:100%;min-height:0}
 .atlas-host-root .atlas-close-overlay{position:absolute}
 .atlas-host-root .atlas-gantt-panel.is-expanded,.atlas-host-root .atlas-dag-panel.is-expanded{position:absolute}
+
+/* Agent's central panel can be narrower than the overall desktop window. */
+.atlas-host-root{container-type:inline-size;container-name:atlas-panel}
+@container atlas-panel (max-width: 1080px){
+ .atlas-host-root .app-shell.atlas-embedded{grid-template-columns:190px minmax(0,1fr)}
+ .atlas-host-root .app-shell.atlas-embedded:not(.no-inspector) .inspector{
+  position:absolute;right:0;top:0;bottom:0;width:min(355px,58%);z-index:15;
+  background:#fff;box-shadow:-8px 0 25px #16325d29
+ }
+}
+@container atlas-panel (max-width: 650px){
+ .atlas-host-root .app-shell.atlas-embedded{grid-template-columns:145px minmax(0,1fr)}
+ .atlas-host-root .app-shell.atlas-embedded .brand{padding:13px 10px}
+ .atlas-host-root .app-shell.atlas-embedded .brand strong{font-size:21px}
+ .atlas-host-root .app-shell.atlas-embedded .workspace{padding:0 12px 12px}
+}
