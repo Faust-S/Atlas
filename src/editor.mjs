@@ -28,6 +28,18 @@ const sourceOptions=p=>{
  }
  return all;
 };
+// An optional work-specific editor records the origin in the existing ledger.
+function findingWorkContext(project,action){
+ if(!action.startsWith("finding-work:"))return null;
+ const pieces=action.slice("finding-work:".length).split(":");
+ if(pieces.length!==2||pieces.some(value=>!value))throw Error("Неверная ссылка на работу и требование");
+ const [workId,targetId]=pieces.map(decodeURIComponent);
+ const work=project.items.find(item=>item.id===workId);
+ if(!work||!(work.targetIds||[]).includes(targetId)||
+    !(project.targets||[]).some(target=>target.id===targetId))
+  throw Error("Работа не связана с указанным требованием");
+ return {workId,targetId,work};
+}
 export function editorSpec(project,action,snapshot=null){
  if(action==="resource-new"||action.startsWith("resource-edit:")){
   if(!snapshot)throw Error("Для ресурсов требуется портфель");
@@ -181,7 +193,20 @@ export function editorSpec(project,action,snapshot=null){
     field("note","Что именно перепроверено на этой ревизии?","textarea","",true)
    ]};
  }
- if(action==="finding"||action.startsWith("finding-target:"))return {title:"Фактическое состояние — заявление",hint:"Это запись сведений, а не независимая приёмка. Для подтверждения выберите источник и версию.",fields:[choice("targetId","К какому требованию относится",targetOptions(project),action.startsWith("finding-target:")?action.slice("finding-target:".length):targetOptions(project)[0]?.value),choice("result","Что известно",[option("present","Реализовано (заявлено)"),option("partial","Частично"),option("absent","Отсутствует")],"partial"),choice("level","Уровень заявления",[option("implementation","Реализация"),option("test","Тестирование"),option("acceptance","Приёмка")],"implementation"),choice("sourceRef","Внешний источник и ветка",sourceOptions(project),"",false),field("reference","Ссылка на документ или проверку","text","",false),field("note","Что именно наблюдалось","textarea","",false)]};
+ if(action==="finding"||action.startsWith("finding-target:")||action.startsWith("finding-work:")){
+  const context=findingWorkContext(project,action);
+  const targets=context?[option(context.targetId,project.targets.find(t=>t.id===context.targetId).title)]:targetOptions(project);
+  const selected=context?.targetId||(action.startsWith("finding-target:")?action.slice("finding-target:".length):targets[0]?.value);
+  return {title:"Фактическое состояние — заявление",
+   hint:context?"Наблюдение по работе «"+context.work.title+"». Связь с работой сохранится в истории. Это заявление, а не независимая приёмка.":
+    "Это запись сведений, а не независимая приёмка. Для подтверждения выберите источник и версию.",
+   fields:[choice("targetId","К какому требованию относится",targets,selected),
+    choice("result","Что известно",[option("present","Реализовано (заявлено)"),option("partial","Частично"),option("absent","Отсутствует")],"partial"),
+    choice("level","Уровень заявления",[option("implementation","Реализация"),option("test","Тестирование"),option("acceptance","Приёмка")],"implementation"),
+    choice("sourceRef","Внешний источник и ветка",sourceOptions(project),"",false),
+    field("reference","Ссылка на документ или проверку","text","",false),
+    field("note","Что именно наблюдалось","textarea","",false)]};
+ }
  if(action.startsWith("respond:")){
   const key=decodeURIComponent(action.slice(8));
   const signal=projectSignals(project,projectImpact(project)).find(s=>s.key===key);
@@ -309,7 +334,10 @@ export function applyEditor(snapshot,projectId,action,input){
    reference:get("reference"),note:get("note"),reviewOfFindingId:candidate.claim.id
   }).state};
  }
- if(action==="finding"||action.startsWith("finding-target:")){
+ if(action==="finding"||action.startsWith("finding-target:")||action.startsWith("finding-work:")){
+  const context=findingWorkContext(p,action);
+  if(context&&get("targetId")!==context.targetId)
+   throw Error("Нельзя изменить требование для наблюдения по конкретной работе");
   const sourceRef=get("sourceRef");
   const marker=sourceRef.indexOf("::");
   const sourceId=marker>=0?sourceRef.slice(0,marker):null;
@@ -317,7 +345,7 @@ export function applyEditor(snapshot,projectId,action,input){
   const source=p.sources.find(s=>s.id===sourceId);
   if(sourceId&&!source)throw Error("Источник не найден");
   const revision=source&&source.status==="ok"&&ref?source.summary?.branchHeads?.[ref]||null:null;
-  return {state:recordFinding(snapshot,projectId,{targetId:get("targetId"),result:get("result"),level:get("level"),sourceId,ref,revision,reference:get("reference"),note:get("note")}).state};
+  return {state:recordFinding(snapshot,projectId,{targetId:get("targetId"),result:get("result"),level:get("level"),sourceId,ref,revision,reference:get("reference"),note:get("note"),workId:context?.workId??null}).state};
  }
  if(action.startsWith("respond:")){
   const key=decodeURIComponent(action.slice(8));

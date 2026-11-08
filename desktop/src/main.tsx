@@ -979,6 +979,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
            ({present:"Заявлено наличие",partial:"Заявлено частично",absent:"Заявлено отсутствие"} as Record<string,string>)[r.observation.result]||r.observation.result:"Факт не внесён"}</Badge>
           {r.observation&&<p>Уровень: {({implementation:"Реализация",test:"Тестирование",acceptance:"Заявлена приёмка"} as Record<string,string>)[r.observation.level]||r.observation.level}
            {" · "}Дата: {readable(r.observation.observedAt)}</p>}
+          {r.observation?.workId&&<p>Наблюдение по работе: <button className="text-link" type="button"
+           aria-label={"Открыть работу, связанную с наблюдением: "+r.observation.workTitle}
+           onClick={()=>openEditor("work:"+r.observation.workId)}>{r.observation.workTitle}</button></p>}
           {r.source?<p title={r.source.revision||""}>Источник: {r.source.locator}
            {r.source.ref?" / "+r.source.ref:""}{r.source.revision?" · "+r.source.revision.slice(0,12):""}</p>:
            <p>Внешний источник не привязан</p>}
@@ -1152,13 +1155,13 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
        <td><Action onClick={()=>openEditor("work:"+w.id)}>Открыть</Action>
         {(w.targetIds||[]).length===1&&targetById.get(w.targetIds[0])&&
          <Action ariaLabel={"Зафиксировать факт по работе: "+w.title+" — "+targetById.get(w.targetIds[0]).title}
-          onClick={()=>openEditor("finding-target:"+w.targetIds[0])}>＋ Факт</Action>}
+          onClick={()=>openEditor("finding-work:"+encodeURIComponent(w.id)+":"+encodeURIComponent(w.targetIds[0]))}>＋ Факт</Action>}
         {(w.targetIds||[]).length>1&&<details className="atlas-work-fact-menu">
          <summary>Факт по требованию ({w.targetIds.length})</summary>
          <div className="button-row">
           {w.targetIds.map((id:string)=>targetById.get(id)&&<Action key={id}
            ariaLabel={"Зафиксировать факт по работе: "+w.title+" — "+targetById.get(id).title}
-           onClick={()=>openEditor("finding-target:"+id)}>{targetById.get(id).title}</Action>)}
+           onClick={()=>openEditor("finding-work:"+encodeURIComponent(w.id)+":"+encodeURIComponent(id))}>{targetById.get(id).title}</Action>)}
          </div></details>}
         <Action disabled={busy||dirty||!persisted||!!editor} onClick={()=>showSavedReference(project.id,w.id)} title="Только сохранённая редакция">Ссылка</Action>
         <Action onClick={()=>removeWork(w.id)}>Удалить</Action></td></tr>)}</tbody></table></div>

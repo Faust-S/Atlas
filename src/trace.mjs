@@ -33,11 +33,18 @@ export function addTarget(snapshot,projectId,{title,desired,intent="committed",p
   p.targets.push(target);return target.id;
  });
 }
-export function recordFinding(snapshot,projectId,{targetId,result,level="implementation",sourceId=null,ref=null,revision=null,reference=null,observedAt=null,note="",reviewOfFindingId=null}){
+export function recordFinding(snapshot,projectId,{targetId,result,level="implementation",sourceId=null,ref=null,revision=null,reference=null,observedAt=null,note="",reviewOfFindingId=null,workId=null}){
  if(!EVIDENCE_RESULT.has(result)||!EVIDENCE_LEVEL.has(level))throw Error("Invalid finding");
  return mutate(snapshot,projectId,p=>{
   if(!p.targets.some(t=>t.id===targetId))throw Error("Unknown target");
   if(sourceId&&!p.sources.some(s=>s.id===sourceId))throw Error("Unknown source");
+  // Check the work/requirement link at observation time, without rewriting
+  // its historical origin if the plan is later reassigned.
+  if(workId!=null){
+   const work=p.items.find(w=>w.id===workId);
+   if(!work||!(work.targetIds||[]).includes(targetId))
+    throw Error("Работа не связана с указанным требованием");
+  }
   if(reviewOfFindingId!=null){
    const previous=p.findings.find(e=>e.id===reviewOfFindingId);
    const latest=latestFindings(p.findings.filter(e=>e.targetId===targetId)).latest;
@@ -52,7 +59,7 @@ export function recordFinding(snapshot,projectId,{targetId,result,level="impleme
     throw Error("Refresh the complete public source before revision review");
    if(!String(note||"").trim())throw Error("Revision review note required");
   }
-  const e={id:id(),targetId,result,level,sourceId:optional(sourceId),ref:optional(ref),revision:optional(revision),reference:optional(reference),observedAt:observedAt?timestamp(observedAt,"evidence date"):new Date().toISOString(),note:String(note||""),origin:"manual",...(reviewOfFindingId!=null?{reviewOfFindingId}:{})};
+  const e={id:id(),targetId,result,level,sourceId:optional(sourceId),ref:optional(ref),revision:optional(revision),reference:optional(reference),observedAt:observedAt?timestamp(observedAt,"evidence date"):new Date().toISOString(),note:String(note||""),origin:"manual",...(workId!=null?{workId}:{}),...(reviewOfFindingId!=null?{reviewOfFindingId}:{})};
   p.findings.push(e);return e.id;
  });
 }

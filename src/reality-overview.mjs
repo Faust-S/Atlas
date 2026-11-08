@@ -39,7 +39,11 @@ export function realityOverview(project, trace, impact) {
       observation: observation ? {
         result: observation.result, level: observation.level,
         observedAt: observation.observedAt, note: observation.note || '',
-        reference: observation.reference || null
+        reference: observation.reference || null,
+        ...(observation.workId?{
+          workId: observation.workId,
+          workTitle: project.items.find(item=>item.id===observation.workId)?.title||'Работа'
+        }:{})
       } : null,
       source: observation?.sourceId ? {
         locator: source?.locator || 'Источник недоступен',

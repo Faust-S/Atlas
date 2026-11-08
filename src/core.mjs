@@ -57,6 +57,9 @@ export function validate(s){
   for(const t of targets)if(typeof t.title!=="string"||!t.title||typeof t.desired!=="string"||!t.desired||!["committed","candidate"].includes(t.intent))throw Error("Invalid target record");
   for(const [position,e] of findings.entries()){
    if(!targetIds.has(e.targetId)||!["present","partial","absent"].includes(e.result)||!["implementation","test","acceptance"].includes(e.level)||e.sourceId&&!sourceIds.has(e.sourceId)||!Number.isFinite(Date.parse(e.observedAt||"")))throw Error("Invalid finding record");
+   // Legacy archives have no workId; explicit links must name a local work.
+   if(e.workId!=null&&(typeof e.workId!=="string"||!itemIds.has(e.workId)))
+    throw Error("Invalid finding workId");
    if(e.reviewOfFindingId!=null){
     const prior=findings.slice(0,position).find(x=>x.id===e.reviewOfFindingId);
     if(!prior||prior.targetId!==e.targetId||prior.sourceId!==e.sourceId||prior.ref!==e.ref||
@@ -196,6 +199,8 @@ export function editItem(s,pid,id,patch){return change(s,x=>{const item=project(
 export function removeItem(s,pid,id){return change(s,x=>{
  const p=project(x,pid);if(!p.items.some(w=>w.id===id))throw Error("Unknown item");
  if(p.dependencies.some(d=>d.from===id||d.to===id))throw Error("Работа связана зависимостями. Сначала удалите связи.");
+ if((p.findings||[]).some(f=>f.workId===id))
+  throw Error("Работа связана с сохранённым наблюдением. История фактов должна сохранять источник.");
  if((p.changes||[]).some(c=>(c.planAmendments||[]).some(a=>a.kind==="work"&&a.itemId===id||a.kind==="new_work"&&a.id===id)))
   throw Error("Работа связана с предложением изменения.");
  p.items=p.items.filter(w=>w.id!==id);
