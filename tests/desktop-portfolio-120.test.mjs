@@ -5,6 +5,7 @@ import {validate,serialize,deserialize,editItem} from "../src/core.mjs";
 import {portfolioSchedule} from "../src/portfolio-schedule.mjs";
 import {portfolioResources} from "../src/portfolio-resources.mjs";
 import {planReviewQueue} from "../src/plan-review.mjs";
+import {projectImpact,portfolioImpact} from "../src/impact.mjs";
 test("R5 reproducible portfolio has the required objects and supports 20 edits",()=>{
  const portfolio=desktopLoadPortfolio(),before=serialize(portfolio);
  assert.equal(portfolio.projects.length,120);
@@ -23,4 +24,25 @@ test("R5 reproducible portfolio has the required objects and supports 20 edits",
  assert.equal(validate(edited),true);
  assert.equal(deserialize(serialize(edited)).projects[0].items[0].estimateDays,2);
  assert.equal(serialize(portfolio),before);
+});
+
+test("cached 120-project impact lookup matches full domain aggregation for 1200 works",()=>{
+ const snapshot=desktopLoadPortfolio();
+ const summary=portfolioImpact(snapshot.projects);
+ const cache=new Map(snapshot.projects.map(p=>[p.id,projectImpact(p)]));
+ assert.equal(cache.size,120);
+ assert.equal(summary.rows.length,120);
+ for(const entry of summary.rows){
+  const v=cache.get(entry.id);
+  assert.equal(v.attention,entry.attention);
+  assert.equal(v.missingWork,entry.missingWork);
+  assert.equal(v.evidenceReview,entry.evidenceReview);
+  assert.equal(v.sourceIssues.length,entry.sourceIssues);
+ }
+ const signatures=new Map([...cache].map(([id,projection])=>[id,projection]));
+ for(const query of ["Project","Project 1","Project 11","Project 119","not found",""]){
+  const visible=snapshot.projects.filter(p=>p.name.toLowerCase().includes(query.toLowerCase()));
+  for(const p of visible)assert.equal(cache.get(p.id),signatures.get(p.id));
+ }
+ assert.equal(snapshot.projects.reduce((n,p)=>n+p.items.length,0),1200);
 });

@@ -89,3 +89,10 @@ test("four primary and six secondary views remain reachable with native keyboard
  assert.match(css,/\.atlas-compact-tabs\{flex-wrap:wrap/);
  assert.match(css,/\.atlas-view-menu-actions\{position:absolute/);
 });
+
+test("portfolio search reuses per-project impact across text, filters and tabs",()=>{
+ assert.match(main,/const impactByProject=useMemo\(\(\)=>new Map\(data\.projects\.map\(\(p:any\)=>\[p\.id,projectImpact\(p\)\]\)\),\[data\.projects\]\)/);
+ assert.match(main,/const impact=project\?impactByProject\.get\(project\.id\)\|\|null:null/);
+ assert.match(main,/const imp=impactByProject\.get\(p\.id\)!/);
+ assert.doesNotMatch(main,/const imp=projectImpact\(p\),row=/);
+});

@@ -4,13 +4,16 @@ import {compareProject} from "./trace.mjs";
 const bad=new Set(["unknown","conflict","stale","gap_reported","partial_reported"]);
 export function projectImpact(project,options={}){
  const trace=compareProject(project,options);
+ // The same immutable source snapshot is shared by every Target; indexing
+ // avoids a linear source scan per target in larger project evidence matrices.
+ const sourcesById=new Map((project.sources||[]).map(s=>[s.id,s]));
  const itemsByTarget=new Map();
  for(const work of project.items||[])for(const id of work.targetIds||[]){
   if(!itemsByTarget.has(id))itemsByTarget.set(id,[]);
   itemsByTarget.get(id).push(work);
  }
  const rows=trace.rows.map(row=>{
-  const source=project.sources.find(s=>s.id===row.latest?.sourceId)||null;
+  const source=sourcesById.get(row.latest?.sourceId)||null;
   const work=itemsByTarget.get(row.id)||[];
   const openWork=work.filter(w=>w.state!=="done");
   const priority=row.intent==="committed"&&(bad.has(row.assessment)||row.assessment==="test_claim"||row.assessment==="implemented_claim"||row.assessment==="acceptance_claim"&&row.freshness.state!=="current_revision");

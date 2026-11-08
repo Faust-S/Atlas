@@ -206,7 +206,10 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   [project,historyType,historyQuery]);
  const plan=useMemo(()=>project?scheduleProject(project):null,[project]);
  const reality=useMemo(()=>project?compareProject(project):null,[project]);
- const impact=useMemo(()=>project?projectImpact(project):null,[project]);
+ // This lookup is invalidated by an actual domain snapshot change, not by
+ // every typed character, search filter, inspector toggle or tab switch.
+ const impactByProject=useMemo(()=>new Map(data.projects.map((p:any)=>[p.id,projectImpact(p)])),[data.projects]);
+ const impact=project?impactByProject.get(project.id)||null:null;
  const nextStep=useMemo(()=>project&&impact?projectNextStep(project,impact):null,[project,impact]);
  const realityMap=useMemo(()=>project&&reality&&impact?realityOverview(project,reality,impact):null,[project,reality,impact]);
  const projected=active?dates.byId.get(active):null;
@@ -267,7 +270,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   return false;
  };
  useEffect(()=>{
-  if(!native){setError("Нативный Atlas 0.3 запускается как установленное приложение Tauri. Для работы с данными откройте его через собственное окно Windows.");return}
+  if(!native){setError("Нативный Atlas 0.4 запускается как установленное приложение Tauri. Для работы с данными откройте его через собственное окно Windows.");return}
   invoke<OpenResult>("atlas_open").then(result=>{
    if(result.needsConfirmation){setRecovery(true);setError("Обнаружена повреждённая текущая редакция. Предыдущая версия доступна для явного восстановления.");return}
    const snapshot=deserialize(JSON.stringify(result.snapshot));
@@ -724,7 +727,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      </select></label></div>
      {filtered.length?<div className="table-scroll"><table><thead><tr><th>Проект</th><th>Состояние</th><th>Требует внимания</th><th>Расчётный срок</th><th>Риск срока</th><th>Действия</th></tr></thead>
       <tbody>{filtered.slice(0,portfolioLimit).map((p:any)=>{
-       const imp=projectImpact(p),row=dates.byId.get(p.id);
+       const imp=impactByProject.get(p.id)!,row=dates.byId.get(p.id);
        return <tr key={p.id}><td><button className="text-link" onClick={()=>selectProject(p.id)}>{p.name}</button><small>{p.goal||"Цель не задана"}</small></td>
         <td><Badge>{statuses[p.status]||p.status}</Badge></td><td className="atlas-portfolio-attention">
           {!(p.targets||[]).length?<button type="button" className="text-link"
