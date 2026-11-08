@@ -99,3 +99,10 @@ test("portfolio search reuses per-project impact across text, filters and tabs",
  assert.match(main,/const imp=impactByProject\.get\(p\.id\)!/);
  assert.doesNotMatch(main,/const imp=projectImpact\(p\),row=/);
 });
+
+test("standalone 1024px overview uses compact one-row metrics without changing hosted layout",()=>{
+ assert.match(css,/@media \(min-width:900px\) and \(max-width:1220px\)/);
+ assert.match(css,/\.app-shell:not\(\.atlas-embedded\) \.metric-grid\{grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/);
+ assert.match(css,/\.app-shell:not\(\.atlas-embedded\) \.metric\{padding:10px 11px;min-height:76px\}/);
+ assert.match(css,/@container atlas-panel \(max-width: 650px\)/);
+});
