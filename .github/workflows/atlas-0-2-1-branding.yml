@@ -5,6 +5,7 @@ on:
     branches:
       - work/2026-11-04-atlas-0-2-1-branding
       - work/2026-11-04-atlas-0-3
+      - work/2026-11-08-atlas-0-4
   workflow_dispatch:
 
 permissions:
@@ -52,7 +53,7 @@ jobs:
         shell: pwsh
         run: cargo test --release --locked --manifest-path desktop/src-tauri/Cargo.toml --lib
       - name: Native Atlas R5 120-project persistence and 20 incremental revisions
-        if: github.ref_name == 'work/2026-11-04-atlas-0-3'
+        if: github.ref_name == 'work/2026-11-04-atlas-0-3' || github.ref_name == 'work/2026-11-08-atlas-0-4'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -64,7 +65,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $expectedVersion = if ($env:GITHUB_REF_NAME -eq 'work/2026-11-04-atlas-0-3') { '0.3.0' } else { '0.2.1' }
+          $expectedVersion = if ($env:GITHUB_REF_NAME -eq 'work/2026-11-08-atlas-0-4') { '0.4.0-dev.1' } elseif ($env:GITHUB_REF_NAME -eq 'work/2026-11-04-atlas-0-3') { '0.3.0' } else { '0.2.1' }
           $installer = Get-ChildItem 'desktop/src-tauri/target/release/bundle/nsis' -Filter "*$expectedVersion*setup.exe" | Select-Object -First 1
           if (!$installer) { throw 'Expected version NSIS installer missing' }
           $p = Start-Process -FilePath $installer.FullName -ArgumentList '/S' -PassThru
@@ -84,9 +85,15 @@ jobs:
           "ATLAS_INSTALLED_EXE=$exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           Write-Output 'ATLAS_INSTALLED_ICON_PASS'
       - name: Regression installed GUI save and restart
+        if: github.ref_name != 'work/2026-11-08-atlas-0-4'
         shell: pwsh
         timeout-minutes: 5
         run: ./desktop/tests/installed-windows-keyboard.ps1
+      - name: Qualify Atlas 0.4 installed GUI and full restart
+        if: github.ref_name == 'work/2026-11-08-atlas-0-4'
+        shell: pwsh
+        timeout-minutes: 6
+        run: ./desktop/tests/installed-atlas04-ux.ps1
       - name: Checkout real Center consumer at audited revision
         if: github.ref_name == 'work/2026-11-04-atlas-0-3'
         uses: actions/checkout@v4
