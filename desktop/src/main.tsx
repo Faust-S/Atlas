@@ -349,8 +349,14 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   void getCurrentWindow().setTitle("IWXA Atlas — "+subject+" — "+display+suffix)
    .catch(error=>console.warn("Atlas native window title unavailable",error));
  },[native,embedded,ready,project?.name,tab,editor?.spec.title,dirty,savedRefPreview?.label]);
+ const resetWorkspaceScroll=()=>{
+  // The React workspace persists between projects/views; do not inherit scroll.
+  const workspace=rootRef.current?.querySelector<HTMLElement>(".workspace");
+  if(workspace)workspace.scrollTop=0;
+ };
  const selectProject=(id:string|null,afterSubmit=false)=>{
   if(!afterSubmit&&!requireClosedForm())return;
+  resetWorkspaceScroll();
   host?.onSelection?.({projectId:id,workId:null,revision:String(latestSnapshot.current.revision)});
   setActive(id);setTab("overview");setEditor(null);setForecastId(null);
   setShowProjectRelations(false);setRelationLimit(12);
@@ -391,6 +397,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   try{
    const p=data.projects.find((x:any)=>x.id===projectId);
    if(!p)throw Error("Проект для решения не найден");
+   resetWorkspaceScroll();
    setActive(projectId);setTab(action.startsWith("plan-")?"changes":"reality");
    setEditor({action,spec:editorSpec(p,action,data)});setInspector(true);setError("");
   }catch(e){issue(e)}
@@ -630,6 +637,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  };
  const view=(tabId:Tab)=>{
   if(!requireClosedForm())return;
+  resetWorkspaceScroll();
   setTab(tabId);setEditor(null);setForecastId(null);
  };
  useEffect(()=>{
@@ -990,10 +998,23 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
          {projectCommand.dependencies.inherited.slice(0,relationLimit).map((cause:any,i:number)=><li key={cause.originId+"-"+cause.kind+"-"+i}>
           <strong>{cause.message}</strong>
           <div className="atlas-relation-path" aria-label="Путь влияния">
-           {cause.path.map((p:any,j:number)=><React.Fragment key={p.id+"-"+j}>
+           {cause.path.length>5&&<>
+            <button type="button" className="text-link" onClick={()=>selectProject(cause.path[0].id)}>
+             {cause.path[0].name}</button>
+            <span className="atlas-relation-omitted">→ … {cause.path.length-3} промежуточных →</span>
+           </>}
+           {(cause.path.length>5?cause.path.slice(-2):cause.path).map((p:any,j:number)=><React.Fragment key={p.id+"-"+j}>
             {j>0&&<span aria-hidden="true"> → </span>}
             <button type="button" className="text-link" onClick={()=>selectProject(p.id)}>{p.name}</button>
-           </React.Fragment>)}</div></li>)}</ol>:
+           </React.Fragment>)}
+           {cause.path.length>5&&<details className="atlas-relation-fullpath">
+            <summary>Полная цепочка ({cause.path.length} проектов)</summary>
+            <div className="atlas-relation-path">
+             {cause.path.map((p:any,j:number)=><React.Fragment key={p.id+"-"+j}>
+              {j>0&&<span aria-hidden="true"> → </span>}
+              <button type="button" className="text-link" onClick={()=>selectProject(p.id)}>{p.name}</button>
+             </React.Fragment>)}</div>
+           </details>}</div></li>)}</ol>:
          <p>Переданных причин нет. Это не подтверждение завершения или приёмки.</p>}
        </div>
        {Math.max(projectCommand.dependencies.predecessors.length,projectCommand.dependencies.successors.length,
