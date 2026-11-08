@@ -65,10 +65,14 @@ export function portfolioImpact(projects,options={}){
  * A priority is only a navigation hint computed from the current local draft.
  */
 export function projectNextStep(project, impact=projectImpact(project)){
- if(!(project.targets||[]).length)return {
-  id:"define_target",title:"Сформулируйте ожидаемый результат",
-  note:"Определите, что должно получиться. Тогда работы и факты можно будет сопоставлять с целью.",
-  button:"Добавить требование",tab:"overview",action:"target"
+ if(!(project.targets||[]).some(target=>target.intent==="committed"))return {
+  id:"define_target",
+  title:(project.targets||[]).length?"Зафиксируйте утверждённый результат":"Сформулируйте ожидаемый результат",
+  note:(project.targets||[]).length?
+   "Есть только предварительные требования. Добавьте утверждённый результат для сопоставления плана с принятыми критериями.":
+   "Определите, что должно получиться. Тогда работы и факты можно будет сопоставлять с целью.",
+  button:(project.targets||[]).length?"Добавить утверждённое требование":"Добавить требование",
+  tab:"overview",action:"target"
  };
  if(!(project.items||[]).length){
   const primary=(project.targets||[]).find(t=>t.intent==="committed")||project.targets[0];

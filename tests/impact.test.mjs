@@ -103,3 +103,14 @@ test("next step follows actual project gaps without granting authority or writin
  assert.equal(JSON.stringify(linked),before);
  assert.equal("automaticApply" in projectNextStep(linked.projects[0]),false);
 });
+
+test("project with candidate-only criteria must first define a committed target",()=>{
+ const p=createProject(empty(),{name:"Candidate-only",type:"engineering"});
+ const candidate=addTarget(p.state,p.id,{title:"Draft goal",desired:"Not approved",intent:"candidate"});
+ const step=projectNextStep(candidate.state.projects[0]);
+ assert.equal(step.id,"define_target");
+ assert.equal(step.action,"target");
+ assert.match(step.title,/утверждённый результат/);
+ const accepted=addTarget(candidate.state,p.id,{title:"Approved",desired:"Verified delivery"});
+ assert.equal(projectNextStep(accepted.state.projects[0]).id,"plan_work");
+});

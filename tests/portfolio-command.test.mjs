@@ -70,3 +70,23 @@ test("source-bound dependency context exposes predecessor and downstream causes"
  assert.equal(release.dependencies.inheritedCount,release.dependencies.inherited.length);
  assert.equal(release.dependencies.downstreamCount,0);
 });
+
+test("unapproved and candidate-only outcomes never look like approved criteria",()=>{
+ const p=createProject(empty(),{name:"Pending criteria",type:"engineering"});
+ const initial=buildPortfolioCommand(p.state);
+ assert.equal(initial.rows[0].required,0);
+ assert.equal(initial.totals.missingCriteria,1);
+ assert.equal(initial.rows[0].primary.kind,"evidence");
+ assert.match(initial.rows[0].primary.label,/Утверждённые требования не заданы/);
+ assert.equal(filterPortfolioCommand(initial,{filter:"evidence"}).length,1);
+ const candidate=addTarget(p.state,p.id,{title:"Draft",desired:"Tentative",intent:"candidate"});
+ const proposed=buildPortfolioCommand(candidate.state);
+ assert.equal(proposed.rows[0].required,0);
+ assert.equal(proposed.totals.missingCriteria,1);
+ assert.ok(proposed.rows[0].signals.some(s=>s.detail.includes("черновые требования")));
+ const accepted=addTarget(candidate.state,p.id,{title:"Committed",desired:"Verifiable result"});
+ const active=buildPortfolioCommand(accepted.state);
+ assert.equal(active.totals.missingCriteria,0);
+ assert.equal(active.rows[0].required,1);
+ assert.ok(active.rows[0].signals.every(s=>!s.label.includes("Утверждённые требования не заданы")));
+});

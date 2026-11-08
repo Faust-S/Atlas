@@ -27,6 +27,7 @@ export function buildPortfolioCommand(snapshot,{now=new Date().toISOString(),imp
  const rows=projects.map(project=>{
   const impact=impacts.get(project.id),response=responseState(project,impact);
   const chain=cascade.byId.get(project.id),schedule=schedules.byId.get(project.id);
+  const required=impact.rows.filter(r=>r.intent==="committed").length;
   const signals=[];
   const add=(kind,label,detail,panel,ref="",value=0)=>{
    if(!label)return;
@@ -65,6 +66,13 @@ export function buildPortfolioCommand(snapshot,{now=new Date().toISOString(),imp
   if(response.unplanned>0 && !signals.some(s=>s.kind==="blocked"&&s.panel==="response"))
    add("planning","Причины без активного плана: "+response.unplanned,
     "Предложения не создаются автоматически","response");
+  // Candidate-only requirements do not establish approved delivery criteria.
+  if(required===0)
+   add("evidence","Утверждённые требования не заданы",
+    (project.targets||[]).length?
+     "Есть черновые требования, но нет утверждённых критериев результата":
+     "Сформулируйте ожидаемый результат и критерии проверки",
+    "evidence");
   const sourceSignals=response.rows.filter(r=>r.key.startsWith("source-issue:"));
   if(sourceSignals.length>0)
    add("sources","Проблемы наблюдения: "+sourceSignals.length,
@@ -74,7 +82,6 @@ export function buildPortfolioCommand(snapshot,{now=new Date().toISOString(),imp
     "Отсутствие сигналов не является подтверждением готовности","project");
   signals.sort((a,b)=>b.priority-a.priority||a.label.localeCompare(b.label,"ru"));
   const primary=signals[0];
-  const required=impact.rows.filter(r=>r.intent==="committed").length;
   const linkedProject=id=>{
    const item=projectsById.get(id);
    return {id,name:item?.name||"Неизвестный проект",status:item?.status||"unknown"};
@@ -105,6 +112,7 @@ export function buildPortfolioCommand(snapshot,{now=new Date().toISOString(),imp
   blocked:rows.filter(r=>r.filterTags.has("blocked")).length,
   dates:rows.filter(r=>r.filterTags.has("dates")&&r.slip>0).length,
   evidence:rows.reduce((n,r)=>n+r.attention,0),
+  missingCriteria:rows.filter(r=>r.required===0).length,
   decisions:rows.reduce((n,r)=>n+r.proposed,0),
   unknownDates:schedules.totals.unknown
  },warning:"Это очередь рассмотрения по наблюдаемым сведениям и расчётам; она не подтверждает готовность продуктов"};
