@@ -190,7 +190,7 @@ test("installed Win32 approval uses actual editor, native Save, human rationale 
  assert.match(script,/ATLAS04_CAUSE_PROPOSAL_DRAFT_PASS/);
  assert.match(script,/ATLAS04_CAUSE_PROPOSAL_NATIVE_SAVE_PASS/);
  assert.match(script,/ATLAS04_CAUSE_PROPOSAL_RESTART_READBACK_PASS/);
- assert.match(script,/title="Изменение по причине", control_type="Button"/);
+ assert.match(script,/visible_uia_action\(window, "Изменение по причине"\)/);
  assert.match(script,/title="Почему принято это решение\?", control_type="Edit"/);
  assert.match(script,/ATLAS04_CAUSE_DECISION_DRAFT_PASS/);
  assert.match(script,/ATLAS04_CAUSE_DECISION_NATIVE_SAVE_PASS/);
@@ -199,4 +199,18 @@ test("installed Win32 approval uses actual editor, native Save, human rationale 
  assert.match(script,/not any\(i\.get\("changeId"\) == change\["id"\] for i in p\["items"\]\)/);
  assert.match(script,/inspect_cause_proposal_and_decision\(saved\["generation"\]\)/);
  assert.doesNotMatch(script,/playwright|puppeteer|chromium\.launch|execute_script/);
+});
+
+test("installed WebView2 cause actions must be physically visible before mouse click",()=>{
+ const script=readFileSync(new URL("../desktop/tests/installed-atlas04-scale.py",import.meta.url),"utf8");
+ assert.match(script,/def visible_uia_action\(window, name, attempts=13\):/);
+ assert.match(script,/rectangle\.left >= bounds\[0\] \+ 245/);
+ assert.match(script,/rectangle\.bottom < bounds\[3\] - 50/);
+ assert.match(script,/mouse\.scroll\(coords=point, wheel_dist=2 if upward else -3\)/);
+ assert.match(script,/change_action = visible_uia_action\(window, "Изменение по причине"\)/);
+ assert.match(script,/decision_button = visible_uia_action\(window, "Решение"\)/);
+ assert.match(script,/ATLAS04_CAUSE_ACTION_UIA_HOLD/);
+ assert.match(script,/screenshot\("cause-change-before-click"\)/);
+ assert.match(script,/wait_title\("Project 119 — Изменения", timeout=15\)/);
+ assert.match(script,/screenshot\("cause-decision-before-click"\)/);
 });
