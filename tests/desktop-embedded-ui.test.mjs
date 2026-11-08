@@ -91,7 +91,10 @@ test("four primary and six secondary views remain reachable with native keyboard
 });
 
 test("portfolio search reuses per-project impact across text, filters and tabs",()=>{
- assert.match(main,/const impactByProject=useMemo\(\(\)=>new Map\(data\.projects\.map\(\(p:any\)=>\[p\.id,projectImpact\(p\)\]\)\),\[data\.projects\]\)/);
+ assert.match(main,/const impactByProject=useMemo\(\(\)=>\{/);
+ assert.match(main,/new Map<string,ReturnType<typeof projectImpact>>\(\)/);
+ assert.match(main,/for\(const p of data\.projects\)indexed\.set\(p\.id,projectImpact\(p\)\)/);
+ assert.match(main,/\},\[data\.projects\]\)/);
  assert.match(main,/const impact=project\?impactByProject\.get\(project\.id\)\|\|null:null/);
  assert.match(main,/const imp=impactByProject\.get\(p\.id\)!/);
  assert.doesNotMatch(main,/const imp=projectImpact\(p\),row=/);

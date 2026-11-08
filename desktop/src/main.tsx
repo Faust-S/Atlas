@@ -208,7 +208,11 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const reality=useMemo(()=>project?compareProject(project):null,[project]);
  // This lookup is invalidated by an actual domain snapshot change, not by
  // every typed character, search filter, inspector toggle or tab switch.
- const impactByProject=useMemo(()=>new Map(data.projects.map((p:any)=>[p.id,projectImpact(p)])),[data.projects]);
+ const impactByProject=useMemo(()=>{
+  const indexed=new Map<string,ReturnType<typeof projectImpact>>();
+  for(const p of data.projects)indexed.set(p.id,projectImpact(p));
+  return indexed;
+ },[data.projects]);
  const impact=project?impactByProject.get(project.id)||null:null;
  const nextStep=useMemo(()=>project&&impact?projectNextStep(project,impact):null,[project,impact]);
  const realityMap=useMemo(()=>project&&reality&&impact?realityOverview(project,reality,impact):null,[project,reality,impact]);
