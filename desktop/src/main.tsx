@@ -984,13 +984,17 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
        <div className="atlas-relations-column"><h3>От кого зависит</h3>
         {projectCommand.dependencies.predecessors.length?<ul>
          {projectCommand.dependencies.predecessors.slice(0,relationLimit).map((p:any)=><li key={p.id}>
-          <button type="button" className="text-link" onClick={()=>selectProject(p.id)}>{p.name}</button>
+          <button type="button" className="text-link"
+           aria-label={"Открыть предшественника: "+p.name}
+           onClick={()=>selectProject(p.id)}>{p.name}</button>
           <small>{statuses[p.status]||p.status}</small></li>)}</ul>:<p>Предшественников не задано.</p>}
        </div>
        <div className="atlas-relations-column"><h3>Кому передаётся результат</h3>
         {projectCommand.dependencies.successors.length?<ul>
          {projectCommand.dependencies.successors.slice(0,relationLimit).map((p:any)=><li key={p.id}>
-          <button type="button" className="text-link" onClick={()=>selectProject(p.id)}>{p.name}</button>
+          <button type="button" className="text-link"
+           aria-label={"Открыть следующий проект: "+p.name}
+           onClick={()=>selectProject(p.id)}>{p.name}</button>
           <small>{statuses[p.status]||p.status}</small></li>)}</ul>:<p>Непосредственных зависимых проектов нет.</p>}
        </div>
        <div className="atlas-relations-causes"><h3>Причины от предшественников</h3>
