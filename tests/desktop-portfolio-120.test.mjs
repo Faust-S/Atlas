@@ -225,7 +225,7 @@ test("installed Win32 work is a separate explicit act after decision and survive
  assert.match(script,/work\["state"\] == "todo"/);
  assert.match(script,/work\.get\("executor"\) is None/);
  assert.match(script,/work\["targetIds"\] == \["load-target-119"\]/);
- assert.match(script,/ATLAS04_SCALE_GUI_BASELINE_PASS_CAUSE_WORKFLOW_HOLD/);
+ assert.match(script,/ATLAS04_SCALE_GUI_BASELINE_PASS_EXTENDED_WORKFLOW_HOLD/);
  assert.match(script,/if completed:\s*print\("ATLAS04_SCALE_GUI_ACCEPTED_PASS"/);
  const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
  assert.match(ui,/Связано работ: \{project\.items\.filter/);
@@ -245,4 +245,20 @@ test("installed Atlas 0.4 opens source-bound fact editor from linked work withou
  assert.match(script,/len\(p\["findings"\]\) == len\(next\(pr for pr in expected\["projects"\]/);
  assert.match(script,/native\(\)\[0\]\["generation"\] == linked_head\["generation"\]/);
  assert.match(script,/ATLAS04_WORK_FACT_UIA_HOLD/);
+});
+
+test("installed linked-work observation requires explicit draft, Save and restart; never grants acceptance",()=>{
+ const script=readFileSync(new URL("../desktop/tests/installed-atlas04-scale.py",import.meta.url),"utf8");
+ assert.match(script,/observation_note = "Manual observation of partial output; independent review still required"/);
+ assert.match(script,/title="Что именно наблюдалось", control_type="Edit"/);
+ assert.match(script,/ATLAS04_WORK_FACT_DRAFT_PASS/);
+ assert.match(script,/ATLAS04_WORK_FACT_NATIVE_SAVE_PASS/);
+ assert.match(script,/ATLAS04_WORK_FACT_NO_AUTOMATIC_ACCEPTANCE_PASS/);
+ assert.match(script,/ATLAS04_WORK_FACT_RESTART_READBACK_PASS/);
+ assert.match(script,/finding\["targetId"\] == "load-target-119"/);
+ assert.match(script,/finding\["result"\] == "partial" and finding\["level"\] == "implementation"/);
+ assert.match(script,/finding\["origin"\] == "manual" and finding\["sourceId"\] is None/);
+ assert.match(script,/related\["state"\] == "todo" and related\["changeId"\] == change\["id"\]/);
+ assert.match(script,/assert head\["generation"\] == recorded_head\["generation"\]/);
+ assert.doesNotMatch(script,/ATLAS04_SCALE_GUI_BASELINE_PASS_CAUSE_WORKFLOW_HOLD/);
 });

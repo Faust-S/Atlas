@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {realityOverview} from '../src/reality-overview.mjs';
-import {empty,createProject,createItem,editItem} from '../src/core.mjs';
+import {empty,createProject,createItem,editItem,serialize,deserialize} from '../src/core.mjs';
 import {addTarget,recordFinding,planChange,decideChange,compareProject} from '../src/trace.mjs';
 import {projectImpact} from '../src/impact.mjs';
 const project=()=>({id:'p',items:[],sources:[],decisions:[],changes:[]});
@@ -170,4 +170,29 @@ test('completed linked work remains a claim until separately recorded target evi
  assert.equal(claimed.assessment,'implemented_claim');
  assert.equal(claimed.observation.result,'present');
  assert.equal(report().independentAcceptance,false);
+});
+
+test('a manual observation after human approval survives roundtrip without completing linked work',()=>{
+ const made=createProject(empty(),{name:'Native observation',type:'engineering'});
+ let state=addTarget(made.state,made.id,{title:'Output',desired:'Reviewed delivery'}).state;
+ const targetId=state.projects[0].targets[0].id;
+ const change=planChange(state,made.id,{title:'Recheck output',targetIds:[targetId],
+  causeKey:'target-review:'+targetId});
+ state=decideChange(change.state,made.id,change.id,{status:'approved',rationale:'Human review'}).state;
+ const created=createItem(state,made.id,{title:'Collect evidence',targetIds:[targetId],changeId:change.id});
+ state=recordFinding(created.state,made.id,{targetId,result:'partial',level:'implementation',
+  note:'Manual observation; independent review pending'}).state;
+ const after=deserialize(serialize(state));
+ const p=after.projects[0],view=realityOverview(p,compareProject(p),projectImpact(p));
+ assert.equal(p.items.find(i=>i.id===created.id).state,'todo');
+ assert.equal(p.items.find(i=>i.id===created.id).changeId,change.id);
+ assert.equal(p.changes.find(c=>c.id===change.id).status,'approved');
+ assert.equal(p.findings.length,1);
+ assert.equal(p.findings[0].origin,'manual');
+ assert.equal(p.findings[0].sourceId,null);
+ assert.equal(view.rows[0].observation.result,'partial');
+ assert.equal(view.rows[0].assessment,'partial_reported');
+ assert.equal(view.rows[0].work[0].state,'todo');
+ assert.equal(view.independentAcceptance,false);
+ assert.equal(serialize(after),serialize(state));
 });

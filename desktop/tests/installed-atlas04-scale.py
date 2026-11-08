@@ -670,7 +670,7 @@ def inspect_cause_proposal_and_decision(saved_generation):
     if not table.exists(timeout=3) or not table.is_visible():
         screenshot("linked-work-fact-tab-hold")
         print("ATLAS04_WORK_FACT_UIA_HOLD work tab inaccessible", flush=True)
-        return True
+        return False
     table.click_input()
     wait_title("Project 119 — Таблица", timeout=15)
     screenshot("linked-work-fact-table")
@@ -681,7 +681,7 @@ def inspect_cause_proposal_and_decision(saved_generation):
     if fact_action is None:
         screenshot("linked-work-fact-action-hold")
         print("ATLAS04_WORK_FACT_UIA_HOLD exact fact action inaccessible", flush=True)
-        return True
+        return False
     screenshot("linked-work-fact-before-click")
     fact_action.click_input()
     wait_title("Форма: Фактическое состояние — заявление", timeout=15)
@@ -693,7 +693,7 @@ def inspect_cause_proposal_and_decision(saved_generation):
     if not cancel.exists(timeout=3):
         screenshot("linked-work-fact-cancel-hold")
         print("ATLAS04_WORK_FACT_UIA_HOLD cancel action inaccessible", flush=True)
-        return True
+        return False
     cancel.click_input()
     wait_title("Project 119 — Таблица", timeout=15)
     assert native()[0]["generation"] == linked_head["generation"], "Cancelling an evidence editor wrote native data"
@@ -702,6 +702,80 @@ def inspect_cause_proposal_and_decision(saved_generation):
         "Opening a work fact editor fabricated an observation"
     )
     print("ATLAS04_WORK_FACT_CANCEL_NO_MUTATION_PASS", flush=True)
+
+    # An explicit new observation is a separate user action. The installed
+    # editor writes to a draft first; the user must Save native data later.
+    action = visible_uia_action(window, fact_label)
+    if action is None:
+        screenshot("linked-work-fact-reopen-hold")
+        print("ATLAS04_WORK_FACT_UIA_HOLD reopen observation button unavailable", flush=True)
+        return False
+    action.click_input()
+    wait_title("Форма: Фактическое состояние — заявление", timeout=15)
+    note = window.child_window(title="Что именно наблюдалось", control_type="Edit")
+    if not note.exists(timeout=3) or not note.is_visible():
+        screenshot("linked-work-fact-note-hold")
+        print("ATLAS04_WORK_FACT_UIA_HOLD observation note unavailable", flush=True)
+        return False
+    note.click_input()
+    observation_note = "Manual observation of partial output; independent review still required"
+    keyboard.send_keys(observation_note, with_spaces=True)
+    assert native()[0]["generation"] == linked_head["generation"], "Typing a fact wrote native Store"
+    screenshot("linked-work-fact-ready-to-submit")
+
+    submit = window.child_window(title="Применить к черновику", control_type="Button")
+    if not submit.exists(timeout=3):
+        screenshot("linked-work-fact-submit-missing")
+        raise AssertionError("Installed evidence editor has no Apply button")
+    submit.click_input()
+    wait_title("Project 119 — Таблица · Не сохранено", timeout=15)
+    assert native()[0]["generation"] == linked_head["generation"], "Fact draft bypassed Save"
+    assert len(next(p for p in native()[1] if p["id"] == "load-project-119")["findings"]) == len(
+        next(pr for pr in expected["projects"] if pr["id"] == "load-project-119")["findings"]
+    ), "Draft fact reached the disk before Save"
+    screenshot("linked-work-fact-draft")
+    print("ATLAS04_WORK_FACT_DRAFT_PASS", flush=True)
+
+    click(746, 65)  # The installed native Save button.
+    end = now() + 25
+    recorded_head = None
+    while now() < end:
+        current, projects = native()
+        if current["generation"] != linked_head["generation"]:
+            recorded_head = current
+            break
+        time.sleep(0.25)
+    if recorded_head is None:
+        screenshot("linked-work-fact-save-missing")
+        raise AssertionError("Explicit observation was not saved via the Windows GUI")
+    original_findings = next(pr for pr in expected["projects"] if pr["id"] == "load-project-119")["findings"]
+    p = next(pr for pr in projects if pr["id"] == "load-project-119")
+    new_findings = [entry for entry in p["findings"] if entry["id"] not in {f["id"] for f in original_findings}]
+    assert len(new_findings) == 1, "Observation count or identity incorrect after Save"
+    finding = new_findings[0]
+    assert finding["targetId"] == "load-target-119", "Observation linked to wrong requirement"
+    assert finding["result"] == "partial" and finding["level"] == "implementation"
+    assert finding["origin"] == "manual" and finding["sourceId"] is None, "Manual claim misrepresented as external verification"
+    assert finding["note"] == observation_note
+    assert recorded_head["revision"] > linked_head["revision"], "Native revision did not advance"
+    related = next(i for i in p["items"] if i["id"] == work["id"])
+    assert related["state"] == "todo" and related["changeId"] == change["id"], "Observation silently completed linked work"
+    assert next(c for c in p["changes"] if c["id"] == change["id"])["status"] == "approved"
+    assert len([d for d in p["decisions"] if d.get("changeId") == change["id"]]) == 1
+    screenshot("linked-work-fact-saved")
+    print("ATLAS04_WORK_FACT_NATIVE_SAVE_PASS", flush=True)
+    print("ATLAS04_WORK_FACT_NO_AUTOMATIC_ACCEPTANCE_PASS", flush=True)
+
+    stop()
+    launch()
+    head, projects = native()
+    assert head["generation"] == recorded_head["generation"], "Manual observation lost after restart"
+    p = next(pr for pr in projects if pr["id"] == "load-project-119")
+    assert any(f["id"] == finding["id"] and f["targetId"] == "load-target-119"
+               and f["origin"] == "manual" and f["note"] == observation_note
+               for f in p["findings"]), "Observation not restored from native Store"
+    assert any(i["id"] == work["id"] and i["state"] == "todo" for i in p["items"])
+    print("ATLAS04_WORK_FACT_RESTART_READBACK_PASS", flush=True)
     return True
 
 
@@ -738,7 +812,7 @@ try:
     if completed:
         print("ATLAS04_SCALE_GUI_ACCEPTED_PASS", flush=True)
     else:
-        print("ATLAS04_SCALE_GUI_BASELINE_PASS_CAUSE_WORKFLOW_HOLD", flush=True)
+        print("ATLAS04_SCALE_GUI_BASELINE_PASS_EXTENDED_WORKFLOW_HOLD", flush=True)
 except Exception as error:
     print("ATLAS04_SCALE_GUI_HOLD phase=" + phase + " error=" + repr(error), flush=True)
     screenshot("failure")
