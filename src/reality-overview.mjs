@@ -54,6 +54,10 @@ export function realityOverview(project, trace, impact) {
         activeChange: causeChange ? {id: causeChange.id, title: causeChange.title, status: causeChange.status} : null,
         approvedWithoutWork: cause.approvedWithoutWork
       } : null,
+      // Work status is a user declaration, never proof of target acceptance.
+      work: (linked?.work || []).map(w => ({
+        id: w.id, title: w.title || 'Работа', state: w.state || 'todo'
+      })),
       workCount: linked?.work?.length || 0,
       openWork: linked?.openWork || 0,
       change: change ? {

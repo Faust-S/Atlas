@@ -148,3 +148,26 @@ test('approved observed cause acquires linked work only by explicit separate cre
  assert.equal(overview().rows[0].cause.approvedWithoutWork,false);
  assert.equal(overview().independentAcceptance,false);
 });
+
+test('completed linked work remains a claim until separately recorded target evidence',()=>{
+ const made=createProject(empty(),{name:'Delivery facts',type:'engineering'});
+ let state=addTarget(made.state,made.id,{title:'Deliver application',desired:'Audited output'}).state;
+ const targetId=state.projects[0].targets[0].id;
+ const produced=createItem(state,made.id,{title:'Implement and test',targetIds:[targetId]});
+ state=editItem(produced.state,made.id,produced.id,{state:'done'});
+ const before=JSON.stringify(state);
+ const report=()=>realityOverview(state.projects[0],compareProject(state.projects[0]),projectImpact(state.projects[0]));
+ const missing=report().rows[0];
+ assert.equal(missing.workCount,1);
+ assert.equal(missing.openWork,0);
+ assert.deepEqual(missing.work,[{id:produced.id,title:'Implement and test',state:'done'}]);
+ assert.equal(missing.assessment,'unknown');
+ assert.equal(missing.observation,null);
+ assert.equal(report().independentAcceptance,false);
+ assert.equal(JSON.stringify(state),before);
+ state=recordFinding(state,made.id,{targetId,result:'present',level:'implementation',note:'User-reported result'}).state;
+ const claimed=report().rows[0];
+ assert.equal(claimed.assessment,'implemented_claim');
+ assert.equal(claimed.observation.result,'present');
+ assert.equal(report().independentAcceptance,false);
+});

@@ -444,3 +444,13 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .atlas-cause-basis{padding:8px 10px;border-left:3px solid #b4cdeb;background:#f4f8fd;border-radius:0 6px 6px 0}
 .change-card{scroll-margin-top:92px}
 .change-card:focus{outline:3px solid #4c8afc;outline-offset:3px}
+
+/* Atlas 0.4: work declaration and evidence remain independent user actions. */
+.atlas-target-work-list{margin:6px 0;padding-left:18px}
+.atlas-target-work-list li{margin:3px 0;overflow-wrap:anywhere}
+.atlas-target-work-list small{margin-left:6px;color:#607590}
+.atlas-work-evidence-note{font-size:11px;color:#536d8c;line-height:1.45}
+.atlas-work-fact-menu{display:inline-block;vertical-align:middle;margin:2px 4px}
+.atlas-work-fact-menu>summary{cursor:pointer;font-size:12px;color:#2868b0;text-decoration:underline}
+.atlas-work-fact-menu>summary:focus-visible{outline:3px solid #4c8afc;outline-offset:2px}
+.atlas-work-fact-menu .button-row{max-width:380px;flex-wrap:wrap;margin-top:6px}

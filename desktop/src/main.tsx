@@ -245,6 +245,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const impact=project?impactByProject.get(project.id)||null:null;
  const nextStep=useMemo(()=>project&&impact?projectNextStep(project,impact):null,[project,impact]);
  const realityMap=useMemo(()=>project&&reality&&impact?realityOverview(project,reality,impact):null,[project,reality,impact]);
+ const targetById=useMemo(()=>new Map<string,any>((project?.targets||[]).map((t:any)=>[t.id,t])),[project]);
  useEffect(()=>{
   // Reveal the actual source-bound row instead of losing the target ID
   // when the user enters a project from the portfolio command queue.
@@ -985,6 +986,17 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
           {r.reasons.length?<ul>{r.reasons.map((reason:string,i:number)=><li key={i}>{reason}</li>)}</ul>:
            <p>Независимая приёмка результатом этой сводки не установлена.</p>}
           <p>Связанных работ: {r.workCount}; незавершённых: {r.openWork}</p>
+          {r.work.length>0&&<ul className="atlas-target-work-list">
+           {r.work.slice(0,3).map((w:any)=><li key={w.id}>
+            <button type="button" className="text-link"
+             aria-label={"Открыть работу по требованию: "+w.title}
+             onClick={()=>openEditor("work:"+w.id)}>{w.title}</button>
+            <small>{workStatuses[w.state]||w.state}</small>
+           </li>)}
+          </ul>}
+          {r.work.length>3&&<Action onClick={()=>view("work")}>Все связанные работы ({r.workCount})</Action>}
+          {r.work.length>0&&r.openWork===0&&<p className="atlas-work-evidence-note">
+           Работы отмечены выполненными. Это не подтверждает результат или его приёмку.</p>}
          </div>
          <div className="atlas-reality-col"><small>Предложение и решение</small>
           {r.cause&&<p className="atlas-cause-basis">
@@ -1123,9 +1135,23 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       </select></label></div>
      <div className="table-scroll"><table><thead><tr><th>Работа</th><th>Состояние</th><th>Длительность</th><th>Ответственный</th><th>Срок</th><th>Изменить</th></tr></thead>
       <tbody>{filteredWork.slice(0,workLimit).map((w:any)=><tr key={w.id}>
-       <td><strong>{w.title}</strong><small>{project.stages.find((s:any)=>s.id===w.stageId)?.name||"Без этапа"}</small></td>
+       <td><strong>{w.title}</strong><small>{project.stages.find((s:any)=>s.id===w.stageId)?.name||"Без этапа"}</small>
+        {w.state==="done"&&(w.targetIds||[]).length>0&&<small className="atlas-work-evidence-note">
+         Завершение работы заявлено; факт результата вносится отдельно.</small>}</td>
        <td><Badge>{workStatuses[w.state]}</Badge></td><td>{w.estimateDays??1} дн.</td><td>{w.assignee||"Не назначен"}</td><td>{readable(w.dueDate)}</td>
-       <td><Action onClick={()=>openEditor("work:"+w.id)}>Открыть</Action><Action disabled={busy||dirty||!persisted||!!editor} onClick={()=>showSavedReference(project.id,w.id)} title="Только сохранённая редакция">Ссылка</Action><Action onClick={()=>removeWork(w.id)}>Удалить</Action></td></tr>)}</tbody></table></div>
+       <td><Action onClick={()=>openEditor("work:"+w.id)}>Открыть</Action>
+        {(w.targetIds||[]).length===1&&targetById.get(w.targetIds[0])&&
+         <Action ariaLabel={"Зафиксировать факт по работе: "+w.title+" — "+targetById.get(w.targetIds[0]).title}
+          onClick={()=>openEditor("finding-target:"+w.targetIds[0])}>＋ Факт</Action>}
+        {(w.targetIds||[]).length>1&&<details className="atlas-work-fact-menu">
+         <summary>Факт по требованию ({w.targetIds.length})</summary>
+         <div className="button-row">
+          {w.targetIds.map((id:string)=>targetById.get(id)&&<Action key={id}
+           ariaLabel={"Зафиксировать факт по работе: "+w.title+" — "+targetById.get(id).title}
+           onClick={()=>openEditor("finding-target:"+id)}>{targetById.get(id).title}</Action>)}
+         </div></details>}
+        <Action disabled={busy||dirty||!persisted||!!editor} onClick={()=>showSavedReference(project.id,w.id)} title="Только сохранённая редакция">Ссылка</Action>
+        <Action onClick={()=>removeWork(w.id)}>Удалить</Action></td></tr>)}</tbody></table></div>
      {project.items.length>0&&<p className="minor">Показано {Math.min(filteredWork.length,workLimit)} из {filteredWork.length} работ по фильтру; всего в проекте: {project.items.length}.</p>}
      {filteredWork.length>workLimit&&<Action onClick={()=>setWorkLimit(n=>Math.min(filteredWork.length,n+200))}>Показать ещё работы</Action>}
      {project.items.length>0&&!filteredWork.length&&<Fallback message="По фильтру работ нет. Очистите поиск или измените состояние."/>}

@@ -152,3 +152,15 @@ test("source-bound fact links to the existing response editor, exact change and 
  assert.match(main,/aria-label="Открыть портфель проектов"/);
  assert.match(css,/\.change-card:focus\{outline:3px solid/);
 });
+
+test("linked work offers explicit requirement-specific fact entry without inferred acceptance",()=>{
+ assert.match(main,/const targetById=useMemo\(\(\)=>new Map<string,any>/);
+ assert.match(main,/r\.work\.slice\(0,3\)\.map/);
+ assert.match(main,/Работы отмечены выполненными\. Это не подтверждает результат или его приёмку/);
+ assert.match(main,/Завершение работы заявлено; факт результата вносится отдельно/);
+ assert.match(main,/ariaLabel=\{"Зафиксировать факт по работе: "\+w\.title/);
+ assert.match(main,/onClick=\{\(\)=>openEditor\("finding-target:"\+w\.targetIds\[0\]\)\}/);
+ assert.match(main,/w\.targetIds\.map\(\(id:string\)=>targetById\.get\(id\)/);
+ assert.match(main,/onClick=\{\(\)=>openEditor\("finding-target:"\+id\)\}/);
+ assert.match(css,/\.atlas-work-fact-menu>summary:focus-visible/);
+});
