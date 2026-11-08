@@ -411,3 +411,8 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .atlas-project-relations .text-link{overflow-wrap:anywhere;font-size:12px}
 @media(max-width:900px){.atlas-project-relations-body{grid-template-columns:1fr}.atlas-project-relations .section-heading{flex-wrap:wrap}}
 @container atlas-panel (max-width:850px){.atlas-project-relations-body{grid-template-columns:1fr}}
+
+/* Atlas 0.4: present desired/observed reality before optional dependency chains. */
+.atlas-project-relations{scroll-margin-top:95px}
+.atlas-project-relations:focus{outline:none}
+.atlas-project-relations:focus-visible{outline:3px solid #4c8afc;outline-offset:2px}
