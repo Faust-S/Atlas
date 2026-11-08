@@ -298,6 +298,8 @@ def inspect_linked_project(saved_generation):
             time.sleep(0.25)
         if not expand.exists(timeout=1) or not expand.is_visible():
             print("ATLAS04_SCALE_GUI_RELATIONS_TOGGLE_UIA_HOLD inaccessible button", flush=True)
+            assert native()[0]["generation"] == saved_generation, "UIA check mutated saved data"
+            return
         else:
             expand.click_input()
             collapse = window.child_window(title="Скрыть цепочки", control_type="Button")
@@ -307,6 +309,7 @@ def inspect_linked_project(saved_generation):
     except Exception as error:
         screenshot("linked-20-toggle-uia-hold")
         print("ATLAS04_SCALE_GUI_RELATIONS_TOGGLE_UIA_HOLD " + repr(error)[:180], flush=True)
+        assert native()[0]["generation"] == saved_generation, "UIA check mutated saved data"
         return
 
     # The direct predecessor has a semantic accessible name distinct from
