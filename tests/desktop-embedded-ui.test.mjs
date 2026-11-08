@@ -224,3 +224,14 @@ test("work factual-gap filters combine with existing search and target filters w
  assert.match(main,/Это поиск заявленных фактов, не независимая приёмка/);
  assert.match(css,/\.atlas-work-evidence-summary\{margin:5px/);
 });
+
+test("unlinked work explains why a fact cannot be attached and reuses its existing editor",()=>{
+ assert.match(main,/!\(w\.targetIds\|\|\[\]\)\.length&&<small className="atlas-work-target-hint">/);
+ assert.match(main,/Нет связи с ожидаемым результатом\. Укажите требование в форме работы/);
+ assert.match(main,/В проекте ещё нет требований\. Добавьте ожидаемый результат/);
+ assert.match(main,/ariaLabel=\{!\(w\.targetIds\|\|\[\]\)\.length&&project\.targets\?\.length/);
+ assert.match(main,/Указать требование для работы: "\+w\.title/);
+ assert.match(main,/onClick=\{\(\)=>openEditor\("work:"\+w\.id\)\}/);
+ assert.match(main,/Указать требование":"Открыть"/);
+ assert.match(css,/\.atlas-work-target-hint\{display:block/);
+});

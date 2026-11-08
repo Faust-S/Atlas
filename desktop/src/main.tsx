@@ -1191,11 +1191,21 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
            Показать ещё наблюдения ({findingsByWork.get(w.id)!.length-(workHistoryLimits[w.id]||5)})
           </Action>}
         </details>}
+        {!(w.targetIds||[]).length&&<small className="atlas-work-target-hint">
+         {project.targets?.length
+          ?"Нет связи с ожидаемым результатом. Укажите требование в форме работы, чтобы записывать факты."
+          :"В проекте ещё нет требований. Добавьте ожидаемый результат в «План / факт», затем свяжите работу."}
+        </small>}
         {w.state==="done"&&(w.targetIds||[]).length>0&&<small className="atlas-work-evidence-note">
          Завершение работы заявлено; факт результата вносится отдельно.</small>}</td>
        <td data-label="Состояние"><Badge>{workStatuses[w.state]}</Badge></td><td data-label="Длительность">{w.estimateDays??1} дн.</td>
        <td data-label="Ответственный">{w.assignee||"Не назначен"}</td><td data-label="Срок">{readable(w.dueDate)}</td>
-       <td data-label="Действия" className="atlas-work-table-actions"><Action onClick={()=>openEditor("work:"+w.id)}>Открыть</Action>
+       <td data-label="Действия" className="atlas-work-table-actions">
+        <Action ariaLabel={!(w.targetIds||[]).length&&project.targets?.length
+          ?"Указать требование для работы: "+w.title:undefined}
+         onClick={()=>openEditor("work:"+w.id)}>
+         {!(w.targetIds||[]).length&&project.targets?.length?"Указать требование":"Открыть"}
+        </Action>
         {(w.targetIds||[]).length===1&&targetById.get(w.targetIds[0])&&
          <Action ariaLabel={"Зафиксировать факт по работе: "+w.title+" — "+targetById.get(w.targetIds[0]).title}
           onClick={()=>openEditor("finding-work:"+encodeURIComponent(w.id)+":"+encodeURIComponent(w.targetIds[0]))}>＋ Факт</Action>}

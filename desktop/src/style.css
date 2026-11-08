@@ -496,3 +496,7 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 
 /* Visual factual gaps, not verified completion or an acceptance assertion. */
 .atlas-work-evidence-summary{margin:5px 0 12px;line-height:1.5;color:#4d6884}
+
+/* The same work editor is the only path from an unlinked task to evidence. */
+.atlas-work-target-hint{display:block;margin-top:7px;font-size:11px;line-height:1.5;color:#715421;
+ border-left:2px solid #d2b87c;padding-left:9px}
