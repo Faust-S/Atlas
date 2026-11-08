@@ -181,3 +181,22 @@ test("Win32 factual queue action uses accessible Portfolio navigation instead of
  assert.doesNotMatch(script,/title_re=r"\^Портфель проектов"/);
  assert.match(script,/ATLAS04_SCALE_REQUIREMENT_NAV_UIA_PASS/);
 });
+
+test("installed Win32 approval uses actual editor, native Save, human rationale and two restarts",()=>{
+ const script=readFileSync(new URL("../desktop/tests/installed-atlas04-scale.py",import.meta.url),"utf8");
+ assert.match(script,/def inspect_cause_proposal_and_decision\(saved_generation\):/);
+ assert.match(script,/title="Предложить устранение причины", control_type="Button"/);
+ assert.match(script,/wait_title\("Форма: Изменение для устранения", timeout=12\)/);
+ assert.match(script,/ATLAS04_CAUSE_PROPOSAL_DRAFT_PASS/);
+ assert.match(script,/ATLAS04_CAUSE_PROPOSAL_NATIVE_SAVE_PASS/);
+ assert.match(script,/ATLAS04_CAUSE_PROPOSAL_RESTART_READBACK_PASS/);
+ assert.match(script,/title="Изменение по причине", control_type="Button"/);
+ assert.match(script,/title="Почему принято это решение\?", control_type="Edit"/);
+ assert.match(script,/ATLAS04_CAUSE_DECISION_DRAFT_PASS/);
+ assert.match(script,/ATLAS04_CAUSE_DECISION_NATIVE_SAVE_PASS/);
+ assert.match(script,/ATLAS04_CAUSE_DECISION_RESTART_READBACK_PASS/);
+ assert.match(script,/not current_change\.get\("planAppliedAt"\)/);
+ assert.match(script,/not any\(i\.get\("changeId"\) == change\["id"\] for i in p\["items"\]\)/);
+ assert.match(script,/inspect_cause_proposal_and_decision\(saved\["generation"\]\)/);
+ assert.doesNotMatch(script,/playwright|puppeteer|chromium\.launch|execute_script/);
+});
