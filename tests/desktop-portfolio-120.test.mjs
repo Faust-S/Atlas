@@ -7,6 +7,7 @@ import {portfolioSchedule} from "../src/portfolio-schedule.mjs";
 import {portfolioResources} from "../src/portfolio-resources.mjs";
 import {planReviewQueue} from "../src/plan-review.mjs";
 import {projectImpact,portfolioImpact} from "../src/impact.mjs";
+import {buildPortfolioCommand,filterPortfolioCommand} from "../src/portfolio-command.mjs";
 test("R5 reproducible portfolio has the required objects and supports 20 edits",()=>{
  const portfolio=desktopLoadPortfolio(),before=serialize(portfolio);
  assert.equal(portfolio.projects.length,120);
@@ -65,4 +66,28 @@ test("installed 0.4 uses the real R5 archive, native import approval, readback, 
  assert.match(script,/"ATLAS_R5_PORTFOLIO_JSON"/);
  assert.match(workflow,/python desktop\/tests\/installed-atlas04-scale\.py/);
  assert.match(workflow,/ATLAS_R5_PORTFOLIO_JSON=\$fixture/);
+});
+
+test("0.4 priority queue uses the already computed 120-project impact and CPM projections",()=>{
+ const portfolio=desktopLoadPortfolio();
+ const now="2026-11-08T14:00:00.000Z";
+ const forecasts=portfolioSchedule(portfolio);
+ const impacts=new Map(portfolio.projects.map(project=>[project.id,projectImpact(project,{now})]));
+ const original=buildPortfolioCommand(portfolio,{now});
+ const reused=buildPortfolioCommand(portfolio,{now,impacts,schedules:forecasts});
+ assert.deepEqual(reused,original,"Cached and uncached priority, evidence and dates must match");
+ assert.equal(reused.rows.length,120);
+ const evidence=filterPortfolioCommand(reused,{filter:"evidence"});
+ assert.equal(evidence.length,120);
+ assert.equal(evidence.slice(0,8).length,8,"React must have a small initial window");
+ assert.equal(filterPortfolioCommand(reused,{filter:"evidence",search:"Project 119"}).length,1);
+ assert.equal(filterPortfolioCommand(reused,{filter:"sources"}).length,0);
+ // UI invokes only navigation into the existing domain tabs, never an apply API.
+ const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ const css=readFileSync(new URL("../desktop/src/style.css",import.meta.url),"utf8");
+ assert.match(ui,/buildPortfolioCommand\(data,\{impacts:impactByProject,schedules:dates\}\)/);
+ assert.match(ui,/attentionRows\.slice\(0,attentionLimit\)/);
+ assert.match(ui,/inspectPortfolioSignal\(row\.id,row\.primary\)/);
+ assert.match(ui,/onClick=\{\(\)=>setAttentionLimit\(n=>Math\.min\(attentionRows\.length,n\+8\)\)\}/);
+ assert.match(css,/atlas-command-entry/);
 });

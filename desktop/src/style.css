@@ -364,3 +364,33 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
  padding:9px 12px;color:#30567d;font-size:13px;background:#fff}
 .atlas-view-menu-actions button:hover{background:#e5effd}
 .atlas-view-menu-actions button.selected{font-weight:700;color:#1b61be;background:#e4effc}
+
+/* Atlas 0.4: actionable portfolio queue from the existing Core projection.
+   Only eight rows render initially; keep native and embedded hosts readable. */
+.atlas-portfolio-command .section-heading{margin-bottom:10px}
+.atlas-command-controls{display:flex;align-items:end;flex-wrap:wrap;gap:9px 14px;margin-bottom:9px}
+.atlas-command-controls label{display:flex;align-items:center;gap:7px;font-size:12px;color:#526987}
+.atlas-command-controls select,.atlas-command-controls input{max-width:240px;min-height:34px;font-size:13px}
+.atlas-command-controls>small{color:#607590;margin-bottom:8px}
+.atlas-command-list{display:grid;gap:8px;margin:12px 0}
+.atlas-command-entry{display:grid;grid-template-columns:minmax(120px,1fr) minmax(180px,2fr) minmax(115px,0.85fr) auto;
+ gap:12px;align-items:start;border:1px solid #dce6f1;border-radius:10px;padding:11px;background:#fff}
+.atlas-command-entry>div{min-width:0;overflow-wrap:anywhere}
+.atlas-command-project .text-link{font-weight:700;text-align:left}
+.atlas-command-entry small{display:block;color:#526987;font-size:11px;margin-top:5px}
+.atlas-command-reason>strong{font-size:13px;color:#213b59}
+.atlas-command-reason p{font-size:12px;color:#405775;margin:6px 0;line-height:1.4}
+.atlas-command-reason details{margin-top:8px}
+.atlas-command-reason summary{font-size:12px;color:#1e5fb3;cursor:pointer}
+.atlas-command-reason ul{list-style:none;padding:3px 0 0 10px;margin:0}
+.atlas-command-reason li{margin:8px 0}
+.atlas-command-reason li .text-link{display:block;text-align:left}
+.atlas-command-due strong{display:block;color:#284b80;font-size:13px;margin-top:4px}
+.atlas-command-actions{justify-self:end}
+@media(max-width:1280px){.atlas-command-entry{grid-template-columns:minmax(140px,1fr) minmax(210px,2fr)}
+ .atlas-command-actions{justify-self:start}}
+@media(max-width:760px){.atlas-command-entry{grid-template-columns:1fr}
+ .atlas-command-controls label{width:100%;justify-content:space-between}
+ .atlas-command-controls input,.atlas-command-controls select{width:55%}}
+@container atlas-panel (max-width:850px){.atlas-command-entry{grid-template-columns:1fr}
+ .atlas-command-actions{justify-self:start}}

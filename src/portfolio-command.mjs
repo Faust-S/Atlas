@@ -13,11 +13,13 @@ const labels = {blocked:"Блокировки",dates:"Сроки",evidence:"Фа
 const actionFor = (projectId,kind,ref="") =>
  "inspect:"+encodeURIComponent(projectId)+":"+kind+(ref?":"+encodeURIComponent(ref):"");
 
-export function buildPortfolioCommand(snapshot,{now=new Date().toISOString()}={}) {
+export function buildPortfolioCommand(snapshot,{now=new Date().toISOString(),impacts:cachedImpacts=null,schedules:cachedSchedules=null}={}) {
  const projects=snapshot.projects||[];
- const impacts=new Map(projects.map(p=>[p.id,projectImpact(p,{now})]));
+ // Standalone callers derive their own data; React desktop reuses the exact
+ // snapshot-bound projections already calculated for its existing portfolio.
+ const impacts=cachedImpacts??new Map(projects.map(p=>[p.id,projectImpact(p,{now})]));
  const cascade=portfolioCascade(snapshot,p=>impacts.get(p.id));
- const schedules=portfolioSchedule(snapshot);
+ const schedules=cachedSchedules??portfolioSchedule(snapshot);
  const rows=projects.map(project=>{
   const impact=impacts.get(project.id),response=responseState(project,impact);
   const chain=cascade.byId.get(project.id),schedule=schedules.byId.get(project.id);

@@ -6,6 +6,7 @@ import {removePortfolioLink} from "../../src/portfolio.mjs";
 import {editorSpec,applyEditor,editorSelectionFields} from "../../src/editor.mjs";
 import {compareProject,decideChange} from "../../src/trace.mjs";
 import {projectImpact,projectNextStep} from "../../src/impact.mjs";
+import {buildPortfolioCommand,filterPortfolioCommand} from "../../src/portfolio-command.mjs";
 import {realityOverview} from "../../src/reality-overview.mjs";
 import {scheduleProject} from "../../src/planning.mjs";
 import {portfolioSchedule,projectedFinishLabel} from "../../src/portfolio-schedule.mjs";
@@ -146,6 +147,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const [active,setActive]=useState<string|null>(null),[tab,setTab]=useState<Tab>("overview");
  const [search,setSearch]=useState(""),[editor,setEditor]=useState<Editor|null>(null);
  const [portfolioStatus,setPortfolioStatus]=useState("all");
+ const [attentionFilter,setAttentionFilter]=useState("all");
+ const [attentionQuery,setAttentionQuery]=useState("");
+ const [attentionLimit,setAttentionLimit]=useState(8);
  const [boardLimits,setBoardLimits]=useState<Record<string,number>>({});
  const [message,setMessage]=useState(""),[error,setError]=useState("");
  const [inspector,setInspector]=useState(()=>!host&&window.innerWidth>1220),[recovery,setRecovery]=useState(false);
@@ -213,6 +217,13 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   for(const p of data.projects)indexed.set(p.id,projectImpact(p));
   return indexed;
  },[data.projects]);
+ // All 120-project command rows derive only on domain snapshot changes.
+ // Filtering and pagination do not recalculate sources, CPM or impact.
+ const portfolioCommand=useMemo(()=>
+  buildPortfolioCommand(data,{impacts:impactByProject,schedules:dates}),[data,impactByProject,dates]);
+ const attentionRows=useMemo(()=>
+  filterPortfolioCommand(portfolioCommand,{filter:attentionFilter,search:attentionQuery}),
+  [portfolioCommand,attentionFilter,attentionQuery]);
  const impact=project?impactByProject.get(project.id)||null:null;
  const nextStep=useMemo(()=>project&&impact?projectNextStep(project,impact):null,[project,impact]);
  const realityMap=useMemo(()=>project&&reality&&impact?realityOverview(project,reality,impact):null,[project,reality,impact]);
@@ -338,6 +349,15 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   // Jump straight to the concrete, still-unapplied planning forecast.
   // This is navigation only; human approval and application stay separate.
   if(tabId==="changes"&&changeId)setForecastId(changeId);
+ };
+ const inspectPortfolioSignal=(projectId:string,signal:{kind:string;panel:string})=>{
+  if(!requireClosedForm())return;
+  const target:Tab=signal.panel==="evidence"?"reality":
+   signal.panel==="sources"?"sources":signal.panel==="schedule"?"timeline":
+   signal.panel==="response"?(signal.kind==="blocked"?"work":"changes"):"overview";
+  // Read-only navigation: the existing domain action still requires an
+  // explicit edit, decision and native Save from its original screen.
+  openProjectTab(projectId,target);
  };
  const openEditor=(action:string,projectId?:string)=>{
   if(!requireClosedForm()||busyRef.current)return;
@@ -722,6 +742,49 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      <Metric value={resources.totals.potentialConflicts} label="Плановые перегрузки"/>
      <Metric value={reviews.totals?.needsDecision??0} label="Решений по плану"/>
     </div>
+    <section className="surface atlas-portfolio-command" aria-label="Очередь внимания по портфелю">
+     <div className="section-heading"><div><h2>Что требует внимания</h2>
+      <p>Причины, сроки и зависимые проекты из существующих расчётов Atlas. Разбор не применяет изменения автоматически.</p></div></div>
+     <div className="atlas-command-controls">
+      <label>Причина <select aria-label="Фильтр причин портфеля" value={attentionFilter}
+       onChange={event=>{setAttentionFilter(event.target.value);setAttentionLimit(8)}}>
+       <option value="all">Все</option><option value="blocked">Блокировки</option>
+       <option value="dates">Сроки</option><option value="evidence">Факты</option>
+       <option value="decisions">Решения</option><option value="sources">Источники</option>
+      </select></label>
+      <label>Поиск по причинам <input type="search" aria-label="Поиск в очереди внимания"
+       placeholder="Проект или проблема" value={attentionQuery}
+       onChange={event=>{setAttentionQuery(event.target.value);setAttentionLimit(8)}}/></label>
+      <small>Найдено {attentionRows.length} из {portfolioCommand.rows.length} проектов</small>
+     </div>
+     <p className="minor">Блокировки: {portfolioCommand.totals.blocked} · Риски срока: {portfolioCommand.totals.dates} ·
+      Требования к проверке: {portfolioCommand.totals.evidence} · Предложения к решению: {portfolioCommand.totals.decisions}</p>
+     {attentionRows.length?<div className="atlas-command-list">
+      {attentionRows.slice(0,attentionLimit).map((row:any)=><article className="atlas-command-entry" key={row.id}>
+       <div className="atlas-command-project"><button type="button" className="text-link"
+        onClick={()=>selectProject(row.id)}>{row.name}</button>
+        <small>{row.affected>0?"Может затронуть проектов: "+row.affected:"Нет вычисленных зависимых проектов"}</small>
+       </div>
+       <div className="atlas-command-reason"><strong>{row.primary.label}</strong>
+        {row.primary.detail&&<p>{row.primary.detail}</p>}
+        {row.signals.length>1&&<details><summary>Другие причины ({row.signals.length-1})</summary>
+         <ul>{row.signals.slice(1,6).map((signal:any,i:number)=><li key={signal.kind+"-"+i}>
+          <button className="text-link" type="button" onClick={()=>inspectPortfolioSignal(row.id,signal)}>
+           {signal.label}</button>{signal.detail&&<small>{signal.detail}</small>}
+         </li>)}</ul>
+        </details>}
+       </div>
+       <div className="atlas-command-due"><small>Расчётный финиш</small>
+        <strong>{row.projectedFinish||"Неизвестен"}</strong>
+        {row.slip>0&&<small>Риск +{row.slip} дн. к контрольной дате</small>}
+       </div>
+       <div className="atlas-command-actions"><Action primary onClick={()=>inspectPortfolioSignal(row.id,row.primary)}>Разобрать</Action></div>
+      </article>)}
+     </div>:<Fallback message="По выбранной причине проектов не найдено. Попробуйте другой фильтр или поиск."/>}
+     {attentionRows.length>attentionLimit&&<Action onClick={()=>setAttentionLimit(n=>Math.min(attentionRows.length,n+8))}>
+      Показать ещё ({attentionRows.length-attentionLimit})</Action>}
+     <p className="minor">Заявления о реализации, календарные оценки и отсутствие сигналов не подтверждают фактическую приёмку результата.</p>
+    </section>
     <section className="surface">
      <div className="section-heading"><div><h2>Проекты и последствия</h2><p>Перейдите к проекту, чтобы увидеть точные причины и объекты.</p></div>
       {data.projects.length>1&&<Action onClick={()=>openEditor("portfolio-link")}>Связать проекты</Action>}</div>
