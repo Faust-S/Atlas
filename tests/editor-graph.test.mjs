@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {empty,createProject,createItem,connect,editItem} from "../src/core.mjs";
+import {empty,createProject,createItem,connect,editItem,serialize,deserialize} from "../src/core.mjs";
 import {editorSpec,renderEditor,applyEditor} from "../src/editor.mjs";
+import {addTarget} from "../src/trace.mjs";
 import {renderDependencyGraph,renderTimeline} from "../src/graph.mjs";
 const values=o=>({get:k=>o[k]??""});
 test("editors create a project, target, finding, change, named work and dependency without UUID input",()=>{
@@ -51,4 +52,27 @@ test("R2 portfolio dependency editor preselects different project IDs",()=>{
  assert.equal(spec.fields[0].value,first.id);
  assert.equal(spec.fields[1].value,second.id);
  assert.notEqual(spec.fields[0].value,spec.fields[1].value);
+});
+
+test("work observation editor fixes the exact target and persists the originating work",()=>{
+ const project=createProject(empty(),{name:"Work evidence",type:"engineering"});
+ const target=addTarget(project.state,project.id,{title:"Expected result",desired:"Review"});
+ const other=addTarget(target.state,project.id,{title:"Other result",desired:"Separate"});
+ const work=createItem(other.state,project.id,{title:"Implementation work",targetIds:[target.id]});
+ const action="finding-work:"+encodeURIComponent(work.id)+":"+encodeURIComponent(target.id);
+ const spec=editorSpec(work.state.projects[0],action);
+ const selector=spec.fields.find(f=>f.name==="targetId");
+ assert.equal(selector.value,target.id);
+ assert.deepEqual(selector.options,[{value:target.id,label:"Expected result"}]);
+ assert.match(spec.hint,/Implementation work/);
+ const applied=applyEditor(work.state,project.id,action,values({targetId:target.id,result:"partial",level:"implementation",note:"Observed"}));
+ const recorded=applied.state.projects[0].findings[0];
+ assert.equal(recorded.targetId,target.id);
+ assert.equal(recorded.workId,work.id);
+ assert.equal(recorded.origin,"manual");
+ assert.equal(recorded.result,"partial");
+ assert.equal(deserialize(serialize(applied.state)).projects[0].findings[0].workId,work.id);
+ assert.throws(()=>applyEditor(work.state,project.id,action,values({targetId:other.id,result:"partial"})),/Нельзя изменить требование/);
+ assert.throws(()=>editorSpec(work.state.projects[0],"finding-work:"+encodeURIComponent(work.id)+":"+encodeURIComponent(other.id)),/не связана/);
+ assert.equal(work.state.projects[0].findings.length,0);
 });

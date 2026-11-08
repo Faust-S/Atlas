@@ -196,3 +196,18 @@ test('a manual observation after human approval survives roundtrip without compl
  assert.equal(view.independentAcceptance,false);
  assert.equal(serialize(after),serialize(state));
 });
+
+test("latest factual statement identifies its work without claiming independent acceptance",()=>{
+ const project=createProject(empty(),{name:'Traceable output',type:'engineering'});
+ let snapshot=addTarget(project.state,project.id,{title:'Outcome',desired:'Verified delivery'}).state;
+ const targetId=snapshot.projects[0].targets[0].id;
+ const made=createItem(snapshot,project.id,{title:'Source implementation',targetIds:[targetId]});
+ snapshot=recordFinding(made.state,project.id,{targetId,workId:made.id,result:'partial',level:'implementation',note:'Not complete'}).state;
+ const before=JSON.stringify(snapshot);
+ const report=realityOverview(snapshot.projects[0],compareProject(snapshot.projects[0]),projectImpact(snapshot.projects[0]));
+ assert.equal(report.rows[0].observation.workId,made.id);
+ assert.equal(report.rows[0].observation.workTitle,'Source implementation');
+ assert.equal(report.rows[0].assessment,'partial_reported');
+ assert.equal(report.independentAcceptance,false);
+ assert.equal(JSON.stringify(snapshot),before);
+});

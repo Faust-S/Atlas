@@ -754,6 +754,7 @@ def inspect_cause_proposal_and_decision(saved_generation):
     assert len(new_findings) == 1, "Observation count or identity incorrect after Save"
     finding = new_findings[0]
     assert finding["targetId"] == "load-target-119", "Observation linked to wrong requirement"
+    assert finding["workId"] == work["id"], "Observation lost its originating work"
     assert finding["result"] == "partial" and finding["level"] == "implementation"
     assert finding["origin"] == "manual" and finding["sourceId"] is None, "Manual claim misrepresented as external verification"
     assert finding["note"] == observation_note

@@ -159,9 +159,9 @@ test("linked work offers explicit requirement-specific fact entry without inferr
  assert.match(main,/Работы отмечены выполненными\. Это не подтверждает результат или его приёмку/);
  assert.match(main,/Завершение работы заявлено; факт результата вносится отдельно/);
  assert.match(main,/ariaLabel=\{"Зафиксировать факт по работе: "\+w\.title/);
- assert.match(main,/onClick=\{\(\)=>openEditor\("finding-target:"\+w\.targetIds\[0\]\)\}/);
+ assert.match(main,/onClick=\{\(\)=>openEditor\("finding-work:"\+encodeURIComponent\(w\.id\)\+":"\+encodeURIComponent\(w\.targetIds\[0\]\)\)\}/);
  assert.match(main,/w\.targetIds\.map\(\(id:string\)=>targetById\.get\(id\)/);
- assert.match(main,/onClick=\{\(\)=>openEditor\("finding-target:"\+id\)\}/);
+ assert.match(main,/onClick=\{\(\)=>openEditor\("finding-work:"\+encodeURIComponent\(w\.id\)\+":"\+encodeURIComponent\(id\)\)\}/);
  assert.match(css,/\.atlas-work-fact-menu>summary:focus-visible/);
 });
 
@@ -173,4 +173,10 @@ test("deep requirement work navigation filters the existing work table by target
  assert.match(main,/aria-label="Фильтр работ по требованию"/);
  assert.match(main,/<option value="all">Все требования<\/option>/);
  assert.match(main,/\(project\.targets\|\|\[\]\)\.map\(\(t:any\)=>/);
+});
+
+test("observed outcome links back to the precise originating work",()=>{
+ assert.match(main,/r\.observation\?\.workId&&<p>Наблюдение по работе:/);
+ assert.match(main,/aria-label=\{"Открыть работу, связанную с наблюдением: "\+r\.observation\.workTitle\}/);
+ assert.match(main,/onClick=\{\(\)=>openEditor\("work:"\+r\.observation\.workId\)\}/);
 });

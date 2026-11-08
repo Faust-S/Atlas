@@ -256,6 +256,7 @@ test("installed linked-work observation requires explicit draft, Save and restar
  assert.match(script,/ATLAS04_WORK_FACT_NO_AUTOMATIC_ACCEPTANCE_PASS/);
  assert.match(script,/ATLAS04_WORK_FACT_RESTART_READBACK_PASS/);
  assert.match(script,/finding\["targetId"\] == "load-target-119"/);
+ assert.match(script,/finding\["workId"\] == work\["id"\]/);
  assert.match(script,/finding\["result"\] == "partial" and finding\["level"\] == "implementation"/);
  assert.match(script,/finding\["origin"\] == "manual" and finding\["sourceId"\] is None/);
  assert.match(script,/related\["state"\] == "todo" and related\["changeId"\] == change\["id"\]/);
