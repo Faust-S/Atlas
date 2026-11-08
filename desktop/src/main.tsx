@@ -708,10 +708,13 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
        const imp=projectImpact(p),row=dates.byId.get(p.id);
        return <tr key={p.id}><td><button className="text-link" onClick={()=>selectProject(p.id)}>{p.name}</button><small>{p.goal||"Цель не задана"}</small></td>
         <td><Badge>{statuses[p.status]||p.status}</Badge></td><td className="atlas-portfolio-attention">
-          {imp.attention>0?<button type="button" className="text-link"
+          {!(p.targets||[]).length?<button type="button" className="text-link"
+           aria-label={"Добавить требования проекта "+p.name}
+           onClick={()=>openProjectTab(p.id,"overview")}>Требования не заданы</button>:
+           imp.attention>0?<button type="button" className="text-link"
            aria-label={"Проверить требования проекта "+p.name}
            onClick={()=>openProjectTab(p.id,"reality")}>Проверить {imp.attention} требований</button>:
-           <span>Нет открытых замечаний к требованиям</span>}
+           <span>Нет замечаний по имеющимся требованиям</span>}
           {imp.sourceIssues.length>0&&<button type="button" className="text-link"
            aria-label={"Проверить источники проекта "+p.name}
            onClick={()=>openProjectTab(p.id,"sources")}>Проблемные источники: {imp.sourceIssues.length}</button>}

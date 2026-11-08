@@ -45,6 +45,8 @@ test("same host surface can remount without overriding a foreign ShadowRoot",()=
 
 test("portfolio attention and project next step navigate in existing views without automatic execution",()=>{
  assert.match(main,/projectNextStep\(project,impact\)/);
+ assert.match(main,/Требования не заданы/);
+ assert.match(main,/onClick=\{\(\)=>openProjectTab\(p\.id,"overview"\)\}/);
  assert.match(main,/onClick=\{\(\)=>openProjectTab\(p\.id,"reality"\)\}/);
  assert.match(main,/onClick=\{\(\)=>openProjectTab\(p\.id,"sources"\)\}/);
  assert.match(main,/nextStep\.action\?openEditor\(nextStep\.action\):view\(nextStep\.tab as Tab\)/);
