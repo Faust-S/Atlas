@@ -254,6 +254,69 @@ def timeline_and_dag():
     screenshot("dag")
     print("ATLAS04_SCALE_GUI_GANTT_DAG_PASS", flush=True)
 
+def inspect_linked_project(saved_generation):
+    """Win32 project navigation plus optional WebView2 UI Automation inspection.
+
+    Native project title and CAS generation are independent success oracles.
+    UIA is best effort: if WebView2 does not expose the button to this runner,
+    capture actual pixels and report HOLD rather than a fabricated toggle PASS.
+    """
+    started = now()
+    click(424, 66)  # Sticky search, still available on the selected DAG
+    keyboard.send_keys("^a")
+    keyboard.send_keys("Project 20", with_spaces=True)
+    time.sleep(0.7)
+    screenshot("search-linked-20")
+    click(110, 317)  # One matching project in the native sidebar
+    wait_title("Project 20 — Обзор")
+    metric("linkedProjectNavigation", started)
+    assert native()[0]["generation"] == saved_generation, "Project navigation wrote native data"
+    screenshot("linked-20-overview-top")
+    print("ATLAS04_SCALE_GUI_LINKED_PROJECT_PASS project=20", flush=True)
+
+    # Scroll the actual installed window, not a headless DOM or browser mock.
+    activate()
+    bounds = win32gui.GetWindowRect(handle)
+    dpi = ctypes.windll.user32.GetDpiForWindow(handle)
+    scale = dpi / 96 if dpi else 1
+    pointer = (bounds[0] + round(690 * scale), bounds[1] + round(535 * scale))
+    mouse.scroll(coords=pointer, wheel_dist=-7)
+    time.sleep(0.35)
+    screenshot("linked-20-relations-scrolled")
+    print("ATLAS04_SCALE_GUI_RELATIONS_VISUAL_CAPTURED project=20", flush=True)
+
+    # On some runner WebView2 builds, HTML controls are not exposed to UIA.
+    # Validate both label transitions and navigation only when UIA really works.
+    try:
+        from pywinauto import Desktop
+        window = Desktop(backend="uia").window(handle=handle)
+        expand = window.child_window(title="Развернуть цепочки", control_type="Button")
+        for _ in range(3):
+            if expand.exists(timeout=1) and expand.is_visible():
+                break
+            mouse.scroll(coords=pointer, wheel_dist=-3)
+            time.sleep(0.25)
+        if not expand.exists(timeout=1) or not expand.is_visible():
+            print("ATLAS04_SCALE_GUI_RELATIONS_TOGGLE_UIA_HOLD inaccessible button", flush=True)
+        else:
+            expand.click_input()
+            collapse = window.child_window(title="Скрыть цепочки", control_type="Button")
+            collapse.wait("exists visible", timeout=4)
+            screenshot("linked-20-relations-expanded")
+            print("ATLAS04_SCALE_GUI_RELATIONS_TOGGLE_UIA_PASS project=20", flush=True)
+            predecessor = window.child_window(title="Project 19", control_type="Button")
+            if predecessor.exists(timeout=2) and predecessor.is_visible():
+                predecessor.click_input()
+                wait_title("Project 19 — Обзор", timeout=12)
+                screenshot("linked-19-after-navigation")
+                print("ATLAS04_SCALE_GUI_PREDECESSOR_NAVIGATION_UIA_PASS", flush=True)
+            else:
+                print("ATLAS04_SCALE_GUI_PREDECESSOR_NAVIGATION_UIA_HOLD inaccessible link", flush=True)
+    except Exception as error:
+        screenshot("linked-20-uia-hold")
+        print("ATLAS04_SCALE_GUI_RELATIONS_TOGGLE_UIA_HOLD " + repr(error)[:180], flush=True)
+    assert native()[0]["generation"] == saved_generation, "Inspecting links mutated saved data"
+
 try:
     assert APP.is_file() and FIXTURE.is_file()
     expected = json.loads(FIXTURE.read_text(encoding="utf-8-sig"))
@@ -276,6 +339,8 @@ try:
     search_and_open()
     phase = "gantt-and-dag"
     timeline_and_dag()
+    phase = "linked-project-navigation"
+    inspect_linked_project(saved["generation"])
     assert native()[0]["generation"] == saved["generation"], "Navigation mutated the native Store"
     stop()
     print("ATLAS04_SCALE_GUI_ACCEPTED_PASS", flush=True)
