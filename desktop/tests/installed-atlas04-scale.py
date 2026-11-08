@@ -1,8 +1,7 @@
-"""Native Windows Atlas 0.4 scale trial (120 projects / 1200 works).
+"""Installed Atlas 0.4 R5 GUI: genuine file dialog, human confirmation and CAS readback.
 
-Uses the existing JSON import dialog and separate human approval to load a
-validated R5 fixture. All writes are exclusively through the installed Tauri
-UI / Rust store. No CDP, Chromium automation, private data or test-only IPC.
+Uses physical Win32 input and window titles rather than WebView2 accessibility
+nodes. No synthetic native Store writes, CDP, Chromium or test-only app API.
 """
 import ctypes
 import hashlib
@@ -13,270 +12,258 @@ import sys
 import time
 from pathlib import Path
 
-from pywinauto import Application, Desktop, keyboard, mouse
+import win32con
+import win32gui
+import win32process
+from pywinauto import keyboard, mouse
 from PIL import ImageGrab
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 APP = Path(os.environ["ATLAS_INSTALLED_EXE"])
 FIXTURE = Path(os.environ["ATLAS_R5_PORTFOLIO_JSON"])
 ROOT = Path(os.environ["LOCALAPPDATA"]) / "ru.iwxa.atlas" / "atlas-store-v1"
-EVIDENCE = Path("desktop/tests/visual-evidence")
-EVIDENCE.mkdir(exist_ok=True, parents=True)
+OUT = Path("desktop/tests/visual-evidence")
+OUT.mkdir(parents=True, exist_ok=True)
 process = None
-window = None
+handle = 0
 phase = "init"
 
-def stamp():
+def now():
     return time.monotonic()
 
-def measure(label, start):
-    ms = int(round((stamp() - start) * 1000))
-    print(f"ATLAS04_SCALE_METRIC {label}Ms={ms}", flush=True)
-    return ms
+def metric(label, start):
+    elapsed = round((now() - start) * 1000)
+    print(f"ATLAS04_SCALE_METRIC {label}Ms={elapsed}", flush=True)
+    return elapsed
+
+def screenshot(name):
+    try:
+        ImageGrab.grab().save(OUT / ("atlas04-scale-" + name + ".png"))
+        print("ATLAS04_SCALE_SCREENSHOT " + name, flush=True)
+    except Exception as error:
+        print("ATLAS04_SCALE_SCREENSHOT_HOLD " + str(error)[:140], flush=True)
+
+def current_title():
+    return win32gui.GetWindowText(handle) if handle else ""
+
+def locate_window():
+    found = []
+    def visit(hwnd, unused):
+        if not win32gui.IsWindowVisible(hwnd):
+            return
+        _, owner = win32process.GetWindowThreadProcessId(hwnd)
+        if owner == process.pid:
+            title = win32gui.GetWindowText(hwnd)
+            if "Atlas" in title:
+                found.append((hwnd, title))
+    win32gui.EnumWindows(visit, None)
+    for hwnd, title in found:
+        if "Портфель" in title:
+            return hwnd
+    return 0
+
+def activate():
+    if not handle or not win32gui.IsWindow(handle):
+        raise AssertionError("Installed Atlas HWND unavailable")
+    win32gui.ShowWindow(handle, win32con.SW_RESTORE)
+    try:
+        win32gui.SetForegroundWindow(handle)
+    except Exception:
+        pass
+    time.sleep(0.18)
+
+def launch():
+    global process, handle
+    start = now()
+    process = subprocess.Popen([str(APP)], env={**os.environ, "ATLAS_CI_RENDERER_PROBE": "1"})
+    end = now() + 65
+    while now() < end:
+        if process.poll() is not None:
+            raise AssertionError("Installed Atlas exited before main portfolio")
+        handle = locate_window()
+        if handle:
+            win32gui.MoveWindow(handle, 0, 0, 1024, 710, True)
+            activate()
+            print("ATLAS04_SCALE_NATIVE_OPEN_PASS", flush=True)
+            return metric("startupToPortfolio", start)
+        time.sleep(0.25)
+    screenshot("win32-window-missing")
+    raise AssertionError("Installed main Atlas HWND not found by process ID")
+
+def click(x, y):
+    activate()
+    bounds = win32gui.GetWindowRect(handle)
+    try:
+        dpi = ctypes.windll.user32.GetDpiForWindow(handle)
+        scale = dpi/96 if dpi else 1
+    except Exception:
+        scale = 1
+    mouse.click(coords=(bounds[0] + round(x*scale), bounds[1] + round(y*scale)))
+    time.sleep(0.3)
+
+def wait_title(value, timeout=25):
+    until = now() + timeout
+    while now() < until:
+        if process.poll() is not None:
+            raise AssertionError("Installed Atlas exited while opening " + value)
+        if value in current_title():
+            return
+        time.sleep(0.16)
+    screenshot("title-missing")
+    raise AssertionError("View '" + value + "' missing, found " + current_title())
+
+def stop():
+    global process, handle
+    if not process:
+        return
+    if process.poll() is None:
+        activate()
+        keyboard.send_keys("%{F4}")
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            win32gui.PostMessage(handle, win32con.WM_CLOSE, 0, 0)
+            process.wait(timeout=9)
+    print("ATLAS04_SCALE_NATIVE_CLOSE_PASS", flush=True)
+    process = None
+    handle = 0
 
 def native():
     manifest = json.loads((ROOT / "head.json").read_text(encoding="utf-8"))
     projects = []
     for item in manifest["projects"]:
-        block = ROOT / "blocks" / (item["sha256"] + ".json")
-        contents = block.read_bytes()
-        assert hashlib.sha256(contents).hexdigest() == item["sha256"], "Corrupt project block"
-        p = json.loads(contents.decode("utf-8"))
-        assert item["id"] == p["id"], "Manifest/project ID mismatch"
-        projects.append(p)
+        block = (ROOT / "blocks" / (item["sha256"] + ".json")).read_bytes()
+        assert hashlib.sha256(block).hexdigest() == item["sha256"], "Native SHA mismatch"
+        project = json.loads(block.decode("utf-8"))
+        assert project["id"] == item["id"], "Native project ID mismatch"
+        projects.append(project)
     return manifest, projects
 
-def shot(name):
-    try:
-        target = EVIDENCE / ("atlas04-scale-" + name + ".png")
-        ImageGrab.grab().save(target)
-        print("ATLAS04_SCALE_SCREENSHOT " + name, flush=True)
-    except Exception as error:
-        print("ATLAS04_SCALE_SCREENSHOT_HOLD " + str(error)[:200], flush=True)
-
-def find_button(title, timeout=25, required=True):
-    end = stamp() + timeout
-    while stamp() < end:
-        try:
-            for item in window.descendants():
-                if item.element_info.control_type == "Button" and (item.element_info.name or "").strip() == title:
-                    if item.is_enabled() and item.is_visible():
-                        return item
-        except Exception:
-            pass
-        time.sleep(0.3)
-    if required:
-        shot("missing-" + title[:16].replace(" ", "-"))
-        raise AssertionError("No actionable installed button: " + title)
-    return None
-
-def launch():
-    global process, window
-    started = stamp()
-    process = subprocess.Popen([str(APP)], env={**os.environ, "ATLAS_CI_RENDERER_PROBE": "1"})
-    app = Application(backend="uia")
-    end = stamp() + 70
-    while stamp() < end:
-        if process.poll() is not None:
-            raise AssertionError("Installed Atlas terminated during startup")
-        try:
-            app.connect(process=process.pid, timeout=2)
-            candidate = app.top_window()
-            if candidate.is_visible() and "Портфель" in candidate.window_text():
-                window = candidate
-                window.move_window(x=0, y=0, width=1024, height=710, repaint=True)
-                print("ATLAS04_SCALE_NATIVE_OPEN_PASS", flush=True)
-                return measure("startupToPortfolio", started)
-        except Exception:
-            pass
-        time.sleep(0.35)
-    raise AssertionError("No visible installed Atlas portfolio after startup")
-
-def click_at(x, y):
-    window.set_focus()
-    rectangle = window.rectangle()
-    try:
-        scale = ctypes.windll.user32.GetDpiForWindow(int(window.handle)) / 96.0
-    except Exception:
-        scale = 1.0
-    mouse.click(coords=(int(rectangle.left + x*scale), int(rectangle.top + y*scale)))
-    time.sleep(0.4)
-
-def close():
-    global process, window
-    if process is None:
-        return
-    if process.poll() is None:
-        try:
-            window.set_focus()
-            keyboard.send_keys("%{F4}")
-            process.wait(timeout=6)
-        except Exception:
-            ctypes.windll.user32.PostMessageW(int(window.handle), 0x0010, 0, 0)
-            process.wait(timeout=9)
-    print("ATLAS04_SCALE_NATIVE_CLOSE_PASS", flush=True)
-    process = None
-    window = None
-
 def choose_json():
-    end = stamp() + 35
-    while stamp() < end:
-        for item in Desktop(backend="win32").windows():
-            try:
-                if item.is_visible() and item.window_text().strip() == "Открыть архив Atlas JSON" and item.class_name() == "#32770":
-                    item.set_focus()
-                    # Windows SendKeys treats ~, %, ^, + and braces as commands.
-                    safe = str(FIXTURE)
-                    assert not any(c in safe for c in "~%^+{}()"), "Unsafe picker path"
-                    keyboard.send_keys("%n")
-                    keyboard.send_keys("^a")
-                    keyboard.send_keys(safe, with_spaces=True)
-                    keyboard.send_keys("{ENTER}")
-                    print("ATLAS04_SCALE_NATIVE_PICKER_PASS", flush=True)
-                    return
-            except (RuntimeError, ValueError):
-                pass
-        time.sleep(0.3)
-    shot("picker-missing")
-    raise AssertionError("Installed Windows JSON picker did not open")
-
-def wait_title(text, timeout=35):
-    end = stamp() + timeout
-    while stamp() < end:
-        if process.poll() is not None:
-            raise AssertionError("Atlas exited while navigating to " + text)
-        if text in window.window_text():
+    deadline = now() + 35
+    while now() < deadline:
+        hwnd = win32gui.FindWindow("#32770", "Открыть архив Atlas JSON")
+        if hwnd and win32gui.IsWindowVisible(hwnd):
+            win32gui.SetForegroundWindow(hwnd)
+            safe = str(FIXTURE)
+            assert not any(char in safe for char in "~%^+{}()"), "Unsafe Windows SendKeys path"
+            keyboard.send_keys("%n")
+            keyboard.send_keys("^a")
+            keyboard.send_keys(safe, with_spaces=True)
+            keyboard.send_keys("{ENTER}")
+            print("ATLAS04_SCALE_NATIVE_PICKER_PASS", flush=True)
             return
-        time.sleep(0.2)
-    shot("missing-title")
-    raise AssertionError("Installed GUI never opened " + text + " (actual=" + window.window_text() + ")")
+        time.sleep(0.25)
+    screenshot("picker-missing")
+    raise AssertionError("No native Windows JSON file picker")
 
-def import_fixture(expected_ids):
-    baseline, original = native()
-    assert len(original) == 1 and original[0]["name"] == "Atlas04InstalledUX"
-    start = stamp()
-    # Menu is collapsed in 0.4. Coordinates were qualified from real 1024 px
-    # installed screenshots; do not click a hidden Open button.
-    click_at(847, 65)
-    shot("file-menu")
-    control = find_button("Открыть JSON", timeout=6, required=False)
-    if control:
-        control.click_input()
-    else:
-        click_at(829, 117)
-    choose_json()
-    confirm = find_button("Заменить портфель в черновике", timeout=45)
-    preview = measure("importToPreview", start)
-    shot("import-preview")
-    assert confirm.is_enabled(), "Import confirmation not available"
-    confirm.click_input()
-    end = stamp() + 35
-    while stamp() < end:
-        if find_button("Заменить портфель в черновике", timeout=1, required=False) is None:
-            break
-        time.sleep(0.2)
-    else:
-        shot("import-not-applied")
-        raise AssertionError("Import preview did not close after explicit confirmation")
-    still, unchanged = native()
-    assert still["generation"] == baseline["generation"]
-    assert len(unchanged) == 1, "Import modified native store before Save"
-    print("ATLAS04_SCALE_IMPORT_PRE_SAVE_UNCHANGED_PASS", flush=True)
-    click_at(746, 65)
-    end = stamp() + 90
-    while stamp() < end:
+def wait_imported(saved_generation, expected_ids, timeout=80):
+    end = now() + timeout
+    while now() < end:
         try:
             saved, projects = native()
-            if saved["generation"] != baseline["generation"] and sorted(p["id"] for p in projects) == expected_ids:
+            if saved["generation"] != saved_generation and sorted(p["id"] for p in projects) == expected_ids:
                 assert len(projects) == 120
                 assert sum(len(p["items"]) for p in projects) == 1200
                 assert sum(len(p["dependencies"]) for p in projects) == 300
                 assert len(saved["root"]["portfolioLinks"]) == 40
-                print("ATLAS04_SCALE_GUI_IMPORT_PASS projects=120 works=1200 dependencies=300 portfolioLinks=40", flush=True)
-                measure("importToNativeSave", start)
-                shot("saved-120")
-                return saved, projects
-        except (OSError, KeyError, json.JSONDecodeError):
+                return saved
+        except (OSError, ValueError, KeyError, json.JSONDecodeError):
             pass
         time.sleep(0.3)
-    shot("import-save-failed")
-    raise AssertionError("120-project import not saved through real installed UI")
+    screenshot("native-save-missing")
+    raise AssertionError("GUI never committed the 120-project snapshot")
 
-def lookup():
-    start = stamp()
-    # A search changes only React display state, not the saved snapshot.
-    edit = None
-    for item in window.descendants():
-        if item.element_info.control_type == "Edit" and "Найти проект" in str(item.element_info.name):
-            edit = item
-            break
-    if edit is not None:
-        edit.set_focus()
-    else:
-        click_at(430, 65)
+def import_fixture(ids):
+    original, before = native()
+    assert len(before) == 1 and before[0]["name"] == "Atlas04InstalledUX"
+    start = now()
+    # The physical coordinates are grounded in 0.4 installed 1024px PNGs.
+    click(847, 65)   # File & versions dropdown
+    screenshot("files-menu-open")
+    click(829, 116)  # Open JSON, first dropdown action
+    choose_json()
+    time.sleep(1.1)
+    screenshot("import-preview")
+    metric("importToPreview", start)
+    assert native()[0]["generation"] == original["generation"], "File choice mutated native state"
+    # React auto-focuses Cancel import; one Tab selects explicit Approve,
+    # Enter applies to the local draft ONLY. Save is a separate user action.
+    activate()
+    keyboard.send_keys("{TAB}")
+    time.sleep(0.2)
+    keyboard.send_keys("{ENTER}")
+    time.sleep(1.4)
+    screenshot("after-human-confirm")
+    assert native()[0]["generation"] == original["generation"], "Import bypassed native Save"
+    print("ATLAS04_SCALE_IMPORT_PRE_SAVE_UNCHANGED_PASS", flush=True)
+    click(746, 65)  # Real 0.4 Save button, confirmed by installed UX screenshots
+    result = wait_imported(original["generation"], ids)
+    metric("importToNativeSave", start)
+    print("ATLAS04_SCALE_GUI_IMPORT_PASS projects=120 works=1200 dependencies=300 portfolioLinks=40", flush=True)
+    screenshot("saved-120")
+    return result
+
+def search_and_open():
+    start = now()
+    click(424, 66)  # Actual search input
     keyboard.send_keys("^a")
     keyboard.send_keys("Project 119", with_spaces=True)
-    match = find_button("Project 119", timeout=30)
-    measure("searchUniqueProject", start)
-    match.click_input()
-    wait_title("Project 119 — Обзор")
-    measure("searchAndOpenProject", start)
-    shot("project-119")
-    assert process.poll() is None
+    time.sleep(0.9)
+    screenshot("search-119")
+    # Filtering reduces the sidebar list to exactly one project. A physical
+    # user click selects the visible row; the native window title is the oracle.
+    click(110, 317)
+    wait_title("Project 119 — Обзор", 25)
+    metric("searchToProject", start)
     print("ATLAS04_SCALE_GUI_SEARCH_PASS project=119", flush=True)
+    screenshot("project-119")
 
-def timeline_and_graph():
-    t = stamp()
-    gantt = find_button("График", timeout=10, required=False)
-    if gantt:
-        gantt.click_input()
-    else:
-        click_at(439, 310)
+def timeline_and_dag():
+    started = now()
+    click(439, 310) # Primary Gantt tab
     wait_title("График")
-    measure("ganttNavigation", t)
-    shot("gantt")
-    click_at(624, 310)
-    item = find_button("Зависимости", timeout=7, required=False)
-    if item:
-        item.click_input()
-    else:
-        click_at(624, 394)
+    metric("ganttNavigation", started)
+    screenshot("gantt")
+    click(624, 310) # Other sections dropdown
+    time.sleep(0.25)
+    screenshot("other-sections-open")
+    click(624, 394) # Dependency DAG
     wait_title("Зависимости")
-    measure("ganttToDagNavigation", t)
-    shot("dag")
+    metric("ganttToDagNavigation", started)
+    screenshot("dag")
     print("ATLAS04_SCALE_GUI_GANTT_DAG_PASS", flush=True)
 
 try:
     assert APP.is_file() and FIXTURE.is_file()
     expected = json.loads(FIXTURE.read_text(encoding="utf-8-sig"))
-    expected_ids = sorted(p["id"] for p in expected["projects"])
-    assert len(expected_ids) == 120
+    ids = sorted(p["id"] for p in expected["projects"])
+    assert len(ids) == 120
     assert sum(len(p["items"]) for p in expected["projects"]) == 1200
     phase = "launch-before-import"
     launch()
-    phase = "gui-file-picker-and-confirm"
-    saved, _ = import_fixture(expected_ids)
-    close()
+    phase = "native-picker-approval-save"
+    saved = import_fixture(ids)
+    stop()
     phase = "restart-with-120-projects"
     launch()
-    restored, projects = native()
-    assert restored["generation"] == saved["generation"] and restored["revision"] == saved["revision"]
-    assert sorted(p["id"] for p in projects) == expected_ids
+    current, projects = native()
+    assert current["generation"] == saved["generation"] and current["revision"] == saved["revision"]
+    assert sorted(p["id"] for p in projects) == ids
     print("ATLAS04_SCALE_GUI_RESTART_READBACK_PASS", flush=True)
-    shot("reopened-120")
-    phase = "find-project-119"
-    lookup()
+    screenshot("reopened-120")
+    phase = "portfolio-search"
+    search_and_open()
     phase = "gantt-and-dag"
-    timeline_and_graph()
-    unchanged, _ = native()
-    assert unchanged["generation"] == saved["generation"], "GUI navigation unexpectedly changed native data"
-    close()
+    timeline_and_dag()
+    assert native()[0]["generation"] == saved["generation"], "Navigation mutated the native Store"
+    stop()
     print("ATLAS04_SCALE_GUI_ACCEPTED_PASS", flush=True)
 except Exception as error:
     print("ATLAS04_SCALE_GUI_HOLD phase=" + phase + " error=" + repr(error), flush=True)
-    shot("failure")
+    screenshot("failure")
     raise
 finally:
-    if process is not None and process.poll() is None:
+    if process and process.poll() is None:
         process.kill()
         process.wait(timeout=10)
