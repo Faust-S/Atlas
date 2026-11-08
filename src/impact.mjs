@@ -55,3 +55,38 @@ export function portfolioImpact(projects,options={}){
   evidenceReview:rows.reduce((n,x)=>n+x.evidenceReview,0),
   sourceIssues:rows.reduce((n,x)=>n+x.sourceIssues,0)};
 }
+
+/**
+ * A contextual, non-authoritative next step for the standalone project screen.
+ * Reuses existing factual impact; never updates a task, decision or work status.
+ * A priority is only a navigation hint computed from the current local draft.
+ */
+export function projectNextStep(project, impact=projectImpact(project)){
+ if(!(project.targets||[]).length)return {
+  id:"define_target",title:"Сформулируйте ожидаемый результат",
+  note:"Определите, что должно получиться. Тогда работы и факты можно будет сопоставлять с целью.",
+  button:"Добавить требование",tab:"overview",action:"target"
+ };
+ if(!(project.items||[]).length)return {
+  id:"plan_work",title:"Разложите цель на работы",
+  note:"Требования уже есть, но работы ещё не запланированы. Создайте первую работу.",
+  button:"Добавить работу",tab:"work",action:"item"
+ };
+ if(impact.sourceIssues.length)return {
+  id:"check_sources",title:"Проверьте источники данных",
+  note:"Проблемных или неполных наблюдений: "+impact.sourceIssues.length+
+   ". Сначала уточните источник; его изменение не означает принятие результата.",
+  button:"Открыть источники",tab:"sources",action:null
+ };
+ if(impact.attention>0)return {
+  id:"review_reality",title:"Сверьте план и фактические сведения",
+  note:"Требований, требующих внимания: "+impact.attention+
+   ". Проверьте разрыв относительно цели и основания решения.",
+  button:"Открыть план / факт",tab:"reality",action:null
+ };
+ return {
+  id:"review_schedule",title:"Проверьте сроки и зависимости",
+  note:"Открытых замечаний по связанным требованиям не выявлено. Это не подтверждение выполнения проекта.",
+  button:"Открыть график",tab:"timeline",action:null
+ };
+}

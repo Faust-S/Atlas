@@ -5,7 +5,7 @@ import {empty,deserialize,serialize,editItem,removeStage,removeItem,disconnect,r
 import {removePortfolioLink} from "../../src/portfolio.mjs";
 import {editorSpec,applyEditor,editorSelectionFields} from "../../src/editor.mjs";
 import {compareProject,decideChange} from "../../src/trace.mjs";
-import {projectImpact} from "../../src/impact.mjs";
+import {projectImpact,projectNextStep} from "../../src/impact.mjs";
 import {scheduleProject} from "../../src/planning.mjs";
 import {portfolioSchedule,projectedFinishLabel} from "../../src/portfolio-schedule.mjs";
 import {portfolioResources} from "../../src/portfolio-resources.mjs";
@@ -202,6 +202,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const plan=useMemo(()=>project?scheduleProject(project):null,[project]);
  const reality=useMemo(()=>project?compareProject(project):null,[project]);
  const impact=useMemo(()=>project?projectImpact(project):null,[project]);
+ const nextStep=useMemo(()=>project&&impact?projectNextStep(project,impact):null,[project,impact]);
  const projected=active?dates.byId.get(active):null;
  const filtered=useMemo(()=>data.projects.filter((p:any)=>
   (portfolioStatus==="all"||portfolioStatus==="active"&&["active","planned","paused"].includes(p.status)||
@@ -642,7 +643,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   window.addEventListener("keydown",key);return ()=>window.removeEventListener("keydown",key);
  });
  if(!ready)return <main className="entry">
-  <div className="entry-card"><img className="logo-symbol" src={logoUrl} alt="" aria-hidden="true" /><h1>IWXA Atlas <em>0.3.0</em></h1>
+  <div className="entry-card"><img className="logo-symbol" src={logoUrl} alt="" aria-hidden="true" /><h1>IWXA Atlas <em>0.4.0-dev.1</em></h1>
    <p>{recovery?"Найдена предыдущая исправная версия портфеля. Восстановление выполняется только по вашему решению.":"Самостоятельное локальное приложение для Windows. Данные принадлежат пользователю."}</p>
    {error&&<p role="alert" className="error">{error}</p>}
    {recovery&&<Action onClick={()=>void restore()} primary disabled={busy}>Восстановить сохранённую версию</Action>}
@@ -652,7 +653,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  </main>;
  return <div ref={rootRef} className={"app-shell"+(inspector?"":" no-inspector")+(editor?" editor-active":"")+(embedded?" atlas-embedded":"")}>
   <aside className="sidebar">
-   <div className="brand"><img className="logo-symbol" src={logoUrl} alt="" aria-hidden="true" /><div><strong>Atlas</strong><small>IWXA · 0.3.0</small></div></div>
+   <div className="brand"><img className="logo-symbol" src={logoUrl} alt="" aria-hidden="true" /><div><strong>Atlas</strong><small>IWXA · 0.4.0-dev.1</small></div></div>
    <nav className="main-nav" aria-label="Основная навигация">
     <button className={!active?"nav-current":""} onClick={()=>selectProject(null)}>▦ <span>Портфель проектов</span><b>{data.projects.length}</b></button>
     <button aria-label="Создать проект" onClick={()=>{selectProject(null);openEditor("new")}}>＋ <span>Создать проект</span></button>
@@ -706,9 +707,17 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       <tbody>{filtered.slice(0,portfolioLimit).map((p:any)=>{
        const imp=projectImpact(p),row=dates.byId.get(p.id);
        return <tr key={p.id}><td><button className="text-link" onClick={()=>selectProject(p.id)}>{p.name}</button><small>{p.goal||"Цель не задана"}</small></td>
-        <td><Badge>{statuses[p.status]||p.status}</Badge></td><td>{imp.attention} требований · {imp.sourceIssues.length} источников</td>
+        <td><Badge>{statuses[p.status]||p.status}</Badge></td><td className="atlas-portfolio-attention">
+          {imp.attention>0?<button type="button" className="text-link"
+           aria-label={"Проверить требования проекта "+p.name}
+           onClick={()=>openProjectTab(p.id,"reality")}>Проверить {imp.attention} требований</button>:
+           <span>Нет открытых замечаний к требованиям</span>}
+          {imp.sourceIssues.length>0&&<button type="button" className="text-link"
+           aria-label={"Проверить источники проекта "+p.name}
+           onClick={()=>openProjectTab(p.id,"sources")}>Проблемные источники: {imp.sourceIssues.length}</button>}
+         </td>
         <td title={row?.notes?.join("; ")||""}>{projectedFinishLabel(row)}</td><td>{row?.deadlineSlipDays==null?"Неизвестно":row.deadlineSlipDays+" дн."}</td>
-        <td><Action onClick={()=>removeProject(p.id)}>Удалить</Action></td></tr>;
+        <td><Action onClick={()=>selectProject(p.id)}>Открыть</Action><Action onClick={()=>removeProject(p.id)}>Удалить</Action></td></tr>;
       })}</tbody></table></div>:<Fallback message={data.projects.length?"По запросу проекты не найдены. Измените поиск, чтобы увидеть остальные.":"Здесь появятся проекты. Создайте первый проект, определите результат и сохраните его на диск."}/>}
      {filtered.length>0&&<p className="minor">Показано {Math.min(filtered.length,portfolioLimit)} из {filtered.length} проектов по текущему поиску.</p>}
      {filtered.length>portfolioLimit&&<Action onClick={()=>setPortfolioLimit(n=>Math.min(filtered.length,n+150))}>Показать ещё проекты</Action>}
@@ -765,6 +774,13 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     {tab==="overview"&&<>
      <div className="metric-grid"><Metric value={project.targets?.length||0} label="Ожидаемых результатов"/><Metric value={impact?.attention??0} label="Требуют внимания"/>
       <Metric value={project.items.length} label="Работ"/><Metric value={projected?.deadlineSlipDays??"?"} label="Дней риска срока"/></div>
+     {nextStep&&<section className="surface atlas-next-step" aria-label="Следующий шаг проекта">
+      <div className="section-heading"><div><small>Подсказка по текущему плану</small>
+       <h2>{nextStep.title}</h2><p>{nextStep.note}</p></div>
+       <Action primary onClick={()=>nextStep.action?openEditor(nextStep.action):view(nextStep.tab as Tab)}>{nextStep.button}</Action>
+      </div>
+      <p className="minor">Переход только открывает представление или редактор. Факты и решения автоматически не изменяются.</p>
+     </section>}
      <section className="surface"><div className="section-heading"><div><h2>Цель, план и факты</h2>
       <p>План и наблюдения разделены. Ни один источник не подтверждает приёмку автоматически.</p></div>
       <Action onClick={()=>openEditor("target")} primary>Добавить требование</Action></div>
@@ -1073,7 +1089,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      </div>
     </section>
    </div>}
-   <footer className="workspace-footer"><span>IWXA Atlas 0.3 · локальный черновик → нативная запись → readback</span>
+   <footer className="workspace-footer"><span>IWXA Atlas 0.4 · локальный черновик → нативная запись → readback</span>
     <span>Готовность определяется доказательствами и решениями, не количеством коммитов.</span></footer>
   </main>
   {inspector&&<aside className="inspector">

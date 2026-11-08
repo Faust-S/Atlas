@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - work/2026-11-04-atlas-0-3
+      - work/2026-11-08-atlas-0-4
     paths:
       - 'src/**'
       - 'tests/**'

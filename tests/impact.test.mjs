@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {empty,createProject,createItem,editItem,attach,observe,serialize,deserialize} from "../src/core.mjs";
 import {addTarget,recordFinding} from "../src/trace.mjs";
-import {projectImpact,portfolioImpact} from "../src/impact.mjs";
+import {projectImpact,portfolioImpact,projectNextStep} from "../src/impact.mjs";
 import {applyEditor} from "../src/editor.mjs";
 const date="2026-11-01T19:00:00.000Z";
 const args=o=>({get:k=>o[k]??""});
@@ -72,4 +72,23 @@ test("portfolio aggregation reports attention without a fabricated percentage",(
  assert.equal(totals.missingWork,1);
  assert.equal(totals.rows[0].name,"P");
  assert.equal("readiness" in totals,false);
+});
+
+test("next step follows actual project gaps without granting authority or writing state",()=>{
+ const created=createProject(empty(),{name:"Project first",type:"engineering"});
+ const id=created.id;
+ assert.equal(projectNextStep(created.state.projects[0]).id,"define_target");
+ const target=addTarget(created.state,id,{title:"Deliver",desired:"Verified result"});
+ assert.equal(projectNextStep(target.state.projects[0]).id,"plan_work");
+ const work=createItem(target.state,id,{title:"Produce evidence"});
+ const before=JSON.stringify(work.state);
+ assert.equal(projectNextStep(work.state.projects[0]).id,"review_reality");
+ const incomplete=structuredClone(work.state.projects[0]);
+ incomplete.sources.push({id:"source:unavailable",locator:"example/repo",status:"error",
+  summary:{complete:false}});
+ assert.equal(projectNextStep(incomplete).id,"check_sources");
+ const projection=projectImpact(work.state.projects[0]);
+ assert.equal(projectNextStep(work.state.projects[0],projection).id,"review_reality");
+ assert.equal(JSON.stringify(work.state),before);
+ assert.equal("automaticApply" in projectNextStep(work.state.projects[0]),false);
 });

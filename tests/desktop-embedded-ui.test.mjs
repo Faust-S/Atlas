@@ -42,3 +42,12 @@ test("same host surface can remount without overriding a foreign ShadowRoot",()=
  assert.match(main,/host\?\.onStateChange\?\./);
  assert.match(css,/@container atlas-panel \(max-width: 650px\)/);
 });
+
+test("portfolio attention and project next step navigate in existing views without automatic execution",()=>{
+ assert.match(main,/projectNextStep\(project,impact\)/);
+ assert.match(main,/onClick=\{\(\)=>openProjectTab\(p\.id,"reality"\)\}/);
+ assert.match(main,/onClick=\{\(\)=>openProjectTab\(p\.id,"sources"\)\}/);
+ assert.match(main,/nextStep\.action\?openEditor\(nextStep\.action\):view\(nextStep\.tab as Tab\)/);
+ assert.match(main,/Факты и решения автоматически не изменяются/);
+ assert.match(css,/\.atlas-next-step/);
+});

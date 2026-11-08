@@ -298,3 +298,10 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
  .atlas-host-root .app-shell.atlas-embedded .brand strong{font-size:21px}
  .atlas-host-root .app-shell.atlas-embedded .workspace{padding:0 12px 12px}
 }
+
+/* Atlas 0.4: a direct, contextual route to the existing project workflow. */
+.atlas-next-step .section-heading{align-items:center;gap:18px}
+.atlas-next-step .section-heading p{max-width:68ch}
+.atlas-next-step .minor{margin:7px 0 0}
+.atlas-portfolio-attention .text-link{display:inline-block;margin-right:12px;text-align:left}
+@media(max-width:850px){.atlas-next-step .section-heading{align-items:flex-start;flex-direction:column}}
