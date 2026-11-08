@@ -334,6 +334,77 @@ def inspect_linked_project(saved_generation):
     finally:
         assert native()[0]["generation"] == saved_generation, "Inspecting links mutated saved data"
 
+def inspect_exact_requirement(saved_generation):
+    """Optional installed WebView2/UIA check for the actual queue -> target card."""
+    try:
+        from pywinauto import Desktop
+        window = Desktop(backend="uia").window(handle=handle)
+        portfolio = window.child_window(title_re=r"^Портфель проектов", control_type="Button")
+        if not portfolio.exists(timeout=2) or not portfolio.is_visible():
+            print("ATLAS04_SCALE_REQUIREMENT_UIA_HOLD portfolio navigation unavailable", flush=True)
+            screenshot("requirement-uia-hold")
+            return
+        portfolio.click_input()
+        wait_title("Портфель — Обзор", timeout=12)
+
+        lookup = window.child_window(title="Поиск в очереди внимания", control_type="Edit")
+        if not lookup.exists(timeout=2) or not lookup.is_visible():
+            print("ATLAS04_SCALE_REQUIREMENT_UIA_HOLD queue search unavailable", flush=True)
+            screenshot("requirement-search-uia-hold")
+            return
+        lookup.click_input()
+        keyboard.send_keys("^a")
+        keyboard.send_keys("Project 119", with_spaces=True)
+        time.sleep(0.45)
+        screenshot("requirement-queue-119")
+
+        # The accessible action name includes both the project and its
+        # source-bound requirement. No numeric coordinate or arbitrary "Разобрать".
+        action_name="Разобрать причину: Project 119 — Требует внимания: Expected result"
+        action=window.child_window(title=action_name, control_type="Button")
+        if not action.exists(timeout=2):
+            print("ATLAS04_SCALE_REQUIREMENT_UIA_HOLD exact queue action unavailable", flush=True)
+            screenshot("requirement-action-uia-hold")
+            return
+        bounds=win32gui.GetWindowRect(handle)
+        dpi=ctypes.windll.user32.GetDpiForWindow(handle)
+        scale=dpi / 96 if dpi else 1
+        pointer=(bounds[0]+round(710*scale),bounds[1]+round(520*scale))
+        for _ in range(5):
+            if action.is_visible():
+                break
+            mouse.scroll(coords=pointer,wheel_dist=-2)
+            time.sleep(0.2)
+        if not action.is_visible():
+            print("ATLAS04_SCALE_REQUIREMENT_UIA_HOLD action outside UIA view", flush=True)
+            screenshot("requirement-action-not-visible")
+            return
+        action.click_input()
+        wait_title("Project 119 — Обзор", timeout=12)
+        screenshot("requirement-119-focused")
+        print("ATLAS04_SCALE_REQUIREMENT_NAV_UIA_PASS project=119",flush=True)
+
+        card_name="Требование: Expected result — Project 119"
+        card=window.child_window(title=card_name)
+        if not card.exists(timeout=3) or not card.is_visible():
+            print("ATLAS04_SCALE_REQUIREMENT_FOCUS_UIA_HOLD target card not exposed",flush=True)
+            return
+        try:
+            focused=bool(card.element_info.element.CurrentHasKeyboardFocus)
+        except Exception as error:
+            print("ATLAS04_SCALE_REQUIREMENT_FOCUS_UIA_HOLD " + repr(error)[:150],flush=True)
+            return
+        if focused:
+            print("ATLAS04_SCALE_REQUIREMENT_FOCUS_UIA_PASS project=119",flush=True)
+        else:
+            print("ATLAS04_SCALE_REQUIREMENT_FOCUS_UIA_HOLD card not focused",flush=True)
+    except Exception as error:
+        screenshot("requirement-navigation-uia-hold")
+        print("ATLAS04_SCALE_REQUIREMENT_UIA_HOLD " + repr(error)[:180],flush=True)
+    finally:
+        assert native()[0]["generation"] == saved_generation, "Requirement navigation mutated native Store"
+
+
 try:
     assert APP.is_file() and FIXTURE.is_file()
     expected = json.loads(FIXTURE.read_text(encoding="utf-8-sig"))
@@ -358,6 +429,8 @@ try:
     timeline_and_dag()
     phase = "linked-project-navigation"
     inspect_linked_project(saved["generation"])
+    phase = "exact-requirement-navigation"
+    inspect_exact_requirement(saved["generation"])
     assert native()[0]["generation"] == saved["generation"], "Navigation mutated the native Store"
     stop()
     print("ATLAS04_SCALE_GUI_ACCEPTED_PASS", flush=True)

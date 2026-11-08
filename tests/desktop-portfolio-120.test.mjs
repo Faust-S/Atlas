@@ -157,3 +157,20 @@ test("R5 source-bound evidence signal retains the real target identifier",()=>{
  assert.equal(snapshot.projects[119].targets[0].id,evidence.ref);
  assert.match(evidence.label,/Expected result/);
 });
+
+test("installed Atlas 0.4 distinguishes exact fact navigation from optional UIA focus",()=>{
+ const script=readFileSync(new URL("../desktop/tests/installed-atlas04-scale.py",import.meta.url),"utf8");
+ assert.match(script,/def inspect_exact_requirement\(saved_generation\):/);
+ assert.match(script,/title="Поиск в очереди внимания", control_type="Edit"/);
+ assert.match(script,/Разобрать причину: Project 119 — Требует внимания: Expected result/);
+ assert.match(script,/wait_title\("Project 119 — Обзор", timeout=12\)/);
+ assert.match(script,/Требование: Expected result — Project 119/);
+ for(const marker of [
+  "ATLAS04_SCALE_REQUIREMENT_NAV_UIA_PASS",
+  "ATLAS04_SCALE_REQUIREMENT_FOCUS_UIA_PASS",
+  "ATLAS04_SCALE_REQUIREMENT_FOCUS_UIA_HOLD",
+  "ATLAS04_SCALE_REQUIREMENT_UIA_HOLD"
+ ])assert.ok(script.includes(marker),marker);
+ assert.match(script,/assert native\(\)\[0\]\["generation"\] == saved_generation/);
+ assert.match(script,/inspect_exact_requirement\(saved\["generation"\]\)/);
+});
