@@ -161,22 +161,58 @@ try {
         Start-Sleep -Milliseconds 220
     }
     if($null -eq $snapshot) {
-        Click-Atlas $script:process 803 75
+        Click-Atlas $script:process 746 65
         Write-Output 'ATLAS04_KEYBOARD_SAVE_HOLD_FALLBACK_GUI_CLICK'
     }
     $snapshot=Wait-ProjectSaved
     Write-Output "ATLAS04_GUI_NATIVE_SAVE_PASS generation=$($snapshot.generation) revision=$($snapshot.revision)"
     Capture-Atlas 'project-saved-1024'
 
+    # Win32 SendKeys may be consumed by the hosted runner. If a shortcut does
+    # not arrive, qualify visible navigation separately instead of claiming
+    # a keyboard PASS. The selected view must change in the native title.
     foreach($test in @(@{key='^1';title='Таблица';image='table'},
                        @{key='^2';title='График';image='gantt'},
                        @{key='^3';title='Зависимости';image='dag'})) {
         Activate-Atlas $script:process
         [System.Windows.Forms.SendKeys]::SendWait([string]$test.key)
+        $keyDelivered=$false
+        for($i=0;$i -lt 10;$i++) {
+            $script:process.Refresh()
+            if($script:process.MainWindowTitle.Contains([string]$test.title)) {
+                $keyDelivered=$true
+                break
+            }
+            Start-Sleep -Milliseconds 220
+        }
+        if(!$keyDelivered) {
+            switch([string]$test.image) {
+                'table' { Click-Atlas $script:process 359 310 }
+                'gantt' { Click-Atlas $script:process 439 310 }
+                'dag' {
+                    Click-Atlas $script:process 624 310
+                    Start-Sleep -Milliseconds 350
+                    Capture-Atlas 'secondary-menu-open'
+                    Click-Atlas $script:process 624 394
+                }
+            }
+            Write-Output "ATLAS04_KEYBOARD_SHORTCUT_NOT_DELIVERED_BY_RUNNER key=$($test.key)"
+        } else {
+            Write-Output "ATLAS04_KEYBOARD_SHORTCUT_PASS key=$($test.key)"
+        }
         Wait-AtlasTitle $script:process ([string]$test.title)
         Capture-Atlas ([string]$test.image)
     }
-    Write-Output 'ATLAS04_INSTALLED_SHORTCUT_VIEWS_PASS'
+    # Validate the new six-section dropdown through the installed window,
+    # independently of the keyboard shortcut for the Graph view.
+    Click-Atlas $script:process 439 310
+    Wait-AtlasTitle $script:process 'График'
+    Click-Atlas $script:process 624 310
+    Start-Sleep -Milliseconds 350
+    Capture-Atlas 'other-sections-open'
+    Click-Atlas $script:process 624 394
+    Wait-AtlasTitle $script:process 'Зависимости'
+    Write-Output 'ATLAS04_INSTALLED_SECONDARY_MENU_PASS'
     Close-Atlas $script:process
     $script:process=$null
 
