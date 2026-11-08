@@ -224,16 +224,33 @@ def search_and_open():
 
 def timeline_and_dag():
     started = now()
-    click(439, 310) # Primary Gantt tab
-    wait_title("График")
+    # Real installed screenshots establish two bounded tab heights:
+    # 253px without a save notification (reopened 120-project portfolio),
+    # 310px while the green save notification is still visible.
+    # Never infer success from a click: check the actual native title.
+    tab_y = None
+    for candidate_y in (253, 310):
+        click(439, candidate_y)
+        end = now() + 2.5
+        while now() < end:
+            if "График" in current_title():
+                tab_y = candidate_y
+                break
+            time.sleep(0.16)
+        if tab_y is not None:
+            break
+    if tab_y is None:
+        screenshot("gantt-tab-not-found")
+        raise AssertionError("Gantt did not open at either screenshot-qualified tab position")
     metric("ganttNavigation", started)
     screenshot("gantt")
-    click(624, 310) # Other sections dropdown
+    dag_start = now()
+    click(624, tab_y)   # Other sections dropdown, relative to same tab band
     time.sleep(0.25)
     screenshot("other-sections-open")
-    click(624, 394) # Dependency DAG
+    click(624, tab_y + 85)  # Dependencies, second row of the dropdown
     wait_title("Зависимости")
-    metric("ganttToDagNavigation", started)
+    metric("ganttToDagNavigation", dag_start)
     screenshot("dag")
     print("ATLAS04_SCALE_GUI_GANTT_DAG_PASS", flush=True)
 
