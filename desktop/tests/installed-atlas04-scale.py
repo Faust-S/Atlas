@@ -304,18 +304,32 @@ def inspect_linked_project(saved_generation):
             collapse.wait("exists visible", timeout=4)
             screenshot("linked-20-relations-expanded")
             print("ATLAS04_SCALE_GUI_RELATIONS_TOGGLE_UIA_PASS project=20", flush=True)
-            predecessor = window.child_window(title="Project 19", control_type="Button")
-            if predecessor.exists(timeout=2) and predecessor.is_visible():
-                predecessor.click_input()
-                wait_title("Project 19 — Обзор", timeout=12)
-                screenshot("linked-19-after-navigation")
-                print("ATLAS04_SCALE_GUI_PREDECESSOR_NAVIGATION_UIA_PASS", flush=True)
-            else:
-                print("ATLAS04_SCALE_GUI_PREDECESSOR_NAVIGATION_UIA_HOLD inaccessible link", flush=True)
     except Exception as error:
-        screenshot("linked-20-uia-hold")
+        screenshot("linked-20-toggle-uia-hold")
         print("ATLAS04_SCALE_GUI_RELATIONS_TOGGLE_UIA_HOLD " + repr(error)[:180], flush=True)
-    assert native()[0]["generation"] == saved_generation, "Inspecting links mutated saved data"
+        return
+
+    # The direct predecessor has a semantic accessible name distinct from
+    # the many "Project 19" links repeated in inherited cause paths.
+    # A real Win32 click followed by the native window title is the oracle.
+    try:
+        predecessor = window.child_window(
+            title="Открыть предшественника: Project 19", control_type="Button"
+        )
+        if not predecessor.exists(timeout=3) or not predecessor.is_visible():
+            screenshot("linked-20-predecessor-uia-hold")
+            print("ATLAS04_SCALE_GUI_PREDECESSOR_NAVIGATION_UIA_HOLD inaccessible labelled link", flush=True)
+            return
+        predecessor.click_input()
+        wait_title("Project 19 — Обзор", timeout=12)
+        screenshot("linked-19-after-navigation")
+        print("ATLAS04_SCALE_GUI_PREDECESSOR_NAVIGATION_UIA_PASS", flush=True)
+    except Exception as error:
+        screenshot("linked-20-predecessor-uia-hold")
+        print("ATLAS04_SCALE_GUI_PREDECESSOR_NAVIGATION_UIA_HOLD " + repr(error)[:180], flush=True)
+        raise
+    finally:
+        assert native()[0]["generation"] == saved_generation, "Inspecting links mutated saved data"
 
 try:
     assert APP.is_file() and FIXTURE.is_file()
