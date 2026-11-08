@@ -445,72 +445,96 @@ def visible_uia_action(window, name, attempts=13):
 
 
 def inspect_work_observation_filter(saved_generation):
-    """Optional native-window UIA check for all work-observation filters.
+    """Physical Win32 selection + scroll to the actual result count.
 
-    The baseline work/finding evidence is read from the native Store, not
-    injected into the application. Selection is made through the installed
-    ComboBox and physical keyboard. Missing WebView2 UIA exposure is HOLD,
-    a wrong count after a real selection is FAIL.
+    On WebView2 the summary at the END of a work list is not necessarily in
+    the current UIA tree until physically scrolled into the viewport. Read
+    expected sizes from native readback, do not query a test-only app API.
+    Missing UIA nodes are HOLD; a wrong visible count never earns PASS.
     """
     from pywinauto import Desktop
     window = Desktop(backend="uia").window(handle=handle)
-    select = window.child_window(title="Фильтр работ по наблюдениям", control_type="ComboBox")
-    if not select.exists(timeout=3) or not select.is_visible():
-        screenshot("observation-filter-uia-hold")
+    combo_title = "Фильтр работ по наблюдениям"
+    combo = window.child_window(title=combo_title, control_type="ComboBox")
+    if not combo.exists(timeout=3) or not combo.is_visible():
+        screenshot("observation-filter-combo-hold")
         print("ATLAS04_OBSERVATION_FILTER_UIA_HOLD ComboBox unavailable", flush=True)
         return False
     current, projects = native()
     assert current["generation"] == saved_generation
     project = next(p for p in projects if p["id"] == "load-project-119")
     works = project["items"]
-    ids = {f.get("workId") for f in project["findings"] if f.get("workId")}
-    with_observation = sum(w["id"] in ids for w in works)
-    without_observation = len(works) - with_observation
-    completed_without = sum(w["state"] == "done" and w["id"] not in ids for w in works)
-    # The 120-project fixture plus the saved correction must expose both
-    # groups; otherwise this test would not discriminate actual filtering.
-    assert with_observation > 0 and without_observation > 0
-    checks = [
-        ("with", 1, with_observation),
-        ("without", 2, without_observation),
-        ("done_without", 3, completed_without),
-        ("all", 0, len(works))
-    ]
-    for name, offset, expected_count in checks:
-        select = window.child_window(title="Фильтр работ по наблюдениям", control_type="ComboBox")
-        if not select.exists(timeout=2):
-            screenshot("observation-filter-uia-lost")
-            print("ATLAS04_OBSERVATION_FILTER_UIA_HOLD ComboBox lost", flush=True)
-            return False
+    observed = {f["workId"] for f in project["findings"] if f.get("workId")}
+    with_count = sum(w["id"] in observed for w in works)
+    without_count = len(works) - with_count
+    done_without = sum(w["state"] == "done" and w["id"] not in observed for w in works)
+    assert with_count and without_count, "Filter fixture does not distinguish observation states"
+    bounds = win32gui.GetWindowRect(handle)
+    dpi = ctypes.windll.user32.GetDpiForWindow(handle)
+    scale = dpi / 96 if dpi else 1
+    wheel_point = (min(bounds[2] - 80, bounds[0] + round(705 * scale)),
+                   min(bounds[3] - 85, bounds[1] + round(520 * scale)))
+    def scroll_up():
         activate()
-        select.click_input()
+        mouse.scroll(coords=wheel_point, wheel_dist=65)
+        time.sleep(0.25)
+    def choose_option(offset):
+        scroll_up()
+        selected = window.child_window(title=combo_title, control_type="ComboBox")
+        if not selected.exists(timeout=2) or not selected.is_visible():
+            return False
+        selected.click_input()
         keyboard.send_keys("{HOME}")
         for _ in range(offset):
             keyboard.send_keys("{DOWN}")
         keyboard.send_keys("{ENTER}")
-        end = now() + 5
-        evidence = None
-        count_line = f"Показано {expected_count} из {expected_count} работ по фильтру"
-        while now() < end:
-            try:
-                for item in window.descendants(control_type="Text"):
-                    if count_line in item.window_text():
-                        evidence = item
+        time.sleep(0.28)
+        return True
+    checks = [
+        ("with", 1, with_count),
+        ("without", 2, without_count),
+        ("done_without", 3, done_without),
+        ("all", 0, len(works))
+    ]
+    completed = False
+    try:
+        for name, offset, count in checks:
+            if not choose_option(offset):
+                screenshot("observation-filter-" + name + "-combo-hold")
+                print("ATLAS04_OBSERVATION_FILTER_UIA_HOLD ComboBox lost mode=" + name, flush=True)
+                return False
+            count_line = f"Показано {count} из {count} работ по фильтру"
+            screenshot("observation-filter-" + name + "-selected")
+            found = False
+            # Physically scroll the actual workspace through the work cards
+            # until the footer count is onscreen and exposed to UIA.
+            for attempt in range(9):
+                try:
+                    nodes = window.descendants(control_type="Text")
+                    if any(count_line in node.window_text() for node in nodes):
+                        found = True
                         break
-            except Exception:
-                pass
-            if evidence is not None:
-                break
-            time.sleep(0.25)
-        if evidence is None:
-            screenshot("observation-filter-" + name + "-uia-hold")
-            print("ATLAS04_OBSERVATION_FILTER_UIA_HOLD count text unavailable mode=" + name, flush=True)
-            return False
-        assert native()[0]["generation"] == saved_generation, "Filtering changed the native Store"
-        screenshot("observation-filter-" + name)
-        print("ATLAS04_OBSERVATION_FILTER_MODE_UIA_PASS mode=" + name + " count=" + str(expected_count), flush=True)
-    print("ATLAS04_OBSERVATION_FILTER_UIA_PASS", flush=True)
-    return True
+                except Exception:
+                    pass
+                activate()
+                mouse.scroll(coords=wheel_point, wheel_dist=-10)
+                time.sleep(0.23)
+            if not found:
+                screenshot("observation-filter-" + name + "-count-hold")
+                print("ATLAS04_OBSERVATION_FILTER_UIA_HOLD footer inaccessible mode=" + name, flush=True)
+                return False
+            assert native()[0]["generation"] == saved_generation, "Changing work filter mutated native Store"
+            screenshot("observation-filter-" + name + "-count")
+            print("ATLAS04_OBSERVATION_FILTER_MODE_UIA_PASS mode=" + name + " count=" + str(count), flush=True)
+        completed = True
+        print("ATLAS04_OBSERVATION_FILTER_UIA_PASS", flush=True)
+        return True
+    finally:
+        # Always restore "Все" before history and work-editor navigation.
+        if not choose_option(0):
+            print("ATLAS04_OBSERVATION_FILTER_UIA_HOLD restoring all rows", flush=True)
+        scroll_up()
+        assert native()[0]["generation"] == saved_generation, "Filter inspection mutated native Store"
 
 
 def inspect_unlinked_work_editor(saved_generation):

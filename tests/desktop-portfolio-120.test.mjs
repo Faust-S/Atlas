@@ -285,6 +285,11 @@ test("installed Win32 filter selects source-bound observation modes without alte
  assert.match(script,/\("done_without", 3, completed_without\)/);
  assert.match(script,/\("all", 0, len\(works\)\)/);
  assert.match(script,/keyboard\.send_keys\("\{HOME\}"\)/);
+ assert.match(script,/mouse\.scroll\(coords=wheel_point, wheel_dist=-10\)/);
+ assert.match(script,/count_line = f"Показано \{count\} из \{count\} работ по фильтру"/);
+ assert.match(script,/footer inaccessible mode=/);
+ assert.match(script,/finally:\s*# Always restore/);
+ assert.match(script,/if not choose_option\(0\):/);
  assert.match(script,/ATLAS04_OBSERVATION_FILTER_MODE_UIA_PASS/);
  assert.match(script,/ATLAS04_OBSERVATION_FILTER_UIA_PASS/);
  assert.match(script,/ATLAS04_OBSERVATION_FILTER_UIA_HOLD/);
