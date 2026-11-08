@@ -52,3 +52,21 @@ test("unobserved source and absent scheduling inputs remain explicit, not accept
  assert.equal(model.rows[0].projectedFinish,null);
  assert.doesNotMatch(renderPortfolioCommand(model),/Релиз подтверждён/);
 });
+
+test("source-bound dependency context exposes predecessor and downstream causes",()=>{
+ const s=scenario(),model=buildPortfolioCommand(s.snapshot,{now:"2026-11-02T00:00:00Z"});
+ const api=model.rows.find(row=>row.id===s.a);
+ const client=model.rows.find(row=>row.id===s.b);
+ const release=model.rows.find(row=>row.id===s.c);
+ assert.deepEqual(api.dependencies.predecessors,[]);
+ assert.deepEqual(api.dependencies.successors.map(p=>p.id),[s.b]);
+ assert.equal(api.dependencies.downstreamCount,2);
+ assert.deepEqual(client.dependencies.predecessors.map(p=>p.id),[s.a]);
+ assert.equal(client.dependencies.successors[0].id,s.c);
+ const block=release.dependencies.inherited.find(c=>c.originId===s.a&&c.kind==="blocked");
+ assert.ok(block,"Root blocker must be visible after two project links");
+ assert.deepEqual(block.path.map(p=>p.id),[s.a,s.b,s.c]);
+ assert.deepEqual(block.path.map(p=>p.name),["API","Client","Release"]);
+ assert.equal(release.dependencies.inheritedCount,release.dependencies.inherited.length);
+ assert.equal(release.dependencies.downstreamCount,0);
+});

@@ -394,3 +394,20 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
  .atlas-command-controls input,.atlas-command-controls select{width:55%}}
 @container atlas-panel (max-width:850px){.atlas-command-entry{grid-template-columns:1fr}
  .atlas-command-actions{justify-self:start}}
+
+/* Atlas 0.4: context from the existing dependency cascade, not a new store. */
+.atlas-project-relations .section-heading{align-items:center}
+.atlas-project-relations-summary{gap:9px 15px;margin:8px 0 2px}
+.atlas-project-relations-summary span{background:#eff5fc;border:1px solid #dce6f1;border-radius:7px;padding:5px 9px;color:#3f5877}
+.atlas-project-relations-body{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px;padding-top:14px}
+.atlas-project-relations-body[hidden]{display:none}
+.atlas-relations-column,.atlas-relations-causes{min-width:0;border-top:1px solid #dce6f1;padding-top:12px}
+.atlas-relations-column ul,.atlas-relations-causes ol{margin:8px 0;padding-left:22px}
+.atlas-relations-column li,.atlas-relations-causes li{margin-bottom:9px;color:#334d6c;font-size:12px}
+.atlas-relations-column small{display:block;color:#68829f}
+.atlas-relations-causes{grid-column:1 / -1}
+.atlas-relations-causes strong{font-size:12px}
+.atlas-relation-path{display:flex;flex-wrap:wrap;align-items:center;gap:3px;margin-top:5px;line-height:1.6}
+.atlas-project-relations .text-link{overflow-wrap:anywhere;font-size:12px}
+@media(max-width:900px){.atlas-project-relations-body{grid-template-columns:1fr}.atlas-project-relations .section-heading{flex-wrap:wrap}}
+@container atlas-panel (max-width:850px){.atlas-project-relations-body{grid-template-columns:1fr}}

@@ -18,6 +18,7 @@ const actionFor = (projectId,kind,ref="") =>
  */
 export function buildPortfolioCommand(snapshot,{now=new Date().toISOString(),impacts:cachedImpacts=null,schedules:cachedSchedules=null}={}) {
  const projects=snapshot.projects||[];
+ const projectsById=new Map(projects.map(p=>[p.id,p]));
  // Standalone callers derive their own data; React desktop reuses the exact
  // snapshot-bound projections already calculated for its existing portfolio.
  const impacts=cachedImpacts??new Map(projects.map(p=>[p.id,projectImpact(p,{now})]));
@@ -74,12 +75,26 @@ export function buildPortfolioCommand(snapshot,{now=new Date().toISOString(),imp
   signals.sort((a,b)=>b.priority-a.priority||a.label.localeCompare(b.label,"ru"));
   const primary=signals[0];
   const required=impact.rows.filter(r=>r.intent==="committed").length;
+  const linkedProject=id=>{
+   const item=projectsById.get(id);
+   return {id,name:item?.name||"Неизвестный проект",status:item?.status||"unknown"};
+  };
+  // Read-only paths from the existing portfolio cascade; no second graph.
+  const dependencies={
+   predecessors:chain.upstream.map(linkedProject),
+   successors:chain.downstream.map(linkedProject),
+   downstreamCount:chain.downstreamAll.length,
+   inheritedCount:chain.inherited.length,
+   inherited:chain.inherited.map(c=>({
+    originId:c.originId,kind:c.kind,message:c.message,path:c.path.map(linkedProject)
+   }))
+  };
   return {
    id:project.id,name:project.name,type:project.type,status:project.status,
    required,attention:impact.attention,proposed:response.proposed,
    affected:chain.downstreamAll.length,deadline:schedule.deadline,
    projectedFinish:schedule.projectedFinish,slip:schedule.deadlineSlipDays,
-   signals,primary,rank:primary.priority,
+   dependencies,signals,primary,rank:primary.priority,
    filterTags:new Set(signals.map(s=>s.kind)),
    search:[project.name,project.goal||"",...signals.map(s=>s.label)].join(" ").toLocaleLowerCase("ru")
   };

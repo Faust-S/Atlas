@@ -150,6 +150,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const [attentionFilter,setAttentionFilter]=useState("all");
  const [attentionQuery,setAttentionQuery]=useState("");
  const [attentionLimit,setAttentionLimit]=useState(8);
+ const [showProjectRelations,setShowProjectRelations]=useState(false);
+ const [relationLimit,setRelationLimit]=useState(12);
  const [boardLimits,setBoardLimits]=useState<Record<string,number>>({});
  const [message,setMessage]=useState(""),[error,setError]=useState("");
  const [inspector,setInspector]=useState(()=>!host&&window.innerWidth>1220),[recovery,setRecovery]=useState(false);
@@ -224,6 +226,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const attentionRows=useMemo(()=>
   filterPortfolioCommand(portfolioCommand,{filter:attentionFilter,search:attentionQuery}),
   [portfolioCommand,attentionFilter,attentionQuery]);
+ const projectCommand=useMemo(()=>project?portfolioCommand.rows.find((row:any)=>row.id===project.id)||null:null,
+  [portfolioCommand,project]);
  const impact=project?impactByProject.get(project.id)||null:null;
  const nextStep=useMemo(()=>project&&impact?projectNextStep(project,impact):null,[project,impact]);
  const realityMap=useMemo(()=>project&&reality&&impact?realityOverview(project,reality,impact):null,[project,reality,impact]);
@@ -339,6 +343,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   if(!afterSubmit&&!requireClosedForm())return;
   host?.onSelection?.({projectId:id,workId:null,revision:String(latestSnapshot.current.revision)});
   setActive(id);setTab("overview");setEditor(null);setForecastId(null);
+  setShowProjectRelations(false);setRelationLimit(12);
   if(!afterSubmit)setMessage("");
   setWorkFilter("all");setWorkQuery("");setWorkSort("title");setWorkLimit(200);setRealityLimit(8);
   setHistoryQuery("");setHistoryType("all");setHistoryLimit(120);setRecheckLimit(25);
@@ -358,6 +363,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   // Read-only navigation: the existing domain action still requires an
   // explicit edit, decision and native Save from its original screen.
   openProjectTab(projectId,target);
+  if(signal.panel==="relations")setShowProjectRelations(true);
  };
  const openEditor=(action:string,projectId?:string)=>{
   if(!requireClosedForm()||busyRef.current)return;
@@ -889,6 +895,49 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
        <Action primary onClick={()=>nextStep.action?openEditor(nextStep.action):view(nextStep.tab as Tab)}>{nextStep.button}</Action>
       </div>
       <p className="minor">Переход только открывает представление или редактор. Факты и решения автоматически не изменяются.</p>
+     </section>}
+
+     {projectCommand&&<section className="surface atlas-project-relations" aria-label="Зависимости проекта и влияние на другие проекты">
+      <div className="section-heading"><div><h2>Связи и последствия</h2>
+       <p>Цепочки из действующего плана портфеля. Возможное влияние не подтверждает задержку или приёмку.</p></div>
+       <button type="button" className="action-button" aria-expanded={showProjectRelations}
+        aria-controls="atlas-project-relations-detail" onClick={()=>setShowProjectRelations(v=>!v)}>
+        {showProjectRelations?"Скрыть цепочки":"Развернуть цепочки"}</button>
+      </div>
+      <div className="summary-line atlas-project-relations-summary">
+       <span>Предшественников: {projectCommand.dependencies.predecessors.length}</span>
+       <span>Следующих проектов: {projectCommand.dependencies.successors.length}</span>
+       <span>Зависимых далее: {projectCommand.dependencies.downstreamCount}</span>
+       <span>Входящих причин: {projectCommand.dependencies.inheritedCount}</span>
+      </div>
+      <div id="atlas-project-relations-detail" hidden={!showProjectRelations} className="atlas-project-relations-body">
+       <div className="atlas-relations-column"><h3>От кого зависит</h3>
+        {projectCommand.dependencies.predecessors.length?<ul>
+         {projectCommand.dependencies.predecessors.slice(0,relationLimit).map((p:any)=><li key={p.id}>
+          <button type="button" className="text-link" onClick={()=>selectProject(p.id)}>{p.name}</button>
+          <small>{statuses[p.status]||p.status}</small></li>)}</ul>:<p>Предшественников не задано.</p>}
+       </div>
+       <div className="atlas-relations-column"><h3>Кому передаётся результат</h3>
+        {projectCommand.dependencies.successors.length?<ul>
+         {projectCommand.dependencies.successors.slice(0,relationLimit).map((p:any)=><li key={p.id}>
+          <button type="button" className="text-link" onClick={()=>selectProject(p.id)}>{p.name}</button>
+          <small>{statuses[p.status]||p.status}</small></li>)}</ul>:<p>Непосредственных зависимых проектов нет.</p>}
+       </div>
+       <div className="atlas-relations-causes"><h3>Причины от предшественников</h3>
+        {projectCommand.dependencies.inherited.length?<ol>
+         {projectCommand.dependencies.inherited.slice(0,relationLimit).map((cause:any,i:number)=><li key={cause.originId+"-"+cause.kind+"-"+i}>
+          <strong>{cause.message}</strong>
+          <div className="atlas-relation-path" aria-label="Путь влияния">
+           {cause.path.map((p:any,j:number)=><React.Fragment key={p.id+"-"+j}>
+            {j>0&&<span aria-hidden="true"> → </span>}
+            <button type="button" className="text-link" onClick={()=>selectProject(p.id)}>{p.name}</button>
+           </React.Fragment>)}</div></li>)}</ol>:
+         <p>Переданных причин нет. Это не подтверждение завершения или приёмки.</p>}
+       </div>
+       {Math.max(projectCommand.dependencies.predecessors.length,projectCommand.dependencies.successors.length,
+        projectCommand.dependencies.inherited.length)>relationLimit&&<Action onClick={()=>setRelationLimit(n=>n+12)}>
+        Показать ещё связи и причины</Action>}
+      </div>
      </section>}
      <section className="surface atlas-reality-overview" aria-label="Сопоставление цели, фактов и решений">
       <div className="section-heading"><div><h2>Должно быть → известно → расхождение → решение</h2>

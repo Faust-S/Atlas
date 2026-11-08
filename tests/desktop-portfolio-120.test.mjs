@@ -91,3 +91,18 @@ test("0.4 priority queue uses the already computed 120-project impact and CPM pr
  assert.match(ui,/onClick=\{\(\)=>setAttentionLimit\(n=>Math\.min\(attentionRows\.length,n\+8\)\)\}/);
  assert.match(css,/atlas-command-entry/);
 });
+
+test("0.4 project chain is bounded in the desktop and uses current portfolio projection",()=>{
+ const queue=buildPortfolioCommand(desktopLoadPortfolio());
+ const origin=queue.rows.find(row=>row.id==="load-project-0");
+ const target=queue.rows.find(row=>row.id==="load-project-40");
+ assert.equal(origin.dependencies.downstreamCount,40);
+ assert.deepEqual(target.dependencies.predecessors.map(p=>p.id),["load-project-39"]);
+ assert.equal(target.dependencies.downstreamCount,0);
+ assert.ok(target.dependencies.inherited.some(c=>c.path.some(p=>p.id==="load-project-0")));
+ const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ assert.match(ui,/atlas-project-relations-detail/);
+ assert.match(ui,/aria-expanded=\{showProjectRelations\}/);
+ assert.match(ui,/if\(signal\.panel==="relations"\)setShowProjectRelations\(true\)/);
+ assert.match(ui,/projectCommand\.dependencies\.inherited\.slice\(0,relationLimit\)/);
+});
