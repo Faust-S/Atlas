@@ -168,6 +168,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const [refreshReport,setRefreshReport]=useState<any>(null);
  const [forecastId,setForecastId]=useState<string|null>(null);
  const [workFilter,setWorkFilter]=useState("all"),[workQuery,setWorkQuery]=useState("");
+ const [workTargetFilter,setWorkTargetFilter]=useState("all");
  const [workSort,setWorkSort]=useState("title");
  const [portfolioLimit,setPortfolioLimit]=useState(150);
  const [sidebarLimit,setSidebarLimit]=useState(120);
@@ -279,9 +280,10 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   const query=workQuery.trim().toLocaleLowerCase("ru-RU");
   return sortWorkRows(project.items.filter((item:any)=>
    (workFilter==="all"||item.state===workFilter)&&
+   (workTargetFilter==="all"||(item.targetIds||[]).includes(workTargetFilter))&&
    (!query||item.title.toLocaleLowerCase("ru-RU").includes(query)||
     String(item.assignee||"").toLocaleLowerCase("ru-RU").includes(query))),workSort);
- },[project,workFilter,workQuery,workSort]);
+ },[project,workFilter,workQuery,workSort,workTargetFilter]);
  const mutate=(next:Atlas,notice:string)=>{setSavedRefPreview(null);latestSnapshot.current=next;setData(next);setMessage(notice);setError("");};
  const issue=(e:unknown)=>{setError(deepFreezeError(e));setMessage("");};
  const showSavedReference=async(projectId:string,workId?:string)=>{
@@ -388,7 +390,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   setActive(id);setTab("overview");setEditor(null);setForecastId(null);
   setShowProjectRelations(false);setRelationLimit(12);setRequirementJump(null);setChangeJump(null);
   if(!afterSubmit)setMessage("");
-  setWorkFilter("all");setWorkQuery("");setWorkSort("title");setWorkLimit(200);setRealityLimit(8);
+  setWorkFilter("all");setWorkTargetFilter("all");setWorkQuery("");setWorkSort("title");setWorkLimit(200);setRealityLimit(8);
   setHistoryQuery("");setHistoryType("all");setHistoryLimit(120);setRecheckLimit(25);
  };
  const openProjectTab=(id:string,tabId:Tab,changeId:string|null=null)=>{
@@ -994,7 +996,10 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
             <small>{workStatuses[w.state]||w.state}</small>
            </li>)}
           </ul>}
-          {r.work.length>3&&<Action onClick={()=>view("work")}>Все связанные работы ({r.workCount})</Action>}
+          {r.work.length>3&&<Action onClick={()=>{
+            if(!requireClosedForm())return;
+            view("work");setWorkTargetFilter(r.id);setWorkLimit(200);
+           }}>Все связанные работы ({r.workCount})</Action>}
           {r.work.length>0&&r.openWork===0&&<p className="atlas-work-evidence-note">
            Работы отмечены выполненными. Это не подтверждает результат или его приёмку.</p>}
          </div>
@@ -1124,7 +1129,12 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     {tab==="work"&&<section className="surface">
      <div className="section-heading"><div><h2>Работы проекта</h2><p>Изменения отражаются в доске, графике и зависимостях.</p></div>
       <div className="button-row"><Action onClick={()=>openEditor("item")} primary title="Ctrl+Shift+N">＋ Работа</Action><Action onClick={()=>openEditor("stage")}>＋ Этап</Action><Action onClick={()=>openEditor("dep")} title="Ctrl+Shift+L">Связь работ</Action></div></div>
-     <div className="filter-row"><label>Состояние <select value={workFilter} onChange={e=>{setWorkFilter(e.target.value);setWorkLimit(200)}}>
+     <div className="filter-row"><label>Требование <select aria-label="Фильтр работ по требованию"
+      value={workTargetFilter} onChange={e=>{setWorkTargetFilter(e.target.value);setWorkLimit(200)}}>
+      <option value="all">Все требования</option>
+      {(project.targets||[]).map((t:any)=><option key={t.id} value={t.id}>{t.title}</option>)}
+     </select></label>
+     <label>Состояние <select value={workFilter} onChange={e=>{setWorkFilter(e.target.value);setWorkLimit(200)}}>
       <option value="all">Все</option>{Object.entries(workStatuses).map(([v,k])=><option value={v} key={v}>{String(k)}</option>)}</select></label>
       <label>Найти работу <input type="search" value={workQuery} aria-label="Найти работу"
        placeholder="Название или ответственный" onChange={e=>{setWorkQuery(e.target.value);setWorkLimit(200)}}/></label>
