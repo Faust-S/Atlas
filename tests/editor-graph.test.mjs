@@ -86,6 +86,10 @@ test("work editor preserves secondary target links on ordinary edits and when pr
  const action="work:"+item.id;
  const spec=editorSpec(item.state.projects[0],action);
  assert.match(spec.hint,/остальные сохраняются: Beta/);
+ assert.equal(spec.fields.find(f=>f.name==="targetId").label,"Основное ожидаемое требование");
+ const lone=createItem(item.state,made.id,{title:"Unlinked work",targetIds:[]});
+ assert.equal(editorSpec(lone.state.projects[0],"work:"+lone.id).fields.find(f=>f.name==="targetId").label,
+  "Связать с ожидаемым результатом");
  const form={title:"Renamed outcome",stageId:"",dueDate:"",state:"todo",priority:"normal",
   assignee:"",estimateDays:"1",resourceId:"",allocationPct:"100"};
  const before=serialize(item.state);
