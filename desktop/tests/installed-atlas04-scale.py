@@ -444,6 +444,75 @@ def visible_uia_action(window, name, attempts=13):
     return None
 
 
+def inspect_work_observation_filter(saved_generation):
+    """Optional native-window UIA check for all work-observation filters.
+
+    The baseline work/finding evidence is read from the native Store, not
+    injected into the application. Selection is made through the installed
+    ComboBox and physical keyboard. Missing WebView2 UIA exposure is HOLD,
+    a wrong count after a real selection is FAIL.
+    """
+    from pywinauto import Desktop
+    window = Desktop(backend="uia").window(handle=handle)
+    select = window.child_window(title="Фильтр работ по наблюдениям", control_type="ComboBox")
+    if not select.exists(timeout=3) or not select.is_visible():
+        screenshot("observation-filter-uia-hold")
+        print("ATLAS04_OBSERVATION_FILTER_UIA_HOLD ComboBox unavailable", flush=True)
+        return False
+    current, projects = native()
+    assert current["generation"] == saved_generation
+    project = next(p for p in projects if p["id"] == "load-project-119")
+    works = project["items"]
+    ids = {f.get("workId") for f in project["findings"] if f.get("workId")}
+    with_observation = sum(w["id"] in ids for w in works)
+    without_observation = len(works) - with_observation
+    completed_without = sum(w["state"] == "done" and w["id"] not in ids for w in works)
+    # The 120-project fixture plus the saved correction must expose both
+    # groups; otherwise this test would not discriminate actual filtering.
+    assert with_observation > 0 and without_observation > 0
+    checks = [
+        ("with", 1, with_observation),
+        ("without", 2, without_observation),
+        ("done_without", 3, completed_without),
+        ("all", 0, len(works))
+    ]
+    for name, offset, expected_count in checks:
+        select = window.child_window(title="Фильтр работ по наблюдениям", control_type="ComboBox")
+        if not select.exists(timeout=2):
+            screenshot("observation-filter-uia-lost")
+            print("ATLAS04_OBSERVATION_FILTER_UIA_HOLD ComboBox lost", flush=True)
+            return False
+        activate()
+        select.click_input()
+        keyboard.send_keys("{HOME}")
+        for _ in range(offset):
+            keyboard.send_keys("{DOWN}")
+        keyboard.send_keys("{ENTER}")
+        end = now() + 5
+        evidence = None
+        count_line = f"Показано {expected_count} из {expected_count} работ по фильтру"
+        while now() < end:
+            try:
+                for item in window.descendants(control_type="Text"):
+                    if count_line in item.window_text():
+                        evidence = item
+                        break
+            except Exception:
+                pass
+            if evidence is not None:
+                break
+            time.sleep(0.25)
+        if evidence is None:
+            screenshot("observation-filter-" + name + "-uia-hold")
+            print("ATLAS04_OBSERVATION_FILTER_UIA_HOLD count text unavailable mode=" + name, flush=True)
+            return False
+        assert native()[0]["generation"] == saved_generation, "Filtering changed the native Store"
+        screenshot("observation-filter-" + name)
+        print("ATLAS04_OBSERVATION_FILTER_MODE_UIA_PASS mode=" + name + " count=" + str(expected_count), flush=True)
+    print("ATLAS04_OBSERVATION_FILTER_UIA_PASS", flush=True)
+    return True
+
+
 def inspect_cause_proposal_and_decision(saved_generation):
     """Installed GUI: exact fact -> cause proposal -> explicit approval -> native readback.
 
@@ -790,6 +859,11 @@ def inspect_cause_proposal_and_decision(saved_generation):
         return True
     work_tab.click_input()
     wait_title("Project 119 — Таблица", timeout=15)
+    # Source-bound filter states must not fabricate observations or change
+    # the native head. This check runs before opening the history disclosure.
+    filter_checked = inspect_work_observation_filter(recorded_head["generation"])
+    if not filter_checked:
+        print("ATLAS04_OBSERVATION_FILTER_NATIVE_DATA_PASS_UIA_HOLD", flush=True)
     history = visible_uia_action(window, "История наблюдений по работе: "+work["title"])
     if history is None:
         assert native()[0]["generation"] == recorded_head["generation"]

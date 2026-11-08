@@ -273,3 +273,21 @@ test("installed history verifies physical disclosure and requirement navigation 
  assert.match(script,/Открыть требование из наблюдения: "\+work\["title"\]\+" — Expected result"/);
  assert.match(script,/native\(\)\[0\]\["generation"\] == recorded_head\["generation"\]/);
 });
+
+test("installed Win32 filter selects source-bound observation modes without altering native data",()=>{
+ const script=readFileSync(new URL("../desktop/tests/installed-atlas04-scale.py",import.meta.url),"utf8");
+ assert.match(script,/def inspect_work_observation_filter\(saved_generation\):/);
+ assert.match(script,/title="Фильтр работ по наблюдениям", control_type="ComboBox"/);
+ assert.match(script,/with_observation = sum\(w\["id"\] in ids for w in works\)/);
+ assert.match(script,/completed_without = sum\(w\["state"\] == "done" and w\["id"\] not in ids for w in works\)/);
+ assert.match(script,/\("with", 1, with_observation\)/);
+ assert.match(script,/\("without", 2, without_observation\)/);
+ assert.match(script,/\("done_without", 3, completed_without\)/);
+ assert.match(script,/\("all", 0, len\(works\)\)/);
+ assert.match(script,/keyboard\.send_keys\("\{HOME\}"\)/);
+ assert.match(script,/ATLAS04_OBSERVATION_FILTER_MODE_UIA_PASS/);
+ assert.match(script,/ATLAS04_OBSERVATION_FILTER_UIA_PASS/);
+ assert.match(script,/ATLAS04_OBSERVATION_FILTER_UIA_HOLD/);
+ assert.match(script,/assert native\(\)\[0\]\["generation"\] == saved_generation/);
+ assert.match(script,/inspect_work_observation_filter\(recorded_head\["generation"\]\)/);
+});
