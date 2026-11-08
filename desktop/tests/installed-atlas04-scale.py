@@ -661,6 +661,47 @@ def inspect_cause_proposal_and_decision(saved_generation):
                and item["state"] == "todo" for item in p["items"])
     assert next(c for c in p["changes"] if c["id"] == change["id"])["status"] == "approved"
     print("ATLAS04_CAUSE_LINKED_WORK_RESTART_READBACK_PASS", flush=True)
+
+    # A work item is not a factual observation. Open the existing explicit
+    # evidence editor from its own table row without making any Store writes.
+    search_and_open()
+    window = Desktop(backend="uia").window(handle=handle)
+    table = window.child_window(title="Таблица", control_type="Button")
+    if not table.exists(timeout=3) or not table.is_visible():
+        screenshot("linked-work-fact-tab-hold")
+        print("ATLAS04_WORK_FACT_UIA_HOLD work tab inaccessible", flush=True)
+        return True
+    table.click_input()
+    wait_title("Project 119 — Таблица", timeout=15)
+    screenshot("linked-work-fact-table")
+    print("ATLAS04_WORK_FACT_TABLE_UIA_PASS project=119", flush=True)
+
+    fact_label = "Зафиксировать факт по работе: " + work["title"] + " — Expected result"
+    fact_action = visible_uia_action(window, fact_label)
+    if fact_action is None:
+        screenshot("linked-work-fact-action-hold")
+        print("ATLAS04_WORK_FACT_UIA_HOLD exact fact action inaccessible", flush=True)
+        return True
+    screenshot("linked-work-fact-before-click")
+    fact_action.click_input()
+    wait_title("Форма: Фактическое состояние — заявление", timeout=15)
+    screenshot("linked-work-fact-editor")
+    assert native()[0]["generation"] == linked_head["generation"], "Opening an evidence form mutated native data"
+    print("ATLAS04_WORK_FACT_EDITOR_UIA_PASS project=119", flush=True)
+
+    cancel = window.child_window(title="Отмена", control_type="Button")
+    if not cancel.exists(timeout=3):
+        screenshot("linked-work-fact-cancel-hold")
+        print("ATLAS04_WORK_FACT_UIA_HOLD cancel action inaccessible", flush=True)
+        return True
+    cancel.click_input()
+    wait_title("Project 119 — Таблица", timeout=15)
+    assert native()[0]["generation"] == linked_head["generation"], "Cancelling an evidence editor wrote native data"
+    p = next(p for p in native()[1] if p["id"] == "load-project-119")
+    assert len(p["findings"]) == len(next(pr for pr in expected["projects"] if pr["id"] == p["id"])["findings"]), (
+        "Opening a work fact editor fabricated an observation"
+    )
+    print("ATLAS04_WORK_FACT_CANCEL_NO_MUTATION_PASS", flush=True)
     return True
 
 

@@ -232,3 +232,17 @@ test("installed Win32 work is a separate explicit act after decision and survive
  assert.match(ui,/＋ Создать связанную работу/);
  assert.match(ui,/＋ Ещё связанная работа/);
 });
+
+test("installed Atlas 0.4 opens source-bound fact editor from linked work without implicit data writes",()=>{
+ const script=readFileSync(new URL("../desktop/tests/installed-atlas04-scale.py",import.meta.url),"utf8");
+ assert.match(script,/wait_title\("Project 119 — Таблица", timeout=15\)/);
+ assert.match(script,/Зафиксировать факт по работе: /);
+ assert.match(script,/fact_action = visible_uia_action\(window, fact_label\)/);
+ assert.match(script,/wait_title\("Форма: Фактическое состояние — заявление", timeout=15\)/);
+ assert.match(script,/ATLAS04_WORK_FACT_EDITOR_UIA_PASS/);
+ assert.match(script,/cancel\.click_input\(\)/);
+ assert.match(script,/ATLAS04_WORK_FACT_CANCEL_NO_MUTATION_PASS/);
+ assert.match(script,/len\(p\["findings"\]\) == len\(next\(pr for pr in expected\["projects"\]/);
+ assert.match(script,/native\(\)\[0\]\["generation"\] == linked_head\["generation"\]/);
+ assert.match(script,/ATLAS04_WORK_FACT_UIA_HOLD/);
+});
