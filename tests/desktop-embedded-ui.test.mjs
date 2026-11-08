@@ -168,7 +168,7 @@ test("linked work offers explicit requirement-specific fact entry without inferr
 test("deep requirement work navigation filters the existing work table by target ID",()=>{
  assert.match(main,/const \[workTargetFilter,setWorkTargetFilter\]=useState\("all"\)/);
  assert.match(main,/\(workTargetFilter==="all"\|\|\(item\.targetIds\|\|\[\]\)\.includes\(workTargetFilter\)\)/);
- assert.match(main,/setWorkTargetFilter\("all"\);setWorkQuery/);
+ assert.match(main,/setWorkTargetFilter\("all"\);setWorkHistoryLimits\(\{\}\);setWorkQuery/);
  assert.match(main,/view\("work"\);setWorkTargetFilter\(r\.id\);setWorkLimit\(200\)/);
  assert.match(main,/aria-label="Фильтр работ по требованию"/);
  assert.match(main,/<option value="all">Все требования<\/option>/);
