@@ -1,0 +1,64 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {realityOverview} from '../src/reality-overview.mjs';
+import {empty,createProject,createItem,editItem} from '../src/core.mjs';
+import {addTarget,recordFinding,planChange,decideChange,compareProject} from '../src/trace.mjs';
+import {projectImpact} from '../src/impact.mjs';
+const project=()=>({id:'p',items:[],sources:[],decisions:[],changes:[]});
+const trace=rows=>({projectId:'p',rows});
+const impact=rows=>({projectId:'p',rows});
+const target=(id,overrides={})=>({id,title:id,desired:'expected',intent:'committed',assessment:'unknown',latest:null,freshness:{state:'never',note:'No evidence'},relatedChanges:[],...overrides});
+const impactRow=(targetId,overrides={})=>({targetId,priority:true,reasons:['Missing evidence'],work:[],openWork:0,...overrides});
+test('no targets: zero inferred completion and no writes',()=>{
+ const p=project(),before=JSON.stringify(p);
+ assert.deepEqual(realityOverview(p,trace([]),impact([])), {projectId:'p',rows:[],count:0,attention:0,unlinkedChanges:0,independentAcceptance:false});
+ assert.equal(JSON.stringify(p),before);
+});
+test('claims carry provenance without turning manual acceptance into verified evidence',()=>{
+ const p=project();p.sources=[{id:'s',locator:'example/eng'}];
+ const r=target('release',{assessment:'acceptance_claim',latest:{sourceId:'s',result:'present',level:'acceptance',ref:'main',revision:'abc',observedAt:'2026-11-08T00:00:00Z',note:'manual review'},freshness:{state:'current_revision',note:'SHA matches'}});
+ const o=realityOverview(p,trace([r]),impact([impactRow('release',{priority:false})]));
+ assert.equal(o.rows[0].source.locator,'example/eng');
+ assert.equal(o.rows[0].source.revision,'abc');
+ assert.equal(o.rows[0].assessment,'acceptance_claim');
+ assert.equal(o.rows[0].observation.level,'acceptance');
+ assert.equal(o.independentAcceptance,false);
+});
+test('stale and affected requirements take priority, actual plan apply and linked decision remain distinct',()=>{
+ const p=project();
+ p.changes=[{id:'c',title:'Revise release',targetIds:['release'],status:'approved',planAppliedAt:'2026-11-08T00:00:00Z'}, {id:'unlinked',targetIds:[],status:'proposed'}];
+ p.decisions=[{changeId:'c',text:'Approved after review',at:'2026-11-08T00:00:00Z'}];
+ const candidate=target('candidate',{intent:'candidate'});
+ const stale=target('release',{assessment:'stale',relatedChanges:[{id:'c',title:'Revise release',status:'approved'}]});
+ const o=realityOverview(p,trace([candidate,stale]),impact([impactRow('candidate',{priority:false}),impactRow('release',{priority:true,openWork:2,work:[{id:'one'},{id:'two'}],reasons:['SHA changed','Blocked work']})]));
+ assert.equal(o.rows[0].id,'release');
+ assert.equal(o.rows[0].openWork,2);
+ assert.deepEqual(o.rows[0].reasons,['SHA changed','Blocked work']);
+ assert.equal(o.rows[0].change.status,'approved');
+ assert.equal(o.rows[0].change.planApplied,true);
+ assert.equal(o.rows[0].change.decision,'Approved after review');
+ assert.equal(o.unlinkedChanges,1);
+});
+test('missing/incorrect projections are rejected rather than silently joined across projects',()=>{
+ assert.throws(()=>realityOverview(project(),{projectId:'foreign',rows:[]},impact([])),/Invalid Atlas/);
+ assert.throws(()=>realityOverview(project(),trace([]),{projectId:'foreign',rows:[]}),/Invalid Atlas/);
+});
+test('real Atlas core facts, linked work and change survive read-only overview without a new store',()=>{
+ const created=createProject(empty(),{name:'Delivery',type:'engineering'});
+ let s=addTarget(created.state,created.id,{title:'Work completed',desired:'Accepted output'}).state;
+ const existingId=s.projects[0].targets[0].id;
+ const item=createItem(s,created.id,{title:'Prepare result'});
+ s=editItem(item.state,created.id,item.id,{targetIds:[existingId]});
+ s=recordFinding(s,created.id,{targetId:existingId,result:'present',level:'acceptance',note:'Manually claimed'}).state;
+ const change=planChange(s,created.id,{title:'Review delivery',targetIds:[existingId]});
+ s=decideChange(change.state,created.id,change.id,{status:'approved',rationale:'Human approved the change'}).state;
+ const before=JSON.stringify(s);
+ const out=realityOverview(s.projects[0],compareProject(s.projects[0]),projectImpact(s.projects[0]));
+ assert.equal(out.rows[0].id,existingId);
+ assert.equal(out.rows[0].assessment,'acceptance_claim');
+ assert.equal(out.rows[0].workCount,1);
+ assert.equal(out.rows[0].change.status,'approved');
+ assert.equal(out.rows[0].change.planApplied,false);
+ assert.equal(out.independentAcceptance,false);
+ assert.equal(JSON.stringify(s),before);
+});

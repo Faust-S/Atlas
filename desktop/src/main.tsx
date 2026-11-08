@@ -6,6 +6,7 @@ import {removePortfolioLink} from "../../src/portfolio.mjs";
 import {editorSpec,applyEditor,editorSelectionFields} from "../../src/editor.mjs";
 import {compareProject,decideChange} from "../../src/trace.mjs";
 import {projectImpact,projectNextStep} from "../../src/impact.mjs";
+import {realityOverview} from "../../src/reality-overview.mjs";
 import {scheduleProject} from "../../src/planning.mjs";
 import {portfolioSchedule,projectedFinishLabel} from "../../src/portfolio-schedule.mjs";
 import {portfolioResources} from "../../src/portfolio-resources.mjs";
@@ -157,6 +158,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const [portfolioLimit,setPortfolioLimit]=useState(150);
  const [sidebarLimit,setSidebarLimit]=useState(120);
  const [workLimit,setWorkLimit]=useState(200);
+ const [realityLimit,setRealityLimit]=useState(8);
  const [showDetails,setShowDetails]=useState(false);
  const [historyQuery,setHistoryQuery]=useState("");
  const [historyType,setHistoryType]=useState("all");
@@ -204,6 +206,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const reality=useMemo(()=>project?compareProject(project):null,[project]);
  const impact=useMemo(()=>project?projectImpact(project):null,[project]);
  const nextStep=useMemo(()=>project&&impact?projectNextStep(project,impact):null,[project,impact]);
+ const realityMap=useMemo(()=>project&&reality&&impact?realityOverview(project,reality,impact):null,[project,reality,impact]);
  const projected=active?dates.byId.get(active):null;
  const filtered=useMemo(()=>data.projects.filter((p:any)=>
   (portfolioStatus==="all"||portfolioStatus==="active"&&["active","planned","paused"].includes(p.status)||
@@ -317,7 +320,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   host?.onSelection?.({projectId:id,workId:null,revision:String(latestSnapshot.current.revision)});
   setActive(id);setTab("overview");setEditor(null);setForecastId(null);
   if(!afterSubmit)setMessage("");
-  setWorkFilter("all");setWorkQuery("");setWorkSort("title");setWorkLimit(200);
+  setWorkFilter("all");setWorkQuery("");setWorkSort("title");setWorkLimit(200);setRealityLimit(8);
   setHistoryQuery("");setHistoryType("all");setHistoryLimit(120);setRecheckLimit(25);
  };
  const openProjectTab=(id:string,tabId:Tab,changeId:string|null=null)=>{
@@ -798,12 +801,50 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       </div>
       <p className="minor">Переход только открывает представление или редактор. Факты и решения автоматически не изменяются.</p>
      </section>}
-     <section className="surface"><div className="section-heading"><div><h2>Цель, план и факты</h2>
-      <p>План и наблюдения разделены. Ни один источник не подтверждает приёмку автоматически.</p></div>
-      <Action onClick={()=>openEditor("target")} primary>Добавить требование</Action></div>
-      {(reality?.rows||[]).slice(0,15).map((r:any)=><div key={r.id} className="attention-row"><div><strong>{r.title}</strong><small>{r.desired}</small></div>
-       <Badge tone={r.assessment==="unknown"||r.assessment==="stale"?"warning":"neutral"}>{evidence[r.assessment]||r.assessment}</Badge></div>)}
-      {!project.targets?.length&&<Fallback message="Сформулируйте ожидаемый результат. После этого его можно связать с работами и доказательствами."/>}
+     <section className="surface atlas-reality-overview" aria-label="Сопоставление цели, фактов и решений">
+      <div className="section-heading"><div><h2>Должно быть → известно → расхождение → решение</h2>
+       <p>Последние заявленные факты и их источники. Ни Git SHA, ни ручная отметка «приёмка» сами по себе не подтверждают выполнение.</p></div>
+       <div className="button-row"><Action onClick={()=>openEditor("target")}>＋ Требование</Action>
+        <Action onClick={()=>view("reality")}>Все факты</Action></div></div>
+      {realityMap?.rows.length?<div className="atlas-reality-list">
+       {realityMap.rows.slice(0,realityLimit).map((r:any)=><article className="atlas-reality-card" key={r.id}>
+        <div className="atlas-reality-grid">
+         <div className="atlas-reality-col"><small>Должно быть</small>
+          <strong>{r.title}</strong><p>{r.desired}</p>
+          {r.intent==="candidate"&&<small>Кандидат, не утверждённое требование</small>}
+         </div>
+         <div className="atlas-reality-col"><small>Последнее наблюдение</small>
+          <Badge tone={r.observation?"neutral":"warning"}>{r.observation?
+           ({present:"Заявлено наличие",partial:"Заявлено частично",absent:"Заявлено отсутствие"} as Record<string,string>)[r.observation.result]||r.observation.result:"Факт не внесён"}</Badge>
+          {r.observation&&<p>Уровень: {({implementation:"Реализация",test:"Тестирование",acceptance:"Заявлена приёмка"} as Record<string,string>)[r.observation.level]||r.observation.level}
+           {" · "}Дата: {readable(r.observation.observedAt)}</p>}
+          {r.source?<p title={r.source.revision||""}>Источник: {r.source.locator}
+           {r.source.ref?" / "+r.source.ref:""}{r.source.revision?" · "+r.source.revision.slice(0,12):""}</p>:
+           <p>Внешний источник не привязан</p>}
+         </div>
+         <div className="atlas-reality-col"><small>Расхождение и причина</small>
+          <Badge tone={r.needsAttention?"warning":"neutral"}>{evidence[r.assessment]||r.assessment}</Badge>
+          {r.reasons.length?<ul>{r.reasons.map((reason:string,i:number)=><li key={i}>{reason}</li>)}</ul>:
+           <p>Независимая приёмка результатом этой сводки не установлена.</p>}
+          <p>Связанных работ: {r.workCount}; незавершённых: {r.openWork}</p>
+         </div>
+         <div className="atlas-reality-col"><small>Предложение и решение</small>
+          {r.change?<><strong>{r.change.title}</strong>
+           <p>{decisionStatus[r.change.status]||r.change.status}{r.change.planApplied?" · План применён локально":""}</p>
+           {r.change.decision&&<p>Основание решения: {r.change.decision}</p>}</>:
+           <p>Связанного предложения пока нет</p>}
+          <div className="button-row"><Action onClick={()=>openEditor("finding-target:"+r.id)}>Уточнить факт</Action>
+           {r.change&&<Action onClick={()=>openProjectTab(project.id,"changes",r.change.id)}>Изменение</Action>}
+          </div>
+         </div>
+        </div>
+       </article>)}
+      </div>:<Fallback message="Сформулируйте ожидаемый результат. После этого его можно связать с работами и доказательствами."/>}
+      {(realityMap?.count??0)>0&&<p className="minor">Показано {Math.min(realityLimit,realityMap?.count??0)} из {realityMap?.count??0} требований;
+       требуют внимания: {realityMap?.attention??0}. Не показатель готовности продукта.</p>}
+      {(realityMap?.count??0)>realityLimit&&<Action onClick={()=>setRealityLimit(n=>Math.min(realityMap?.count??n,n+8))}>Показать ещё требования</Action>}
+      {(realityMap?.unlinkedChanges??0)>0&&<p className="minor">Есть предложения без прямой привязки к требованию: {realityMap?.unlinkedChanges}.
+       <button type="button" className="text-link" onClick={()=>view("changes")}>Открыть все изменения</button></p>}
      </section>
      <section className="surface"><div className="section-heading"><div><h2>Сроки и зависимости</h2>
       <p>CPM по календарным дням, без автоматического распределения ресурсов.</p></div>

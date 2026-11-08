@@ -327,3 +327,21 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
  .toolbar-actions{flex-wrap:nowrap;gap:6px}
 }
 @media(max-width:760px){.atlas-file-menu-actions{right:auto;left:0}}
+
+/* Atlas 0.4: one source-bound reality view, no independent acceptance state. */
+.atlas-reality-list{display:grid;gap:10px}
+.atlas-reality-card{border:1px solid #dce6f1;border-radius:10px;background:#fff;padding:14px}
+.atlas-reality-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.atlas-reality-col{min-width:0;border-left:2px solid #d1e0f2;padding-left:11px;overflow-wrap:anywhere}
+.atlas-reality-col:first-child{border-color:#5c8fcf}
+.atlas-reality-col>small{display:block;color:#526987;font-size:12px;font-weight:650;margin-bottom:7px}
+.atlas-reality-col>strong{display:block;color:#213b59;font-size:13px;line-height:1.4;margin-bottom:7px}
+.atlas-reality-col p{font-size:12px;margin:8px 0;color:#405775;line-height:1.4}
+.atlas-reality-col ul{margin:8px 0;padding-left:18px;font-size:12px;color:#405775}
+.atlas-reality-col li{margin-bottom:4px}
+.atlas-reality-col .button-row{margin-top:9px;justify-content:flex-start}
+.atlas-reality-col .action-button{font-size:12px;padding:5px 8px;min-height:31px}
+.atlas-reality-overview>.minor{margin-top:12px}
+@media(max-width:1499px){.atlas-reality-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:850px){.atlas-reality-grid{grid-template-columns:1fr}.atlas-reality-overview .section-heading{flex-wrap:wrap}}
+@container atlas-panel (max-width:850px){.atlas-reality-grid{grid-template-columns:1fr}}

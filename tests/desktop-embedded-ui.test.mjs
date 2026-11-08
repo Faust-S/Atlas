@@ -64,3 +64,16 @@ test("secondary file operations are grouped without losing existing native guard
  assert.match(css,/@media\(min-width:761px\) and \(max-width:1220px\)/);
  assert.match(css,/\.atlas-file-menu-actions\{position:absolute/);
 });
+
+test("overview presents the same Atlas facts, evidence provenance, linked decisions and paging",()=>{
+ assert.match(main,/realityOverview\(project,reality,impact\)/);
+ assert.match(main,/aria-label="Сопоставление цели, фактов и решений"/);
+ assert.match(main,/r\.source\.revision\.slice\(0,12\)/);
+ assert.match(main,/r\.change\.planApplied\?" · План применён локально":""/);
+ assert.match(main,/openProjectTab\(project\.id,"changes",r\.change\.id\)/);
+ assert.match(main,/setRealityLimit\(n=>Math\.min\(realityMap\?\.count\?\?n,n\+8\)\)/);
+ assert.match(main,/setRealityLimit\(8\)/);
+ assert.match(main,/Уточнить факт/);
+ assert.match(css,/\.atlas-reality-grid\{display:grid/);
+ assert.match(css,/@container atlas-panel \(max-width:850px\)/);
+});
