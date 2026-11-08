@@ -141,7 +141,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const fileMenuRef=useRef<HTMLDetailsElement|null>(null);
  const viewMenuRef=useRef<HTMLDetailsElement|null>(null);
  const relationSectionRef=useRef<HTMLElement|null>(null);
- const requirementCardRef=useRef<HTMLArticleElement|null>(null);
+ const requirementCardRef=useRef<HTMLElement|null>(null);
  const logoUrl=host?.assetUrl??"/atlas-mark.svg";
  const [data,setData]=useState<Atlas>(()=>empty());
  const [ready,setReady]=useState(false),[busy,setBusy]=useState(false);
