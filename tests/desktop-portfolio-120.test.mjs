@@ -174,3 +174,10 @@ test("installed Atlas 0.4 distinguishes exact fact navigation from optional UIA 
  assert.match(script,/assert native\(\)\[0\]\["generation"\] == saved_generation/);
  assert.match(script,/inspect_exact_requirement\(saved\["generation"\]\)/);
 });
+
+test("Win32 factual queue action uses accessible Portfolio navigation instead of count-dependent label",()=>{
+ const script=readFileSync(new URL("../desktop/tests/installed-atlas04-scale.py",import.meta.url),"utf8");
+ assert.match(script,/window\.child_window\(title="Открыть портфель проектов", control_type="Button"\)/);
+ assert.doesNotMatch(script,/title_re=r"\^Портфель проектов"/);
+ assert.match(script,/ATLAS04_SCALE_REQUIREMENT_NAV_UIA_PASS/);
+});

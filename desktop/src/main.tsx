@@ -142,6 +142,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const viewMenuRef=useRef<HTMLDetailsElement|null>(null);
  const relationSectionRef=useRef<HTMLElement|null>(null);
  const requirementCardRef=useRef<HTMLElement|null>(null);
+ const changeCardRef=useRef<HTMLDivElement|null>(null);
  const logoUrl=host?.assetUrl??"/atlas-mark.svg";
  const [data,setData]=useState<Atlas>(()=>empty());
  const [ready,setReady]=useState(false),[busy,setBusy]=useState(false);
@@ -156,6 +157,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const [relationLimit,setRelationLimit]=useState(12);
  const [relationJump,setRelationJump]=useState<string|null>(null);
  const [requirementJump,setRequirementJump]=useState<{projectId:string;targetId:string}|null>(null);
+ const [changeJump,setChangeJump]=useState<{projectId:string;changeId:string}|null>(null);
  const [boardLimits,setBoardLimits]=useState<Record<string,number>>({});
  const [message,setMessage]=useState(""),[error,setError]=useState("");
  const [inspector,setInspector]=useState(()=>!host&&window.innerWidth>1220),[recovery,setRecovery]=useState(false);
@@ -256,6 +258,15 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   card.focus({preventScroll:true});
   setRequirementJump(null);
  },[requirementJump,ready,active,tab,realityMap,realityLimit]);
+ useEffect(()=>{
+  if(!changeJump||!ready||active!==changeJump.projectId||tab!=="changes"||!project)return;
+  if(!(project.changes||[]).some((c:any)=>c.id===changeJump.changeId)){setChangeJump(null);return;}
+  const card=changeCardRef.current;
+  if(!card)return;
+  card.scrollIntoView({block:"center",behavior:"auto"});
+  card.focus({preventScroll:true});
+  setChangeJump(null);
+ },[changeJump,ready,active,tab,project]);
  const projected=active?dates.byId.get(active):null;
  const filtered=useMemo(()=>data.projects.filter((p:any)=>
   (portfolioStatus==="all"||portfolioStatus==="active"&&["active","planned","paused"].includes(p.status)||
@@ -374,7 +385,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   resetWorkspaceScroll();
   host?.onSelection?.({projectId:id,workId:null,revision:String(latestSnapshot.current.revision)});
   setActive(id);setTab("overview");setEditor(null);setForecastId(null);
-  setShowProjectRelations(false);setRelationLimit(12);setRequirementJump(null);
+  setShowProjectRelations(false);setRelationLimit(12);setRequirementJump(null);setChangeJump(null);
   if(!afterSubmit)setMessage("");
   setWorkFilter("all");setWorkQuery("");setWorkSort("title");setWorkLimit(200);setRealityLimit(8);
   setHistoryQuery("");setHistoryType("all");setHistoryLimit(120);setRecheckLimit(25);
@@ -384,7 +395,10 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   selectProject(id);setTab(tabId);
   // Jump straight to the concrete, still-unapplied planning forecast.
   // This is navigation only; human approval and application stay separate.
-  if(tabId==="changes"&&changeId)setForecastId(changeId);
+  if(tabId==="changes"&&changeId){
+   setForecastId(changeId);
+   setChangeJump({projectId:id,changeId});
+  }
  };
  const inspectPortfolioSignal=(projectId:string,signal:{kind:string;panel:string;ref?:string})=>{
   if(!requireClosedForm())return;
@@ -734,7 +748,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   <aside className="sidebar">
    <div className="brand"><img className="logo-symbol" src={logoUrl} alt="" aria-hidden="true" /><div><strong>Atlas</strong><small>IWXA · 0.4.0-dev.1</small></div></div>
    <nav className="main-nav" aria-label="Основная навигация">
-    <button className={!active?"nav-current":""} onClick={()=>selectProject(null)}>▦ <span>Портфель проектов</span><b>{data.projects.length}</b></button>
+    <button aria-label="Открыть портфель проектов" className={!active?"nav-current":""}
+      onClick={()=>selectProject(null)}>▦ <span>Портфель проектов</span><b>{data.projects.length}</b></button>
     <button aria-label="Создать проект" onClick={()=>{selectProject(null);openEditor("new")}}>＋ <span>Создать проект</span></button>
    </nav>
    <div className="sidebar-label">Мои проекты</div>
@@ -972,12 +987,22 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
           <p>Связанных работ: {r.workCount}; незавершённых: {r.openWork}</p>
          </div>
          <div className="atlas-reality-col"><small>Предложение и решение</small>
+          {r.cause&&<p className="atlas-cause-basis">
+           Основание для рассмотрения: {r.cause.title}. {r.cause.detail}</p>}
           {r.change?<><strong>{r.change.title}</strong>
            <p>{decisionStatus[r.change.status]||r.change.status}{r.change.planApplied?" · План применён локально":""}</p>
            {r.change.decision&&<p>Основание решения: {r.change.decision}</p>}</>:
            <p>Связанного предложения пока нет</p>}
           <div className="button-row"><Action onClick={()=>openEditor("finding-target:"+r.id)}>Уточнить факт</Action>
-           {r.change&&<Action onClick={()=>openProjectTab(project.id,"changes",r.change.id)}>Изменение</Action>}
+           {r.cause?.needsProposal&&<Action onClick={()=>openEditor("respond:"+encodeURIComponent(r.cause.key))}>
+            Предложить устранение причины</Action>}
+           {r.cause?.activeChange&&<Action onClick={()=>openProjectTab(project.id,"changes",r.cause.activeChange.id)}>
+            Изменение по причине</Action>}
+           {r.change&&r.change.id!==r.cause?.activeChange?.id&&
+            <Action onClick={()=>openProjectTab(project.id,"changes",r.change.id)}>Связанное изменение</Action>}
+           {r.cause?.approvedWithoutWork&&r.cause.activeChange&&
+            ["approved","in_progress"].includes(r.cause.activeChange.status)&&
+            <Action onClick={()=>openEditor("work-change:"+r.cause.activeChange.id)}>Добавить работу по решению</Action>}
           </div>
          </div>
         </div>
@@ -1158,7 +1183,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     {tab==="changes"&&<section className="surface"><div className="section-heading"><div><h2>Предложения и утверждённые изменения</h2>
      <p>Утверждение - отдельное решение человека. Применение конкретного плана также требует подтверждения.</p></div>
      <Action onClick={()=>openEditor("proposal")} primary>＋ Предложение</Action></div>
-     {(project.changes||[]).slice().reverse().map((c:any)=><div className="change-card" key={c.id}>
+     {(project.changes||[]).slice().reverse().map((c:any)=><div className="change-card" key={c.id}
+      tabIndex={-1} ref={c.id===changeJump?.changeId?changeCardRef:undefined}
+      aria-label={"Изменение: "+c.title+" — "+project.name}>
       <div className="section-heading"><div><h3>{c.title}</h3><p>{c.description}</p></div><Badge>{decisionStatus[c.status]||c.status}</Badge></div>
       <div className="button-row">
        {["proposed","deferred","approved","in_progress"].includes(c.status)&&<Action onClick={()=>openEditor("change:"+c.id)}>Решение</Action>}

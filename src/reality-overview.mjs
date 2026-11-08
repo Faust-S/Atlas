@@ -1,5 +1,6 @@
 // Read-only Atlas project overview of requirements, observations and decisions.
 // All source observations and authority remain in their existing owners.
+import {responseState} from './response.mjs';
 export function realityOverview(project, trace, impact) {
   if (!project || !Array.isArray(project.items) || !Array.isArray(project.sources) ||
       !Array.isArray(project.decisions) || !trace || trace.projectId !== project.id ||
@@ -11,6 +12,10 @@ export function realityOverview(project, trace, impact) {
   const changes = new Map((project.changes || []).map(change => [change.id, change]));
   const decisions = new Map(project.decisions.filter(d => d.changeId).map(d => [d.changeId, d]));
   const reviews = new Map(project.decisions.filter(d => d.kind === 'plan_review').map(d => [d.id, d]));
+  // Existing response owner gives a cause-bound plan without new storage.
+  const causes = new Map(responseState(project, impact).rows
+    .filter(row => row.key.startsWith('target-review:'))
+    .map(row => [row.key.slice('target-review:'.length), row]));
 
   const rows = trace.rows.map((target, index) => {
     const linked = impacts.get(target.id);
@@ -19,6 +24,8 @@ export function realityOverview(project, trace, impact) {
     const proposed = (target.relatedChanges || []).at(-1);
     const change = proposed ? changes.get(proposed.id) : null;
     const decision = change && (decisions.get(change.id) || reviews.get(change.planReviewDecisionId));
+    const cause = causes.get(target.id) || null;
+    const causeChange = cause?.activeChanges?.at(-1) || null;
     return {
       id: target.id,
       title: target.title,
@@ -38,6 +45,12 @@ export function realityOverview(project, trace, impact) {
         freshnessNote: target.freshness?.note || ''
       } : null,
       reasons: (linked?.reasons || []).slice(0, 3),
+      cause: cause ? {
+        key: cause.key, title: cause.title, detail: cause.detail,
+        needsProposal: cause.needsProposal,
+        activeChange: causeChange ? {id: causeChange.id, title: causeChange.title, status: causeChange.status} : null,
+        approvedWithoutWork: cause.approvedWithoutWork
+      } : null,
       workCount: linked?.work?.length || 0,
       openWork: linked?.openWork || 0,
       change: change ? {

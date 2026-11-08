@@ -439,3 +439,8 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 /* Exact command-queue drilldown uses the existing fact card and native focus. */
 .atlas-reality-card{scroll-margin-top:92px}
 .atlas-reality-card:focus{outline:3px solid #4c8afc;outline-offset:3px}
+
+/* Exact fact -> existing cause -> human decision; no additional task owner. */
+.atlas-cause-basis{padding:8px 10px;border-left:3px solid #b4cdeb;background:#f4f8fd;border-radius:0 6px 6px 0}
+.change-card{scroll-margin-top:92px}
+.change-card:focus{outline:3px solid #4c8afc;outline-offset:3px}

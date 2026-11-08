@@ -79,3 +79,29 @@ test("a deep-linked requirement beyond initial page remains source-bound and non
  assert.equal(overview.independentAcceptance,false);
  assert.equal(JSON.stringify(state),before);
 });
+
+test('one observed cause follows the existing proposal, decision, and work requirement without mutation',()=>{
+ const made=createProject(empty(),{name:'Cause demo',type:'engineering'});
+ let snapshot=addTarget(made.state,made.id,{title:'Release criterion',desired:'Approval'}).state;
+ const targetId=snapshot.projects[0].targets[0].id;
+ const show=()=>realityOverview(snapshot.projects[0],compareProject(snapshot.projects[0]),projectImpact(snapshot.projects[0]));
+ const first=show().rows[0];
+ assert.equal(first.cause.key,'target-review:'+targetId);
+ assert.equal(first.cause.needsProposal,true);
+ assert.equal(first.cause.activeChange,null);
+ const before=JSON.stringify(snapshot);
+ show();assert.equal(JSON.stringify(snapshot),before);
+ const proposal=planChange(snapshot,made.id,{title:'Close release gap',description:'Require evidence',
+  targetIds:[targetId],causeKey:first.cause.key});
+ snapshot=proposal.state;
+ const open=show().rows[0];
+ assert.equal(open.cause.needsProposal,false);
+ assert.equal(open.cause.activeChange.id,proposal.id);
+ assert.equal(open.cause.activeChange.status,'proposed');
+ snapshot=decideChange(snapshot,made.id,proposal.id,{status:'approved',rationale:'Human rationale'}).state;
+ const final=show().rows[0];
+ assert.equal(final.cause.activeChange.status,'approved');
+ assert.equal(final.cause.approvedWithoutWork,true);
+ assert.equal(final.change.decision,'Human rationale');
+ assert.equal(show().independentAcceptance,false);
+});

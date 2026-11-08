@@ -141,3 +141,14 @@ test("source-bound portfolio cause focuses the exact existing fact card",()=>{
  assert.ok(main.includes('setRequirementJump(null);'));
  assert.ok(css.includes('.atlas-reality-card:focus{outline:3px solid'));
 });
+
+test("source-bound fact links to the existing response editor, exact change and human decision",()=>{
+ assert.match(main,/r\.cause\?\.needsProposal&&<Action onClick=\{\(\)=>openEditor\("respond:"\+encodeURIComponent\(r\.cause\.key\)\)\}/);
+ assert.match(main,/r\.cause\?\.activeChange&&<Action onClick=\{\(\)=>openProjectTab\(project\.id,"changes",r\.cause\.activeChange\.id\)\}/);
+ assert.match(main,/r\.cause\?\.approvedWithoutWork&&r\.cause\.activeChange/);
+ assert.match(main,/openEditor\("work-change:"\+r\.cause\.activeChange\.id\)/);
+ assert.match(main,/setChangeJump\(\{projectId:id,changeId\}\)/);
+ assert.match(main,/aria-label=\{"Изменение: "\+c\.title\+" — "\+project\.name\}/);
+ assert.match(main,/aria-label="Открыть портфель проектов"/);
+ assert.match(css,/\.change-card:focus\{outline:3px solid/);
+});

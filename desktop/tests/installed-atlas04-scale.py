@@ -339,7 +339,7 @@ def inspect_exact_requirement(saved_generation):
     try:
         from pywinauto import Desktop
         window = Desktop(backend="uia").window(handle=handle)
-        portfolio = window.child_window(title_re=r"^Портфель проектов", control_type="Button")
+        portfolio = window.child_window(title="Открыть портфель проектов", control_type="Button")
         if not portfolio.exists(timeout=2) or not portfolio.is_visible():
             print("ATLAS04_SCALE_REQUIREMENT_UIA_HOLD portfolio navigation unavailable", flush=True)
             screenshot("requirement-uia-hold")
