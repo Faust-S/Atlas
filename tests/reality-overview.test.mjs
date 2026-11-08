@@ -105,3 +105,25 @@ test('one observed cause follows the existing proposal, decision, and work requi
  assert.equal(final.change.decision,'Human rationale');
  assert.equal(show().independentAcceptance,false);
 });
+
+test('active cause-bound decision takes priority over a newer unrelated proposal on the same target',()=>{
+ const made=createProject(empty(),{name:'Mixed changes',type:'engineering'});
+ let state=addTarget(made.state,made.id,{title:'Release',desired:'Approved evidence'}).state;
+ const targetId=state.projects[0].targets[0].id;
+ const active=planChange(state,made.id,{title:'Resolve observed cause',description:'Evidence audit',
+  targetIds:[targetId],causeKey:'target-review:'+targetId});
+ state=decideChange(active.state,made.id,active.id,{status:'approved',
+  rationale:'Approve audited corrective action'}).state;
+ const generic=planChange(state,made.id,{title:'Unrelated later proposal',
+  description:'Other work',targetIds:[targetId]});
+ state=generic.state;
+ const before=JSON.stringify(state);
+ const overview=realityOverview(state.projects[0],compareProject(state.projects[0]),projectImpact(state.projects[0]));
+ const row=overview.rows[0];
+ assert.equal(row.cause.activeChange.id,active.id);
+ assert.equal(row.change.id,active.id,'An unrelated newer proposal must not mask active root-cause work');
+ assert.equal(row.change.status,'approved');
+ assert.equal(row.change.decision,'Approve audited corrective action');
+ assert.equal(overview.independentAcceptance,false);
+ assert.equal(JSON.stringify(state),before);
+});

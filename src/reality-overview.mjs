@@ -21,11 +21,14 @@ export function realityOverview(project, trace, impact) {
     const linked = impacts.get(target.id);
     const observation = target.latest || null;
     const source = observation?.sourceId ? sources.get(observation.sourceId) : null;
-    const proposed = (target.relatedChanges || []).at(-1);
-    const change = proposed ? changes.get(proposed.id) : null;
-    const decision = change && (decisions.get(change.id) || reviews.get(change.planReviewDecisionId));
     const cause = causes.get(target.id) || null;
     const causeChange = cause?.activeChanges?.at(-1) || null;
+    const lastRelated = (target.relatedChanges || []).at(-1);
+    // When multiple changes mention a requirement, the active change linked
+    // to its observed root cause is the primary action. Do not misattribute
+    // another change's decision or approval to that cause.
+    const change = causeChange || (lastRelated ? changes.get(lastRelated.id) : null);
+    const decision = change && (decisions.get(change.id) || reviews.get(change.planReviewDecisionId));
     return {
       id: target.id,
       title: target.title,
