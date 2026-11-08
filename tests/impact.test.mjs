@@ -92,14 +92,14 @@ test("next step follows actual project gaps without granting authority or writin
  assert.equal(unlinked.id,"link_work");
  assert.equal(unlinked.action,"item-target:"+target.id);
  const linked=editItem(unrelated.state,id,unrelated.id,{targetIds:[target.id]});
- const before=JSON.stringify(linked.state);
- assert.equal(projectNextStep(linked.state.projects[0]).id,"review_reality");
- const incomplete=structuredClone(linked.state.projects[0]);
+ const before=JSON.stringify(linked);
+ assert.equal(projectNextStep(linked.projects[0]).id,"review_reality");
+ const incomplete=structuredClone(linked.projects[0]);
  incomplete.sources.push({id:"source:unavailable",locator:"example/repo",status:"error",
   summary:{complete:false}});
  assert.equal(projectNextStep(incomplete).id,"check_sources");
- const projection=projectImpact(linked.state.projects[0]);
- assert.equal(projectNextStep(linked.state.projects[0],projection).id,"review_reality");
- assert.equal(JSON.stringify(linked.state),before);
- assert.equal("automaticApply" in projectNextStep(linked.state.projects[0]),false);
+ const projection=projectImpact(linked.projects[0]);
+ assert.equal(projectNextStep(linked.projects[0],projection).id,"review_reality");
+ assert.equal(JSON.stringify(linked),before);
+ assert.equal("automaticApply" in projectNextStep(linked.projects[0]),false);
 });
