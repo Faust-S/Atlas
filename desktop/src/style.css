@@ -493,3 +493,6 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .atlas-work-observation-history li small{display:block;margin-top:3px;font-size:11px;line-height:1.4}
 .atlas-work-observation-history li p{font-size:11px;margin:3px 0;color:#506784}
 .atlas-work-observation-history .action-button{font-size:11px;min-height:29px;padding:5px 9px}
+
+/* Visual factual gaps, not verified completion or an acceptance assertion. */
+.atlas-work-evidence-summary{margin:5px 0 12px;line-height:1.5;color:#4d6884}

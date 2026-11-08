@@ -20,7 +20,7 @@ import {ProjectGantt,ProjectDependencyDiagram} from "./ProjectVisuals";
 import {prepareImportedSnapshot} from "./import-snapshot.mjs";
 import {commitWithReadback,readSavedSnapshotForReference} from "./native-save.mjs";
 import {projectHistoryRows} from "./history-view.mjs";
-import {sortWorkRows} from "./work-sorting.mjs";
+import {sortWorkRows,filterWorkRowsByObservation} from "./work-sorting.mjs";
 import {createAtlasSavedRef} from "../../src/project-host-port.mjs";
 import {invokeAtlasHost,type AtlasEmbeddedHost} from "./embedded-host";
 
@@ -169,6 +169,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const [forecastId,setForecastId]=useState<string|null>(null);
  const [workFilter,setWorkFilter]=useState("all"),[workQuery,setWorkQuery]=useState("");
  const [workTargetFilter,setWorkTargetFilter]=useState("all");
+ const [workObservationFilter,setWorkObservationFilter]=useState("all");
  const [workHistoryLimits,setWorkHistoryLimits]=useState<Record<string,number>>({});
  const [workSort,setWorkSort]=useState("title");
  const [portfolioLimit,setPortfolioLimit]=useState(150);
@@ -249,6 +250,10 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const realityMap=useMemo(()=>project&&reality&&impact?realityOverview(project,reality,impact):null,[project,reality,impact]);
  const targetById=useMemo(()=>new Map<string,any>((project?.targets||[]).map((t:any)=>[t.id,t])),[project]);
  const findingsByWork=useMemo(()=>project?workObservationIndex(project):new Map<string,any[]>(),[project]);
+ const workObservationCounts=useMemo(()=>{
+  const without=(project?.items||[]).filter((w:any)=>!findingsByWork.has(w.id));
+  return {without:without.length,doneWithout:without.filter((w:any)=>w.state==="done").length};
+ },[project,findingsByWork]);
  useEffect(()=>{
   // Reveal the actual source-bound row instead of losing the target ID
   // when the user enters a project from the portfolio command queue.
@@ -280,12 +285,13 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const filteredWork=useMemo(()=>{
   if(!project)return [];
   const query=workQuery.trim().toLocaleLowerCase("ru-RU");
-  return sortWorkRows(project.items.filter((item:any)=>
+  const matching=project.items.filter((item:any)=>
    (workFilter==="all"||item.state===workFilter)&&
    (workTargetFilter==="all"||(item.targetIds||[]).includes(workTargetFilter))&&
    (!query||item.title.toLocaleLowerCase("ru-RU").includes(query)||
-    String(item.assignee||"").toLocaleLowerCase("ru-RU").includes(query))),workSort);
- },[project,workFilter,workQuery,workSort,workTargetFilter]);
+    String(item.assignee||"").toLocaleLowerCase("ru-RU").includes(query)));
+  return sortWorkRows(filterWorkRowsByObservation(matching,findingsByWork,workObservationFilter),workSort);
+ },[project,workFilter,workQuery,workSort,workTargetFilter,workObservationFilter,findingsByWork]);
  const mutate=(next:Atlas,notice:string)=>{setSavedRefPreview(null);latestSnapshot.current=next;setData(next);setMessage(notice);setError("");};
  const issue=(e:unknown)=>{setError(deepFreezeError(e));setMessage("");};
  const showSavedReference=async(projectId:string,workId?:string)=>{
@@ -392,7 +398,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   setActive(id);setTab("overview");setEditor(null);setForecastId(null);
   setShowProjectRelations(false);setRelationLimit(12);setRequirementJump(null);setChangeJump(null);
   if(!afterSubmit)setMessage("");
-  setWorkFilter("all");setWorkTargetFilter("all");setWorkHistoryLimits({});setWorkQuery("");setWorkSort("title");setWorkLimit(200);setRealityLimit(8);
+  setWorkFilter("all");setWorkTargetFilter("all");setWorkObservationFilter("all");setWorkHistoryLimits({});setWorkQuery("");setWorkSort("title");setWorkLimit(200);setRealityLimit(8);
   setHistoryQuery("");setHistoryType("all");setHistoryLimit(120);setRecheckLimit(25);
  };
  const openProjectTab=(id:string,tabId:Tab,changeId:string|null=null)=>{
@@ -1141,6 +1147,12 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      </select></label>
      <label>Состояние <select value={workFilter} onChange={e=>{setWorkFilter(e.target.value);setWorkLimit(200)}}>
       <option value="all">Все</option>{Object.entries(workStatuses).map(([v,k])=><option value={v} key={v}>{String(k)}</option>)}</select></label>
+     <label>Наблюдения <select aria-label="Фильтр работ по наблюдениям" value={workObservationFilter}
+      onChange={e=>{setWorkObservationFilter(e.target.value);setWorkLimit(200)}}>
+      <option value="all">Все</option><option value="with">С наблюдениями</option>
+      <option value="without">Без наблюдений</option>
+      <option value="done_without">Выполнены без наблюдений</option>
+     </select></label>
       <label>Найти работу <input type="search" value={workQuery} aria-label="Найти работу"
        placeholder="Название или ответственный" onChange={e=>{setWorkQuery(e.target.value);setWorkLimit(200)}}/></label>
       <label>Сортировка <select aria-label="Сортировка работ" value={workSort} onChange={e=>{setWorkSort(e.target.value);setWorkLimit(200)}}>
@@ -1148,6 +1160,10 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
        <option value="priority">По приоритету</option><option value="estimateDays">По длительности</option>
        <option value="state">По состоянию</option>
       </select></label></div>
+     <p className="minor atlas-work-evidence-summary" role="status">
+      Без наблюдений по работе: {workObservationCounts.without}; завершены без наблюдений: {workObservationCounts.doneWithout}.
+      Это поиск заявленных фактов, не независимая приёмка.
+     </p>
      <div className="table-scroll atlas-work-table-scroll"><table className="atlas-work-table" aria-label="Работы проекта"><thead><tr><th>Работа</th><th>Состояние</th><th>Длительность</th><th>Ответственный</th><th>Срок</th><th>Изменить</th></tr></thead>
       <tbody>{filteredWork.slice(0,workLimit).map((w:any)=><tr key={w.id}>
        <td data-label="Работа"><strong>{w.title}</strong><small>{project.stages.find((s:any)=>s.id===w.stageId)?.name||"Без этапа"}</small>
@@ -1194,7 +1210,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
         <Action onClick={()=>removeWork(w.id)}>Удалить</Action></td></tr>)}</tbody></table></div>
      {project.items.length>0&&<p className="minor">Показано {Math.min(filteredWork.length,workLimit)} из {filteredWork.length} работ по фильтру; всего в проекте: {project.items.length}.</p>}
      {filteredWork.length>workLimit&&<Action onClick={()=>setWorkLimit(n=>Math.min(filteredWork.length,n+200))}>Показать ещё работы</Action>}
-     {project.items.length>0&&!filteredWork.length&&<Fallback message="По фильтру работ нет. Очистите поиск или измените состояние."/>}
+     {project.items.length>0&&!filteredWork.length&&<Fallback message="По выбранным фильтрам работ нет. Измените требование, состояние, наблюдения или поисковый запрос."/>}
      {!project.items.length&&<Fallback message="Пока нет работ. Добавьте первую работу и сохраните проект."/>}
     </section>}
     {tab==="board"&&<div className="board">

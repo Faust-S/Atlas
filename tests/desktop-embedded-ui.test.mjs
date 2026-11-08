@@ -209,3 +209,18 @@ test("work observations show a source-bound expandable history, not acceptance",
  assert.match(main,/setWorkHistoryLimits\(\{\}\);setWorkQuery/);
  assert.match(css,/\.atlas-work-observation-history>summary:focus-visible/);
 });
+
+test("work factual-gap filters combine with existing search and target filters without granting acceptance",()=>{
+ assert.match(main,/const \[workObservationFilter,setWorkObservationFilter\]=useState\("all"\)/);
+ assert.match(main,/const workObservationCounts=useMemo\(\(\)=>\{/);
+ assert.match(main,/without\.filter\(\(w:any\)=>w\.state==="done"\)\.length/);
+ assert.match(main,/filterWorkRowsByObservation\(matching,findingsByWork,workObservationFilter\)/);
+ assert.match(main,/setWorkObservationFilter\("all"\);setWorkHistoryLimits\(\{\}\)/);
+ assert.match(main,/aria-label="Фильтр работ по наблюдениям"/);
+ assert.match(main,/<option value="with">С наблюдениями<\/option>/);
+ assert.match(main,/<option value="without">Без наблюдений<\/option>/);
+ assert.match(main,/<option value="done_without">Выполнены без наблюдений<\/option>/);
+ assert.match(main,/Без наблюдений по работе: \{workObservationCounts\.without\}/);
+ assert.match(main,/Это поиск заявленных фактов, не независимая приёмка/);
+ assert.match(css,/\.atlas-work-evidence-summary\{margin:5px/);
+});

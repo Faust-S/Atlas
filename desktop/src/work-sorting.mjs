@@ -18,3 +18,17 @@ export function sortWorkRows(items,kind="title"){
   return result||text(a.title).localeCompare(text(b.title),"ru");
  });
 }
+
+
+/** Pure work-list filter, based only on explicitly originating observations.
+ * Neither completion nor a manual finding grants independent acceptance.
+ */
+export function filterWorkRowsByObservation(items,findingsByWork,mode="all"){
+ if(!new Set(["all","with","without","done_without"]).has(mode))throw Error("Unknown work observation filter");
+ if(!(findingsByWork instanceof Map))throw Error("Expected work observation index");
+ return items.filter(item=>{
+  const observed=(findingsByWork.get(item.id)?.length||0)>0;
+  return mode==="all"||mode==="with"&&observed||
+   mode==="without"&&!observed||mode==="done_without"&&item.state==="done"&&!observed;
+ });
+}

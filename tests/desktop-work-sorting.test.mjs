@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {sortWorkRows} from "../desktop/src/work-sorting.mjs";
+import {sortWorkRows,filterWorkRowsByObservation} from "../desktop/src/work-sorting.mjs";
 test("R3 work ordering uses a projection and keeps the original rows unchanged",()=>{
  const input=[
   {id:"a",title:"Gamma",priority:"normal",state:"todo",estimateDays:4,dueDate:null},
@@ -15,4 +15,25 @@ test("R3 work ordering uses a projection and keeps the original rows unchanged",
  assert.deepEqual(ids("state"),["b","a","c"]);
  assert.equal(JSON.stringify(input),before);
  assert.throws(()=>sortWorkRows(input,"unsupported"),/Unknown/);
+});
+
+test("work-list factual gap filters never infer completion or mutate source rows",()=>{
+ const works=[
+  {id:"todo",title:"Todo",state:"todo"},
+  {id:"done",title:"Done without observation",state:"done"},
+  {id:"observed",title:"Observed",state:"in_progress"},
+  {id:"observed-done",title:"Observed and done",state:"done"}
+ ];
+ const index=new Map([["observed",[{id:"f1",workId:"observed",origin:"manual"}]],
+  ["observed-done",[{id:"f2",workId:"observed-done",origin:"manual"}]]]);
+ const before=JSON.stringify(works),seen=JSON.stringify([...index]);
+ const ids=mode=>filterWorkRowsByObservation(works,index,mode).map(w=>w.id);
+ assert.deepEqual(ids("all"),["todo","done","observed","observed-done"]);
+ assert.deepEqual(ids("with"),["observed","observed-done"]);
+ assert.deepEqual(ids("without"),["todo","done"]);
+ assert.deepEqual(ids("done_without"),["done"]);
+ assert.equal(JSON.stringify(works),before);
+ assert.equal(JSON.stringify([...index]),seen);
+ assert.throws(()=>filterWorkRowsByObservation(works,index,"accepted"),/Unknown/);
+ assert.throws(()=>filterWorkRowsByObservation(works,{},"without"),/Expected work observation index/);
 });
