@@ -1,4 +1,5 @@
 import test from "node:test";
+import {readFileSync} from "node:fs";
 import assert from "node:assert/strict";
 import {desktopLoadPortfolio} from "./fixtures/desktop-portfolio-120.mjs";
 import {validate,serialize,deserialize,editItem} from "../src/core.mjs";
@@ -45,4 +46,19 @@ test("cached 120-project impact lookup matches full domain aggregation for 1200 
   for(const p of visible)assert.equal(cache.get(p.id),signatures.get(p.id));
  }
  assert.equal(snapshot.projects.reduce((n,p)=>n+p.items.length,0),1200);
+});
+
+test("installed 0.4 uses the real R5 archive, native import approval, readback, search and charts",()=>{
+ const script=readFileSync(new URL("../desktop/tests/installed-atlas04-scale.py",import.meta.url),"utf8");
+ const workflow=readFileSync(new URL("../.github/workflows/atlas-0-2-1-branding.yml",import.meta.url),"utf8");
+ for(const marker of [
+  "ATLAS04_SCALE_NATIVE_PICKER_PASS","ATLAS04_SCALE_IMPORT_PRE_SAVE_UNCHANGED_PASS",
+  "ATLAS04_SCALE_GUI_IMPORT_PASS projects=120 works=1200",
+  "ATLAS04_SCALE_GUI_RESTART_READBACK_PASS","ATLAS04_SCALE_GUI_SEARCH_PASS",
+  "ATLAS04_SCALE_GUI_GANTT_DAG_PASS","ATLAS04_SCALE_GUI_ACCEPTED_PASS"
+ ])assert.ok(script.includes(marker),marker);
+ assert.match(script,/"Заменить портфель в черновике"/);
+ assert.match(script,/"ATLAS_R5_PORTFOLIO_JSON"/);
+ assert.match(workflow,/python desktop\/tests\/installed-atlas04-scale\.py/);
+ assert.match(workflow,/ATLAS_R5_PORTFOLIO_JSON=\$fixture/);
 });

@@ -60,6 +60,7 @@ jobs:
           $fixture = Join-Path $env:RUNNER_TEMP 'atlas-r5-portfolio-120.json'
           node tests/fixtures/desktop-portfolio-120.mjs | Set-Content -LiteralPath $fixture -Encoding utf8
           $env:ATLAS_R5_PORTFOLIO_JSON = $fixture
+          "ATLAS_R5_PORTFOLIO_JSON=$fixture" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           cargo test --release --locked --manifest-path desktop/src-tauri/Cargo.toml --lib persistence_tests::native_r5_scale_and_incremental_readback -- --exact --nocapture
       - name: Install candidate, verify executable and icon
         shell: pwsh
@@ -94,6 +95,17 @@ jobs:
         shell: pwsh
         timeout-minutes: 6
         run: ./desktop/tests/installed-atlas04-ux.ps1
+      - name: Install existing Windows GUI test driver for the large-portfolio import
+        if: github.ref_name == 'work/2026-11-08-atlas-0-4'
+        shell: pwsh
+        run: |
+          python -m pip install pywinauto==0.6.9 pillow==11.3.0
+          python -m py_compile desktop/tests/installed-atlas04-scale.py
+      - name: Measure real 120-project / 1200-work installed Atlas 0.4 UI
+        if: github.ref_name == 'work/2026-11-08-atlas-0-4'
+        shell: pwsh
+        timeout-minutes: 8
+        run: python desktop/tests/installed-atlas04-scale.py
       - name: Checkout real Center consumer at audited revision
         if: github.ref_name == 'work/2026-11-04-atlas-0-3'
         uses: actions/checkout@v4
