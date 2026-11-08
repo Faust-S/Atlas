@@ -180,3 +180,25 @@ test("observed outcome links back to the precise originating work",()=>{
  assert.match(main,/aria-label=\{"Открыть работу, связанную с наблюдением: "\+r\.observation\.workTitle\}/);
  assert.match(main,/onClick=\{\(\)=>openEditor\("work:"\+r\.observation\.workId\)\}/);
 });
+
+test("narrow installed and embedded work list has readable cards without horizontal action overflow",()=>{
+ assert.match(main,/className="surface atlas-work-surface"/);
+ assert.match(main,/className="table-scroll atlas-work-table-scroll"/);
+ assert.match(main,/className="atlas-work-table" aria-label="Работы проекта"/);
+ assert.match(main,/data-label="Состояние"/);
+ assert.match(main,/data-label="Ответственный"/);
+ assert.match(main,/data-label="Срок"/);
+ assert.match(main,/className="atlas-work-table-actions"/);
+ assert.match(css,/\.atlas-work-surface\{container-type:inline-size;container-name:atlas-work-surface\}/);
+ assert.match(css,/@container atlas-work-surface \(max-width:850px\)/);
+ assert.match(css,/\.atlas-work-table tbody tr\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+ assert.match(css,/\.atlas-work-table td\.atlas-work-table-actions\{display:flex;flex-wrap:wrap/);
+ assert.match(css,/\.atlas-work-table-scroll\{overflow-x:visible\}/);
+});
+test("work observations are counted by originating work, never as independently accepted outcomes",()=>{
+ assert.match(main,/const findingCountByWork=useMemo\(\(\)=>\{/);
+ assert.match(main,/if\(finding\.workId\)totals\.set\(finding\.workId/);
+ assert.match(main,/findingCountByWork\.has\(w\.id\)/);
+ assert.match(main,/Заявленных наблюдений по работе: \{findingCountByWork\.get\(w\.id\)\}/);
+ assert.match(main,/Это не независимая приёмка/);
+});

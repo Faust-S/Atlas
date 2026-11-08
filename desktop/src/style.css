@@ -454,3 +454,31 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .atlas-work-fact-menu>summary{cursor:pointer;font-size:12px;color:#2868b0;text-decoration:underline}
 .atlas-work-fact-menu>summary:focus-visible{outline:3px solid #4c8afc;outline-offset:2px}
 .atlas-work-fact-menu .button-row{max-width:380px;flex-wrap:wrap;margin-top:6px}
+
+
+/* Installed 1024px UX: work rows become compact cards at the width of the
+   actual workspace, including an embedded host. Desktop-wide tables remain
+   native HTML tables, with the same keyboard and source-bound actions. */
+.atlas-work-surface{container-type:inline-size;container-name:atlas-work-surface}
+.atlas-work-observations{font-size:11px;color:#3e638a}
+@container atlas-work-surface (max-width:850px){
+ .atlas-work-surface .filter-row{flex-wrap:wrap;gap:9px 12px}
+ .atlas-work-surface .filter-row label{flex:1 1 170px;min-width:0;justify-content:space-between}
+ .atlas-work-surface .filter-row select,.atlas-work-surface .filter-row input{min-width:0;max-width:min(100%,225px)}
+ .atlas-work-table-scroll{overflow-x:visible}
+ .atlas-work-table{display:block;min-width:0;width:100%}
+ .atlas-work-table thead{position:absolute;width:1px;height:1px;clip-path:inset(50%);overflow:hidden;white-space:nowrap}
+ .atlas-work-table tbody{display:grid;gap:10px}
+ .atlas-work-table tbody tr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:12px;row-gap:7px;
+  border:1px solid #d9e4f1;background:#fff;border-radius:10px;padding:12px;min-width:0}
+ .atlas-work-table tbody tr:hover{background:#f7faff}
+ .atlas-work-table td{display:block;min-width:0;border:0;padding:2px 0;overflow-wrap:anywhere}
+ .atlas-work-table td:before{content:attr(data-label);display:block;font-size:11px;color:#697f9b;font-weight:650;margin-bottom:3px}
+ .atlas-work-table td:first-child,.atlas-work-table td:last-child{grid-column:1/-1}
+ .atlas-work-table td:first-child:before,.atlas-work-table td:last-child:before{content:none}
+ .atlas-work-table td:first-child strong{font-size:14px}
+ .atlas-work-table td.atlas-work-table-actions{display:flex;flex-wrap:wrap;gap:6px;align-items:center;
+  padding-top:9px;margin-top:3px;border-top:1px solid #e0e9f3}
+ .atlas-work-table-actions .action-button{min-height:32px;font-size:12px;padding:5px 10px}
+ .atlas-work-table-actions .atlas-work-fact-menu{margin:0 2px}
+}

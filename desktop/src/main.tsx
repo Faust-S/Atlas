@@ -247,6 +247,12 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const nextStep=useMemo(()=>project&&impact?projectNextStep(project,impact):null,[project,impact]);
  const realityMap=useMemo(()=>project&&reality&&impact?realityOverview(project,reality,impact):null,[project,reality,impact]);
  const targetById=useMemo(()=>new Map<string,any>((project?.targets||[]).map((t:any)=>[t.id,t])),[project]);
+ const findingCountByWork=useMemo(()=>{
+  const totals=new Map<string,number>();
+  for(const finding of project?.findings||[])
+   if(finding.workId)totals.set(finding.workId,(totals.get(finding.workId)||0)+1);
+  return totals;
+ },[project]);
  useEffect(()=>{
   // Reveal the actual source-bound row instead of losing the target ID
   // when the user enters a project from the portfolio command queue.
@@ -1129,7 +1135,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       </div>
      </section>
     </>}
-    {tab==="work"&&<section className="surface">
+    {tab==="work"&&<section className="surface atlas-work-surface">
      <div className="section-heading"><div><h2>Работы проекта</h2><p>Изменения отражаются в доске, графике и зависимостях.</p></div>
       <div className="button-row"><Action onClick={()=>openEditor("item")} primary title="Ctrl+Shift+N">＋ Работа</Action><Action onClick={()=>openEditor("stage")}>＋ Этап</Action><Action onClick={()=>openEditor("dep")} title="Ctrl+Shift+L">Связь работ</Action></div></div>
      <div className="filter-row"><label>Требование <select aria-label="Фильтр работ по требованию"
@@ -1146,13 +1152,16 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
        <option value="priority">По приоритету</option><option value="estimateDays">По длительности</option>
        <option value="state">По состоянию</option>
       </select></label></div>
-     <div className="table-scroll"><table><thead><tr><th>Работа</th><th>Состояние</th><th>Длительность</th><th>Ответственный</th><th>Срок</th><th>Изменить</th></tr></thead>
+     <div className="table-scroll atlas-work-table-scroll"><table className="atlas-work-table" aria-label="Работы проекта"><thead><tr><th>Работа</th><th>Состояние</th><th>Длительность</th><th>Ответственный</th><th>Срок</th><th>Изменить</th></tr></thead>
       <tbody>{filteredWork.slice(0,workLimit).map((w:any)=><tr key={w.id}>
-       <td><strong>{w.title}</strong><small>{project.stages.find((s:any)=>s.id===w.stageId)?.name||"Без этапа"}</small>
+       <td data-label="Работа"><strong>{w.title}</strong><small>{project.stages.find((s:any)=>s.id===w.stageId)?.name||"Без этапа"}</small>
+        {findingCountByWork.has(w.id)&&<small className="atlas-work-observations">
+         Заявленных наблюдений по работе: {findingCountByWork.get(w.id)} · Это не независимая приёмка</small>}
         {w.state==="done"&&(w.targetIds||[]).length>0&&<small className="atlas-work-evidence-note">
          Завершение работы заявлено; факт результата вносится отдельно.</small>}</td>
-       <td><Badge>{workStatuses[w.state]}</Badge></td><td>{w.estimateDays??1} дн.</td><td>{w.assignee||"Не назначен"}</td><td>{readable(w.dueDate)}</td>
-       <td><Action onClick={()=>openEditor("work:"+w.id)}>Открыть</Action>
+       <td data-label="Состояние"><Badge>{workStatuses[w.state]}</Badge></td><td data-label="Длительность">{w.estimateDays??1} дн.</td>
+       <td data-label="Ответственный">{w.assignee||"Не назначен"}</td><td data-label="Срок">{readable(w.dueDate)}</td>
+       <td data-label="Действия" className="atlas-work-table-actions"><Action onClick={()=>openEditor("work:"+w.id)}>Открыть</Action>
         {(w.targetIds||[]).length===1&&targetById.get(w.targetIds[0])&&
          <Action ariaLabel={"Зафиксировать факт по работе: "+w.title+" — "+targetById.get(w.targetIds[0]).title}
           onClick={()=>openEditor("finding-work:"+encodeURIComponent(w.id)+":"+encodeURIComponent(w.targetIds[0]))}>＋ Факт</Action>}
