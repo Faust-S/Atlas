@@ -406,6 +406,44 @@ def inspect_exact_requirement(saved_generation):
 
 
 
+def visible_uia_action(window, name, attempts=13):
+    """Find an accessible control after physical mouse-wheel navigation.
+
+    WebView2 UIA can enumerate an offscreen button and allow click_input()
+    even when no pixels under that rectangle can actually receive the click.
+    Only click once its rectangle is inside the installed workspace viewport.
+    """
+    bounds = win32gui.GetWindowRect(handle)
+    dpi = ctypes.windll.user32.GetDpiForWindow(handle)
+    scale = dpi / 96 if dpi else 1
+    point = (min(bounds[2] - 70, bounds[0] + round(755 * scale)),
+             min(bounds[3] - 95, bounds[1] + round(490 * scale)))
+    for attempt in range(attempts):
+        control = window.child_window(title=name, control_type="Button")
+        rectangle = None
+        try:
+            if control.exists(timeout=1):
+                rectangle = control.rectangle()
+                if (control.is_visible() and control.is_enabled()
+                        and rectangle.width() > 3 and rectangle.height() > 3
+                        and rectangle.left >= bounds[0] + 245
+                        and rectangle.right < bounds[2] - 12
+                        and rectangle.top >= bounds[1] + 105
+                        and rectangle.bottom < bounds[3] - 50):
+                    return control
+        except Exception:
+            pass
+        # A control above the sticky toolbar needs an upward scroll;
+        # absent/offscreen-below controls require a downward scroll.
+        upward = rectangle is not None and rectangle.top < bounds[1] + 105
+        activate()
+        mouse.scroll(coords=point, wheel_dist=2 if upward else -3)
+        time.sleep(0.23)
+    screenshot("uia-action-offscreen")
+    print("ATLAS04_CAUSE_ACTION_UIA_HOLD " + name + " not physically visible", flush=True)
+    return None
+
+
 def inspect_cause_proposal_and_decision(saved_generation):
     """Installed GUI: exact fact -> cause proposal -> explicit approval -> native readback.
 
@@ -492,21 +530,23 @@ def inspect_cause_proposal_and_decision(saved_generation):
 
     search_and_open()
     window = Desktop(backend="uia").window(handle=handle)
-    change_action = window.child_window(title="Изменение по причине", control_type="Button")
-    if not change_action.exists(timeout=3):
+    change_action = visible_uia_action(window, "Изменение по причине")
+    if change_action is None:
         screenshot("cause-change-navigation-hold")
         print("ATLAS04_CAUSE_DECISION_UIA_HOLD change navigation unavailable", flush=True)
         return
+    screenshot("cause-change-before-click")
     change_action.click_input()
     wait_title("Project 119 — Изменения", timeout=15)
     screenshot("cause-change-focused")
     print("ATLAS04_CAUSE_EXACT_CHANGE_NAV_UIA_PASS", flush=True)
 
-    decision_button = window.child_window(title="Решение", control_type="Button")
-    if not decision_button.exists(timeout=3):
+    decision_button = visible_uia_action(window, "Решение")
+    if decision_button is None:
         screenshot("cause-decision-button-hold")
         print("ATLAS04_CAUSE_DECISION_UIA_HOLD decision button unavailable", flush=True)
         return
+    screenshot("cause-decision-before-click")
     decision_button.click_input()
     wait_title("Форма: Решение:", timeout=15)
     screenshot("cause-decision-editor")
