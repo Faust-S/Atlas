@@ -135,3 +135,15 @@ test("installed Win32 linked-project qualification distinguishes real title read
  // No artificial WebView2 store write, browser automation, or renderer shortcut.
  assert.doesNotMatch(script,/playwright|puppeteer|chromium\.launch|execute_script/);
 });
+
+test("direct predecessor has unique accessible name, not the repeated cause-path name",()=>{
+ const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ const script=readFileSync(new URL("../desktop/tests/installed-atlas04-scale.py",import.meta.url),"utf8");
+ assert.match(ui,/aria-label=\{"Открыть предшественника: "\+p\.name\}/);
+ assert.match(ui,/aria-label=\{"Открыть следующий проект: "\+p\.name\}/);
+ assert.match(script,/title="Открыть предшественника: Project 19", control_type="Button"/);
+ assert.doesNotMatch(script,/window\.child_window\(title="Project 19", control_type="Button"\)/);
+ assert.match(script,/ATLAS04_SCALE_GUI_PREDECESSOR_NAVIGATION_UIA_HOLD/);
+ assert.match(script,/ATLAS04_SCALE_GUI_PREDECESSOR_NAVIGATION_UIA_PASS/);
+ assert.match(script,/assert native\(\)\[0\]\["generation"\] == saved_generation/);
+});
