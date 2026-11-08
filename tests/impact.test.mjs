@@ -79,16 +79,27 @@ test("next step follows actual project gaps without granting authority or writin
  const id=created.id;
  assert.equal(projectNextStep(created.state.projects[0]).id,"define_target");
  const target=addTarget(created.state,id,{title:"Deliver",desired:"Verified result"});
- assert.equal(projectNextStep(target.state.projects[0]).id,"plan_work");
- const work=createItem(target.state,id,{title:"Produce evidence"});
- const before=JSON.stringify(work.state);
- assert.equal(projectNextStep(work.state.projects[0]).id,"review_reality");
- const incomplete=structuredClone(work.state.projects[0]);
+ const first=projectNextStep(target.state.projects[0]);
+ assert.equal(first.id,"plan_work");
+ assert.equal(first.action,"item-target:"+target.id);
+ const produced=applyEditor(target.state,id,first.action,args({
+  title:"Verify expected result",targetId:target.id,stageId:"",assignee:"QA",estimateDays:"1"
+ }));
+ assert.deepEqual(produced.state.projects[0].items[0].targetIds,[target.id]);
+ const unrelated=createItem(target.state,id,{title:"Produce evidence"});
+ assert.deepEqual(unrelated.state.projects[0].items[0].targetIds,[]);
+ const unlinked=projectNextStep(unrelated.state.projects[0]);
+ assert.equal(unlinked.id,"link_work");
+ assert.equal(unlinked.action,"item-target:"+target.id);
+ const linked=editItem(unrelated.state,id,unrelated.id,{targetIds:[target.id]});
+ const before=JSON.stringify(linked.state);
+ assert.equal(projectNextStep(linked.state.projects[0]).id,"review_reality");
+ const incomplete=structuredClone(linked.state.projects[0]);
  incomplete.sources.push({id:"source:unavailable",locator:"example/repo",status:"error",
   summary:{complete:false}});
  assert.equal(projectNextStep(incomplete).id,"check_sources");
- const projection=projectImpact(work.state.projects[0]);
- assert.equal(projectNextStep(work.state.projects[0],projection).id,"review_reality");
- assert.equal(JSON.stringify(work.state),before);
- assert.equal("automaticApply" in projectNextStep(work.state.projects[0]),false);
+ const projection=projectImpact(linked.state.projects[0]);
+ assert.equal(projectNextStep(linked.state.projects[0],projection).id,"review_reality");
+ assert.equal(JSON.stringify(linked.state),before);
+ assert.equal("automaticApply" in projectNextStep(linked.state.projects[0]),false);
 });

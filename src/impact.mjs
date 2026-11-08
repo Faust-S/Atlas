@@ -67,16 +67,25 @@ export function projectNextStep(project, impact=projectImpact(project)){
   note:"Определите, что должно получиться. Тогда работы и факты можно будет сопоставлять с целью.",
   button:"Добавить требование",tab:"overview",action:"target"
  };
- if(!(project.items||[]).length)return {
-  id:"plan_work",title:"Разложите цель на работы",
-  note:"Требования уже есть, но работы ещё не запланированы. Создайте первую работу.",
-  button:"Добавить работу",tab:"work",action:"item"
- };
+ if(!(project.items||[]).length){
+  const primary=(project.targets||[]).find(t=>t.intent==="committed")||project.targets[0];
+  return {
+   id:"plan_work",title:"Разложите цель на работы",
+   note:"Создайте работу по требованию «"+primary.title+"». Так вы сможете сопоставлять план и факты с ожидаемым результатом.",
+   button:"Добавить связанную работу",tab:"work",action:"item-target:"+primary.id
+  };
+ }
  if(impact.sourceIssues.length)return {
   id:"check_sources",title:"Проверьте источники данных",
   note:"Проблемных или неполных наблюдений: "+impact.sourceIssues.length+
    ". Сначала уточните источник; его изменение не означает принятие результата.",
   button:"Открыть источники",tab:"sources",action:null
+ };
+ const unlinked=impact.rows.find(row=>row.intent==="committed"&&row.work.length===0);
+ if(unlinked)return {
+  id:"link_work",title:"Свяжите работы с ожидаемым результатом",
+  note:"У требования «"+unlinked.title+"» пока нет связанной работы. Назначьте конкретную проверяемую работу.",
+  button:"Создать связанную работу",tab:"work",action:"item-target:"+unlinked.targetId
  };
  if(impact.attention>0)return {
   id:"review_reality",title:"Сверьте план и фактические сведения",
