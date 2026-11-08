@@ -119,3 +119,19 @@ test("0.4 keeps facts ahead of optional chains and focuses inspected causes",()=
  assert.match(main,/Нет утверждённых требований/);
  assert.match(main,/portfolioCommand\.totals\.missingCriteria/);
 });
+
+test("installed Win32 linked-project qualification distinguishes real title readback and optional UIA",()=>{
+ const script=readFileSync(new URL("../desktop/tests/installed-atlas04-scale.py",import.meta.url),"utf8");
+ assert.match(script,/def inspect_linked_project\(saved_generation\):/);
+ assert.match(script,/wait_title\("Project 20 — Обзор"\)/);
+ assert.match(script,/ATLAS04_SCALE_GUI_LINKED_PROJECT_PASS project=20/);
+ assert.match(script,/ATLAS04_SCALE_GUI_RELATIONS_VISUAL_CAPTURED project=20/);
+ assert.match(script,/ATLAS04_SCALE_GUI_RELATIONS_TOGGLE_UIA_PASS/);
+ assert.match(script,/ATLAS04_SCALE_GUI_RELATIONS_TOGGLE_UIA_HOLD/);
+ assert.match(script,/ATLAS04_SCALE_GUI_PREDECESSOR_NAVIGATION_UIA_PASS/);
+ assert.match(script,/wait_title\("Project 19 — Обзор", timeout=12\)/);
+ assert.match(script,/assert native\(\)\[0\]\["generation"\] == saved_generation/);
+ assert.match(script,/inspect_linked_project\(saved\["generation"\]\)/);
+ // No artificial WebView2 store write, browser automation, or renderer shortcut.
+ assert.doesNotMatch(script,/CDP|playwright|puppeteer|chromium\.launch|execute_script/);
+});
