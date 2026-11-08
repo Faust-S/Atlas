@@ -513,6 +513,48 @@ def inspect_work_observation_filter(saved_generation):
     return True
 
 
+def inspect_unlinked_work_editor(saved_generation):
+    """Optional installed UX check: why work without a target cannot record facts.
+
+    The only corrective action opens the existing work editor, never makes
+    a target link or observation without a human Save.
+    """
+    from pywinauto import Desktop
+    window = Desktop(backend="uia").window(handle=handle)
+    head, projects = native()
+    assert head["generation"] == saved_generation
+    project = next(p for p in projects if p["id"] == "load-project-119")
+    if not project["targets"]:
+        print("ATLAS04_UNLINKED_WORK_UIA_HOLD no target in fixture", flush=True)
+        return False
+    work = next((w for w in project["items"] if not w.get("targetIds")), None)
+    if work is None:
+        print("ATLAS04_UNLINKED_WORK_UIA_HOLD no unlinked work in fixture", flush=True)
+        return False
+    label = "Указать требование для работы: " + work["title"]
+    action = visible_uia_action(window, label)
+    if action is None:
+        screenshot("unlinked-work-action-hold")
+        print("ATLAS04_UNLINKED_WORK_UIA_HOLD target-link action inaccessible", flush=True)
+        return False
+    screenshot("unlinked-work-before-editor")
+    action.click_input()
+    wait_title("Форма: Работа: " + work["title"], timeout=15)
+    screenshot("unlinked-work-editor")
+    select = window.child_window(title="Связать с ожидаемым результатом", control_type="ComboBox")
+    available = select.exists(timeout=3)
+    cancel = window.child_window(title="Отмена", control_type="Button")
+    assert cancel.exists(timeout=3), "Work editor has no cancel button"
+    cancel.click_input()
+    wait_title("Project 119 — Таблица", timeout=15)
+    assert native()[0]["generation"] == saved_generation, "Opening unlinked work editor changed native data"
+    if not available:
+        print("ATLAS04_UNLINKED_WORK_UIA_HOLD target selector inaccessible", flush=True)
+        return False
+    print("ATLAS04_UNLINKED_WORK_EDITOR_UIA_PASS work=" + work["id"], flush=True)
+    return True
+
+
 def inspect_cause_proposal_and_decision(saved_generation):
     """Installed GUI: exact fact -> cause proposal -> explicit approval -> native readback.
 
@@ -864,6 +906,7 @@ def inspect_cause_proposal_and_decision(saved_generation):
     filter_checked = inspect_work_observation_filter(recorded_head["generation"])
     if not filter_checked:
         print("ATLAS04_OBSERVATION_FILTER_NATIVE_DATA_PASS_UIA_HOLD", flush=True)
+    inspect_unlinked_work_editor(recorded_head["generation"])
     history = visible_uia_action(window, "История наблюдений по работе: "+work["title"])
     if history is None:
         assert native()[0]["generation"] == recorded_head["generation"]

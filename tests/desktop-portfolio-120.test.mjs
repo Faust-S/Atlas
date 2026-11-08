@@ -291,3 +291,18 @@ test("installed Win32 filter selects source-bound observation modes without alte
  assert.match(script,/assert native\(\)\[0\]\["generation"\] == saved_generation/);
  assert.match(script,/inspect_work_observation_filter\(recorded_head\["generation"\]\)/);
 });
+
+test("installed Windows gives unlinked work a precise route to the existing target editor",()=>{
+ const script=readFileSync(new URL("../desktop/tests/installed-atlas04-scale.py",import.meta.url),"utf8");
+ const main=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ assert.match(script,/def inspect_unlinked_work_editor\(saved_generation\):/);
+ assert.match(script,/not w\.get\("targetIds"\)/);
+ assert.match(script,/label = "Указать требование для работы: " \+ work\["title"\]/);
+ assert.match(script,/wait_title\("Форма: Работа: " \+ work\["title"\], timeout=15\)/);
+ assert.match(script,/title="Связать с ожидаемым результатом", control_type="ComboBox"/);
+ assert.match(script,/assert native\(\)\[0\]\["generation"\] == saved_generation/);
+ assert.match(script,/ATLAS04_UNLINKED_WORK_EDITOR_UIA_PASS/);
+ assert.match(script,/ATLAS04_UNLINKED_WORK_UIA_HOLD/);
+ assert.match(script,/inspect_unlinked_work_editor\(recorded_head\["generation"\]\)/);
+ assert.match(main,/Указать требование для работы: "\+w\.title/);
+});
