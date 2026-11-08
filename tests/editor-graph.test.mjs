@@ -76,3 +76,28 @@ test("work observation editor fixes the exact target and persists the originatin
  assert.throws(()=>editorSpec(work.state.projects[0],"finding-work:"+encodeURIComponent(work.id)+":"+encodeURIComponent(other.id)),/не связана/);
  assert.equal(work.state.projects[0].findings.length,0);
 });
+
+test("work editor preserves secondary target links on ordinary edits and when primary changes",()=>{
+ const made=createProject(empty(),{name:"Multi-target evidence",type:"engineering"});
+ const a=addTarget(made.state,made.id,{title:"Alpha",desired:"A"});
+ const b=addTarget(a.state,made.id,{title:"Beta",desired:"B"});
+ const c=addTarget(b.state,made.id,{title:"Gamma",desired:"C"});
+ const item=createItem(c.state,made.id,{title:"Both outcomes",targetIds:[a.id,b.id]});
+ const action="work:"+item.id;
+ const spec=editorSpec(item.state.projects[0],action);
+ assert.match(spec.hint,/остальные сохраняются: Beta/);
+ const form={title:"Renamed outcome",stageId:"",dueDate:"",state:"todo",priority:"normal",
+  assignee:"",estimateDays:"1",resourceId:"",allocationPct:"100"};
+ const before=serialize(item.state);
+ const rename=applyEditor(item.state,made.id,action,values({...form,targetId:a.id}));
+ assert.deepEqual(rename.state.projects[0].items[0].targetIds,[a.id,b.id]);
+ assert.equal(rename.state.projects[0].items[0].title,"Renamed outcome");
+ assert.equal(serialize(item.state),before,"Source snapshot mutated");
+ const moved=applyEditor(rename.state,made.id,action,values({...form,targetId:c.id}));
+ assert.deepEqual(moved.state.projects[0].items[0].targetIds,[c.id,b.id],
+  "Selecting a new primary must preserve the secondary relation");
+ const cleared=applyEditor(moved.state,made.id,action,values({...form,targetId:""}));
+ assert.deepEqual(cleared.state.projects[0].items[0].targetIds,[b.id],
+  "Clearing primary must not erase secondary work outcomes");
+ assert.deepEqual(deserialize(serialize(cleared.state)).projects[0].items[0].targetIds,[b.id]);
+});

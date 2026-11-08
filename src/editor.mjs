@@ -243,7 +243,17 @@ export function editorSpec(project,action,snapshot=null){
  field("dueDate","Контрольный срок","date",project.dueDate||"",false)
  ]};
  if(action.startsWith("duration:")){const item=project.items.find(x=>x.id===action.slice(9));if(!item)throw Error("Работа не найдена");return {title:"Продолжительность: "+item.title,fields:[field("estimateDays","Календарных дней (0–36500)","number",String(item.estimateDays??1))]}};
- if(action.startsWith("work:")){const item=project.items.find(x=>x.id===action.slice(5));if(!item)throw Error("Работа не найдена");return {title:"Работа: "+item.title,fields:[field("title","Название работы","text",item.title),choice("stageId","Этап",stageOptions(project),item.stageId||"",false),field("dueDate","Срок работы","date",item.dueDate||"",false),choice("state","Состояние",workOptions,item.state),choice("priority","Приоритет",[option("low","Низкий"),option("normal","Обычный"),option("high","Высокий"),option("critical","Критический")],item.priority),field("assignee","Ответственный","text",item.assignee,false),field("estimateDays","Плановая длительность, дней","number",String(item.estimateDays??1)),choice("resourceId","Плановый ресурс",resourceChoiceOptions(snapshot),item.resourceId||"",false),field("allocationPct","Доля ресурса, %","number",String(item.allocationPct??100)),choice("targetId","Связать с ожидаемым результатом",optionalTargets(project),item.targetIds?.[0]||"",false)]}};
+ if(action.startsWith("work:")){
+  const item=project.items.find(x=>x.id===action.slice(5));if(!item)throw Error("Работа не найдена");
+  // The legacy work editor offers one select, but domain works can have
+  // multiple targetIds. Make the primary/secondary distinction explicit;
+  // other associations must survive an unrelated edit of the work.
+  const additional=(item.targetIds||[]).slice(1).map(id=>
+   (project.targets||[]).find(t=>t.id===id)?.title||id);
+  return {title:"Работа: "+item.title,
+   ...(additional.length?{hint:"Работа связана с несколькими требованиями. Здесь изменяется только основная связь; остальные сохраняются: "+additional.join(", ")}:{}),
+   fields:[field("title","Название работы","text",item.title),choice("stageId","Этап",stageOptions(project),item.stageId||"",false),field("dueDate","Срок работы","date",item.dueDate||"",false),choice("state","Состояние",workOptions,item.state),choice("priority","Приоритет",[option("low","Низкий"),option("normal","Обычный"),option("high","Высокий"),option("critical","Критический")],item.priority),field("assignee","Ответственный","text",item.assignee,false),field("estimateDays","Плановая длительность, дней","number",String(item.estimateDays??1)),choice("resourceId","Плановый ресурс",resourceChoiceOptions(snapshot),item.resourceId||"",false),field("allocationPct","Доля ресурса, %","number",String(item.allocationPct??100)),choice("targetId","Основное ожидаемое требование",optionalTargets(project),item.targetIds?.[0]||"",false)]};
+ }
  if(action==="risk")return {title:"Новый риск",fields:[field("text","Что может помешать?","textarea")]};
  if(action.startsWith("risk-edit:")){
   const risk=project.risks.find(r=>r.id===action.slice(10));if(!risk)throw Error("Риск не найден");
@@ -371,7 +381,15 @@ export function applyEditor(snapshot,projectId,action,input){
  if(action==="status")return {state:editProject(snapshot,projectId,{status:get("status")})};
  if(action==="start"||action==="dates")return {state:editProject(snapshot,projectId,{startDate:get("startDate")||null,dueDate:get("dueDate")||null})};
  if(action.startsWith("duration:"))return {state:editItem(snapshot,projectId,action.slice(9),{estimateDays:integer("estimateDays")})};
- if(action.startsWith("work:"))return {state:editItem(snapshot,projectId,action.slice(5),{title:get("title"),stageId:get("stageId")||null,dueDate:get("dueDate")||null,state:get("state"),priority:get("priority"),assignee:get("assignee"),estimateDays:integer("estimateDays"),resourceId:get("resourceId"),allocationPct:percentage("allocationPct"),targetIds:get("targetId")?[get("targetId")]:[]})};
+ if(action.startsWith("work:")){
+  const id=action.slice(5),item=p.items.find(w=>w.id===id);
+  if(!item)throw Error("Работа не найдена");
+  // The editor can change the first association but cannot express edits
+  // to the remaining associations. Do not silently drop them on Save.
+  const selected=get("targetId"),rest=(item.targetIds||[]).slice(1);
+  const targetIds=[...(selected?[selected]:[]),...rest.filter(link=>link!==selected)];
+  return {state:editItem(snapshot,projectId,id,{title:get("title"),stageId:get("stageId")||null,dueDate:get("dueDate")||null,state:get("state"),priority:get("priority"),assignee:get("assignee"),estimateDays:integer("estimateDays"),resourceId:get("resourceId"),allocationPct:percentage("allocationPct"),targetIds})};
+ }
  if(action==="risk")return {state:createRisk(snapshot,projectId,get("text"))};
  if(action==="decision")return {state:createDecision(snapshot,projectId,get("text"))};
  if(action==="source")return {state:attach(snapshot,projectId,get("kind"),get("locator")).state};
