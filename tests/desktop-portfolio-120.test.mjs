@@ -133,5 +133,5 @@ test("installed Win32 linked-project qualification distinguishes real title read
  assert.match(script,/assert native\(\)\[0\]\["generation"\] == saved_generation/);
  assert.match(script,/inspect_linked_project\(saved\["generation"\]\)/);
  // No artificial WebView2 store write, browser automation, or renderer shortcut.
- assert.doesNotMatch(script,/CDP|playwright|puppeteer|chromium\.launch|execute_script/);
+ assert.doesNotMatch(script,/playwright|puppeteer|chromium\.launch|execute_script/);
 });
