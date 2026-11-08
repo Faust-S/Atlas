@@ -106,3 +106,25 @@ test("standalone 1024px overview uses compact one-row metrics without changing h
  assert.match(css,/\.app-shell:not\(\.atlas-embedded\) \.metric\{padding:10px 11px;min-height:76px\}/);
  assert.match(css,/@container atlas-panel \(max-width: 650px\)/);
 });
+
+test("project and tab navigation reset the viewport while cause inspection keeps explicit focus",()=>{
+ assert.match(main,/const resetWorkspaceScroll=\(\)=>\{/);
+ assert.match(main,/if\(workspace\)workspace\.scrollTop=0/);
+ const project=main.match(/const selectProject=\([\s\S]*?const openProjectTab=/)?.[0]||"";
+ const view=main.match(/const view=\(tabId:Tab\)=>\{[\s\S]*?\n \};/)?.[0]||"";
+ const decision=main.match(/const openEditorFor=\([\s\S]*?const cancelEditor=/)?.[0]||"";
+ assert.match(project,/resetWorkspaceScroll\(\)/);
+ assert.match(view,/resetWorkspaceScroll\(\)/);
+ assert.match(decision,/resetWorkspaceScroll\(\)/);
+ assert.match(main,/element\.scrollIntoView\(\{block:"start",behavior:"auto"\}\)/);
+ assert.match(main,/element\.focus\(\{preventScroll:true\}\)/);
+});
+
+test("deep inherited causes show short keyboard path with explicit full-chain disclosure",()=>{
+ assert.match(main,/cause\.path\.length>5/);
+ assert.match(main,/cause\.path\.slice\(-2\)/);
+ assert.match(main,/cause\.path\.length-3\} промежуточных/);
+ assert.match(main,/className="atlas-relation-fullpath"/);
+ assert.match(main,/Полная цепочка \(\{cause\.path\.length\} проектов\)/);
+ assert.match(css,/\.atlas-relation-fullpath>summary:focus-visible/);
+});
