@@ -64,7 +64,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $expectedVersion = if ($env:GITHUB_REF_NAME -eq 'work/2026-11-04-atlas-0-3') { '0.3.0-dev.1' } else { '0.2.1' }
+          $expectedVersion = if ($env:GITHUB_REF_NAME -eq 'work/2026-11-04-atlas-0-3') { '0.3.0' } else { '0.2.1' }
           $installer = Get-ChildItem 'desktop/src-tauri/target/release/bundle/nsis' -Filter "*$expectedVersion*setup.exe" | Select-Object -First 1
           if (!$installer) { throw 'Expected version NSIS installer missing' }
           $p = Start-Process -FilePath $installer.FullName -ArgumentList '/S' -PassThru
