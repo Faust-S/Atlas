@@ -425,3 +425,13 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
  .app-shell:not(.atlas-embedded) .metric strong{font-size:22px}
  .app-shell:not(.atlas-embedded) .metric small{font-size:11px}
 }
+
+/* Dense inherited dependency chains stay keyboard-manageable by default.
+   Expand per cause to inspect and navigate every intermediate project. */
+.atlas-relation-omitted{color:#607590;font-size:11px}
+.atlas-relation-fullpath{flex-basis:100%;margin-top:5px;max-width:100%;min-width:0}
+.atlas-relation-fullpath>summary{display:inline-block;cursor:pointer;color:#2868b0;
+ font-size:12px;text-decoration:underline;text-underline-offset:2px}
+.atlas-relation-fullpath>summary:focus-visible{outline:3px solid #4c8afc;outline-offset:2px}
+.atlas-relation-fullpath>.atlas-relation-path{margin:7px 0 0 9px;padding:7px 9px;
+ border-left:2px solid #c4d9ef;background:#f6f9fd;border-radius:0 6px 6px 0}
