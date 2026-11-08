@@ -103,7 +103,7 @@ test("0.4 project chain is bounded in the desktop and uses current portfolio pro
  const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
  assert.match(ui,/atlas-project-relations-detail/);
  assert.match(ui,/aria-expanded=\{showProjectRelations\}/);
- assert.match(ui,/if\(signal\.panel==="relations"\)setShowProjectRelations\(true\)/);
+ assert.match(ui,/if\(signal\.panel==="relations"\)\{[\s\S]*?setShowProjectRelations\(true\)/);
  assert.match(ui,/projectCommand\.dependencies\.inherited\.slice\(0,relationLimit\)/);
 });
 
