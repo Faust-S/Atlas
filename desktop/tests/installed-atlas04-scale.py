@@ -193,7 +193,10 @@ def import_fixture(ids):
     keyboard.send_keys("{TAB}")
     time.sleep(0.2)
     keyboard.send_keys("{ENTER}")
-    time.sleep(1.4)
+    # A 120-project snapshot can take longer to derive than a small portfolio.
+    # The native window title is an independent oracle that the preview was
+    # approved into the React draft; it is not a substitute for disk readback.
+    wait_title("Портфель — Обзор · Не сохранено", timeout=45)
     screenshot("after-human-confirm")
     assert native()[0]["generation"] == original["generation"], "Import bypassed native Save"
     print("ATLAS04_SCALE_IMPORT_PRE_SAVE_UNCHANGED_PASS", flush=True)
