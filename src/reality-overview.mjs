@@ -92,10 +92,11 @@ export function realityOverview(project, trace, impact) {
 
 /** Read-only source-bound history indexed by originating work, in ledger order. */
 export function workObservationIndex(project){
- if(!project||!Array.isArray(project.items)||!Array.isArray(project.findings))
+ if(!project||!Array.isArray(project.items)||
+    (project.findings!==undefined&&!Array.isArray(project.findings)))
   throw Error("Invalid work observation index input");
  const workIds=new Set(project.items.map(work=>work.id)),index=new Map();
- for(const finding of project.findings){
+ for(const finding of project.findings||[]){
   if(!finding?.workId||!workIds.has(finding.workId))continue;
   if(!index.has(finding.workId))index.set(finding.workId,[]);
   index.get(finding.workId).push(finding);

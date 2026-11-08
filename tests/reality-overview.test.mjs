@@ -228,5 +228,9 @@ test("work-specific observation index is read-only, chronological and preserves 
  assert.equal(serialize(state),before);
  const moved=editItem(state,made.id,workA.id,{targetIds:[]});
  assert.deepEqual(workObservationIndex(moved.projects[0]).get(workA.id).map(f=>f.id),[f1.id,f3.id]);
+ const legacy=structuredClone(state.projects[0]);
+ delete legacy.findings;
+ assert.equal(workObservationIndex(legacy).size,0,"Legacy project without trace arrays must remain readable");
+ assert.throws(()=>workObservationIndex({items:[],findings:{}}),/Invalid work observation index input/);
  assert.throws(()=>workObservationIndex(null),/Invalid work observation index input/);
 });
