@@ -277,12 +277,13 @@ test("installed history verifies physical disclosure and requirement navigation 
 test("installed Win32 filter selects source-bound observation modes without altering native data",()=>{
  const script=readFileSync(new URL("../desktop/tests/installed-atlas04-scale.py",import.meta.url),"utf8");
  assert.match(script,/def inspect_work_observation_filter\(saved_generation\):/);
- assert.match(script,/title="Фильтр работ по наблюдениям", control_type="ComboBox"/);
- assert.match(script,/with_observation = sum\(w\["id"\] in ids for w in works\)/);
- assert.match(script,/completed_without = sum\(w\["state"\] == "done" and w\["id"\] not in ids for w in works\)/);
- assert.match(script,/\("with", 1, with_observation\)/);
- assert.match(script,/\("without", 2, without_observation\)/);
- assert.match(script,/\("done_without", 3, completed_without\)/);
+ assert.match(script,/combo_title = "Фильтр работ по наблюдениям"/);
+ assert.match(script,/window\.child_window\(title=combo_title, control_type="ComboBox"\)/);
+ assert.match(script,/with_count = sum\(w\["id"\] in observed for w in works\)/);
+ assert.match(script,/done_without = sum\(w\["state"\] == "done" and w\["id"\] not in observed for w in works\)/);
+ assert.match(script,/\("with", 1, with_count\)/);
+ assert.match(script,/\("without", 2, without_count\)/);
+ assert.match(script,/\("done_without", 3, done_without\)/);
  assert.match(script,/\("all", 0, len\(works\)\)/);
  assert.match(script,/keyboard\.send_keys\("\{HOME\}"\)/);
  assert.match(script,/mouse\.scroll\(coords=wheel_point, wheel_dist=-10\)/);
