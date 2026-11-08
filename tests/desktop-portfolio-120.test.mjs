@@ -57,7 +57,11 @@ test("installed 0.4 uses the real R5 archive, native import approval, readback, 
   "ATLAS04_SCALE_GUI_RESTART_READBACK_PASS","ATLAS04_SCALE_GUI_SEARCH_PASS",
   "ATLAS04_SCALE_GUI_GANTT_DAG_PASS","ATLAS04_SCALE_GUI_ACCEPTED_PASS"
  ])assert.ok(script.includes(marker),marker);
- assert.match(script,/"Заменить портфель в черновике"/);
+ const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ assert.match(ui,/Заменить портфель в черновике/);
+ assert.match(ui,/autoFocus disabled=\{busy\} onClick=\{\(\)=>setPendingImport\(null\)\}/);
+ assert.match(script,/keyboard\.send_keys\("\{TAB\}"\)/);
+ assert.match(script,/keyboard\.send_keys\("\{ENTER\}"\)/);
  assert.match(script,/"ATLAS_R5_PORTFOLIO_JSON"/);
  assert.match(workflow,/python desktop\/tests\/installed-atlas04-scale\.py/);
  assert.match(workflow,/ATLAS_R5_PORTFOLIO_JSON=\$fixture/);
