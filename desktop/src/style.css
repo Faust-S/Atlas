@@ -416,3 +416,12 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .atlas-project-relations{scroll-margin-top:95px}
 .atlas-project-relations:focus{outline:none}
 .atlas-project-relations:focus-visible{outline:3px solid #4c8afc;outline-offset:2px}
+
+/* Atlas 0.4 Windows 1024px: make room for the requirement/fact matrix.
+   Keep hosted Atlas and genuinely narrow windows in their existing 2-column mode. */
+@media (min-width:900px) and (max-width:1220px){
+ .app-shell:not(.atlas-embedded) .metric-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+ .app-shell:not(.atlas-embedded) .metric{padding:10px 11px;min-height:76px}
+ .app-shell:not(.atlas-embedded) .metric strong{font-size:22px}
+ .app-shell:not(.atlas-embedded) .metric small{font-size:11px}
+}
