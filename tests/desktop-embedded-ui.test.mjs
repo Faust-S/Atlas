@@ -128,3 +128,16 @@ test("deep inherited causes show short keyboard path with explicit full-chain di
  assert.match(main,/Полная цепочка \(\{cause\.path\.length\} проектов\)/);
  assert.match(css,/\.atlas-relation-fullpath>summary:focus-visible/);
 });
+
+test("source-bound portfolio cause focuses the exact existing fact card",()=>{
+ assert.ok(main.includes('signal.panel==="evidence"?"overview"'));
+ assert.ok(main.includes('if(validTarget)setRequirementJump({projectId,targetId:signal.ref!});'));
+ assert.ok(main.includes('if(index>=realityLimit){setRealityLimit(index+1);return;}'));
+ assert.ok(main.includes('card.scrollIntoView({block:"center",behavior:"auto"});'));
+ assert.ok(main.includes('card.focus({preventScroll:true});'));
+ assert.ok(main.includes('ref={r.id===requirementJump?.targetId?requirementCardRef:undefined}'));
+ assert.ok(main.includes('aria-label={"Требование: "+r.title+" — "+project.name}'));
+ assert.ok(main.includes('ariaLabel={"Разобрать причину: "+row.name+" — "+row.primary.label}'));
+ assert.ok(main.includes('setRequirementJump(null);'));
+ assert.ok(css.includes('.atlas-reality-card:focus{outline:3px solid'));
+});

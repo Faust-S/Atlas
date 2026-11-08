@@ -81,8 +81,8 @@ class AtlasRenderBoundary extends React.Component<{children:React.ReactNode;logo
 function Badge({children,tone="neutral"}:{children:React.ReactNode;tone?:string}){
  return <span className={"status-chip "+tone}>{children}</span>;
 }
-function Action({children,onClick,primary=false,disabled=false,title,autoFocus=false}:{children:React.ReactNode;onClick:()=>void;primary?:boolean;disabled?:boolean;title?:string;autoFocus?:boolean}){
- return <button type="button" disabled={disabled} title={title} autoFocus={autoFocus} className={"action-button"+(primary?" primary":"")} onClick={onClick}>{children}</button>;
+function Action({children,onClick,primary=false,disabled=false,title,autoFocus=false,ariaLabel}:{children:React.ReactNode;onClick:()=>void;primary?:boolean;disabled?:boolean;title?:string;autoFocus?:boolean;ariaLabel?:string}){
+ return <button type="button" disabled={disabled} title={title} aria-label={ariaLabel} autoFocus={autoFocus} className={"action-button"+(primary?" primary":"")} onClick={onClick}>{children}</button>;
 }
 function Metric({value,label,note}:{value:number|string;label:string;note?:string}){
  return <div className="metric"><small>{label}</small><strong>{value}</strong>{note&&<small>{note}</small>}</div>;
@@ -141,6 +141,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const fileMenuRef=useRef<HTMLDetailsElement|null>(null);
  const viewMenuRef=useRef<HTMLDetailsElement|null>(null);
  const relationSectionRef=useRef<HTMLElement|null>(null);
+ const requirementCardRef=useRef<HTMLArticleElement|null>(null);
  const logoUrl=host?.assetUrl??"/atlas-mark.svg";
  const [data,setData]=useState<Atlas>(()=>empty());
  const [ready,setReady]=useState(false),[busy,setBusy]=useState(false);
@@ -154,6 +155,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const [showProjectRelations,setShowProjectRelations]=useState(false);
  const [relationLimit,setRelationLimit]=useState(12);
  const [relationJump,setRelationJump]=useState<string|null>(null);
+ const [requirementJump,setRequirementJump]=useState<{projectId:string;targetId:string}|null>(null);
  const [boardLimits,setBoardLimits]=useState<Record<string,number>>({});
  const [message,setMessage]=useState(""),[error,setError]=useState("");
  const [inspector,setInspector]=useState(()=>!host&&window.innerWidth>1220),[recovery,setRecovery]=useState(false);
@@ -241,6 +243,19 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const impact=project?impactByProject.get(project.id)||null:null;
  const nextStep=useMemo(()=>project&&impact?projectNextStep(project,impact):null,[project,impact]);
  const realityMap=useMemo(()=>project&&reality&&impact?realityOverview(project,reality,impact):null,[project,reality,impact]);
+ useEffect(()=>{
+  // Reveal the actual source-bound row instead of losing the target ID
+  // when the user enters a project from the portfolio command queue.
+  if(!requirementJump||!ready||active!==requirementJump.projectId||tab!=="overview"||!realityMap)return;
+  const index=realityMap.rows.findIndex((row:any)=>row.id===requirementJump.targetId);
+  if(index<0){setRequirementJump(null);return;}
+  if(index>=realityLimit){setRealityLimit(index+1);return;}
+  const card=requirementCardRef.current;
+  if(!card)return;
+  card.scrollIntoView({block:"center",behavior:"auto"});
+  card.focus({preventScroll:true});
+  setRequirementJump(null);
+ },[requirementJump,ready,active,tab,realityMap,realityLimit]);
  const projected=active?dates.byId.get(active):null;
  const filtered=useMemo(()=>data.projects.filter((p:any)=>
   (portfolioStatus==="all"||portfolioStatus==="active"&&["active","planned","paused"].includes(p.status)||
@@ -359,7 +374,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   resetWorkspaceScroll();
   host?.onSelection?.({projectId:id,workId:null,revision:String(latestSnapshot.current.revision)});
   setActive(id);setTab("overview");setEditor(null);setForecastId(null);
-  setShowProjectRelations(false);setRelationLimit(12);
+  setShowProjectRelations(false);setRelationLimit(12);setRequirementJump(null);
   if(!afterSubmit)setMessage("");
   setWorkFilter("all");setWorkQuery("");setWorkSort("title");setWorkLimit(200);setRealityLimit(8);
   setHistoryQuery("");setHistoryType("all");setHistoryLimit(120);setRecheckLimit(25);
@@ -371,14 +386,18 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   // This is navigation only; human approval and application stay separate.
   if(tabId==="changes"&&changeId)setForecastId(changeId);
  };
- const inspectPortfolioSignal=(projectId:string,signal:{kind:string;panel:string})=>{
+ const inspectPortfolioSignal=(projectId:string,signal:{kind:string;panel:string;ref?:string})=>{
   if(!requireClosedForm())return;
-  const target:Tab=signal.panel==="evidence"?"reality":
+  // Evidence belongs to the existing rich fact/provenance cards. If an old
+  // reference no longer exists, open the overview without a false selection.
+  const target:Tab=signal.panel==="evidence"?"overview":
    signal.panel==="sources"?"sources":signal.panel==="schedule"?"timeline":
    signal.panel==="response"?(signal.kind==="blocked"?"work":"changes"):"overview";
-  // Read-only navigation: the existing domain action still requires an
-  // explicit edit, decision and native Save from its original screen.
+  const validTarget=signal.panel==="evidence"&&Boolean(signal.ref)&&
+   data.projects.find((p:any)=>p.id===projectId)?.targets?.some((t:any)=>t.id===signal.ref);
+  // Read-only navigation: approval and local native Save remain explicit.
   openProjectTab(projectId,target);
+  if(validTarget)setRequirementJump({projectId,targetId:signal.ref!});
   if(signal.panel==="relations"){
    setShowProjectRelations(true);
    setRelationJump(projectId);
@@ -797,7 +816,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
         {row.primary.detail&&<p>{row.primary.detail}</p>}
         {row.signals.length>1&&<details><summary>Другие причины ({row.signals.length-1})</summary>
          <ul>{row.signals.slice(1,6).map((signal:any,i:number)=><li key={signal.kind+"-"+i}>
-          <button className="text-link" type="button" onClick={()=>inspectPortfolioSignal(row.id,signal)}>
+          <button className="text-link" type="button"
+           aria-label={"Разобрать причину: "+row.name+" — "+signal.label}
+           onClick={()=>inspectPortfolioSignal(row.id,signal)}>
            {signal.label}</button>{signal.detail&&<small>{signal.detail}</small>}
          </li>)}</ul>
         </details>}
@@ -806,7 +827,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
         <strong>{row.projectedFinish||"Неизвестен"}</strong>
         {row.slip>0&&<small>Риск +{row.slip} дн. к контрольной дате</small>}
        </div>
-       <div className="atlas-command-actions"><Action primary onClick={()=>inspectPortfolioSignal(row.id,row.primary)}>Разобрать</Action></div>
+       <div className="atlas-command-actions"><Action primary
+         ariaLabel={"Разобрать причину: "+row.name+" — "+row.primary.label}
+         onClick={()=>inspectPortfolioSignal(row.id,row.primary)}>Разобрать</Action></div>
       </article>)}
      </div>:<Fallback message="По выбранной причине проектов не найдено. Попробуйте другой фильтр или поиск."/>}
      {attentionRows.length>attentionLimit&&<Action onClick={()=>setAttentionLimit(n=>Math.min(attentionRows.length,n+8))}>
@@ -925,7 +948,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
        <div className="button-row"><Action onClick={()=>openEditor("target")}>＋ Требование</Action>
         <Action onClick={()=>view("reality")}>Все факты</Action></div></div>
       {realityMap?.rows.length?<div className="atlas-reality-list">
-       {realityMap.rows.slice(0,realityLimit).map((r:any)=><article className="atlas-reality-card" key={r.id}>
+       {realityMap.rows.slice(0,realityLimit).map((r:any)=><article className="atlas-reality-card" key={r.id}
+        tabIndex={-1} ref={r.id===requirementJump?.targetId?requirementCardRef:undefined}
+        aria-label={"Требование: "+r.title+" — "+project.name}>
         <div className="atlas-reality-grid">
          <div className="atlas-reality-col"><small>Должно быть</small>
           <strong>{r.title}</strong><p>{r.desired}</p>

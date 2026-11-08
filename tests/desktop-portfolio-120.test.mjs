@@ -147,3 +147,13 @@ test("direct predecessor has unique accessible name, not the repeated cause-path
  assert.match(script,/ATLAS04_SCALE_GUI_PREDECESSOR_NAVIGATION_UIA_PASS/);
  assert.match(script,/assert native\(\)\[0\]\["generation"\] == saved_generation/);
 });
+
+test("R5 source-bound evidence signal retains the real target identifier",()=>{
+ const snapshot=desktopLoadPortfolio(),queue=buildPortfolioCommand(snapshot);
+ const row=queue.rows.find(value=>value.id==="load-project-119");
+ const evidence=row.signals.find(signal=>signal.kind==="evidence"&&signal.ref);
+ assert.ok(evidence);
+ assert.equal(evidence.ref,"load-target-119");
+ assert.equal(snapshot.projects[119].targets[0].id,evidence.ref);
+ assert.match(evidence.label,/Expected result/);
+});

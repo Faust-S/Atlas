@@ -62,3 +62,20 @@ test('real Atlas core facts, linked work and change survive read-only overview w
  assert.equal(out.independentAcceptance,false);
  assert.equal(JSON.stringify(s),before);
 });
+
+test("a deep-linked requirement beyond initial page remains source-bound and non-mutating",()=>{
+ const created=createProject(empty(),{name:'Twelve criteria',type:'engineering'});
+ let state=created.state;
+ const ids=[];
+ for(let i=0;i<12;i++){
+  const record=addTarget(state,created.id,{title:'Criterion '+i,desired:'Verified '+i});
+  state=record.state;ids.push(record.id);
+ }
+ const before=JSON.stringify(state),project=state.projects[0];
+ const overview=realityOverview(project,compareProject(project),projectImpact(project));
+ assert.equal(overview.count,12);
+ assert.equal(overview.rows.findIndex(row=>row.id===ids[10]),10);
+ assert.equal(Math.max(8,10+1),11);
+ assert.equal(overview.independentAcceptance,false);
+ assert.equal(JSON.stringify(state),before);
+});

@@ -435,3 +435,7 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .atlas-relation-fullpath>summary:focus-visible{outline:3px solid #4c8afc;outline-offset:2px}
 .atlas-relation-fullpath>.atlas-relation-path{margin:7px 0 0 9px;padding:7px 9px;
  border-left:2px solid #c4d9ef;background:#f6f9fd;border-radius:0 6px 6px 0}
+
+/* Exact command-queue drilldown uses the existing fact card and native focus. */
+.atlas-reality-card{scroll-margin-top:92px}
+.atlas-reality-card:focus{outline:3px solid #4c8afc;outline-offset:3px}
