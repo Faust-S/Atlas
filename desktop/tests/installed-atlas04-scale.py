@@ -600,6 +600,69 @@ def inspect_cause_proposal_and_decision(saved_generation):
     assert any(d.get("changeId") == change["id"] and d["status"] == "approved" for d in p["decisions"])
     print("ATLAS04_CAUSE_DECISION_RESTART_READBACK_PASS", flush=True)
 
+    # An explicit linked work item must be created only after approval.
+    # This step uses the existing work-change editor, not direct Store writes.
+    search_and_open()
+    window = Desktop(backend="uia").window(handle=handle)
+    work_action = visible_uia_action(window, "Добавить работу по решению")
+    if work_action is None:
+        screenshot("cause-linked-work-action-hold")
+        print("ATLAS04_CAUSE_LINKED_WORK_UIA_HOLD approved-work button inaccessible", flush=True)
+        return False
+    screenshot("cause-linked-work-before-click")
+    work_action.click_input()
+    wait_title("Форма: Работа по утверждённому изменению", timeout=15)
+    assert native()[0]["generation"] == approved_head["generation"], "Opening work editor wrote native data"
+    screenshot("cause-linked-work-editor")
+
+    submit = window.child_window(title="Применить к черновику", control_type="Button")
+    if not submit.exists(timeout=3):
+        raise AssertionError("Installed linked work editor has no Apply button")
+    submit.click_input()
+    wait_title("Project 119 — Обзор · Не сохранено", timeout=15)
+    assert native()[0]["generation"] == approved_head["generation"], "Work draft wrote native data"
+    screenshot("cause-linked-work-draft")
+    print("ATLAS04_CAUSE_LINKED_WORK_DRAFT_PASS", flush=True)
+
+    click(746, 65)
+    end = now() + 25
+    linked_head = None
+    while now() < end:
+        current, projects = native()
+        if current["generation"] != approved_head["generation"]:
+            linked_head = current
+            break
+        time.sleep(0.25)
+    if linked_head is None:
+        screenshot("cause-linked-work-save-missing")
+        raise AssertionError("Linked work not saved through installed Windows GUI")
+
+    p = next(p for p in projects if p["id"] == "load-project-119")
+    items = [item for item in p["items"] if item.get("changeId") == change["id"]]
+    assert len(items) == 1, "Explicit work must link to exactly the approved decision"
+    work = items[0]
+    assert work["targetIds"] == ["load-target-119"], "Work lost requirement traceability"
+    assert work["state"] == "todo", "New work must not be marked completed"
+    assert work["estimateDays"] == 1, "Unedited default work estimate changed"
+    assert work.get("executor") is None, "Creating a work item launched an executor"
+    assert next(c for c in p["changes"] if c["id"] == change["id"])["status"] == "approved"
+    assert not next(c for c in p["changes"] if c["id"] == change["id"]).get("planAppliedAt")
+    assert any(d.get("changeId") == change["id"] and d["status"] == "approved" for d in p["decisions"])
+    screenshot("cause-linked-work-saved")
+    print("ATLAS04_CAUSE_LINKED_WORK_NATIVE_SAVE_PASS", flush=True)
+
+    stop()
+    launch()
+    current, projects = native()
+    assert current["generation"] == linked_head["generation"], "Linked work lost on restart"
+    p = next(p for p in projects if p["id"] == "load-project-119")
+    assert any(item["id"] == work["id"] and item.get("changeId") == change["id"]
+               and item["targetIds"] == ["load-target-119"]
+               and item["state"] == "todo" for item in p["items"])
+    assert next(c for c in p["changes"] if c["id"] == change["id"])["status"] == "approved"
+    print("ATLAS04_CAUSE_LINKED_WORK_RESTART_READBACK_PASS", flush=True)
+    return True
+
 
 try:
     assert APP.is_file() and FIXTURE.is_file()
@@ -629,9 +692,12 @@ try:
     inspect_exact_requirement(saved["generation"])
     assert native()[0]["generation"] == saved["generation"], "Navigation mutated the native Store"
     phase = "cause-proposal-and-decision"
-    inspect_cause_proposal_and_decision(saved["generation"])
+    completed = inspect_cause_proposal_and_decision(saved["generation"])
     stop()
-    print("ATLAS04_SCALE_GUI_ACCEPTED_PASS", flush=True)
+    if completed:
+        print("ATLAS04_SCALE_GUI_ACCEPTED_PASS", flush=True)
+    else:
+        print("ATLAS04_SCALE_GUI_BASELINE_PASS_CAUSE_WORKFLOW_HOLD", flush=True)
 except Exception as error:
     print("ATLAS04_SCALE_GUI_HOLD phase=" + phase + " error=" + repr(error), flush=True)
     screenshot("failure")

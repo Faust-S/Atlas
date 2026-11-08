@@ -214,3 +214,21 @@ test("installed WebView2 cause actions must be physically visible before mouse c
  assert.match(script,/wait_title\("Project 119 — Изменения", timeout=15\)/);
  assert.match(script,/screenshot\("cause-decision-before-click"\)/);
 });
+
+test("installed Win32 work is a separate explicit act after decision and survives native restart",()=>{
+ const script=readFileSync(new URL("../desktop/tests/installed-atlas04-scale.py",import.meta.url),"utf8");
+ assert.match(script,/visible_uia_action\(window, "Добавить работу по решению"\)/);
+ assert.match(script,/wait_title\("Форма: Работа по утверждённому изменению", timeout=15\)/);
+ assert.match(script,/ATLAS04_CAUSE_LINKED_WORK_DRAFT_PASS/);
+ assert.match(script,/ATLAS04_CAUSE_LINKED_WORK_NATIVE_SAVE_PASS/);
+ assert.match(script,/ATLAS04_CAUSE_LINKED_WORK_RESTART_READBACK_PASS/);
+ assert.match(script,/work\["state"\] == "todo"/);
+ assert.match(script,/work\.get\("executor"\) is None/);
+ assert.match(script,/work\["targetIds"\] == \["load-target-119"\]/);
+ assert.match(script,/ATLAS04_SCALE_GUI_BASELINE_PASS_CAUSE_WORKFLOW_HOLD/);
+ assert.match(script,/if completed:\s*print\("ATLAS04_SCALE_GUI_ACCEPTED_PASS"/);
+ const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ assert.match(ui,/Связано работ: \{project\.items\.filter/);
+ assert.match(ui,/＋ Создать связанную работу/);
+ assert.match(ui,/＋ Ещё связанная работа/);
+});

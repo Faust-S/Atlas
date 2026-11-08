@@ -127,3 +127,24 @@ test('active cause-bound decision takes priority over a newer unrelated proposal
  assert.equal(overview.independentAcceptance,false);
  assert.equal(JSON.stringify(state),before);
 });
+
+test('approved observed cause acquires linked work only by explicit separate creation',()=>{
+ const made=createProject(empty(),{name:'Approved without automatic work',type:'engineering'});
+ let s=addTarget(made.state,made.id,{title:'Expected output',desired:'Verified delivery'}).state;
+ const id=s.projects[0].targets[0].id, causeKey='target-review:'+id;
+ const change=planChange(s,made.id,{title:'Correct evidence gap',description:'Review',
+  targetIds:[id],causeKey});
+ s=decideChange(change.state,made.id,change.id,{status:'approved',rationale:'Reviewed'}).state;
+ const overview=()=>realityOverview(s.projects[0],compareProject(s.projects[0]),projectImpact(s.projects[0]));
+ assert.equal(overview().rows[0].cause.approvedWithoutWork,true);
+ assert.equal(s.projects[0].items.length,0,'Approval alone must not create work');
+ const work=createItem(s,made.id,{title:'Verify linked output',targetIds:[id],changeId:change.id});
+ s=work.state;
+ const linked=s.projects[0].items.find(item=>item.id===work.id);
+ assert.equal(linked.changeId,change.id);
+ assert.deepEqual(linked.targetIds,[id]);
+ assert.equal(linked.state,'todo');
+ assert.equal(linked.executor,null);
+ assert.equal(overview().rows[0].cause.approvedWithoutWork,false);
+ assert.equal(overview().independentAcceptance,false);
+});

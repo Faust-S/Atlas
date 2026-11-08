@@ -1193,7 +1193,10 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
         <Action onClick={()=>openEditor("amend-dates:"+c.id)}>Даты</Action>
         {project.items.length>0&&<Action onClick={()=>openEditor("amend-work:"+c.id)}>Изменить работу</Action>}
         <Action onClick={()=>openEditor("amend-new:"+c.id)}>Добавить работу</Action></>}
-       {["approved","in_progress"].includes(c.status)&&<Action onClick={()=>openEditor("work-change:"+c.id)}>Связанная работа</Action>}
+       {["approved","in_progress"].includes(c.status)&&<Action onClick={()=>openEditor("work-change:"+c.id)}>
+        {project.items.some((w:any)=>w.changeId===c.id)?"＋ Ещё связанная работа":"＋ Создать связанную работу"}</Action>}
+       {project.items.some((w:any)=>w.changeId===c.id)&&<span className="minor">
+        Связано работ: {project.items.filter((w:any)=>w.changeId===c.id).length}</span>}
        {!!c.planAmendments?.length&&!c.planAppliedAt&&<Action onClick={()=>setForecastId(forecastId===c.id?null:c.id)}>Сценарий до / после</Action>}
       </div>
       {!!c.planAmendments?.length&&<div className="minor">Корректировок: {c.planAmendments.length} · {c.planAppliedAt?"Применено "+c.planAppliedAt:"Пока не применено"}</div>}
