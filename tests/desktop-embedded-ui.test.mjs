@@ -53,3 +53,14 @@ test("portfolio attention and project next step navigate in existing views witho
  assert.match(main,/Факты и решения автоматически не изменяются/);
  assert.match(css,/\.atlas-next-step/);
 });
+
+test("secondary file operations are grouped without losing existing native guards",()=>{
+ assert.match(main,/<details ref=\{fileMenuRef\} className="atlas-file-menu"/);
+ assert.match(main,/<summary>Файлы и версии<\/summary>/);
+ assert.match(main,/disabled=\{busy\|\|!!editor\|\|pendingImport!==null\}>Открыть JSON/);
+ assert.match(main,/disabled=\{busy\|\|dirty\|\|!!editor\|\|!persisted\}>Резервная копия/);
+ assert.match(main,/disabled=\{busy\|\|dirty\|\|!!editor\|\|!persisted\|\|savedVersions!==null\}>Версии на диске/);
+ assert.match(main,/fileMenuRef\.current\?\.removeAttribute\("open"\)/);
+ assert.match(css,/@media\(min-width:761px\) and \(max-width:1220px\)/);
+ assert.match(css,/\.atlas-file-menu-actions\{position:absolute/);
+});

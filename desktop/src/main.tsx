@@ -135,6 +135,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   : nativeInvoke<T>(command,args);
  const embedded=Boolean(host);
  const rootRef=useRef<HTMLDivElement|null>(null);
+ const fileMenuRef=useRef<HTMLDetailsElement|null>(null);
  const logoUrl=host?.assetUrl??"/atlas-mark.svg";
  const [data,setData]=useState<Atlas>(()=>empty());
  const [ready,setReady]=useState(false),[busy,setBusy]=useState(false);
@@ -677,9 +678,22 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     <div className="toolbar-actions">
      <Badge tone={editor||dirty?"warning":persisted?"good":"neutral"}>{editor?"Форма не применена":dirty?"Не сохранено":persisted?"Сохранено":"Новый портфель"}</Badge>
      <Action onClick={()=>void save()} primary disabled={!dirty||busy||!!editor} title={editor?"Сначала примените открытую форму":"Ctrl+S"}>Сохранить</Action>
-     <Action onClick={()=>void importJson()} disabled={busy||!!editor||pendingImport!==null}>Открыть JSON</Action>
-     <Action onClick={()=>void exportJson()} disabled={busy||dirty||!!editor||!persisted}>Резервная копия</Action>
-     <Action onClick={()=>void showNativeHistory()} disabled={busy||dirty||!!editor||!persisted||savedVersions!==null}>Версии на диске</Action>
+     <details ref={fileMenuRef} className="atlas-file-menu" onKeyDown={event=>{
+      if(event.key==="Escape"){
+       event.stopPropagation();fileMenuRef.current?.removeAttribute("open");
+       fileMenuRef.current?.querySelector("summary")?.focus();
+      }
+     }}>
+      <summary>Файлы и версии</summary>
+      <div className="atlas-file-menu-actions">
+       <Action onClick={()=>{fileMenuRef.current?.removeAttribute("open");void importJson()}}
+        disabled={busy||!!editor||pendingImport!==null}>Открыть JSON</Action>
+       <Action onClick={()=>{fileMenuRef.current?.removeAttribute("open");void exportJson()}}
+        disabled={busy||dirty||!!editor||!persisted}>Резервная копия</Action>
+       <Action onClick={()=>{fileMenuRef.current?.removeAttribute("open");void showNativeHistory()}}
+        disabled={busy||dirty||!!editor||!persisted||savedVersions!==null}>Версии на диске</Action>
+      </div>
+     </details>
      <button disabled={!!editor} className="icon-button inspector-button" aria-label={inspector?"Скрыть инспектор":"Показать инспектор"}
       title="Инспектор" onClick={()=>setInspector(!inspector)}>◧</button>
     </div>
