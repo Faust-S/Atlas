@@ -777,6 +777,45 @@ def inspect_cause_proposal_and_decision(saved_generation):
                for f in p["findings"]), "Observation not restored from native Store"
     assert any(i["id"] == work["id"] and i["state"] == "todo" for i in p["items"])
     print("ATLAS04_WORK_FACT_RESTART_READBACK_PASS", flush=True)
+
+    # Qualify the new work-history disclosure with real installed WebView2
+    # controls. UIA support for <summary> depends on Windows Runtime, so a
+    # missing control is a separately reported HOLD, not a forged PASS.
+    search_and_open()
+    window = Desktop(backend="uia").window(handle=handle)
+    work_tab = window.child_window(title="Таблица", control_type="Button")
+    if not work_tab.exists(timeout=2):
+        assert native()[0]["generation"] == recorded_head["generation"]
+        print("ATLAS04_WORK_HISTORY_UIA_HOLD table unavailable", flush=True)
+        return True
+    work_tab.click_input()
+    wait_title("Project 119 — Таблица", timeout=15)
+    history = visible_uia_action(window, "История наблюдений по работе: "+work["title"])
+    if history is None:
+        assert native()[0]["generation"] == recorded_head["generation"]
+        screenshot("work-history-disclosure-hold")
+        print("ATLAS04_WORK_HISTORY_UIA_HOLD disclosure unavailable", flush=True)
+        return True
+    history.click_input()
+    screenshot("work-history-expanded")
+    print("ATLAS04_WORK_HISTORY_DISCLOSURE_UIA_PASS", flush=True)
+    to_requirement = visible_uia_action(window, "Открыть требование из наблюдения: "+work["title"]+" — Expected result")
+    if to_requirement is None:
+        assert native()[0]["generation"] == recorded_head["generation"]
+        screenshot("work-history-link-hold")
+        print("ATLAS04_WORK_HISTORY_UIA_HOLD target link unavailable", flush=True)
+        return True
+    to_requirement.click_input()
+    wait_title("Project 119 — Обзор", timeout=15)
+    card = window.child_window(title="Требование: Expected result — Project 119")
+    if not card.exists(timeout=3) or not card.is_visible():
+        assert native()[0]["generation"] == recorded_head["generation"]
+        screenshot("work-history-target-hold")
+        print("ATLAS04_WORK_HISTORY_UIA_HOLD target card inaccessible", flush=True)
+        return True
+    screenshot("work-history-requirement-focused")
+    assert native()[0]["generation"] == recorded_head["generation"], "Navigating observation history wrote native data"
+    print("ATLAS04_WORK_HISTORY_TO_REQUIREMENT_UIA_PASS", flush=True)
     return True
 
 

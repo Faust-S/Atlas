@@ -195,10 +195,17 @@ test("narrow installed and embedded work list has readable cards without horizon
  assert.match(css,/\.atlas-work-table td\.atlas-work-table-actions\{display:flex;flex-wrap:wrap/);
  assert.match(css,/\.atlas-work-table-scroll\{overflow-x:visible\}/);
 });
-test("work observations are counted by originating work, never as independently accepted outcomes",()=>{
- assert.match(main,/const findingCountByWork=useMemo\(\(\)=>\{/);
- assert.match(main,/if\(finding\.workId\)totals\.set\(finding\.workId/);
- assert.match(main,/findingCountByWork\.has\(w\.id\)/);
- assert.match(main,/Заявленных наблюдений по работе: \{findingCountByWork\.get\(w\.id\)\}/);
- assert.match(main,/Это не независимая приёмка/);
+test("work observations show a source-bound expandable history, not acceptance",()=>{
+ assert.match(main,/const findingsByWork=useMemo\(\(\)=>project\?workObservationIndex\(project\)/);
+ assert.match(main,/findingsByWork\.has\(w\.id\)/);
+ assert.match(main,/className="atlas-work-observation-history"/);
+ assert.match(main,/aria-label=\{"История наблюдений по работе: "\+w\.title\}/);
+ assert.match(main,/Заявленных наблюдений: \{findingsByWork\.get\(w\.id\)\?\.length\}/);
+ assert.match(main,/Не независимая приёмка/);
+ assert.match(main,/observation\.note&&<p>\{observation\.note\}<\/p>/);
+ assert.match(main,/aria-label=\{"Открыть требование из наблюдения: "\+w\.title/);
+ assert.match(main,/setRequirementJump\(\{projectId:project\.id,targetId:observation\.targetId\}\)/);
+ assert.match(main,/setWorkHistoryLimits\(prev=>\(\{\.\.\.prev,\[w\.id\]:Math\.min/);
+ assert.match(main,/setWorkHistoryLimits\(\{\}\);setWorkQuery/);
+ assert.match(css,/\.atlas-work-observation-history>summary:focus-visible/);
 });

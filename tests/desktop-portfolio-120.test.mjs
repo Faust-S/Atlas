@@ -263,3 +263,13 @@ test("installed linked-work observation requires explicit draft, Save and restar
  assert.match(script,/assert head\["generation"\] == recorded_head\["generation"\]/);
  assert.doesNotMatch(script,/ATLAS04_SCALE_GUI_BASELINE_PASS_CAUSE_WORKFLOW_HOLD/);
 });
+
+test("installed history verifies physical disclosure and requirement navigation separately from native saves",()=>{
+ const script=readFileSync(new URL("../desktop/tests/installed-atlas04-scale.py",import.meta.url),"utf8");
+ assert.match(script,/История наблюдений по работе: "\+work\["title"\]/);
+ assert.match(script,/ATLAS04_WORK_HISTORY_DISCLOSURE_UIA_PASS/);
+ assert.match(script,/ATLAS04_WORK_HISTORY_TO_REQUIREMENT_UIA_PASS/);
+ assert.match(script,/ATLAS04_WORK_HISTORY_UIA_HOLD/);
+ assert.match(script,/Открыть требование из наблюдения: "\+work\["title"\]\+" — Expected result"/);
+ assert.match(script,/native\(\)\[0\]\["generation"\] == recorded_head\["generation"\]/);
+});

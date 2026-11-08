@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {realityOverview} from '../src/reality-overview.mjs';
+import {realityOverview,workObservationIndex} from '../src/reality-overview.mjs';
 import {empty,createProject,createItem,editItem,serialize,deserialize} from '../src/core.mjs';
 import {addTarget,recordFinding,planChange,decideChange,compareProject} from '../src/trace.mjs';
 import {projectImpact} from '../src/impact.mjs';
@@ -210,4 +210,23 @@ test("latest factual statement identifies its work without claiming independent 
  assert.equal(report.rows[0].assessment,'partial_reported');
  assert.equal(report.independentAcceptance,false);
  assert.equal(JSON.stringify(snapshot),before);
+});
+
+test("work-specific observation index is read-only, chronological and preserves work ID after replanning",()=>{
+ const made=createProject(empty(),{name:"Evidence history",type:"engineering"});
+ const target=addTarget(made.state,made.id,{title:"Delivered output",desired:"Reviewed"});
+ const workA=createItem(target.state,made.id,{title:"Implementation",targetIds:[target.id]});
+ const workB=createItem(workA.state,made.id,{title:"Testing",targetIds:[target.id]});
+ const f1=recordFinding(workB.state,made.id,{targetId:target.id,workId:workA.id,result:"partial",note:"First"});
+ const f2=recordFinding(f1.state,made.id,{targetId:target.id,workId:workB.id,result:"present",note:"Test claim"});
+ const f3=recordFinding(f2.state,made.id,{targetId:target.id,workId:workA.id,result:"absent",note:"Regression"});
+ const state=f3.state,before=serialize(state);
+ const groups=workObservationIndex(state.projects[0]);
+ assert.deepEqual(groups.get(workA.id).map(f=>f.id),[f1.id,f3.id]);
+ assert.deepEqual(groups.get(workB.id).map(f=>f.id),[f2.id]);
+ assert.equal(groups.get(workA.id)[1].targetId,target.id);
+ assert.equal(serialize(state),before);
+ const moved=editItem(state,made.id,workA.id,{targetIds:[]});
+ assert.deepEqual(workObservationIndex(moved.projects[0]).get(workA.id).map(f=>f.id),[f1.id,f3.id]);
+ assert.throws(()=>workObservationIndex(null),/Invalid work observation index input/);
 });
