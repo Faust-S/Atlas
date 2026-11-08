@@ -106,3 +106,16 @@ test("0.4 project chain is bounded in the desktop and uses current portfolio pro
  assert.match(ui,/if\(signal\.panel==="relations"\)setShowProjectRelations\(true\)/);
  assert.match(ui,/projectCommand\.dependencies\.inherited\.slice\(0,relationLimit\)/);
 });
+
+test("0.4 keeps facts ahead of optional chains and focuses inspected causes",()=>{
+ const main=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ assert.ok(main.indexOf('className="surface atlas-reality-overview"') <
+  main.indexOf('aria-label="Зависимости проекта и влияние на другие проекты"'));
+ assert.match(main,/projectCommand\.dependencies\.predecessors\.length>0/);
+ assert.match(main,/relationSectionRef\.current/);
+ assert.match(main,/scrollIntoView\(\{block:"start",behavior:"auto"\}\)/);
+ assert.match(main,/element\.focus\(\{preventScroll:true\}\)/);
+ assert.match(main,/setRelationJump\(projectId\)/);
+ assert.match(main,/Нет утверждённых требований/);
+ assert.match(main,/portfolioCommand\.totals\.missingCriteria/);
+});
