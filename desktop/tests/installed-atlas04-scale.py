@@ -405,6 +405,162 @@ def inspect_exact_requirement(saved_generation):
         assert native()[0]["generation"] == saved_generation, "Requirement navigation mutated native Store"
 
 
+
+def inspect_cause_proposal_and_decision(saved_generation):
+    """Installed GUI: exact fact -> cause proposal -> explicit approval -> native readback.
+
+    No native fixture writes, browser debugging, test endpoints, or acceptance
+    shortcuts. If a WebView2 accessibility control is missing, record HOLD
+    before touching the draft. Once a form has been submitted, missing Save or
+    incorrect persisted data are real failures of this installed scenario.
+    """
+    if "Project 119 — Обзор" not in current_title():
+        screenshot("cause-workflow-no-project")
+        print("ATLAS04_CAUSE_WORKFLOW_UIA_HOLD Project 119 is not open", flush=True)
+        return
+
+    from pywinauto import Desktop
+    window = Desktop(backend="uia").window(handle=handle)
+    propose = window.child_window(title="Предложить устранение причины", control_type="Button")
+    if not propose.exists(timeout=3):
+        screenshot("cause-proposal-action-missing")
+        print("ATLAS04_CAUSE_WORKFLOW_UIA_HOLD propose button not exposed", flush=True)
+        return
+
+    starting, baseline = native()
+    assert starting["generation"] == saved_generation
+    baseline_project = next(p for p in baseline if p["id"] == "load-project-119")
+    assert not baseline_project["changes"], "Load fixture must contain no changes"
+
+    try:
+        propose.click_input()
+    except Exception as error:
+        screenshot("cause-proposal-click-hold")
+        print("ATLAS04_CAUSE_WORKFLOW_UIA_HOLD proposal click " + repr(error)[:150], flush=True)
+        return
+    wait_title("Форма: Изменение для устранения", timeout=12)
+    screenshot("cause-proposal-editor")
+    assert native()[0]["generation"] == saved_generation, "Opening a form mutated disk"
+
+    # This editor is already prefilled with the exact cause and its description
+    # by the existing 'respond:' domain editor, so no synthetic data injection.
+    submit = window.child_window(title="Применить к черновику", control_type="Button")
+    if not submit.exists(timeout=3):
+        screenshot("cause-proposal-submit-missing")
+        raise AssertionError("Installed proposal editor has no Apply button")
+    submit.click_input()
+    wait_title("Project 119 — Обзор · Не сохранено", timeout=15)
+    assert native()[0]["generation"] == saved_generation, "Applying draft mutated native disk"
+    screenshot("cause-proposal-draft")
+    print("ATLAS04_CAUSE_PROPOSAL_DRAFT_PASS", flush=True)
+
+    click(746, 65)  # Actual installed Save, not an invisible IPC command.
+    end = now() + 25
+    proposal_saved = None
+    while now() < end:
+        head, projects = native()
+        if head["generation"] != saved_generation:
+            proposal_saved = head
+            break
+        time.sleep(0.25)
+    if proposal_saved is None:
+        screenshot("cause-proposal-save-missing")
+        raise AssertionError("Cause proposal not saved via installed Windows GUI")
+
+    p = next(p for p in projects if p["id"] == "load-project-119")
+    links = [c for c in p["changes"] if c.get("causeKey") == "target-review:load-target-119"]
+    assert len(links) == 1, "Proposal not bound to observed requirement cause"
+    change = links[0]
+    assert change["targetIds"] == ["load-target-119"]
+    assert change["status"] == "proposed"
+    assert len(p["decisions"]) == 0, "Proposal was automatically approved"
+    assert not any(i.get("changeId") == change["id"] for i in p["items"]), "Proposal created work without approval"
+    assert not change.get("planAppliedAt"), "Proposal automatically applied its plan"
+    assert head["revision"] > starting["revision"], "Saved proposal did not change revision"
+    screenshot("cause-proposal-saved")
+    print("ATLAS04_CAUSE_PROPOSAL_NATIVE_SAVE_PASS", flush=True)
+
+    # A complete process restart is part of product acceptance.
+    stop()
+    launch()
+    reloaded, projects = native()
+    assert reloaded["generation"] == proposal_saved["generation"]
+    saved_project = next(p for p in projects if p["id"] == "load-project-119")
+    assert any(c["id"] == change["id"] and c["status"] == "proposed"
+               for c in saved_project["changes"]), "Proposal lost after process restart"
+    print("ATLAS04_CAUSE_PROPOSAL_RESTART_READBACK_PASS", flush=True)
+
+    search_and_open()
+    window = Desktop(backend="uia").window(handle=handle)
+    change_action = window.child_window(title="Изменение по причине", control_type="Button")
+    if not change_action.exists(timeout=3):
+        screenshot("cause-change-navigation-hold")
+        print("ATLAS04_CAUSE_DECISION_UIA_HOLD change navigation unavailable", flush=True)
+        return
+    change_action.click_input()
+    wait_title("Project 119 — Изменения", timeout=15)
+    screenshot("cause-change-focused")
+    print("ATLAS04_CAUSE_EXACT_CHANGE_NAV_UIA_PASS", flush=True)
+
+    decision_button = window.child_window(title="Решение", control_type="Button")
+    if not decision_button.exists(timeout=3):
+        screenshot("cause-decision-button-hold")
+        print("ATLAS04_CAUSE_DECISION_UIA_HOLD decision button unavailable", flush=True)
+        return
+    decision_button.click_input()
+    wait_title("Форма: Решение:", timeout=15)
+    screenshot("cause-decision-editor")
+
+    rationale = window.child_window(title="Почему принято это решение?", control_type="Edit")
+    if not rationale.exists(timeout=3):
+        screenshot("cause-rationale-edit-hold")
+        print("ATLAS04_CAUSE_DECISION_UIA_HOLD rationale edit unavailable", flush=True)
+        return
+    rationale.click_input()
+    keyboard.send_keys("Reviewed the recorded evidence and approved corrective work", with_spaces=True)
+
+    submit = window.child_window(title="Применить к черновику", control_type="Button")
+    if not submit.exists(timeout=3):
+        raise AssertionError("Decision editor has no Apply button")
+    submit.click_input()
+    wait_title("Project 119 — Изменения · Не сохранено", timeout=15)
+    assert native()[0]["generation"] == proposal_saved["generation"], "Decision draft mutated disk"
+    screenshot("cause-decision-draft")
+    print("ATLAS04_CAUSE_DECISION_DRAFT_PASS", flush=True)
+
+    click(746, 65)
+    end = now() + 25
+    approved_head = None
+    while now() < end:
+        latest, projects = native()
+        if latest["generation"] != proposal_saved["generation"]:
+            approved_head = latest
+            break
+        time.sleep(0.25)
+    if approved_head is None:
+        screenshot("cause-decision-save-missing")
+        raise AssertionError("Decision was not saved through installed Windows GUI")
+    p = next(p for p in projects if p["id"] == "load-project-119")
+    current_change = next(c for c in p["changes"] if c["id"] == change["id"])
+    assert current_change["status"] == "approved", "Expected explicit human approval"
+    assert not current_change.get("planAppliedAt"), "Approval silently applied a plan"
+    decisions = [d for d in p["decisions"] if d.get("changeId") == change["id"]]
+    assert len(decisions) == 1 and decisions[0]["status"] == "approved"
+    assert "Reviewed the recorded evidence" in decisions[0]["text"]
+    assert not any(i.get("changeId") == change["id"] for i in p["items"]), "Approval created unrequested work"
+    screenshot("cause-decision-saved")
+    print("ATLAS04_CAUSE_DECISION_NATIVE_SAVE_PASS", flush=True)
+
+    stop()
+    launch()
+    head, projects = native()
+    assert head["generation"] == approved_head["generation"], "Decision lost on restart"
+    p = next(p for p in projects if p["id"] == "load-project-119")
+    assert next(c for c in p["changes"] if c["id"] == change["id"])["status"] == "approved"
+    assert any(d.get("changeId") == change["id"] and d["status"] == "approved" for d in p["decisions"])
+    print("ATLAS04_CAUSE_DECISION_RESTART_READBACK_PASS", flush=True)
+
+
 try:
     assert APP.is_file() and FIXTURE.is_file()
     expected = json.loads(FIXTURE.read_text(encoding="utf-8-sig"))
@@ -432,6 +588,8 @@ try:
     phase = "exact-requirement-navigation"
     inspect_exact_requirement(saved["generation"])
     assert native()[0]["generation"] == saved["generation"], "Navigation mutated the native Store"
+    phase = "cause-proposal-and-decision"
+    inspect_cause_proposal_and_decision(saved["generation"])
     stop()
     print("ATLAS04_SCALE_GUI_ACCEPTED_PASS", flush=True)
 except Exception as error:
