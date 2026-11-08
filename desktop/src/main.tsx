@@ -37,6 +37,7 @@ const tabs:{key:Tab;title:string}[]=[
  {key:"reality",title:"План / факт"},{key:"changes",title:"Изменения"},
  {key:"resources",title:"Ресурсы"},{key:"history",title:"История"},{key:"sources",title:"Источники"},
 ];
+const primaryTabKeys:Tab[]=["overview","work","timeline","reality"];
 const statuses:any={planned:"Запланирован",active:"В работе",paused:"Приостановлен",
  completed:"Завершён (заявлено)",cancelled:"Отменён"};
 const workStatuses:any={todo:"Запланирована",in_progress:"В работе",blocked:"Заблокирована",done:"Выполнена (заявлено)"};
@@ -137,6 +138,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const embedded=Boolean(host);
  const rootRef=useRef<HTMLDivElement|null>(null);
  const fileMenuRef=useRef<HTMLDetailsElement|null>(null);
+ const viewMenuRef=useRef<HTMLDetailsElement|null>(null);
  const logoUrl=host?.assetUrl??"/atlas-mark.svg";
  const [data,setData]=useState<Atlas>(()=>empty());
  const [ready,setReady]=useState(false),[busy,setBusy]=useState(false);
@@ -788,9 +790,26 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      <h1>{project.name}</h1><p>{project.goal||"Цель пока не определена"}</p></div>
      <div className="button-row"><Badge>{statuses[project.status]||project.status}</Badge><Action disabled={busy||dirty||!persisted||!!editor} onClick={()=>showSavedReference(project.id)} title="Ctrl+Alt+P · Только сохранённая редакция">Ссылка на проект</Action><Action onClick={()=>openEditor("project-edit")}>Редактировать проект</Action></div>
     </div>
-    <nav className="tabbar" aria-label="Представления проекта">{tabs.map(t=><button key={t.key}
-      title={t.key==="work"?"Ctrl+1":t.key==="timeline"?"Ctrl+2":t.key==="graph"?"Ctrl+3":undefined}
-      className={tab===t.key?"selected":""} onClick={()=>view(t.key)}>{t.title}</button>)}</nav>
+    <nav className="tabbar atlas-compact-tabs" aria-label="Представления проекта">
+     {tabs.filter(t=>primaryTabKeys.includes(t.key)).map(t=><button key={t.key}
+      type="button" title={t.key==="work"?"Ctrl+1":t.key==="timeline"?"Ctrl+2":undefined}
+      aria-current={tab===t.key?"page":undefined} className={tab===t.key?"selected":""}
+      onClick={()=>view(t.key)}>{t.title}</button>)}
+     <details className="atlas-view-menu" ref={viewMenuRef} onKeyDown={event=>{
+      if(event.key==="Escape"){event.stopPropagation();viewMenuRef.current?.removeAttribute("open");
+       viewMenuRef.current?.querySelector("summary")?.focus()}
+     }}>
+      <summary className={!primaryTabKeys.includes(tab)?"selected":""} aria-label="Дополнительные представления проекта">
+       {primaryTabKeys.includes(tab)?"Другие разделы":tabs.find(t=>t.key===tab)?.title||"Другие разделы"}
+      </summary>
+      <div className="atlas-view-menu-actions" role="group" aria-label="Другие представления">
+       {tabs.filter(t=>!primaryTabKeys.includes(t.key)).map(t=><button key={t.key} type="button"
+        title={t.key==="graph"?"Ctrl+3":undefined} aria-current={tab===t.key?"page":undefined}
+        className={tab===t.key?"selected":""}
+        onClick={()=>{viewMenuRef.current?.removeAttribute("open");view(t.key)}}>{t.title}</button>)}
+      </div>
+     </details>
+    </nav>
     {tab==="overview"&&<>
      <div className="metric-grid"><Metric value={project.targets?.length||0} label="Ожидаемых результатов"/><Metric value={impact?.attention??0} label="Требуют внимания"/>
       <Metric value={project.items.length} label="Работ"/><Metric value={projected?.deadlineSlipDays??"?"} label="Дней риска срока"/></div>

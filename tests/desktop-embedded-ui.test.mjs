@@ -77,3 +77,15 @@ test("overview presents the same Atlas facts, evidence provenance, linked decisi
  assert.match(css,/\.atlas-reality-grid\{display:grid/);
  assert.match(css,/@container atlas-panel \(max-width:850px\)/);
 });
+
+test("four primary and six secondary views remain reachable with native keyboard support",()=>{
+ assert.match(main,/const primaryTabKeys:Tab\[\]=\["overview","work","timeline","reality"\]/);
+ assert.match(main,/tabs\.filter\(t=>primaryTabKeys\.includes\(t\.key\)\)/);
+ assert.match(main,/tabs\.filter\(t=>!primaryTabKeys\.includes\(t\.key\)\)/);
+ assert.match(main,/aria-label="Дополнительные представления проекта"/);
+ assert.match(main,/viewMenuRef\.current\?\.removeAttribute\("open"\);view\(t\.key\)/);
+ assert.match(main,/title=\{t\.key==="graph"\?"Ctrl\+3":undefined\}/);
+ assert.match(main,/aria-current=\{tab===t\.key\?"page":undefined\}/);
+ assert.match(css,/\.atlas-compact-tabs\{flex-wrap:wrap/);
+ assert.match(css,/\.atlas-view-menu-actions\{position:absolute/);
+});

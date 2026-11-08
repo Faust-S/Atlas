@@ -12,7 +12,9 @@ test("all project, tab and editor navigation preserves unapplied forms",()=>{
  assert.match(ui,/const openEditorFor=\(projectId:string,action:string\)=>\{\s*if\(!requireClosedForm\(\)\|\|busyRef\.current\)return/);
  assert.match(ui,/const view=\(tabId:Tab\)=>\{\s*if\(!requireClosedForm\(\)\)return/);
  assert.match(ui,/if\(result\.projectId\)selectProject\(result\.projectId,true\)/);
- assert.match(ui,/<nav className="tabbar"[^>]*>\{tabs\.map\(t=><button key=\{t\.key\}/);
+ assert.match(ui,/<nav className="tabbar atlas-compact-tabs" aria-label="Представления проекта">/);
+ assert.match(ui,/tabs\.filter\(t=>primaryTabKeys\.includes\(t\.key\)\)\.map\(t=><button key=\{t\.key\}/);
+ assert.match(ui,/tabs\.filter\(t=>!primaryTabKeys\.includes\(t\.key\)\)\.map\(t=><button key=\{t\.key\}/);
  assert.match(ui,/filtered\.slice\(0,sidebarLimit\)\.map\(\(p:any\)=><button key=\{p\.id\}/);
  assert.doesNotMatch(ui,/<button disabled=\{!!editor\} key=\{(?:t|p)\.key\}/);
 });
