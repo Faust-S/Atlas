@@ -482,3 +482,14 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
  .atlas-work-table-actions .action-button{min-height:32px;font-size:12px;padding:5px 10px}
  .atlas-work-table-actions .atlas-work-fact-menu{margin:0 2px}
 }
+
+/* Work-origin observation history is collapsed by default to save space.
+   Every recorded claim remains linkable to its exact requirement. */
+.atlas-work-observation-history{margin-top:7px;font-size:11px;color:#526b87;max-width:100%}
+.atlas-work-observation-history>summary{cursor:pointer;color:#235eab;font-weight:650;overflow-wrap:anywhere;line-height:1.4}
+.atlas-work-observation-history>summary:focus-visible{outline:3px solid #4c8afc;outline-offset:2px}
+.atlas-work-observation-history>ol{margin:9px 0;padding-left:19px;display:grid;gap:8px}
+.atlas-work-observation-history li{overflow-wrap:anywhere;border-bottom:1px solid #e4edf7;padding-bottom:7px}
+.atlas-work-observation-history li small{display:block;margin-top:3px;font-size:11px;line-height:1.4}
+.atlas-work-observation-history li p{font-size:11px;margin:3px 0;color:#506784}
+.atlas-work-observation-history .action-button{font-size:11px;min-height:29px;padding:5px 9px}

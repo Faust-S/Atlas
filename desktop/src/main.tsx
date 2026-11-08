@@ -7,7 +7,7 @@ import {editorSpec,applyEditor,editorSelectionFields} from "../../src/editor.mjs
 import {compareProject,decideChange} from "../../src/trace.mjs";
 import {projectImpact,projectNextStep} from "../../src/impact.mjs";
 import {buildPortfolioCommand,filterPortfolioCommand} from "../../src/portfolio-command.mjs";
-import {realityOverview} from "../../src/reality-overview.mjs";
+import {realityOverview,workObservationIndex} from "../../src/reality-overview.mjs";
 import {scheduleProject} from "../../src/planning.mjs";
 import {portfolioSchedule,projectedFinishLabel} from "../../src/portfolio-schedule.mjs";
 import {portfolioResources} from "../../src/portfolio-resources.mjs";
@@ -169,6 +169,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const [forecastId,setForecastId]=useState<string|null>(null);
  const [workFilter,setWorkFilter]=useState("all"),[workQuery,setWorkQuery]=useState("");
  const [workTargetFilter,setWorkTargetFilter]=useState("all");
+ const [workHistoryLimits,setWorkHistoryLimits]=useState<Record<string,number>>({});
  const [workSort,setWorkSort]=useState("title");
  const [portfolioLimit,setPortfolioLimit]=useState(150);
  const [sidebarLimit,setSidebarLimit]=useState(120);
@@ -247,12 +248,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const nextStep=useMemo(()=>project&&impact?projectNextStep(project,impact):null,[project,impact]);
  const realityMap=useMemo(()=>project&&reality&&impact?realityOverview(project,reality,impact):null,[project,reality,impact]);
  const targetById=useMemo(()=>new Map<string,any>((project?.targets||[]).map((t:any)=>[t.id,t])),[project]);
- const findingCountByWork=useMemo(()=>{
-  const totals=new Map<string,number>();
-  for(const finding of project?.findings||[])
-   if(finding.workId)totals.set(finding.workId,(totals.get(finding.workId)||0)+1);
-  return totals;
- },[project]);
+ const findingsByWork=useMemo(()=>project?workObservationIndex(project):new Map<string,any[]>(),[project]);
  useEffect(()=>{
   // Reveal the actual source-bound row instead of losing the target ID
   // when the user enters a project from the portfolio command queue.
@@ -396,7 +392,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   setActive(id);setTab("overview");setEditor(null);setForecastId(null);
   setShowProjectRelations(false);setRelationLimit(12);setRequirementJump(null);setChangeJump(null);
   if(!afterSubmit)setMessage("");
-  setWorkFilter("all");setWorkTargetFilter("all");setWorkQuery("");setWorkSort("title");setWorkLimit(200);setRealityLimit(8);
+  setWorkFilter("all");setWorkTargetFilter("all");setWorkHistoryLimits({});setWorkQuery("");setWorkSort("title");setWorkLimit(200);setRealityLimit(8);
   setHistoryQuery("");setHistoryType("all");setHistoryLimit(120);setRecheckLimit(25);
  };
  const openProjectTab=(id:string,tabId:Tab,changeId:string|null=null)=>{
@@ -1155,8 +1151,30 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      <div className="table-scroll atlas-work-table-scroll"><table className="atlas-work-table" aria-label="Работы проекта"><thead><tr><th>Работа</th><th>Состояние</th><th>Длительность</th><th>Ответственный</th><th>Срок</th><th>Изменить</th></tr></thead>
       <tbody>{filteredWork.slice(0,workLimit).map((w:any)=><tr key={w.id}>
        <td data-label="Работа"><strong>{w.title}</strong><small>{project.stages.find((s:any)=>s.id===w.stageId)?.name||"Без этапа"}</small>
-        {findingCountByWork.has(w.id)&&<small className="atlas-work-observations">
-         Заявленных наблюдений по работе: {findingCountByWork.get(w.id)} · Это не независимая приёмка</small>}
+        {findingsByWork.has(w.id)&&<details className="atlas-work-observation-history">
+         <summary aria-label={"История наблюдений по работе: "+w.title}>
+          Заявленных наблюдений: {findingsByWork.get(w.id)?.length} · Не независимая приёмка
+         </summary>
+         <ol>
+          {findingsByWork.get(w.id)!.slice(-(workHistoryLimits[w.id]||5)).reverse().map((observation:any)=><li key={observation.id}>
+           <button type="button" className="text-link"
+            aria-label={"Открыть требование из наблюдения: "+w.title+" — "+(targetById.get(observation.targetId)?.title||"Требование")}
+            onClick={()=>{
+             if(!requireClosedForm())return;
+             openProjectTab(project.id,"overview");
+             setRequirementJump({projectId:project.id,targetId:observation.targetId});
+            }}>{targetById.get(observation.targetId)?.title||"Требование"}</button>
+           <small>{({present:"Заявлено наличие",partial:"Заявлено частично",absent:"Заявлено отсутствие"} as Record<string,string>)[observation.result]||observation.result}
+            {" · "}{readable(observation.observedAt)}{" · "}
+            {({implementation:"Реализация",test:"Тест",acceptance:"Заявлена приёмка"} as Record<string,string>)[observation.level]||observation.level}</small>
+           {observation.note&&<p>{observation.note}</p>}
+          </li>)}
+         </ol>
+         {findingsByWork.get(w.id)!.length>(workHistoryLimits[w.id]||5)&&
+          <Action onClick={()=>setWorkHistoryLimits(prev=>({...prev,[w.id]:Math.min(findingsByWork.get(w.id)!.length,(prev[w.id]||5)+10)}))}>
+           Показать ещё наблюдения ({findingsByWork.get(w.id)!.length-(workHistoryLimits[w.id]||5)})
+          </Action>}
+        </details>}
         {w.state==="done"&&(w.targetIds||[]).length>0&&<small className="atlas-work-evidence-note">
          Завершение работы заявлено; факт результата вносится отдельно.</small>}</td>
        <td data-label="Состояние"><Badge>{workStatuses[w.state]}</Badge></td><td data-label="Длительность">{w.estimateDays??1} дн.</td>
