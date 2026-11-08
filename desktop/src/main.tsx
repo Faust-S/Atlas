@@ -140,6 +140,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const rootRef=useRef<HTMLDivElement|null>(null);
  const fileMenuRef=useRef<HTMLDetailsElement|null>(null);
  const viewMenuRef=useRef<HTMLDetailsElement|null>(null);
+ const relationSectionRef=useRef<HTMLElement|null>(null);
  const logoUrl=host?.assetUrl??"/atlas-mark.svg";
  const [data,setData]=useState<Atlas>(()=>empty());
  const [ready,setReady]=useState(false),[busy,setBusy]=useState(false);
@@ -152,6 +153,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const [attentionLimit,setAttentionLimit]=useState(8);
  const [showProjectRelations,setShowProjectRelations]=useState(false);
  const [relationLimit,setRelationLimit]=useState(12);
+ const [relationJump,setRelationJump]=useState<string|null>(null);
  const [boardLimits,setBoardLimits]=useState<Record<string,number>>({});
  const [message,setMessage]=useState(""),[error,setError]=useState("");
  const [inspector,setInspector]=useState(()=>!host&&window.innerWidth>1220),[recovery,setRecovery]=useState(false);
@@ -228,6 +230,14 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   [portfolioCommand,attentionFilter,attentionQuery]);
  const projectCommand=useMemo(()=>project?portfolioCommand.rows.find((row:any)=>row.id===project.id)||null:null,
   [portfolioCommand,project]);
+ useEffect(()=>{
+  if(!relationJump||!ready||active!==relationJump||tab!=="overview"||!showProjectRelations)return;
+  const element=relationSectionRef.current;
+  if(!element)return;
+  element.scrollIntoView({block:"start",behavior:"auto"});
+  element.focus({preventScroll:true});
+  setRelationJump(null);
+ },[relationJump,ready,active,tab,showProjectRelations,projectCommand]);
  const impact=project?impactByProject.get(project.id)||null:null;
  const nextStep=useMemo(()=>project&&impact?projectNextStep(project,impact):null,[project,impact]);
  const realityMap=useMemo(()=>project&&reality&&impact?realityOverview(project,reality,impact):null,[project,reality,impact]);
@@ -363,7 +373,10 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   // Read-only navigation: the existing domain action still requires an
   // explicit edit, decision and native Save from its original screen.
   openProjectTab(projectId,target);
-  if(signal.panel==="relations")setShowProjectRelations(true);
+  if(signal.panel==="relations"){
+   setShowProjectRelations(true);
+   setRelationJump(projectId);
+  }
  };
  const openEditor=(action:string,projectId?:string)=>{
   if(!requireClosedForm()||busyRef.current)return;
@@ -764,7 +777,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       <small>Найдено {attentionRows.length} из {portfolioCommand.rows.length} проектов</small>
      </div>
      <p className="minor">Блокировки: {portfolioCommand.totals.blocked} · Риски срока: {portfolioCommand.totals.dates} ·
-      Требования к проверке: {portfolioCommand.totals.evidence} · Предложения к решению: {portfolioCommand.totals.decisions}</p>
+      Требования к проверке: {portfolioCommand.totals.evidence} · Без утверждённых критериев: {portfolioCommand.totals.missingCriteria} ·
+       Предложения к решению: {portfolioCommand.totals.decisions}</p>
      {attentionRows.length?<div className="atlas-command-list">
       {attentionRows.slice(0,attentionLimit).map((row:any)=><article className="atlas-command-entry" key={row.id}>
        <div className="atlas-command-project"><button type="button" className="text-link"
@@ -803,9 +817,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
        const imp=impactByProject.get(p.id)!,row=dates.byId.get(p.id);
        return <tr key={p.id}><td><button className="text-link" onClick={()=>selectProject(p.id)}>{p.name}</button><small>{p.goal||"Цель не задана"}</small></td>
         <td><Badge>{statuses[p.status]||p.status}</Badge></td><td className="atlas-portfolio-attention">
-          {!(p.targets||[]).length?<button type="button" className="text-link"
-           aria-label={"Добавить требования проекта "+p.name}
-           onClick={()=>openProjectTab(p.id,"overview")}>Требования не заданы</button>:
+          {!(p.targets||[]).some((t:any)=>t.intent==="committed")?<button type="button" className="text-link"
+           aria-label={"Уточнить утверждённые требования проекта "+p.name}
+           onClick={()=>openProjectTab(p.id,"overview")}>{(p.targets||[]).length?"Нет утверждённых требований":"Требования не заданы"}</button>:
            imp.attention>0?<button type="button" className="text-link"
            aria-label={"Проверить требования проекта "+p.name}
            onClick={()=>openProjectTab(p.id,"reality")}>Проверить {imp.attention} требований</button>:
@@ -897,48 +911,6 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       <p className="minor">Переход только открывает представление или редактор. Факты и решения автоматически не изменяются.</p>
      </section>}
 
-     {projectCommand&&<section className="surface atlas-project-relations" aria-label="Зависимости проекта и влияние на другие проекты">
-      <div className="section-heading"><div><h2>Связи и последствия</h2>
-       <p>Цепочки из действующего плана портфеля. Возможное влияние не подтверждает задержку или приёмку.</p></div>
-       <button type="button" className="action-button" aria-expanded={showProjectRelations}
-        aria-controls="atlas-project-relations-detail" onClick={()=>setShowProjectRelations(v=>!v)}>
-        {showProjectRelations?"Скрыть цепочки":"Развернуть цепочки"}</button>
-      </div>
-      <div className="summary-line atlas-project-relations-summary">
-       <span>Предшественников: {projectCommand.dependencies.predecessors.length}</span>
-       <span>Следующих проектов: {projectCommand.dependencies.successors.length}</span>
-       <span>Зависимых далее: {projectCommand.dependencies.downstreamCount}</span>
-       <span>Входящих причин: {projectCommand.dependencies.inheritedCount}</span>
-      </div>
-      <div id="atlas-project-relations-detail" hidden={!showProjectRelations} className="atlas-project-relations-body">
-       <div className="atlas-relations-column"><h3>От кого зависит</h3>
-        {projectCommand.dependencies.predecessors.length?<ul>
-         {projectCommand.dependencies.predecessors.slice(0,relationLimit).map((p:any)=><li key={p.id}>
-          <button type="button" className="text-link" onClick={()=>selectProject(p.id)}>{p.name}</button>
-          <small>{statuses[p.status]||p.status}</small></li>)}</ul>:<p>Предшественников не задано.</p>}
-       </div>
-       <div className="atlas-relations-column"><h3>Кому передаётся результат</h3>
-        {projectCommand.dependencies.successors.length?<ul>
-         {projectCommand.dependencies.successors.slice(0,relationLimit).map((p:any)=><li key={p.id}>
-          <button type="button" className="text-link" onClick={()=>selectProject(p.id)}>{p.name}</button>
-          <small>{statuses[p.status]||p.status}</small></li>)}</ul>:<p>Непосредственных зависимых проектов нет.</p>}
-       </div>
-       <div className="atlas-relations-causes"><h3>Причины от предшественников</h3>
-        {projectCommand.dependencies.inherited.length?<ol>
-         {projectCommand.dependencies.inherited.slice(0,relationLimit).map((cause:any,i:number)=><li key={cause.originId+"-"+cause.kind+"-"+i}>
-          <strong>{cause.message}</strong>
-          <div className="atlas-relation-path" aria-label="Путь влияния">
-           {cause.path.map((p:any,j:number)=><React.Fragment key={p.id+"-"+j}>
-            {j>0&&<span aria-hidden="true"> → </span>}
-            <button type="button" className="text-link" onClick={()=>selectProject(p.id)}>{p.name}</button>
-           </React.Fragment>)}</div></li>)}</ol>:
-         <p>Переданных причин нет. Это не подтверждение завершения или приёмки.</p>}
-       </div>
-       {Math.max(projectCommand.dependencies.predecessors.length,projectCommand.dependencies.successors.length,
-        projectCommand.dependencies.inherited.length)>relationLimit&&<Action onClick={()=>setRelationLimit(n=>n+12)}>
-        Показать ещё связи и причины</Action>}
-      </div>
-     </section>}
      <section className="surface atlas-reality-overview" aria-label="Сопоставление цели, фактов и решений">
       <div className="section-heading"><div><h2>Должно быть → известно → расхождение → решение</h2>
        <p>Последние заявленные факты и их источники. Ни Git SHA, ни ручная отметка «приёмка» сами по себе не подтверждают выполнение.</p></div>
@@ -984,6 +956,51 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       {(realityMap?.unlinkedChanges??0)>0&&<p className="minor">Есть предложения без прямой привязки к требованию: {realityMap?.unlinkedChanges}.
        <button type="button" className="text-link" onClick={()=>view("changes")}>Открыть все изменения</button></p>}
      </section>
+     {projectCommand&&(projectCommand.dependencies.predecessors.length>0||
+      projectCommand.dependencies.successors.length>0||projectCommand.dependencies.inheritedCount>0)
+      &&<section ref={relationSectionRef} tabIndex={-1} className="surface atlas-project-relations"
+       aria-label="Зависимости проекта и влияние на другие проекты">
+      <div className="section-heading"><div><h2>Связи и последствия</h2>
+       <p>Цепочки из действующего плана портфеля. Возможное влияние не подтверждает задержку или приёмку.</p></div>
+       <button type="button" className="action-button" aria-expanded={showProjectRelations}
+        aria-controls="atlas-project-relations-detail" onClick={()=>setShowProjectRelations(v=>!v)}>
+        {showProjectRelations?"Скрыть цепочки":"Развернуть цепочки"}</button>
+      </div>
+      <div className="summary-line atlas-project-relations-summary">
+       <span>Предшественников: {projectCommand.dependencies.predecessors.length}</span>
+       <span>Следующих проектов: {projectCommand.dependencies.successors.length}</span>
+       <span>Зависимых далее: {projectCommand.dependencies.downstreamCount}</span>
+       <span>Входящих причин: {projectCommand.dependencies.inheritedCount}</span>
+      </div>
+      <div id="atlas-project-relations-detail" hidden={!showProjectRelations} className="atlas-project-relations-body">
+       <div className="atlas-relations-column"><h3>От кого зависит</h3>
+        {projectCommand.dependencies.predecessors.length?<ul>
+         {projectCommand.dependencies.predecessors.slice(0,relationLimit).map((p:any)=><li key={p.id}>
+          <button type="button" className="text-link" onClick={()=>selectProject(p.id)}>{p.name}</button>
+          <small>{statuses[p.status]||p.status}</small></li>)}</ul>:<p>Предшественников не задано.</p>}
+       </div>
+       <div className="atlas-relations-column"><h3>Кому передаётся результат</h3>
+        {projectCommand.dependencies.successors.length?<ul>
+         {projectCommand.dependencies.successors.slice(0,relationLimit).map((p:any)=><li key={p.id}>
+          <button type="button" className="text-link" onClick={()=>selectProject(p.id)}>{p.name}</button>
+          <small>{statuses[p.status]||p.status}</small></li>)}</ul>:<p>Непосредственных зависимых проектов нет.</p>}
+       </div>
+       <div className="atlas-relations-causes"><h3>Причины от предшественников</h3>
+        {projectCommand.dependencies.inherited.length?<ol>
+         {projectCommand.dependencies.inherited.slice(0,relationLimit).map((cause:any,i:number)=><li key={cause.originId+"-"+cause.kind+"-"+i}>
+          <strong>{cause.message}</strong>
+          <div className="atlas-relation-path" aria-label="Путь влияния">
+           {cause.path.map((p:any,j:number)=><React.Fragment key={p.id+"-"+j}>
+            {j>0&&<span aria-hidden="true"> → </span>}
+            <button type="button" className="text-link" onClick={()=>selectProject(p.id)}>{p.name}</button>
+           </React.Fragment>)}</div></li>)}</ol>:
+         <p>Переданных причин нет. Это не подтверждение завершения или приёмки.</p>}
+       </div>
+       {Math.max(projectCommand.dependencies.predecessors.length,projectCommand.dependencies.successors.length,
+        projectCommand.dependencies.inherited.length)>relationLimit&&<Action onClick={()=>setRelationLimit(n=>n+12)}>
+        Показать ещё связи и причины</Action>}
+      </div>
+     </section>}
      <section className="surface"><div className="section-heading"><div><h2>Сроки и зависимости</h2>
       <p>CPM по календарным дням, без автоматического распределения ресурсов.</p></div>
       <Action onClick={()=>openEditor("dates")}>Изменить даты</Action></div>
