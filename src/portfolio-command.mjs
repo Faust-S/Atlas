@@ -13,6 +13,9 @@ const labels = {blocked:"Блокировки",dates:"Сроки",evidence:"Фа
 const actionFor = (projectId,kind,ref="") =>
  "inspect:"+encodeURIComponent(projectId)+":"+kind+(ref?":"+encodeURIComponent(ref):"");
 
+/** @param {any} snapshot
+ * @param {{now?:string, impacts?:Map<string, any>|null, schedules?:any}} [options]
+ */
 export function buildPortfolioCommand(snapshot,{now=new Date().toISOString(),impacts:cachedImpacts=null,schedules:cachedSchedules=null}={}) {
  const projects=snapshot.projects||[];
  // Standalone callers derive their own data; React desktop reuses the exact
