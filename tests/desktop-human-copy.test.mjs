@@ -30,7 +30,7 @@ test("backup UI does not mislabel legacy JSON as unified IWXA exchange",()=>{
 });
 
 test("project source review describes only actual read-only, manually initiated public GitHub scope",()=>{
- assert.match(ui,/Проверка открытых репозиториев GitHub запускается вручную/);
+ assert.match(ui,/Проверяйте изменения и сборки открытых репозиториев GitHub по своему запросу/);
  assert.match(ui,/Ничего в них не меняет/);
  assert.match(ui,/const syncPublic=async/);
  assert.match(source,/Public GitHub REST observation only; never accepts tokens or writes to source/);
