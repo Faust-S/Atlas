@@ -74,7 +74,7 @@ test("CI review distinguishes current, obsolete and unavailable GitHub Actions s
  assert.equal(current.authority,"OBSERVATION_ONLY");
  const stale=sourceReview(source({...base,ci:{state:"observed",branch:"main",runId:101,
   headCurrent:"previous",status:"completed",conclusion:"success"}}));
- assert.match(stale.ci.label,/предыдущей версии/);
+ assert.match(stale.ci.label,/другой редакции/);
  assert.doesNotMatch(stale.ci.label,/этой версии успешно/);
  const running=sourceReview(source({...base,ci:{state:"observed",branch:"main",runId:102,
   headCurrent:"current",status:"in_progress",conclusion:null}}));
@@ -178,4 +178,23 @@ test("source screen offers read-only journey from GitHub evidence to project rea
  assert.doesNotMatch(ui,/project\.targets\?\.length>0&&<button type="button" className="text-link"/);
  assert.match(ui,/onClick=\{\(\)=>view\("reality"\)\}/);
  assert.match(ui,/Сборка на GitHub не подтверждает выполнение требований/);
+});
+
+test("Actions evidence links the run's exact commit separately from observed branch head",()=>{
+ const branch=source({scope:"repository",complete:true,defaultBranch:"main",
+  branchHeads:{main:shaB},ci:{state:"observed",branch:"main",runId:902,
+  headSha:shaA,headCurrent:"previous",status:"completed",conclusion:"success"}});
+ const review=sourceReview(branch);
+ assert.equal(review.observedCommit.sha,shaB);
+ assert.equal(review.ci.checkedCommit.sha,shaA);
+ assert.equal(review.ci.checkedCommit.url,"https://github.com/Faust-S/Atlas/commit/"+shaA);
+ assert.match(review.ci.label,/другой редакции/);
+ assert.doesNotMatch(review.ci.label,/предыдущей версии/);
+ const invalid=sourceReview(source({ci:{state:"observed",branch:"main",runId:901,
+  headSha:"https://evil.example/",headCurrent:"previous",status:"completed",conclusion:"success"}}));
+ assert.equal(invalid.ci.checkedCommit,null);
+ assert.equal(sourceReview({...branch,locator:"javascript:1"}).ci.checkedCommit,null);
+ const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ assert.match(ui,/href={review.ci.checkedCommit.url}/);
+ assert.match(ui,/Совпадение с последней наблюдавшейся редакцией ветки не подтверждено/);
 });

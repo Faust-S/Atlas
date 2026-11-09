@@ -41,13 +41,20 @@ function checkReview(source){
   else if(["queued","waiting","pending","requested"].includes(check.status))label="Проверка GitHub ожидает запуска";
   else if(check.status==="completed"&&check.conclusion==="success")
    label=check.headCurrent==="current"?"Проверка этой версии успешно завершена":
-    check.headCurrent==="previous"?"Успешная проверка относится к предыдущей версии":"Проверка завершилась успешно, но версия не сопоставлена";
+    check.headCurrent==="previous"?"Успешная проверка относится к другой редакции":"Проверка завершилась успешно, но версия не сопоставлена";
   else if(check.status==="completed"&&["failure","timed_out","action_required","stale"].includes(check.conclusion))
    label="Последняя проверка GitHub завершилась с ошибкой";
   else if(check.status==="completed")label="Последняя проверка не подтвердила успех";
   else label="Состояние проверки GitHub не определено";
-  if(check.headCurrent==="previous"&&!label.includes("предыдущей версии"))
-   label+=". Для текущей версии результата нет";
+  if(check.headCurrent==="previous"&&!label.includes("другой редакции"))
+   label+=". Для редакции, наблюдавшейся при сверке, результат не подтверждён";
+ }
+ let checkedCommit=null;
+ if(check.state==="observed"&&typeof check.headSha==="string"&&/^[a-f0-9]{40}$/i.test(check.headSha)){
+  try{
+   const sha=check.headSha.toLowerCase();
+   checkedCommit={sha,url:"https://github.com/"+repoName(source.locator)+"/commit/"+sha};
+  }catch{checkedCommit=null}
  }
  let url=null;
  if(check.state==="observed"&&Number.isSafeInteger(check.runId)&&check.runId>0){
@@ -55,7 +62,8 @@ function checkReview(source){
   catch{url=null}
  }
  if(source.status==="error")label="Предыдущее наблюдение: "+label;
- return {state:check.state,label,url,branch:check.branch??null,headCurrent:check.headCurrent||"unknown",
+ return {state:check.state,label,url,branch:check.branch??null,checkedCommit,
+  headCurrent:check.headCurrent||"unknown",
   // No workflow state can authorize a readiness or acceptance verdict.
   authority:"OBSERVATION_ONLY"};
 }

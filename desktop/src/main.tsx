@@ -1437,6 +1437,12 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
          <p>{review.ci.label}</p>
          {review.ci.url&&<a className="text-link" href={review.ci.url}
           target="_blank" rel="noopener noreferrer">Открыть проверку на GitHub</a>}
+         {review.ci.checkedCommit&&review.ci.headCurrent!=="current"&&<p className="minor">
+           Запуск относится к <a className="text-link" href={review.ci.checkedCommit.url}
+             target="_blank" rel="noopener noreferrer">
+             редакции {review.ci.checkedCommit.sha.slice(0,12)}</a>.
+           Совпадение с последней наблюдавшейся редакцией ветки не подтверждено.
+         </p>}
          <button type="button" className="text-link"
            onClick={()=>view("reality")}>Сверить требования и факты проекта</button>
          <p className="minor">Сборка на GitHub не подтверждает выполнение требований и приёмку проекта.</p>
