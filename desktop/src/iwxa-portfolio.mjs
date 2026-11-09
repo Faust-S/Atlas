@@ -13,6 +13,11 @@ const SCHEMA="schemas/"+IWXA_PROFILE+"@"+IWXA_PROFILE_VERSION+".json";
 const PATHS=[CONTENT,WORKSPACES,SCHEMA].sort(),NAMES=["manifest.json",...PATHS];
 const encoder=new TextEncoder();
 const validSha=x=>typeof x==="string"&&/^[a-f0-9]{64}$/.test(x);
+// Match the date-time envelopes in the pinned T2 Runtime 1.3.0 contract.
+// A date-only string may parse in JavaScript but is not a T2 date-time.
+const validDateTime=x=>typeof x==="string"&&
+ /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(x)&&
+ Number.isFinite(Date.parse(x));
 const fail=reason=>{throw Error("Не удалось открыть архив IWXA: "+reason)};
 const expect=(condition,reason)=>{if(!condition)fail(reason)};
 function canonical(value){
@@ -76,7 +81,7 @@ function preflightZip(bytes){
 }
 export async function buildIwxaPortfolio(raw,{now=new Date().toISOString()}={}){
  const snapshot=deserialize(serialize(raw));
- expect(typeof now==="string"&&!Number.isNaN(Date.parse(now)),"неверная дата");
+ expect(validDateTime(now),"неверная дата");
  const workspaceId="iwxa:atlas:portfolio:local",model={snapshot};
  const schema=schemaDefinition();
  const schemeRecord={schema_id:IWXA_PROFILE,schema_version:IWXA_PROFILE_VERSION,
@@ -86,7 +91,10 @@ export async function buildIwxaPortfolio(raw,{now=new Date().toISOString()}={}){
  const obj={object_id:"portfolio",workspace_id:workspaceId,
   schema_id:IWXA_PROFILE,schema_version:IWXA_PROFILE_VERSION,
   created_by_service:"iwxa.atlas",updated_by_service:"iwxa.atlas",
-  created_at:now,updated_at:now,revision:snapshot.revision,data:model,extensions:{}};
+  // Atlas's first local snapshot has revision 0, but T2 Object 1.3.0
+  // requires envelope revision >= 1. Keep the original project revision
+  // unchanged inside data.snapshot; the carrier has its own revision.
+  created_at:now,updated_at:now,revision:Math.max(1,snapshot.revision),data:model,extensions:{}};
  const contents={
   [CONTENT]:strToU8(line(obj)),[WORKSPACES]:strToU8(line(ws)),
   [SCHEMA]:strToU8(JSON.stringify(schemeRecord,null,2)+"\n")
@@ -127,16 +135,29 @@ export async function readIwxaPortfolio(bytes){
  let scheme;try{scheme=JSON.parse(strFromU8(entries[SCHEMA]))}catch{fail("неверная схема данных")}
  expect(scheme.schema_id===IWXA_PROFILE&&scheme.schema_version===IWXA_PROFILE_VERSION&&
   scheme.preserve_unknown===false&&Object.keys(scheme.embedded||{}).length===0&&
-  await digestObject(scheme.json_schema)===scheme.canonical_sha256,"неверная схема данных");
+  await digestObject(scheme.json_schema)===scheme.canonical_sha256&&
+  await digestObject(scheme.json_schema)===await digestObject(schemaDefinition()),
+  "неверная схема данных");
  expect(obj?.schema_id===IWXA_PROFILE&&obj.schema_version===IWXA_PROFILE_VERSION&&
   obj.object_id==="portfolio"&&obj.workspace_id===ws.workspace_id&&
   ws.profile===IWXA_PROFILE&&Array.isArray(manifest.workspaces)&&
   manifest.workspaces.length===1&&manifest.workspaces[0]===ws.workspace_id,
   "профиль Atlas не поддерживается");
+ // Existing 0.5 dev packages may carry object revision 0 for an empty
+ // portfolio. Read that one historical shape, but never export it again.
+ const legacyEmptyRevision=obj.revision===0&&obj.data?.snapshot?.revision===0;
+ expect(Number.isSafeInteger(obj.revision)&&(obj.revision>=1||legacyEmptyRevision)&&
+  validDateTime(obj.created_at)&&validDateTime(obj.updated_at)&&
+  validDateTime(ws.created_at)&&validDateTime(ws.updated_at)&&
+  typeof obj.created_by_service==="string"&&!!obj.created_by_service&&
+  typeof obj.updated_by_service==="string"&&!!obj.updated_by_service&&
+  validDateTime(manifest.created_at),
+  "недопустимая редакция или дата объекта");
  expect(manifest.workspace_states?.length===1&&
   manifest.workspace_states[0]?.workspace_id===ws.workspace_id&&
   JSON.stringify(manifest.counts)===JSON.stringify({workspaces:1,objects:1,events:0,relations:0,assets:0,schemas:1})&&
-  manifest.options?.include_schemas===true&&manifest.options?.include_assets===false,
+  manifest.options?.include_schemas===true&&manifest.options?.include_assets===false&&
+  manifest.options?.include_relations===false&&manifest.options?.include_history===false,
   "состав портфеля не подтверждён");
  expect(obj.data?.snapshot&&validSha(manifest.semantic_digest)&&
   await digestObject(obj.data)===manifest.semantic_digest,"целостность данных не подтверждена");

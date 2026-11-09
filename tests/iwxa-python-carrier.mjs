@@ -37,6 +37,7 @@ with zipfile.ZipFile(path) as z:
     obj=json.loads(z.read('content/objects.ndjson'))
     ws=json.loads(z.read('content/workspaces.ndjson'))
     schema=json.loads(z.read('schemas/iwxa.atlas.portfolio@1.0.0.json'))
+    assert isinstance(obj['revision'],int) and obj['revision']>=1, 'T2 object revision below 1'
     assert obj['schema_id']=='iwxa.atlas.portfolio'
     assert obj['workspace_id']==ws['workspace_id']==manifest['workspaces'][0]
     assert obj['data']['snapshot']['schema']=='atlas.project/1'

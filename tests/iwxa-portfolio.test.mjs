@@ -101,3 +101,39 @@ test("native IWXA exchange remains disabled inside a host without file-picker co
  assert.doesNotMatch(host,/atlas_export_iwxa|atlas_select_iwxa/);
  assert.match(ui,/История сохранений в него не входит/);
 });
+
+test("fresh empty Atlas snapshot uses T2 object envelope revision 1 but retains local revision 0",async()=>{
+ const snapshot=empty(),archive=await buildIwxaPortfolio(snapshot,
+  {now:"2026-11-09T10:00:00.000Z"}),files=unzipSync(archive);
+ const obj=JSON.parse(strFromU8(files["content/objects.ndjson"]));
+ assert.equal(obj.revision,1,"T2 Runtime 1.3.0 Object requires revision >= 1");
+ assert.equal(obj.data.snapshot.revision,0,"Atlas initial snapshot revision must not be rewritten");
+ assert.equal(serialize((await readIwxaPortfolio(archive)).snapshot),serialize(snapshot));
+});
+test("T2 package date-time envelope is not merely a parsable date",async()=>{
+ await assert.rejects(buildIwxaPortfolio(empty(),{now:"2026-11-09"}),/неверная дата/);
+ await assert.rejects(buildIwxaPortfolio(empty(),{now:"invalid date"}),/неверная дата/);
+ const accepted=await buildIwxaPortfolio(empty(),{now:"2026-11-09T10:00:00+03:00"});
+ assert.equal((await readIwxaPortfolio(accepted)).snapshot.revision,0);
+});
+test("Atlas rejects a re-signed carrier with a different local project schema",async()=>{
+ const zip=unzipSync(await make()),path="schemas/iwxa.atlas.portfolio@1.0.0.json";
+ const schema=JSON.parse(strFromU8(zip[path]));
+ schema.json_schema={type:"object"};
+ const digest=async bytes=>{
+  const raw=typeof bytes==="string"?new TextEncoder().encode(bytes):bytes;
+  return Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",raw)),
+   b=>b.toString(16).padStart(2,"0")).join("");
+ };
+ const canonical=value=>Array.isArray(value)?value.map(canonical):
+  value&&typeof value==="object"?Object.fromEntries(Object.keys(value).sort()
+   .map(key=>[key,canonical(value[key])])):value;
+ schema.canonical_sha256=await digest(JSON.stringify(canonical(schema.json_schema)));
+ zip[path]=strToU8(JSON.stringify(schema));
+ const manifest=JSON.parse(strFromU8(zip["manifest.json"]));
+ const file=manifest.files.find(f=>f.path===path);
+ file.size=zip[path].length;file.sha256=await digest(zip[path]);
+ manifest.package_digest=await digest(manifest.files.map(f=>f.path+"\t"+f.sha256+"\n").join(""));
+ zip["manifest.json"]=strToU8(JSON.stringify(manifest));
+ await assert.rejects(readIwxaPortfolio(zipSync(zip,{level:0})),/неверная схема данных/);
+});
