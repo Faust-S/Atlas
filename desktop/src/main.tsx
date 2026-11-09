@@ -548,7 +548,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     throw Error("Проекты изменились во время подготовки архива. Сохранение отменено.");
    const message=await invoke<string>("atlas_export_iwxa",{
     expectedGeneration,archiveBase64:toBase64(archive)});
-   setMessage(message+" Вы сможете открыть этот файл в Atlas. Передача в другие программы IWXA пока не подключена.");
+   setMessage(message+" Вы сможете открыть этот файл в Atlas. Совместимый Admin Center может открыть этот архив для просмотра проектов и подготовки поручений. Синхронизация и передача прав не включаются.");
    setError("");
   }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
  };
@@ -847,7 +847,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
         disabled={busy||dirty||!!editor||!persisted||savedVersions!==null}>История сохранений</Action>
        <p className="atlas-file-menu-note">{embedded
         ?"Файловый обмен .iwxa доступен в самостоятельном Atlas. Встроенный режим работает через разрешения своей программы."
-        :"Архив .iwxa переносит проекты между копиями Atlas. История сохранений в него не входит. JSON остаётся для совместимости с Admin Center. Обмен с другими программами IWXA пока не подключён."}</p>
+        :"Архив .iwxa переносит проекты между копиями Atlas. История сохранений в него не входит. В совместимом Admin Center архив открывается для просмотра и подготовки поручений. Для прежних версий остаётся копия JSON."}</p>
       </div>
      </details>
      <button disabled={!!editor} className="icon-button inspector-button" aria-label={inspector?"Скрыть инспектор":"Показать инспектор"}
@@ -1459,10 +1459,10 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
        <textarea className="atlas-ref-text" aria-label="Сохранённая ссылка Atlas" readOnly
         rows={5} value={savedRefPreview.json} onFocus={event=>event.currentTarget.select()}/>
       </label>
-      <p className="minor">Для проверки в Admin Center понадобится тот же сохранённый JSON-файл портфеля. Эта операция не создаёт автоматическое соединение.</p>
+      <p className="minor">В совместимом Admin Center откройте архив .iwxa из меню «Сохранение и копии». Для старых версий можно сохранить копию JSON. Эта операция не создаёт автоматическое соединение.</p>
      </details>
      <div className="button-row">
-      <Action onClick={()=>void exportJson("center")} disabled={busy}>Сохранить файл для Admin Center</Action>
+      <Action onClick={()=>void exportJson("center")} disabled={busy}>Сохранить копию JSON для старой версии Center</Action>
       <Action autoFocus onClick={()=>setSavedRefPreview(null)}>Закрыть</Action>
      </div>
     </section>
@@ -1472,7 +1472,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      <div className="atlas-import-body">
       <h2 id="atlas-import-preview-title">{pendingImport.format==="iwxa"?"Открыть архив .iwxa":"Открыть резервную копию JSON"}</h2>
      <p>Проверьте содержимое копии. При подтверждении она заменит текущие проекты, но пока ничего не изменено.</p>
-     {pendingImport.format==="iwxa"&&<p className="minor">Архив подходит для Atlas. Обмен с другими программами IWXA пока не подтверждён.</p>}
+     {pendingImport.format==="iwxa"&&<p className="minor">Этот архив можно восстановить в Atlas. В совместимом Admin Center он доступен как копия для просмотра, без синхронизации и передачи прав.</p>}
      <p className="minor">Редакция архива: {pendingImport.originalRevision}. Подтверждение изменит только черновик.</p>
      <div className="table-scroll"><table><thead><tr><th>Показатель</th><th>Сейчас</th><th>После импорта</th></tr></thead><tbody>
       {([["projects","Проекты"],["works","Работы"],["findings","Факты"],["decisions","Решения"],["changes","Предложения"],["sources","Источники"],["links","Связи проектов"]] as const).map(([key,label])=>
