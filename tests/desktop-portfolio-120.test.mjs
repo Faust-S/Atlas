@@ -270,7 +270,7 @@ test("installed history verifies physical disclosure and requirement navigation 
  assert.match(script,/История наблюдений по работе: "\+work\["title"\]/);
  assert.match(script,/ATLAS04_WORK_HISTORY_DISCLOSURE_UIA_PASS/);
  assert.match(script,/ATLAS04_WORK_HISTORY_TO_REQUIREMENT_UIA_PASS/);
- assert.match(script,/ATLAS04_WORK_HISTORY_UIA_HOLD/);
+ assert.match(script,/raise AssertionError\("Installed work history is not reachable after closing work editor"\)/);
  assert.match(script,/Открыть требование из наблюдения: "\+work\["title"\]\+" — Expected result"/);
  assert.match(script,/native\(\)\[0\]\["generation"\] == recorded_head\["generation"\]/);
 });
