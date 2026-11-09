@@ -13,6 +13,7 @@ import subprocess
 import sys
 import time
 import urllib.request
+from urllib.parse import urlsplit
 from pathlib import Path
 
 import win32con
@@ -247,7 +248,14 @@ def read_public_run(ci):
     assert run["head_branch"] == BRANCH, "Observed Actions run belongs to another branch"
     assert run["head_sha"].lower() == ci["headSha"], "Observed Actions SHA does not match GitHub"
     assert run["status"] in ("queued", "in_progress", "completed", "waiting", "pending", "requested")
-    assert ci["url"] == "https://github.com/" + REPO + "/actions/runs/" + str(run["id"])
+    # Atlas normalizes repository names to lowercase for network deduplication.
+    # GitHub owner/repository paths are case-insensitive, but scheme, host,
+    # action path and the exact run ID still have to match.
+    link = urlsplit(ci["url"])
+    expected_path = "/" + REPO.lower() + "/actions/runs/" + str(run["id"])
+    assert (link.scheme == "https" and link.netloc == "github.com" and
+            link.path.lower() == expected_path and not link.query and
+            not link.fragment), "Unexpected GitHub Actions link: " + repr(ci["url"])
     print("ATLAS05_GITHUB_PUBLIC_API_RECEIPT_PASS id=" + str(run["id"]) +
           " status=" + run["status"], flush=True)
 
