@@ -6,6 +6,7 @@ on:
       - work/2026-11-04-atlas-0-2-1-branding
       - work/2026-11-04-atlas-0-3
       - work/2026-11-08-atlas-0-4
+      - release/0.4
   workflow_dispatch:
 
 permissions:
@@ -17,7 +18,7 @@ concurrency:
 
 jobs:
   frontend:
-    if: github.ref_name == 'work/2026-11-04-atlas-0-2-1-branding' || github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[windows-accept]')
+    if: github.ref_name == 'work/2026-11-04-atlas-0-2-1-branding' || github.ref_name == 'release/0.4' || github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[windows-accept]')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -34,6 +35,8 @@ jobs:
         working-directory: desktop
         run: npm run build
   windows-installer:
+    permissions:
+      contents: write
     runs-on: windows-latest
     needs: frontend
     timeout-minutes: 35
@@ -53,7 +56,7 @@ jobs:
         shell: pwsh
         run: cargo test --release --locked --manifest-path desktop/src-tauri/Cargo.toml --lib
       - name: Native Atlas R5 120-project persistence and 20 incremental revisions
-        if: github.ref_name == 'work/2026-11-04-atlas-0-3' || github.ref_name == 'work/2026-11-08-atlas-0-4'
+        if: github.ref_name == 'work/2026-11-04-atlas-0-3' || github.ref_name == 'work/2026-11-08-atlas-0-4' || github.ref_name == 'release/0.4'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -66,7 +69,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $expectedVersion = if ($env:GITHUB_REF_NAME -eq 'work/2026-11-08-atlas-0-4') { '0.4.0-dev.1' } elseif ($env:GITHUB_REF_NAME -eq 'work/2026-11-04-atlas-0-3') { '0.3.0' } else { '0.2.1' }
+          $expectedVersion = if ($env:GITHUB_REF_NAME -eq 'release/0.4') { '0.4.0' } elseif ($env:GITHUB_REF_NAME -eq 'work/2026-11-08-atlas-0-4') { '0.4.0-dev.1' } elseif ($env:GITHUB_REF_NAME -eq 'work/2026-11-04-atlas-0-3') { '0.3.0' } else { '0.2.1' }
           $installer = Get-ChildItem 'desktop/src-tauri/target/release/bundle/nsis' -Filter "*$expectedVersion*setup.exe" | Select-Object -First 1
           if (!$installer) { throw 'Expected version NSIS installer missing' }
           $p = Start-Process -FilePath $installer.FullName -ArgumentList '/S' -PassThru
@@ -86,23 +89,23 @@ jobs:
           "ATLAS_INSTALLED_EXE=$exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           Write-Output 'ATLAS_INSTALLED_ICON_PASS'
       - name: Regression installed GUI save and restart
-        if: github.ref_name != 'work/2026-11-08-atlas-0-4'
+        if: github.ref_name != 'work/2026-11-08-atlas-0-4' && github.ref_name != 'release/0.4'
         shell: pwsh
         timeout-minutes: 5
         run: ./desktop/tests/installed-windows-keyboard.ps1
       - name: Qualify Atlas 0.4 installed GUI and full restart
-        if: github.ref_name == 'work/2026-11-08-atlas-0-4'
+        if: github.ref_name == 'work/2026-11-08-atlas-0-4' || github.ref_name == 'release/0.4'
         shell: pwsh
         timeout-minutes: 6
         run: ./desktop/tests/installed-atlas04-ux.ps1
       - name: Install existing Windows GUI test driver for the large-portfolio import
-        if: github.ref_name == 'work/2026-11-08-atlas-0-4'
+        if: github.ref_name == 'work/2026-11-08-atlas-0-4' || github.ref_name == 'release/0.4'
         shell: pwsh
         run: |
           python -m pip install pywinauto==0.6.9 pillow==11.3.0
           python -m py_compile desktop/tests/installed-atlas04-scale.py
       - name: Measure real 120-project / 1200-work installed Atlas 0.4 UI
-        if: github.ref_name == 'work/2026-11-08-atlas-0-4'
+        if: github.ref_name == 'work/2026-11-08-atlas-0-4' || github.ref_name == 'release/0.4'
         shell: pwsh
         timeout-minutes: 8
         run: python desktop/tests/installed-atlas04-scale.py
@@ -154,3 +157,21 @@ jobs:
           path: desktop/src-tauri/target/release/bundle/nsis/*.exe
           if-no-files-found: error
           retention-days: 3
+
+      - name: Publish Atlas 0.4.0 stable release after Windows acceptance
+        if: github.ref == 'refs/heads/release/0.4' && github.event_name == 'push' && contains(github.event.head_commit.message, '[publish-release-0.4]')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installer = Get-ChildItem 'desktop/src-tauri/target/release/bundle/nsis' -Filter '*0.4.0_x64-setup.exe' | Select-Object -First 1
+          if (!$installer) { throw 'Stable NSIS installer was not built' }
+          gh release view v0.4.0 --repo $env:GITHUB_REPOSITORY 2>$null
+          if ($LASTEXITCODE -eq 0) { throw 'Release v0.4.0 already exists; refusing overwrite' }
+          $sumfile = Join-Path $env:RUNNER_TEMP 'SHA256SUMS.txt'
+          $checksum = (Get-FileHash -LiteralPath $installer.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          [System.IO.File]::WriteAllText($sumfile, "$checksum *$($installer.Name)`n", [System.Text.UTF8Encoding]::new($false))
+          gh release create v0.4.0 "$($installer.FullName)" "$sumfile" --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title 'IWXA Atlas 0.4.0' --notes 'Windows x64 stable release based on the accepted Atlas 0.4 candidate. Installed Tauri/NSIS, native persistence, 120 projects / 1200 works, and strict installed GUI routes are qualified. New UX copy, unified .iwxa exchange and expanded GitHub connectivity belong to Atlas 0.5.'
+          if ($LASTEXITCODE -ne 0) { throw 'Release publication failed' }
+          Write-Output "ATLAS04_STABLE_RELEASE_PUBLISHED sha=$env:GITHUB_SHA checksum=$checksum"
