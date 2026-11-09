@@ -168,8 +168,8 @@ def confirm_and_save_import(original):
         if updated["generation"]!=original["generation"]:
             assert updated["revision"]>original["revision"],"IWXA import lost the next revision"
             assert updated["projects"]==original["projects"],"IWXA roundtrip changed project content"
-            assert updated.get("portfolioLinks")==original.get("portfolioLinks"),"IWXA roundtrip changed project links"
-            provenance=updated.get("importProvenance") or {}
+            assert (updated.get("root") or {}).get("portfolioLinks")==(original.get("root") or {}).get("portfolioLinks"),"IWXA roundtrip changed project links"
+            provenance=(updated.get("root") or {}).get("importProvenance") or {}
             assert provenance.get("source")=="iwxa.atlas.portfolio/1.0.0","IWXA import source was lost"
             assert provenance.get("originalRevision")==original["revision"],"IWXA original revision was lost"
             screenshot("import-saved")
