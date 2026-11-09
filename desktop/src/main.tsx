@@ -47,6 +47,7 @@ const evidence:any={unknown:"Не установлено",conflict:"Против
  acceptance_claim:"Заявлена приёмка"};
 const decisionStatus:any={proposed:"Предложено",approved:"Утверждено",in_progress:"В работе",
  implemented:"Реализовано (заявлено)",deferred:"Отложено",rejected:"Отклонено"};
+const sourceNames:Record<string,string>={github:"GitHub",github_owner:"GitHub (владелец)",gitlab:"GitLab",forgejo:"Forgejo",gitea:"Gitea",obsidian:"Obsidian",anytype:"Anytype",jira:"Jira",file:"Файл",other:"Другой источник"};
 const planReviewStatus:Record<string,string>={
  needs_decision:"Ожидает решения",deferred:"Решение отложено",
  needs_proposal:"Нужно новое предложение",source_hold:"Обновить Git-источник",
@@ -495,7 +496,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    const changedWhileSaving=latestSnapshot.current!==startedWith;
    const notice=result.reconciled?
     "Запись найдена и сверена с диском после потери ответа нативной команды.":
-    "Сохранено и перечитано с диска. Новых файлов проектов: "+result.projectBlocksWritten+".";
+    "Изменения сохранены на этом компьютере.";
    setMessage(notice+(changedWhileSaving?" Изменения, внесённые во время записи, ещё не сохранены.":""));
    host?.onReadback?.({generation:result.generation,revision:String(startedWith.revision),
     projectId:active,dirty:changedWhileSaving});
@@ -747,7 +748,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   window.addEventListener("keydown",key);return ()=>window.removeEventListener("keydown",key);
  });
  if(!ready)return <main className="entry">
-  <div className="entry-card"><img className="logo-symbol" src={logoUrl} alt="" aria-hidden="true" /><h1>IWXA Atlas <em>0.4.0</em></h1>
+  <div className="entry-card"><img className="logo-symbol" src={logoUrl} alt="" aria-hidden="true" /><h1>IWXA Atlas <em>0.4.0-dev.1</em></h1>
    <p>{recovery?"Найдена предыдущая исправная версия портфеля. Восстановление выполняется только по вашему решению.":"Самостоятельное локальное приложение для Windows. Данные принадлежат пользователю."}</p>
    {error&&<p role="alert" className="error">{error}</p>}
    {recovery&&<Action onClick={()=>void restore()} primary disabled={busy}>Восстановить сохранённую версию</Action>}
@@ -757,7 +758,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  </main>;
  return <div ref={rootRef} className={"app-shell"+(inspector?"":" no-inspector")+(editor?" editor-active":"")+(embedded?" atlas-embedded":"")}>
   <aside className="sidebar">
-   <div className="brand"><img className="logo-symbol" src={logoUrl} alt="" aria-hidden="true" /><div><strong>Atlas</strong><small>IWXA · 0.4.0</small></div></div>
+   <div className="brand"><img className="logo-symbol" src={logoUrl} alt="" aria-hidden="true" /><div><strong>Atlas</strong><small>IWXA · 0.4.0-dev.1</small></div></div>
    <nav className="main-nav" aria-label="Основная навигация">
     <button aria-label="Открыть портфель проектов" className={!active?"nav-current":""}
       onClick={()=>selectProject(null)}>▦ <span>Портфель проектов</span><b>{data.projects.length}</b></button>
@@ -773,7 +774,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     </button>}
     {!filtered.length&&<small className="nav-hint">Проекты не найдены</small>}
    </div>
-   <div className="sidebar-foot"><div className="foot-title">{embedded?"Atlas в Personal Agent":"Локальная работа"}</div><p>{embedded?"Полный интерфейс Atlas. Хранилище принадлежит Atlas; команды разрешает host.":"Без Agent и сервера. Данные сохраняются по вашей команде."}</p><small>Схема: atlas.project/1</small></div>
+   <div className="sidebar-foot"><div className="foot-title">{embedded?"Atlas в Personal Agent":"Мои проекты"}</div><p>{embedded?"Работайте с проектами в своём рабочем пространстве.":"Проекты хранятся на этом компьютере. Сохраняйте изменения, когда работа завершена."}</p></div>
   </aside>
   <main className="workspace">
    <header className="commandbar">
@@ -788,14 +789,15 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
        fileMenuRef.current?.querySelector("summary")?.focus();
       }
      }}>
-      <summary>Файлы и версии</summary>
+      <summary>Сохранение и копии</summary>
       <div className="atlas-file-menu-actions">
        <Action onClick={()=>{fileMenuRef.current?.removeAttribute("open");void importJson()}}
-        disabled={busy||!!editor||pendingImport!==null}>Открыть JSON</Action>
+        disabled={busy||!!editor||pendingImport!==null}>Открыть резервную копию</Action>
        <Action onClick={()=>{fileMenuRef.current?.removeAttribute("open");void exportJson()}}
-        disabled={busy||dirty||!!editor||!persisted}>Резервная копия</Action>
+        disabled={busy||dirty||!!editor||!persisted}>Сохранить резервную копию</Action>
        <Action onClick={()=>{fileMenuRef.current?.removeAttribute("open");void showNativeHistory()}}
-        disabled={busy||dirty||!!editor||!persisted||savedVersions!==null}>Версии на диске</Action>
+        disabled={busy||dirty||!!editor||!persisted||savedVersions!==null}>История сохранений</Action>
+       <p className="atlas-file-menu-note">Копии пока сохраняются в JSON. Обмен файлами .iwxa здесь ещё не подключён.</p>
       </div>
      </details>
      <button disabled={!!editor} className="icon-button inspector-button" aria-label={inspector?"Скрыть инспектор":"Показать инспектор"}
@@ -917,8 +919,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      {resources.people.length>resourceLimit&&<Action onClick={()=>setResourceLimit(n=>Math.min(resources.people.length,n+40))}>Показать ещё ресурсы</Action>}
     </section>
     <section className="surface">
-     <div className="section-heading"><div><h2>Публичные источники</h2><p>Read-only наблюдения GitHub, без доступа к приватным репозиториям.</p></div>
-      <Action onClick={()=>void syncPublic()} disabled={busy||!sourceQueue.bindings}>Сверить источники</Action></div>
+     <div className="section-heading"><div><h2>Источники проектов</h2><p>Atlas проверяет открытые репозитории GitHub по вашему запросу. Ничего в них не меняет.</p></div>
+      <Action onClick={()=>void syncPublic()} disabled={busy||!sourceQueue.bindings}>Проверить обновления</Action></div>
      {refreshReport&&<p className="minor">Последняя попытка: {refreshReport.updated} обновлено · {refreshReport.failed} ошибок · {refreshReport.remaining} отложено.</p>}
      <div className="summary-line"><span>Всего привязок: {sourceQueue.bindings}</span><span>Требуют проверки: {sourceQueue.pending}</span><span>Ошибки: {sourceQueue.errors}</span></div>
      {sourceQueue.rows.slice(0,sourceLimit).map((r:any,i:number)=><div key={i} className="attention-row"><div><strong>{r.locator}</strong><small>{r.error?"Ошибка":r.stale?"Требует обновления":"Наблюдался"} · {r.count} привязок</small></div>
@@ -969,8 +971,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      </section>}
 
      <section className="surface atlas-reality-overview" aria-label="Сопоставление цели, фактов и решений">
-      <div className="section-heading"><div><h2>Должно быть → известно → расхождение → решение</h2>
-       <p>Последние заявленные факты и их источники. Ни Git SHA, ни ручная отметка «приёмка» сами по себе не подтверждают выполнение.</p></div>
+      <div className="section-heading"><div><h2>План, факты и решения</h2>
+       <p>Atlas сопоставляет требования с записанными фактами, показывает расхождения и связанные решения. Источники можно проверить отдельно.</p></div>
        <div className="button-row"><Action onClick={()=>openEditor("target")}>＋ Требование</Action>
         <Action onClick={()=>view("reality")}>Все факты</Action></div></div>
       {realityMap?.rows.length?<div className="atlas-reality-list">
@@ -978,11 +980,11 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
         tabIndex={-1} ref={r.id===requirementJump?.targetId?requirementCardRef:undefined}
         aria-label={"Требование: "+r.title+" — "+project.name}>
         <div className="atlas-reality-grid">
-         <div className="atlas-reality-col"><small>Должно быть</small>
+         <div className="atlas-reality-col"><small>Ожидаемый результат</small>
           <strong>{r.title}</strong><p>{r.desired}</p>
           {r.intent==="candidate"&&<small>Кандидат, не утверждённое требование</small>}
          </div>
-         <div className="atlas-reality-col"><small>Последнее наблюдение</small>
+         <div className="atlas-reality-col"><small>Что известно сейчас</small>
           <Badge tone={r.observation?"neutral":"warning"}>{r.observation?
            ({present:"Заявлено наличие",partial:"Заявлено частично",absent:"Заявлено отсутствие"} as Record<string,string>)[r.observation.result]||r.observation.result:"Факт не внесён"}</Badge>
           {r.observation&&<p>Уровень: {({implementation:"Реализация",test:"Тестирование",acceptance:"Заявлена приёмка"} as Record<string,string>)[r.observation.level]||r.observation.level}
@@ -991,13 +993,13 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
            aria-label={"Открыть работу, связанную с наблюдением: "+r.observation.workTitle}
            onClick={()=>openEditor("work:"+r.observation.workId)}>{r.observation.workTitle}</button></p>}
           {r.source?<p title={r.source.revision||""}>Источник: {r.source.locator}
-           {r.source.ref?" / "+r.source.ref:""}{r.source.revision?" · "+r.source.revision.slice(0,12):""}</p>:
-           <p>Внешний источник не привязан</p>}
+           {r.source.ref?" / "+r.source.ref:""}</p>:
+           <p>Источник не указан</p>}
          </div>
-         <div className="atlas-reality-col"><small>Расхождение и причина</small>
+         <div className="atlas-reality-col"><small>Что требует внимания</small>
           <Badge tone={r.needsAttention?"warning":"neutral"}>{evidence[r.assessment]||r.assessment}</Badge>
           {r.reasons.length?<ul>{r.reasons.map((reason:string,i:number)=><li key={i}>{reason}</li>)}</ul>:
-           <p>Независимая приёмка результатом этой сводки не установлена.</p>}
+           <p>Пока недостаточно сведений, чтобы подтвердить результат.</p>}
           <p>Связанных работ: {r.workCount}; незавершённых: {r.openWork}</p>
           {r.work.length>0&&<ul className="atlas-target-work-list">
            {r.work.slice(0,3).map((w:any)=><li key={w.id}>
@@ -1014,7 +1016,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
           {r.work.length>0&&r.openWork===0&&<p className="atlas-work-evidence-note">
            Работы отмечены выполненными. Это не подтверждает результат или его приёмку.</p>}
          </div>
-         <div className="atlas-reality-col"><small>Предложение и решение</small>
+         <div className="atlas-reality-col"><small>Как поступить</small>
           {r.cause&&<p className="atlas-cause-basis">
            Основание для рассмотрения: {r.cause.title}. {r.cause.detail}</p>}
           {r.change?<><strong>{r.change.title}</strong>
@@ -1352,18 +1354,18 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      {history.length>0&&<p className="minor">Показано {Math.min(historyLimit,history.length)} из {history.length} записей. Всего в проекте: {project.decisions.length+(project.findings||[]).length}.</p>}
      {history.length>historyLimit&&<Action onClick={()=>setHistoryLimit(n=>Math.min(history.length,n+120))}>Показать ещё записи</Action>}
     </section>}
-    {tab==="sources"&&<section className="surface"><div className="section-heading"><div><h2>Связанные источники</h2>
-     <p>Только публичные сведения GitHub доступны напрямую. Иные источники остаются ссылками до подключения разрешённого адаптера.</p></div>
+    {tab==="sources"&&<section className="surface"><div className="section-heading"><div><h2>Источники проекта</h2>
+     <p>Проверка открытых репозиториев GitHub запускается вручную. Другие источники пока можно добавить как ссылки.</p></div>
      <Action onClick={()=>openEditor("source")} primary>＋ Источник</Action></div>
      {(project.sources||[]).map((s:any)=>{
       const review=sourceReview(s,{limit:sourceRowLimits[s.id]||12});
       return <div className="atlas-source-review" key={s.id}>
-       <div className="attention-row"><div><strong>{s.kind}: {s.locator}</strong>
+       <div className="attention-row"><div><strong>{sourceNames[s.kind]||"Источник"}: {s.locator}</strong>
         <small>{review.status} · Попытка: {review.lastAttempt||"не выполнялась"}</small>
         {review.lastSuccess&&<small>Последнее успешное наблюдение: {review.lastSuccess}</small>}
         {review.error&&<small className="atlas-source-error">{review.error}</small>}
        </div>
-       {review.supported&&<Action onClick={()=>void syncPublic({projectId:project.id,sourceId:s.id})} disabled={busy}>Сверить</Action>}
+       {review.supported&&<Action onClick={()=>void syncPublic({projectId:project.id,sourceId:s.id})} disabled={busy}>Проверить</Action>}
        </div>
        {review.supported&&<div className="atlas-source-details">
         <p className="minor">{review.comparison==="COMPARABLE"
@@ -1407,8 +1409,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    {pendingImport!==null&&<div className="atlas-close-overlay">
     <section className="atlas-close-dialog atlas-import-dialog" role="dialog" aria-modal="true" aria-labelledby="atlas-import-preview-title">
      <div className="atlas-import-body">
-      <h2 id="atlas-import-preview-title">Проверка импорта JSON 0.1</h2>
-     <p>Это полная замена портфеля, не объединение. JSON проверен Atlas и ещё не изменил текущие данные.</p>
+      <h2 id="atlas-import-preview-title">Открыть резервную копию</h2>
+     <p>Проверьте содержимое копии. При подтверждении она заменит текущие проекты, но пока ничего не изменено.</p>
      <p className="minor">Редакция архива: {pendingImport.originalRevision}. Подтверждение изменит только черновик.</p>
      <div className="table-scroll"><table><thead><tr><th>Показатель</th><th>Сейчас</th><th>После импорта</th></tr></thead><tbody>
       {([["projects","Проекты"],["works","Работы"],["findings","Факты"],["decisions","Решения"],["changes","Предложения"],["sources","Источники"],["links","Связи проектов"]] as const).map(([key,label])=>
@@ -1426,7 +1428,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      {pendingImport.summary.incoming.projects===0&&<p className="atlas-schedule-warning">
       Внимание: архив пуст. После сохранения все текущие проекты исчезнут из активного портфеля.
      </p>}
-     <p className="minor">После нативного сохранения прежняя редакция останется в разделе «Версии на диске».</p>
+     <p className="minor">Предыдущие данные останутся в истории сохранений после того, как вы сохраните импортированный портфель.</p>
      {error&&<p className="alert error" role="alert">Не удалось подтвердить импорт: {error}</p>}
      </div>
      <div className="button-row atlas-import-actions">
@@ -1438,9 +1440,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    {savedVersions!==null&&<div className="atlas-close-overlay">
     <section className="atlas-close-dialog atlas-history-dialog" role="dialog" aria-modal="true" aria-labelledby="atlas-versions-title">
      <div className="atlas-history-body">
-      <h2 id="atlas-versions-title">Предыдущие редакции Atlas</h2>
-      <p>Версии получены из нативного хранилища. Восстановление создаёт новую сохранённую редакцию,
-       не изменяет архивный оригинал и сохраняет текущий портфель в истории.</p>
+      <h2 id="atlas-versions-title">История сохранений</h2>
+      <p>Вы можете вернуть более раннюю версию. Текущий портфель сохранится в истории, если понадобится вернуться к нему.</p>
       {savedVersions.length?<div className="table-scroll"><table><thead><tr><th>Редакция</th><th>Проекты</th><th>Действие</th></tr></thead><tbody>
        {savedVersions.slice(0,nativeHistoryLimit).map(item=><tr key={item.generation}><td>{item.revision}</td><td>{item.projects}</td><td>
         <Action disabled={busy} onClick={()=>{setSelectedHistory(item);setError("")}}>
@@ -1478,8 +1479,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      </div>
     </section>
    </div>}
-   <footer className="workspace-footer"><span>IWXA Atlas 0.4 · локальный черновик → нативная запись → readback</span>
-    <span>Готовность определяется доказательствами и решениями, не количеством коммитов.</span></footer>
+   <footer className="workspace-footer"><span>IWXA Atlas 0.4 · проекты хранятся на этом компьютере</span>
+    <span>Вы сами решаете, какие изменения сохранить и принять.</span></footer>
   </main>
   {inspector&&<aside className="inspector">
    {editor?<EditorPanel key={editor.action} editor={editor} onSubmit={submit}
@@ -1488,14 +1489,14 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     <div className="inspector-block"><small>Текущий контекст</small><strong>{project?.name||"Портфель проектов"}</strong>
      <p>{project?.goal||"Выберите проект для работы с планом, доказательствами и изменениями."}</p></div>
     <div className="inspector-block"><small>Состояние данных</small><Badge tone={editor||dirty?"warning":persisted?"good":"neutral"}>{editor?"Форма не применена":dirty?"Только в памяти":persisted?"Сохранено на диск":"Ещё не сохранялся"}</Badge>
-     <p>Редакция: {data.revision}</p><p>Хранилище: нативное Atlas</p>
+     <p>Данные портфеля хранятся на этом компьютере.</p>
      <Action onClick={()=>void save()} primary disabled={!dirty||busy||!!editor}>Сохранить редакцию</Action></div>
     {project&&<div className="inspector-block"><small>План проекта</small><p>Начало: {readable(project.startDate)}</p>
      <p>Контрольный срок: {readable(project.dueDate)}</p>
      <p>Расчётный финиш: {projectedFinishLabel(projected)}</p>
      <Action onClick={()=>openEditor("dates")}>Изменить даты</Action></div>}
     <div className="inspector-block"><small>Дополнительные сведения</small>
-     <p>Источник и результат не получают статус «подтверждено» только из-за успешной сборки или заявления исполнителя.</p></div>
+     <p>Сведения из источника помогут проверить выполненную работу. Окончательное решение остаётся за вами.</p></div>
    </section>}
   </aside>}
  </div>;
