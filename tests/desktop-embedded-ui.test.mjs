@@ -56,10 +56,10 @@ test("portfolio attention and project next step navigate in existing views witho
 
 test("secondary file operations are grouped without losing existing native guards",()=>{
  assert.match(main,/<details ref=\{fileMenuRef\} className="atlas-file-menu"/);
- assert.match(main,/<summary>Файлы и версии<\/summary>/);
- assert.match(main,/disabled=\{busy\|\|!!editor\|\|pendingImport!==null\}>Открыть JSON/);
- assert.match(main,/disabled=\{busy\|\|dirty\|\|!!editor\|\|!persisted\}>Резервная копия/);
- assert.match(main,/disabled=\{busy\|\|dirty\|\|!!editor\|\|!persisted\|\|savedVersions!==null\}>Версии на диске/);
+ assert.match(main,/<summary>Сохранение и копии<\/summary>/);
+ assert.match(main,/disabled=\{busy\|\|!!editor\|\|pendingImport!==null\}>Открыть резервную копию/);
+ assert.match(main,/disabled=\{busy\|\|dirty\|\|!!editor\|\|!persisted\}>Сохранить резервную копию/);
+ assert.match(main,/disabled=\{busy\|\|dirty\|\|!!editor\|\|!persisted\|\|savedVersions!==null\}>История сохранений/);
  assert.match(main,/fileMenuRef\.current\?\.removeAttribute\("open"\)/);
  assert.match(css,/@media\(min-width:761px\) and \(max-width:1220px\)/);
  assert.match(css,/\.atlas-file-menu-actions\{position:absolute/);
@@ -68,7 +68,7 @@ test("secondary file operations are grouped without losing existing native guard
 test("overview presents the same Atlas facts, evidence provenance, linked decisions and paging",()=>{
  assert.match(main,/realityOverview\(project,reality,impact\)/);
  assert.match(main,/aria-label="Сопоставление цели, фактов и решений"/);
- assert.match(main,/r\.source\.revision\.slice\(0,12\)/);
+ assert.match(main,/r\.source\.ref\?" \/ "\+r\.source\.ref/);
  assert.match(main,/r\.change\.planApplied\?" · План применён локально":""/);
  assert.match(main,/openProjectTab\(project\.id,"changes",r\.change\.id\)/);
  assert.match(main,/setRealityLimit\(n=>Math\.min\(realityMap\?\.count\?\?n,n\+8\)\)/);
