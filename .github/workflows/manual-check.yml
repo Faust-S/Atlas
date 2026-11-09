@@ -32,6 +32,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Install pinned desktop frontend
+        working-directory: desktop
+        run: npm ci --no-audit --no-fund
       - name: Existing Atlas and new 0.3 regression suite
         run: npm test
       - name: Validate source syntax
@@ -54,9 +57,6 @@ jobs:
           persist-credentials: false
       - name: Qualify Atlas project/work and stale revision with real Center sources
         run: node tests/atlas-center-interop.mjs
-      - name: Install pinned desktop frontend
-        working-directory: desktop
-        run: npm ci --no-audit --no-fund
       - name: Verify production desktop build
         working-directory: desktop
         run: npm run build

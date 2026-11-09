@@ -27,11 +27,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Test existing Atlas and branded icon
-        run: npm test
       - name: Install pinned React dependencies
         working-directory: desktop
         run: npm ci --no-audit --no-fund
+      - name: Test existing Atlas and branded icon
+        run: npm test
       - name: Build branded production GUI
         working-directory: desktop
         run: npm run build

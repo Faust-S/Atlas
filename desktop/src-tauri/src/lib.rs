@@ -2,6 +2,7 @@
 //! Immutable per-project blocks + one atomic manifest update. No HTTP server,
 //! cloud identity, Task Engine or access to arbitrary frontend-supplied paths.
 use fs2::FileExt;
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -16,6 +17,7 @@ use tauri_plugin_dialog::{DialogExt, FilePath};
 use uuid::Uuid;
 
 const MAX_FILE: u64 = 100 * 1024 * 1024;
+const MAX_IWXA_BYTES: usize = 32 * 1024 * 1024;
 const MAX_PROJECTS: usize = 5000;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -400,6 +402,53 @@ fn atlas_export_json(app:AppHandle, expected_generation:String)->Result<String,S
     // generation. Report success only after an atomic exported file exists.
     Ok(format!("Резервная копия Atlas сохранена: {}",selected.display()))
 }
+// Keep the existing native Save As / open dialogs and atomic publisher.
+// The verified IWXA carrier is assembled by the Atlas consumer adapter.
+#[tauri::command]
+fn atlas_export_iwxa(
+    app: AppHandle, expected_generation: String, archive_base64: String
+)->Result<String,String>{
+    if archive_base64.len() > (MAX_IWXA_BYTES / 3 + 1) * 4 + 4 {
+        return Err("Архив IWXA слишком большой (максимум 32 МБ)".into());
+    }
+    let bytes=BASE64.decode(&archive_base64).map_err(|_|"Некорректные данные архива IWXA")?;
+    if bytes.len() < 22 || bytes.len() > MAX_IWXA_BYTES || !bytes.starts_with(b"PK\x03\x04") {
+        return Err("Некорректный контейнер IWXA".into());
+    }
+    let chosen=app.dialog().file().set_title("Сохранить архив проектов IWXA")
+        .set_file_name("atlas-projects.iwxa")
+        .add_filter("IWXA", &["iwxa"]).blocking_save_file();
+    let Some(FilePath::Path(selected))=chosen else {
+        return Err("Выбор файла отменён".into());
+    };
+    if selected.extension().and_then(|x|x.to_str()).map(|x|x.to_ascii_lowercase())
+      !=Some("iwxa".into()) {return Err("Разрешён только файл .iwxa".into());}
+    // The picker may stay open while another window saves a newer generation.
+    let root=path_for(&app)?;
+    {
+        let _guard=lock(&root)?;
+        let head=current(&root)?.ok_or("Сначала сохраните портфель")?;
+        if head.generation!=expected_generation{
+            return Err("Портфель на диске изменился. Экспорт отменён.".into());
+        }
+        decode(&root,&head)?;
+    }
+    write_export_atomic(&selected,&bytes)?;
+    Ok(format!("Архив IWXA сохранён: {}",selected.display()))
+}
+#[tauri::command]
+fn atlas_select_iwxa(app:AppHandle)->Result<Option<String>,String>{
+    let chosen=app.dialog().file().set_title("Открыть архив проектов IWXA")
+        .add_filter("IWXA",&["iwxa"]).blocking_pick_file();
+    let Some(FilePath::Path(selected))=chosen else{return Ok(None)};
+    if selected.extension().and_then(|x|x.to_str()).map(|x|x.to_ascii_lowercase())
+      !=Some("iwxa".into()) {return Err("Открывать можно только файлы .iwxa".into());}
+    let bytes=read_limited(&selected)?;
+    if bytes.len() < 22 || bytes.len()>MAX_IWXA_BYTES {
+        return Err("Размер архива IWXA недопустим".into());
+    }
+    Ok(Some(BASE64.encode(bytes)))
+}
 #[tauri::command]
 fn atlas_select_import(app:AppHandle)->Result<Option<Value>,String>{
     let picked=app.dialog().file().set_title("Открыть архив Atlas JSON")
@@ -753,7 +802,8 @@ pub fn run(){
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
-            atlas_open,atlas_commit,atlas_export_json,atlas_select_import,atlas_restore_previous,
+            atlas_open,atlas_commit,atlas_export_json,atlas_select_import,
+            atlas_export_iwxa,atlas_select_iwxa,atlas_restore_previous,
             atlas_list_history,atlas_restore_history
         ])
         .run(tauri::generate_context!())

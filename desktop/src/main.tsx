@@ -18,6 +18,7 @@ import {planPublicRefresh,reconcilePublicSources,publicSourceQueue} from "../../
 import {sourceReview} from "../../src/source-review.mjs";
 import {ProjectGantt,ProjectDependencyDiagram} from "./ProjectVisuals";
 import {prepareImportedSnapshot} from "./import-snapshot.mjs";
+import {buildIwxaPortfolio,readIwxaPortfolio,toBase64,fromBase64} from "./iwxa-portfolio.mjs";
 import {commitWithReadback,readSavedSnapshotForReference} from "./native-save.mjs";
 import {projectHistoryRows} from "./history-view.mjs";
 import {sortWorkRows,filterWorkRowsByObservation} from "./work-sorting.mjs";
@@ -26,7 +27,7 @@ import {invokeAtlasHost,type AtlasEmbeddedHost} from "./embedded-host";
 
 type Atlas = any;
 type HistoryEntry = {generation:string;revision:number;projects:number};
-type ImportPreview = {snapshot:Atlas;originalRevision:number;expectedGeneration:string;startedWith:Atlas;summary:any};
+type ImportPreview = {snapshot:Atlas;originalRevision:number;expectedGeneration:string;startedWith:Atlas;summary:any;format:"json"|"iwxa"};
 type OpenResult = {generation:string;snapshot:Atlas;restoredFromBackup:boolean;needsConfirmation:boolean};
 type Field = {name:string;label:string;value?:string;required?:boolean;type:string;options?:{value:string;label:string}[]};
 type Editor = {action:string;spec:{title:string;hint?:string;fields:Field[]}};
@@ -531,6 +532,47 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    setError("");
   }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
  };
+ // The portable carrier is IWXA package 1.0; the Atlas object profile is
+ // consumer-local. Native Save As owns the file; the Atlas store remains owner.
+ const exportIwxa=async()=>{
+  if(!requireClosedForm()||busyRef.current||!ready)return;
+  if(dirty||!persisted){issue(Error("Сначала сохраните текущие проекты."));return}
+  busyRef.current=true;setBusy(true);
+  try{
+   const startedWith=latestSnapshot.current,expectedGeneration=generation;
+   const checked=await readSavedSnapshotForReference({invoke,expectedGeneration,
+    snapshot:startedWith,signature:snapshotText,
+    readValidated:(raw:Atlas)=>deserialize(JSON.stringify(raw))});
+   const archive=await buildIwxaPortfolio(checked);
+   if(latestSnapshot.current!==startedWith||dirtyRef.current||editorOpenRef.current)
+    throw Error("Проекты изменились во время подготовки архива. Сохранение отменено.");
+   const message=await invoke<string>("atlas_export_iwxa",{
+    expectedGeneration,archiveBase64:toBase64(archive)});
+   setMessage(message+" Вы сможете открыть этот файл в Atlas. Передача в другие программы IWXA пока не подключена.");
+   setError("");
+  }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
+ };
+ const importIwxa=async()=>{
+  if(!requireClosedForm()||busyRef.current||!ready)return;
+  if(dirty){issue(Error("Сначала сохраните изменения или отмените их перед импортом."));return}
+  busyRef.current=true;setBusy(true);
+  try{
+   const startedWith=latestSnapshot.current,expectedGeneration=generation;
+   const selected=await invoke<string|null>("atlas_select_iwxa");
+   if(selected===null)return;
+   const imported=await readIwxaPortfolio(fromBase64(selected));
+   if(latestSnapshot.current!==startedWith||dirtyRef.current||editorOpenRef.current)
+    throw Error("Проекты изменились во время выбора архива. Текущие данные не затронуты.");
+   const head=await invoke<OpenResult>("atlas_open");
+   if(head.needsConfirmation||head.generation!==expectedGeneration)
+    throw Error("Сохранённый портфель изменился. Откройте актуальную редакцию.");
+   const {snapshot:next,originalRevision,summary}=prepareImportedSnapshot(
+    startedWith,imported.snapshot,undefined,"iwxa.atlas.portfolio/1.0.0");
+   setPendingImport({snapshot:next,originalRevision,summary,startedWith,expectedGeneration,
+    format:"iwxa"});
+   setMessage("");setError("");
+  }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
+ };
  const importJson=async()=>{
   if(!requireClosedForm()||busyRef.current||!ready)return;
   if(dirty){issue(Error("Сначала сохраните изменения или отмените их перед импортом."));return}
@@ -548,7 +590,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    const {snapshot:next,originalRevision,summary}=prepareImportedSnapshot(startedWith,imported);
    // A chosen file is not permission to replace the user's portfolio.
    // Keep the fully validated candidate separate until explicit approval.
-   setPendingImport({snapshot:next,originalRevision,summary,startedWith,expectedGeneration:generation});
+   setPendingImport({snapshot:next,originalRevision,summary,startedWith,expectedGeneration:generation,format:"json"});
    setMessage("");setError("");
   }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
  };
@@ -791,13 +833,17 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      }}>
       <summary>Сохранение и копии</summary>
       <div className="atlas-file-menu-actions">
-       <Action onClick={()=>{fileMenuRef.current?.removeAttribute("open");void importJson()}}
-        disabled={busy||!!editor||pendingImport!==null}>Открыть резервную копию</Action>
+       <Action onClick={()=>{fileMenuRef.current?.removeAttribute("open");void exportIwxa()}}
+        disabled={busy||dirty||!!editor||!persisted}>Сохранить архив .iwxa</Action>
+       <Action onClick={()=>{fileMenuRef.current?.removeAttribute("open");void importIwxa()}}
+        disabled={busy||!!editor||pendingImport!==null}>Открыть архив .iwxa</Action>
        <Action onClick={()=>{fileMenuRef.current?.removeAttribute("open");void exportJson()}}
-        disabled={busy||dirty||!!editor||!persisted}>Сохранить резервную копию</Action>
+        disabled={busy||dirty||!!editor||!persisted}>Сохранить копию JSON</Action>
+       <Action onClick={()=>{fileMenuRef.current?.removeAttribute("open");void importJson()}}
+        disabled={busy||!!editor||pendingImport!==null}>Открыть копию JSON</Action>
        <Action onClick={()=>{fileMenuRef.current?.removeAttribute("open");void showNativeHistory()}}
         disabled={busy||dirty||!!editor||!persisted||savedVersions!==null}>История сохранений</Action>
-       <p className="atlas-file-menu-note">Копии пока сохраняются в JSON. Обмен файлами .iwxa здесь ещё не подключён.</p>
+       <p className="atlas-file-menu-note">Архив .iwxa переносит проекты между копиями Atlas. JSON остаётся для совместимости с Admin Center. Обмен с другими программами IWXA пока не подключён.</p>
       </div>
      </details>
      <button disabled={!!editor} className="icon-button inspector-button" aria-label={inspector?"Скрыть инспектор":"Показать инспектор"}
@@ -1416,8 +1462,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    {pendingImport!==null&&<div className="atlas-close-overlay">
     <section className="atlas-close-dialog atlas-import-dialog" role="dialog" aria-modal="true" aria-labelledby="atlas-import-preview-title">
      <div className="atlas-import-body">
-      <h2 id="atlas-import-preview-title">Открыть резервную копию</h2>
+      <h2 id="atlas-import-preview-title">{pendingImport.format==="iwxa"?"Открыть архив .iwxa":"Открыть резервную копию JSON"}</h2>
      <p>Проверьте содержимое копии. При подтверждении она заменит текущие проекты, но пока ничего не изменено.</p>
+     {pendingImport.format==="iwxa"&&<p className="minor">Архив подходит для Atlas. Обмен с другими программами IWXA пока не подтверждён.</p>}
      <p className="minor">Редакция архива: {pendingImport.originalRevision}. Подтверждение изменит только черновик.</p>
      <div className="table-scroll"><table><thead><tr><th>Показатель</th><th>Сейчас</th><th>После импорта</th></tr></thead><tbody>
       {([["projects","Проекты"],["works","Работы"],["findings","Факты"],["decisions","Решения"],["changes","Предложения"],["sources","Источники"],["links","Связи проектов"]] as const).map(([key,label])=>

@@ -14,7 +14,8 @@
   "dependencies": {
     "@tauri-apps/api": "2.12.3",
     "react": "19.2.0",
-    "react-dom": "19.2.0"
+    "react-dom": "19.2.0",
+    "fflate": "0.8.3"
   },
   "devDependencies": {
     "@tauri-apps/cli": "2.12.2",

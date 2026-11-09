@@ -28,15 +28,20 @@ test("native import, export and background mutations cannot discard an open form
   const span=ui.slice(ui.indexOf(" const "+name+"="),ui.indexOf("};",ui.indexOf(" const "+name+"=")));
   assert.match(span,/requireClosedForm\(\)/,name+" must protect the open editor");
  }
- assert.match(ui,/disabled=\{busy\|\|!!editor\|\|pendingImport!==null\}>Открыть резервную копию/);
- assert.match(ui,/disabled=\{busy\|\|dirty\|\|!!editor\|\|!persisted\}>Сохранить резервную копию/);
+ assert.match(ui,/const importIwxa=async\(\)=>\{\s*if\(!requireClosedForm\(\)\|\|busyRef\.current\|\|!ready\)return/);
+ assert.match(ui,/disabled=\{busy\|\|!!editor\|\|pendingImport!==null\}>Открыть архив \.iwxa/);
+ assert.match(ui,/disabled=\{busy\|\|!!editor\|\|pendingImport!==null\}>Открыть копию JSON/);
+ assert.match(ui,/const exportIwxa=async\(\)=>\{\s*if\(!requireClosedForm\(\)\|\|busyRef\.current\|\|!ready\)return/);
+ assert.match(ui,/disabled=\{busy\|\|dirty\|\|!!editor\|\|!persisted\}>Сохранить архив \.iwxa/);
+ assert.match(ui,/disabled=\{busy\|\|dirty\|\|!!editor\|\|!persisted\}>Сохранить копию JSON/);
  assert.match(ui,/disabled=\{!!editor\} className="icon-button inspector-button"/);
  assert.match(ui,/useState\(\(\)=>!host&&window\.innerWidth>1220\)/);
  assert.match(ui,/aria-label=\{inspector\?"Скрыть инспектор":"Показать инспектор"\}/);
 });
 
 test("JSON preview guards a draft until human approval and native generation recheck",()=>{
- assert.match(ui,/setPendingImport\(\{snapshot:next,originalRevision,summary,startedWith,expectedGeneration:generation\}\)/);
+ assert.match(ui,/setPendingImport\(\{snapshot:next,originalRevision,summary,startedWith,expectedGeneration:generation,format:"json"\}\)/);
+ assert.match(ui,/format:"iwxa"/);
  assert.match(ui,/const applyPendingImport=async\(\)=>/);
  assert.match(ui,/head\.needsConfirmation\|\|head\.generation!==candidate\.expectedGeneration/);
  assert.match(ui,/latestSnapshot\.current!==candidate\.startedWith/);

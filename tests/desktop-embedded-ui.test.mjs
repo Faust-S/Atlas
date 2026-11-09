@@ -57,8 +57,10 @@ test("portfolio attention and project next step navigate in existing views witho
 test("secondary file operations are grouped without losing existing native guards",()=>{
  assert.match(main,/<details ref=\{fileMenuRef\} className="atlas-file-menu"/);
  assert.match(main,/<summary>Сохранение и копии<\/summary>/);
- assert.match(main,/disabled=\{busy\|\|!!editor\|\|pendingImport!==null\}>Открыть резервную копию/);
- assert.match(main,/disabled=\{busy\|\|dirty\|\|!!editor\|\|!persisted\}>Сохранить резервную копию/);
+ assert.match(main,/disabled=\{busy\|\|!!editor\|\|pendingImport!==null\}>Открыть архив \.iwxa/);
+ assert.match(main,/disabled=\{busy\|\|!!editor\|\|pendingImport!==null\}>Открыть копию JSON/);
+ assert.match(main,/disabled=\{busy\|\|dirty\|\|!!editor\|\|!persisted\}>Сохранить архив \.iwxa/);
+ assert.match(main,/disabled=\{busy\|\|dirty\|\|!!editor\|\|!persisted\}>Сохранить копию JSON/);
  assert.match(main,/disabled=\{busy\|\|dirty\|\|!!editor\|\|!persisted\|\|savedVersions!==null\}>История сохранений/);
  assert.match(main,/fileMenuRef\.current\?\.removeAttribute\("open"\)/);
  assert.match(css,/@media\(min-width:761px\) and \(max-width:1220px\)/);

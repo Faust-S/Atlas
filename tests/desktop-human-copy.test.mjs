@@ -18,11 +18,14 @@ test("Atlas 0.5 shows human-first copy without leaking project schema",()=>{
  assert.match(ui,/Проекты хранятся на этом компьютере/);
 });
 
-test("backup UI does not mislabel legacy JSON as unified IWXA exchange",()=>{
+test("portable IWXA archives are primary, legacy JSON remains visibly separate",()=>{
  assert.match(ui,/<summary>Сохранение и копии<\/summary>/);
- assert.match(ui,/>Открыть резервную копию<\/Action>/);
- assert.match(ui,/>Сохранить резервную копию<\/Action>/);
- assert.match(ui,/Копии пока сохраняются в JSON\. Обмен файлами \.iwxa здесь ещё не подключён/);
+ assert.match(ui,/>Открыть архив \.iwxa<\/Action>/);
+ assert.match(ui,/>Открыть копию JSON<\/Action>/);
+ assert.match(ui,/>Сохранить архив \.iwxa<\/Action>/);
+ assert.match(ui,/>Сохранить копию JSON<\/Action>/);
+ assert.match(ui,/Архив \.iwxa переносит проекты между копиями Atlas/);
+ assert.match(ui,/Обмен с другими программами IWXA пока не подключён/);
  assert.match(ui,/>История сохранений<\/Action>/);
  assert.match(css,/\.atlas-file-menu-note\{/);
  assert.match(ui,/invoke<string>\("atlas_export_json"/);

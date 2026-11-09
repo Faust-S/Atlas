@@ -24,7 +24,8 @@ function importImpact(base,incoming){
   addedExamples:added.slice(0,6).map(p=>p.name)
  };
 }
-export function prepareImportedSnapshot(current,raw,importedAt=new Date().toISOString()){
+export function prepareImportedSnapshot(current,raw,importedAt=new Date().toISOString(),sourceLabel="atlas.project/1 JSON"){
+ if(!["atlas.project/1 JSON","iwxa.atlas.portfolio/1.0.0"].includes(sourceLabel))throw Error("Недопустимый источник импорта");
  const incoming=deserialize(JSON.stringify(raw));
  const base=deserialize(JSON.stringify(current));
  const originalRevision=incoming.revision;
@@ -35,7 +36,7 @@ export function prepareImportedSnapshot(current,raw,importedAt=new Date().toISOS
  const previous=snapshot.importProvenance;
  snapshot.revision=nextRevision;
  snapshot.importProvenance={
-  source:"atlas.project/1 JSON",originalRevision,importedAt,
+  source:sourceLabel,originalRevision,importedAt,
   ...(previous===undefined?{}:{previous})
  };
  deserialize(JSON.stringify(snapshot));
