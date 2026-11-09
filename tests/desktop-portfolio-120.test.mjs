@@ -225,8 +225,9 @@ test("installed Win32 work is a separate explicit act after decision and survive
  assert.match(script,/work\["state"\] == "todo"/);
  assert.match(script,/work\.get\("executor"\) is None/);
  assert.match(script,/work\["targetIds"\] == \["load-target-119"\]/);
- assert.match(script,/ATLAS04_SCALE_GUI_BASELINE_PASS_EXTENDED_WORKFLOW_HOLD/);
- assert.match(script,/if completed:\s*print\("ATLAS04_SCALE_GUI_ACCEPTED_PASS"/);
+ assert.match(script,/Mandatory installed 0\.4 cause\/decision\/work\/fact workflow remains unqualified/);
+ assert.match(script,/if not completed:\s*raise AssertionError/);
+ assert.match(script,/print\("ATLAS04_SCALE_GUI_ACCEPTED_PASS"/);
  const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
  assert.match(ui,/Связано работ: \{project\.items\.filter/);
  assert.match(ui,/＋ Создать связанную работу/);
@@ -316,4 +317,13 @@ test("installed Windows gives unlinked work a precise route to the existing targ
  assert.match(script,/ATLAS04_UNLINKED_WORK_UIA_HOLD/);
  assert.match(script,/inspect_unlinked_work_editor\(recorded_head\["generation"\]\)/);
  assert.match(main,/Указать требование для работы: "\+w\.title/);
+});
+
+test("installed 0.4 closure gate fails rather than silently accepting missing history or work flow",()=>{
+ const script=readFileSync(new URL("../desktop/tests/installed-atlas04-scale.py",import.meta.url),"utf8");
+ assert.match(script,/raise AssertionError\("Installed work-history Table tab unavailable"\)/);
+ assert.match(script,/raise AssertionError\("Installed observation filter lacks UIA evidence"\)/);
+ assert.match(script,/raise AssertionError\("Installed work history is not reachable after closing work editor"\)/);
+ assert.match(script,/raise AssertionError\("Mandatory installed 0\.4 cause\/decision\/work\/fact workflow remains unqualified"\)/);
+ assert.doesNotMatch(script,/ATLAS04_SCALE_GUI_BASELINE_PASS_EXTENDED_WORKFLOW_HOLD/);
 });

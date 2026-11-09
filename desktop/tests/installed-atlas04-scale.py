@@ -937,9 +937,8 @@ def inspect_cause_proposal_and_decision(saved_generation):
     window = Desktop(backend="uia").window(handle=handle)
     work_tab = window.child_window(title="Таблица", control_type="Button")
     if not work_tab.exists(timeout=2):
-        assert native()[0]["generation"] == recorded_head["generation"]
-        print("ATLAS04_WORK_HISTORY_UIA_HOLD table unavailable", flush=True)
-        return True
+        screenshot("work-history-tab-missing")
+        raise AssertionError("Installed work-history Table tab unavailable")
     work_tab.click_input()
     wait_title("Project 119 — Таблица", timeout=15)
     # Source-bound filter states must not fabricate observations or change
@@ -1002,10 +1001,9 @@ try:
     phase = "cause-proposal-and-decision"
     completed = inspect_cause_proposal_and_decision(saved["generation"])
     stop()
-    if completed:
-        print("ATLAS04_SCALE_GUI_ACCEPTED_PASS", flush=True)
-    else:
-        print("ATLAS04_SCALE_GUI_BASELINE_PASS_EXTENDED_WORKFLOW_HOLD", flush=True)
+    if not completed:
+        raise AssertionError("Mandatory installed 0.4 cause/decision/work/fact workflow remains unqualified")
+    print("ATLAS04_SCALE_GUI_ACCEPTED_PASS", flush=True)
 except Exception as error:
     print("ATLAS04_SCALE_GUI_HOLD phase=" + phase + " error=" + repr(error), flush=True)
     screenshot("failure")
