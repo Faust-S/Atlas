@@ -7,6 +7,7 @@ on:
       - work/2026-11-04-atlas-0-3
       - work/2026-11-08-atlas-0-4
       - release/0.4
+      - work/2026-11-09-atlas-0-5
   workflow_dispatch:
 
 permissions:
@@ -56,7 +57,7 @@ jobs:
         shell: pwsh
         run: cargo test --release --locked --manifest-path desktop/src-tauri/Cargo.toml --lib
       - name: Native Atlas R5 120-project persistence and 20 incremental revisions
-        if: github.ref_name == 'work/2026-11-04-atlas-0-3' || github.ref_name == 'work/2026-11-08-atlas-0-4' || github.ref_name == 'release/0.4'
+        if: github.ref_name == 'work/2026-11-04-atlas-0-3' || github.ref_name == 'work/2026-11-08-atlas-0-4' || github.ref_name == 'release/0.4' || github.ref_name == 'work/2026-11-09-atlas-0-5'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -69,7 +70,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $expectedVersion = if ($env:GITHUB_REF_NAME -eq 'release/0.4') { '0.4.0' } elseif ($env:GITHUB_REF_NAME -eq 'work/2026-11-08-atlas-0-4') { '0.4.0-dev.1' } elseif ($env:GITHUB_REF_NAME -eq 'work/2026-11-04-atlas-0-3') { '0.3.0' } else { '0.2.1' }
+          $expectedVersion = if ($env:GITHUB_REF_NAME -eq 'work/2026-11-09-atlas-0-5') { '0.5.0-dev.1' } elseif ($env:GITHUB_REF_NAME -eq 'release/0.4') { '0.4.0' } elseif ($env:GITHUB_REF_NAME -eq 'work/2026-11-08-atlas-0-4') { '0.4.0-dev.1' } elseif ($env:GITHUB_REF_NAME -eq 'work/2026-11-04-atlas-0-3') { '0.3.0' } else { '0.2.1' }
           $installer = Get-ChildItem 'desktop/src-tauri/target/release/bundle/nsis' -Filter "*$expectedVersion*setup.exe" | Select-Object -First 1
           if (!$installer) { throw 'Expected version NSIS installer missing' }
           $p = Start-Process -FilePath $installer.FullName -ArgumentList '/S' -PassThru
