@@ -17,6 +17,9 @@ test("installed GitHub acceptance uses real native GUI, remote public receipt an
  assert.match(script,/ATLAS05_GITHUB_REQUIREMENT_SOURCE_LINK_RESTART_PASS/);
  assert.match(script,/verify_requirement_from_source\(saved\)/);
  assert.match(script,/finding\["sourceId"\] == observed_source\["id"\]/);
+ assert.match(script,/title="К какому требованию относится", control_type="ComboBox"/);
+ assert.match(script,/target_select\.click_input\(\)/);
+ assert.match(script,/keyboard\.send_keys\("\{END\}\{ENTER\}"\)/);
  assert.match(script,/finding\["revision"\] == observed_sha/);
  assert.match(script,/assert head\(\) == persisted, "Navigating from linked source/);
  assert.match(script,/ATLAS05_GITHUB_CAUSE_TO_HUMAN_PROPOSAL_PASS/);

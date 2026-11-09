@@ -403,6 +403,17 @@ def verify_requirement_from_source(saved):
     assert head() == saved, "Adding a requirement was written before the user saved"
     click_button("＋ Наблюдение")
     wait_title("Форма: Фактическое состояние — заявление")
+    # The generic "+ Observation" form defaults to the first requirement.
+    # Pick the NEW requirement explicitly: this scenario's human action
+    # must not silently attach the fact to another preexisting criterion.
+    target_select = window().child_window(
+        title="К какому требованию относится", control_type="ComboBox"
+    )
+    if not target_select.exists(timeout=8) or not target_select.is_visible():
+        screenshot("target-fact-selector-missing")
+        raise AssertionError("Manual evidence requirement selector unavailable")
+    target_select.click_input()
+    keyboard.send_keys("{END}{ENTER}")
     source_select = window().child_window(
         title="Внешний источник и ветка", control_type="ComboBox"
     )
