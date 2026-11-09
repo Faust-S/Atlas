@@ -80,7 +80,7 @@ test("CI review distinguishes current, obsolete and unavailable GitHub Actions s
   headCurrent:"current",status:"in_progress",conclusion:null}}));
  assert.match(running.ci.label,/выполняется/);
  const unavailable=sourceReview(source({...base,ci:{state:"unavailable",reason:"RATE_LIMITED"}}));
- assert.match(unavailable.ci.label,/Не удалось получить/);
+ assert.match(unavailable.ci.label,/GitHub временно ограничил количество запросов/);
  assert.equal(unavailable.ci.url,null);
  const failed=sourceReview(source({...base,ci:{state:"observed",branch:"main",runId:103,
   headCurrent:"current",status:"completed",conclusion:"failure"}},"error"));
@@ -197,4 +197,18 @@ test("Actions evidence links the run's exact commit separately from observed bra
  const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
  assert.match(ui,/href={review.ci.checkedCommit.url}/);
  assert.match(ui,/Совпадение с последней наблюдавшейся редакцией ветки не подтверждено/);
+});
+
+test("source review distinguishes unverified partial-list branch lookup from a missing branch",()=>{
+ const base={scope:"repository",complete:false,branches:["main"],
+  branchHeads:{main:shaA},defaultBranch:"main"};
+ for(const reason of ["BRANCH_LOOKUP_UNAVAILABLE","BRANCH_LOOKUP_INVALID"]){
+  const model=sourceReview(source({...base,ci:{state:"unavailable",branch:"feature/unlisted",reason}}));
+  assert.match(model.ci.label,/Не удалось проверить выбранную ветку/);
+  assert.doesNotMatch(model.ci.label,/не найдена/);
+  assert.equal(model.authority,"OBSERVATION_ONLY");
+ }
+ const missing=sourceReview(source({...base,ci:{state:"unavailable",branch:"feature/missing",reason:"BRANCH_NOT_FOUND"}}));
+ assert.match(missing.ci.label,/ветка не найдена/);
+ assert.equal(missing.ci.url,null);
 });
