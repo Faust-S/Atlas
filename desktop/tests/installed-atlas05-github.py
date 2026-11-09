@@ -315,8 +315,30 @@ def reopened_check(saved, identity):
     if not any("Проверки GitHub Actions" in name for name in names):
         screenshot("actions-reopened-missing")
         raise AssertionError("Saved Actions observation was not shown after restart")
+    if not any("Редакция при последней сверке" in name for name in names):
+        screenshot("saved-revision-missing")
+        raise AssertionError("Saved GitHub branch revision is not visible in installed Atlas")
     screenshot("actions-reopened")
     print("ATLAS05_GITHUB_RESTART_READBACK_PASS", flush=True)
+    # The source review must lead to the existing plan/fact screen even if
+    # this project has no declared targets yet. Navigation is read-only.
+    activate()
+    for attempt in range(5):
+        choices = [item for item in window().descendants(control_type="Button")
+                   if item.window_text() == "Сверить требования и факты проекта"
+                   and item.is_visible() and item.is_enabled()]
+        if choices:
+            choices[0].click_input()
+            break
+        keyboard.send_keys("{PGDN}")
+        time.sleep(0.35)
+    else:
+        screenshot("plan-fact-navigation-missing")
+        raise AssertionError("Atlas did not expose GitHub to project requirements action")
+    wait_title("Project 0 — План / факт")
+    assert head() == saved, "Navigating from GitHub observation unexpectedly changed owner store"
+    screenshot("github-to-plan-fact")
+    print("ATLAS05_GITHUB_TO_PLAN_FACT_NATIVE_PASS", flush=True)
 
 
 initial = head()

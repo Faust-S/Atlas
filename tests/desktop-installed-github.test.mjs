@@ -12,6 +12,10 @@ test("installed GitHub acceptance uses real native GUI, remote public receipt an
  assert.match(script,/STORE \/ "head\.json"/);
  assert.match(script,/source\["summary"\]/);
  assert.match(script,/ATLAS05_GITHUB_RESTART_READBACK_PASS/);
+ assert.match(script,/ATLAS05_GITHUB_TO_PLAN_FACT_NATIVE_PASS/);
+ assert.match(script,/Сверить требования и факты проекта/);
+ assert.match(script,/Редакция при последней сверке/);
+ assert.match(script,/assert head\(\) == saved, "Navigating from GitHub observation/);
  assert.match(script,/Публичные наблюдения обновлены в черновике/);
  assert.doesNotMatch(script,/Получены сведения GitHub/);
  assert.match(script,/except PermissionError:/);
