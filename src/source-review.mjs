@@ -35,7 +35,11 @@ function checkReview(source){
  if(check.state==="none")label="На выбранной ветке нет запусков GitHub Actions";
  if(check.state==="invalid")label="GitHub вернул неполные сведения о проверке";
  if(check.state==="unavailable")label=check.reason==="BRANCH_NOT_FOUND"?
-  "Выбранная ветка не найдена в открытом репозитории":"Не удалось получить состояние GitHub Actions";
+  "Выбранная ветка не найдена в открытом репозитории":
+  ["BRANCH_LOOKUP_UNAVAILABLE","BRANCH_LOOKUP_INVALID"].includes(check.reason)?
+  "Не удалось проверить выбранную ветку GitHub":
+  check.reason==="RATE_LIMITED"?"GitHub временно ограничил количество запросов":
+  "Не удалось получить состояние GitHub Actions";
  if(check.state==="observed"){
   if(check.status==="in_progress")label="Проверка GitHub выполняется";
   else if(["queued","waiting","pending","requested"].includes(check.status))label="Проверка GitHub ожидает запуска";

@@ -85,9 +85,28 @@ export async function observePublicRepo(value,fetcher=globalThis.fetch,{maxPages
  let ci=null;
  if(includeActions){
   const branch=selectedBranch??(typeof repo.default_branch==="string"?repo.default_branch:null);
+  let lookupIssue=null;
+  // A capped list is not evidence that an unlisted branch does not exist.
+  // Resolve only the user's chosen branch; never enumerate further or fall
+  // back to the default branch's successful Actions run.
+  if(branch&&!branches.includes(branch)&&!complete){
+   try{
+    const exact=await request(base+"/branches/"+encodeURIComponent(branch),fetcher,signal);
+    if(exact?.name===branch&&typeof exact.commit?.sha==="string"&&
+       /^[a-f0-9]{40}$/i.test(exact.commit.sha)){
+      branches.push(branch);
+      branchHeads[branch]=exact.commit.sha.toLowerCase();
+    }else lookupIssue="BRANCH_LOOKUP_INVALID";
+   }catch(error){
+    const message=String(error?.message||error);
+    lookupIssue=/\b404\b/.test(message)?"BRANCH_NOT_FOUND":
+     /\b(?:403|429)\b|rate.limit|rate-limit/i.test(message)?"RATE_LIMITED":
+     "BRANCH_LOOKUP_UNAVAILABLE";
+   }
+  }
   if(!branch||!branches.includes(branch)){
    ci={state:"unavailable",branch,
-    reason:selectedBranch?"BRANCH_NOT_FOUND":"NO_DEFAULT_BRANCH"};
+    reason:lookupIssue??(branch?"BRANCH_NOT_FOUND":"NO_DEFAULT_BRANCH")};
   }else{
    try{
     const payload=await request(base+"/actions/runs?branch="+encodeURIComponent(branch)+

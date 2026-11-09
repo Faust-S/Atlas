@@ -110,3 +110,69 @@ test("unknown or invalid requested branch cannot borrow success from main",async
  assert.equal(branchName("feature/Atlas-0.5"),"feature/Atlas-0.5");
  await assert.rejects(observePublicRepo("example/demo",f.fetcher,{includeActions:true,actionsBranch:"a..b"}),/Invalid public GitHub branch/);
 });
+
+test("partially listed GitHub repository resolves the exact selected branch before showing Actions",async()=>{
+ const hidden="work/2026-11-09-atlas-0-5",sha="c".repeat(40),calls=[];
+ const firstHundred=Array.from({length:100},(_,n)=>({name:"branch-"+n,commit:{sha:shaA}}));
+ const fetcher=async url=>{
+  calls.push(url);
+  if(url.endsWith("/repos/example/demo"))return ok({id:31,private:false,default_branch:"main"});
+  if(url.includes("/branches?"))return ok(firstHundred);
+  if(url.endsWith("/branches/"+encodeURIComponent(hidden)))return ok({name:hidden,commit:{sha}});
+  if(url.includes("/actions/runs?"))return ok({workflow_runs:[workflow({head_branch:hidden,head_sha:sha})]});
+  throw Error("Unexpected API "+url);
+ };
+ const result=await observePublicRepo("example/demo",fetcher,
+  {maxPages:1,includeActions:true,actionsBranch:hidden});
+ assert.equal(result.complete,false,"one page of 100 cannot establish complete enumeration");
+ assert.ok(result.branches.includes(hidden));
+ assert.equal(result.branchHeads[hidden],sha);
+ assert.equal(result.ci.branch,hidden);
+ assert.equal(result.ci.headCurrent,"current");
+ assert.equal(result.ci.conclusion,"success");
+ assert.ok(calls.some(url=>url.endsWith("/branches/work%2F2026-11-09-atlas-0-5")));
+ assert.equal(calls.filter(url=>url.includes("/actions/runs?")).length,1);
+ assert.equal(calls.length,4,"repository, capped list, exact branch and its Actions");
+});
+test("capped GitHub branch list differentiates missing branches, API limits and invalid metadata",async()=>{
+ const wanted="work/feature",listed=Array.from({length:100},(_,i)=>({name:"topic-"+i,commit:{sha:shaA}}));
+ for(const [code,reason] of [[404,"BRANCH_NOT_FOUND"],[403,"RATE_LIMITED"],[429,"RATE_LIMITED"],[500,"BRANCH_LOOKUP_UNAVAILABLE"]]){
+  const calls=[];
+  const fetcher=async url=>{
+   calls.push(url);
+   if(url.endsWith("/repos/example/demo"))return ok({id:31,private:false,default_branch:"main"});
+   if(url.includes("/branches?"))return ok(listed);
+   if(url.includes("/branches/"))return missing(code);
+   throw Error("Should not consult Actions without a confirmed branch");
+  };
+  const result=await observePublicRepo("example/demo",fetcher,
+   {maxPages:1,includeActions:true,actionsBranch:wanted});
+  assert.equal(result.ci.state,"unavailable");
+  assert.equal(result.ci.reason,reason);
+  assert.equal(result.complete,false);
+  assert.equal(calls.length,3);
+ }
+ const broken=async url=>url.endsWith("/repos/example/demo")?
+  ok({id:31,private:false,default_branch:"main"}):
+  url.includes("/branches?")?ok(listed):ok({name:"other",commit:{sha:shaB}});
+ const result=await observePublicRepo("example/demo",broken,
+  {maxPages:1,includeActions:true,actionsBranch:wanted});
+ assert.equal(result.ci.reason,"BRANCH_LOOKUP_INVALID");
+});
+test("exact GitHub default branch is also discoverable when a capped page omits it",async()=>{
+ const pages=Array.from({length:100},(_,i)=>({name:"feature-"+i,commit:{sha:shaA}}));
+ const urls=[];
+ const fetcher=async url=>{
+  urls.push(url);
+  if(url.endsWith("/repos/example/demo"))return ok({id:31,private:false,default_branch:"main"});
+  if(url.includes("/branches?"))return ok(pages);
+  if(url.endsWith("/branches/main"))return ok({name:"main",commit:{sha:shaB}});
+  if(url.includes("/actions/runs?"))return ok({workflow_runs:[workflow()]});
+  throw Error("Unexpected API "+url);
+ };
+ const result=await observePublicRepo("example/demo",fetcher,{maxPages:1,includeActions:true});
+ assert.equal(result.ci.branch,"main");
+ assert.equal(result.ci.headCurrent,"current");
+ assert.equal(result.complete,false);
+ assert.ok(urls.some(url=>url.endsWith("/branches/main")));
+});
