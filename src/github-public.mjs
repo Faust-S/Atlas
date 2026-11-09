@@ -86,7 +86,7 @@ export async function observePublicRepo(value,fetcher=globalThis.fetch,{maxPages
     // observation into a failed project/source statement.
     const message=String(error?.message||error);
     ci={state:"unavailable",branch,
-     reason:/\\b(?:403|429)\\b|rate.limit|rate-limit/i.test(message)?"RATE_LIMITED":"SOURCE_UNAVAILABLE"};
+     reason:/\b(?:403|429)\b|rate.limit|rate-limit/i.test(message)?"RATE_LIMITED":"SOURCE_UNAVAILABLE"};
    }
   }
  }
