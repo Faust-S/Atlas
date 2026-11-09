@@ -390,6 +390,89 @@ def reopened_check(saved, identity):
     print("ATLAS05_GITHUB_TO_PLAN_FACT_NATIVE_PASS", flush=True)
 
 
+def verify_requirement_from_source(saved):
+    # A manually created fact can use the exact selected GitHub branch and be
+    # reopened through the source card. All writes use native user controls.
+    title = "GitHub evidence review"
+    click_button("＋ Требование")
+    wait_title("Форма: Ожидаемый результат")
+    set_text("Название требования", title)
+    set_text("Критерий выполнения", "Human-reviewed test result for the selected GitHub branch")
+    click_button("Применить к черновику")
+    wait_title("Project 0 — План / факт · Не сохранено")
+    assert head() == saved, "Adding a requirement was written before the user saved"
+    click_button("＋ Наблюдение")
+    wait_title("Форма: Фактическое состояние — заявление")
+    source_select = window().child_window(
+        title="Внешний источник и ветка", control_type="ComboBox"
+    )
+    if not source_select.exists(timeout=8) or not source_select.is_visible():
+        screenshot("source-fact-selector-missing")
+        raise AssertionError("Manual evidence source selector unavailable")
+    source_select.click_input()
+    keyboard.send_keys("{HOME}{DOWN}{ENTER}")
+    set_text("Что именно наблюдалось", "Reviewed the exact public GitHub branch")
+    screenshot("github-requirement-fact-form")
+    click_button("Применить к черновику")
+    wait_title("Project 0 — План / факт · Не сохранено")
+    assert head() == saved, "Recording a source-linked fact changed disk without Save"
+    click_button("Сохранить")
+    deadline = time.monotonic() + 40
+    while time.monotonic() < deadline:
+        persisted = head()
+        if persisted["generation"] != saved["generation"]:
+            break
+        time.sleep(0.25)
+    else:
+        screenshot("source-fact-save-timeout")
+        raise AssertionError("Source-linked fact was not persisted")
+    current = project(persisted)
+    targets = [t for t in current.get("targets", []) if t["title"] == title]
+    assert len(targets) == 1, "The required human-entered target is not persisted"
+    target_id = targets[0]["id"]
+    findings = [f for f in current.get("findings", []) if f["targetId"] == target_id]
+    assert len(findings) == 1, "The manually observed target has no saved finding"
+    finding = findings[0]
+    observed_source = current["sources"][0]
+    observed_sha = observed_source["summary"]["branchHeads"][BRANCH]
+    assert finding["sourceId"] == observed_source["id"]
+    assert finding["ref"] == BRANCH
+    assert finding["revision"] == observed_sha
+    assert finding["origin"] == "manual"
+    assert finding["result"] == "partial"
+    assert current["changes"] == [], "A source fact created an unsolicited action"
+    assert current["decisions"] == [], "A source fact created an unsolicited approval"
+    screenshot("source-fact-saved")
+    print("ATLAS05_GITHUB_REQUIREMENT_MANUAL_FACT_NATIVE_PASS", flush=True)
+    open_source_view()
+    label = "Открыть требование из источника: " + title
+    activate()
+    for _ in range(12):
+        matches = [item for item in window().descendants(control_type="Button")
+                   if item.window_text() == label and item.is_visible() and item.is_enabled()]
+        if matches:
+            matches[0].click_input()
+            break
+        keyboard.send_keys("{PGDN}")
+        time.sleep(0.3)
+    else:
+        screenshot("linked-requirement-missing")
+        raise AssertionError("Saved GitHub source card has no exact linked requirement")
+    wait_title("Project 0 — Обзор")
+    assert head() == persisted, "Navigating from linked source modified persisted data"
+    screenshot("source-fact-to-requirement")
+    stop()
+    launch()
+    assert head() == persisted, "Native restart lost the human source-linked finding"
+    assert any(f["id"] == finding["id"] for f in project(head()).get("findings", []))
+    open_source_view()
+    if not any(title in name for name in visible_texts()):
+        screenshot("linked-requirement-restart-missing")
+        raise AssertionError("Saved GitHub source requirement not restored to GUI")
+    screenshot("linked-requirement-reopened")
+    print("ATLAS05_GITHUB_REQUIREMENT_SOURCE_LINK_RESTART_PASS", flush=True)
+
+
 initial = head()
 assert len(initial["projects"]) == 120, "First qualify installed 120-project portfolio"
 assert not project(initial)["sources"], "Expected an unconnected project in fresh Windows qualification"
@@ -400,6 +483,7 @@ try:
     refresh_source()
     saved, identity = save_source(initial)
     reopened_check(saved, identity)
+    verify_requirement_from_source(saved)
     print("ATLAS05_GITHUB_INSTALLED_EXCHANGE_PASS", flush=True)
 except Exception as error:
     print("ATLAS05_GITHUB_INSTALLED_HOLD " + repr(error), flush=True)

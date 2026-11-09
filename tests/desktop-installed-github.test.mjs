@@ -13,6 +13,12 @@ test("installed GitHub acceptance uses real native GUI, remote public receipt an
  assert.match(script,/source\["summary"\]/);
  assert.match(script,/ATLAS05_GITHUB_RESTART_READBACK_PASS/);
  assert.match(script,/ATLAS05_GITHUB_TO_PLAN_FACT_NATIVE_PASS/);
+ assert.match(script,/ATLAS05_GITHUB_REQUIREMENT_MANUAL_FACT_NATIVE_PASS/);
+ assert.match(script,/ATLAS05_GITHUB_REQUIREMENT_SOURCE_LINK_RESTART_PASS/);
+ assert.match(script,/verify_requirement_from_source\(saved\)/);
+ assert.match(script,/finding\["sourceId"\] == observed_source\["id"\]/);
+ assert.match(script,/finding\["revision"\] == observed_sha/);
+ assert.match(script,/assert head\(\) == persisted, "Navigating from linked source/);
  assert.match(script,/ATLAS05_GITHUB_CAUSE_TO_HUMAN_PROPOSAL_PASS/);
  assert.match(script,/ATLAS05_GITHUB_GREEN_CI_NO_FALSE_CAUSE_PASS/);
  assert.match(script,/qualify_source_decision_route\(saved\)/);
