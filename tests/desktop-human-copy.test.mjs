@@ -43,7 +43,7 @@ test("technical source revisions are opt-in, not permanent UI columns",()=>{
  assert.doesNotMatch(ui,/<th>Предыдущий SHA<\/th>/);
  assert.doesNotMatch(ui,/<th>Новый SHA<\/th>/);
  assert.match(ui,/className="atlas-technical-details"/);
- assert.match(ui,/<summary>Версии источника<\/summary>/);
+ assert.match(ui,/<summary>Версия источника<\/summary>/);
  assert.match(ui,/<summary>Данные для ручного подключения<\/summary>/);
  assert.match(css,/\.atlas-technical-details>summary:focus-visible/);
 });
