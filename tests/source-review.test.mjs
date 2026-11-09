@@ -174,7 +174,8 @@ test("source screen offers read-only journey from GitHub evidence to project rea
  const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
  assert.match(ui,/review\.observedCommit&&<small>Редакция при последней сверке/);
  assert.match(ui,/href={review.observedCommit.url}/);
- assert.match(ui,/Сверить с требованиями проекта/);
+ assert.match(ui,/Сверить требования и факты проекта/);
+ assert.doesNotMatch(ui,/project\.targets\?\.length>0&&<button type="button" className="text-link"/);
  assert.match(ui,/onClick=\{\(\)=>view\("reality"\)\}/);
  assert.match(ui,/Сборка на GitHub не подтверждает выполнение требований/);
 });

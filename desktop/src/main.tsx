@@ -1437,8 +1437,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
          <p>{review.ci.label}</p>
          {review.ci.url&&<a className="text-link" href={review.ci.url}
           target="_blank" rel="noopener noreferrer">Открыть проверку на GitHub</a>}
-         {project.targets?.length>0&&<button type="button" className="text-link"
-           onClick={()=>view("reality")}>Сверить с требованиями проекта</button>}
+         <button type="button" className="text-link"
+           onClick={()=>view("reality")}>Сверить требования и факты проекта</button>
          <p className="minor">Сборка на GitHub не подтверждает выполнение требований и приёмку проекта.</p>
         </div>}
         <p className="minor">{review.comparison==="COMPARABLE"
