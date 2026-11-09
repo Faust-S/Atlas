@@ -1,5 +1,5 @@
 // Named, accessible in-page editors. Never expose internal IDs as editable text.
-import {validate as validateLinkedPlan,createProject,editProject,createStage,editStage,createItem,editItem,connect,createRisk,editRisk,createDecision,attach} from "./core.mjs";
+import {validate as validateLinkedPlan,createProject,editProject,createStage,editStage,createItem,editItem,connect,createRisk,editRisk,createDecision,attach,setSourceBranch} from "./core.mjs";
 import {addTarget,recordFinding,planChange,updateChange,decideChange} from "./trace.mjs";
 import {projectSignals,validCauseKey} from "./response.mjs";
 import {projectImpact} from "./impact.mjs";
@@ -263,6 +263,13 @@ export function editorSpec(project,action,snapshot=null){
    choice("status","Состояние",[option("open","Открыт"),option("closed","Закрыт")],risk.status)]};
  }
  if(action==="decision")return {title:"Зафиксировать решение",fields:[field("text","Решение и основание","textarea")]};
+ if(action.startsWith("source-branch:")){
+  const id=decodeURIComponent(action.slice("source-branch:".length));
+  const source=p?.sources?.find(s=>s.id===id&&s.kind==="github");
+  if(!source)throw Error("Репозиторий для изменения ветки не найден");
+  return {title:"Ветка проверок GitHub",hint:"Если оставить поле пустым, будет выбрана основная ветка. Результаты наблюдения прежней ветки не переносятся. Предыдущие сохранения остаются в истории.",
+   fields:[field("branch","Название ветки","text",source.branch||"",false)]};
+ }
  if(action==="source")return {title:"Добавить источник проекта",hint:"Atlas проверяет выбранную ветку открытого репозитория GitHub. Оставьте поле ветки пустым для основной ветки. Приватный доступ пока не подключён.",fields:[choice("kind","Тип источника",[
   option("github","Репозиторий GitHub"),option("github_owner","Организация или пользователь GitHub"),
   option("gitlab","GitLab (ссылка)"),option("forgejo","Forgejo (ссылка)"),option("gitea","Gitea (ссылка)"),
@@ -398,6 +405,12 @@ export function applyEditor(snapshot,projectId,action,input){
  }
  if(action==="risk")return {state:createRisk(snapshot,projectId,get("text"))};
  if(action==="decision")return {state:createDecision(snapshot,projectId,get("text"))};
+ if(action.startsWith("source-branch:")){
+  const branch=get("branch");
+  if(branch)try{branchName(branch)}catch{throw Error("Укажите корректное имя ветки GitHub.");}
+  const id=decodeURIComponent(action.slice("source-branch:".length));
+  return {state:setSourceBranch(snapshot,projectId,id,branch||null)};
+ }
  if(action==="source"){
   const kind=get("kind"),locator=get("locator"),branch=get("branch");
   if(branch&&kind!=="github")throw Error("Выбор ветки доступен только для репозитория GitHub.");

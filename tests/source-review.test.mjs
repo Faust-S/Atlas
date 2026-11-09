@@ -125,3 +125,11 @@ test("unavailable selected branch is shown as missing, not as a failed product",
  assert.equal(review.ci.branch,"work/removed");
  assert.equal(review.authority,"OBSERVATION_ONLY");
 });
+
+test("source screen can edit a connected branch without rebuilding the source",()=>{
+ const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ assert.match(ui,/openEditor\("source-branch:"\+encodeURIComponent\(s\.id\)\)/);
+ assert.match(ui,/Изменить ветку/);
+ const editor=readFileSync(new URL("../src/editor.mjs",import.meta.url),"utf8");
+ assert.match(editor,/Результаты наблюдения прежней ветки не переносятся/);
+});

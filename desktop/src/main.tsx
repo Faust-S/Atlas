@@ -1416,7 +1416,10 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
         {review.lastSuccess&&<small>Последнее успешное наблюдение: {review.lastSuccess}</small>}
         {review.error&&<small className="atlas-source-error">{review.error}</small>}
        </div>
-       {review.supported&&<Action onClick={()=>void syncPublic({projectId:project.id,sourceId:s.id})} disabled={busy}>{s.kind==="github"?"Проверить код и сборку":"Обновить список"}</Action>}
+       <div className="button-row">
+        {s.kind==="github"&&<Action onClick={()=>openEditor("source-branch:"+encodeURIComponent(s.id))} disabled={busy}>Изменить ветку</Action>}
+        {review.supported&&<Action onClick={()=>void syncPublic({projectId:project.id,sourceId:s.id})} disabled={busy}>{s.kind==="github"?"Проверить код и сборку":"Обновить список"}</Action>}
+       </div>
        </div>
        {review.supported&&<div className="atlas-source-details">
         {review.ci&&<div className="atlas-source-ci" aria-label="Проверки исходного кода GitHub">

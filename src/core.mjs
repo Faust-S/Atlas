@@ -225,6 +225,20 @@ export function attach(s,pid,kind,locator,{branch=null}={}){if(!kinds.has(kind))
  const id=uid();return{id,state:change(s,x=>project(x,pid).sources.push({id,kind,locator:nonempty(locator,"Source"),
   ...(branch===null?{}:{branch}),status:"never",observedAt:null,summary:null,error:null}))};
 }
+// A source may track a different GitHub branch without changing its identity.
+// Old branch observations must never be presented as evidence for the new branch.
+export function setSourceBranch(s,pid,id,branch=null){
+ if(branch!==null&&(typeof branch!=="string"||!branch.trim()||branch.length>200))
+  throw Error("Invalid source branch");
+ const current=project(s,pid).sources.find(v=>v.id===id);
+ if(!current||current.kind!=="github")throw Error("Unknown GitHub repository source");
+ if((current.branch??null)===branch)return s;
+ return change(s,x=>{
+  const source=project(x,pid).sources.find(v=>v.id===id);
+  if(branch===null)delete source.branch;else source.branch=branch;
+  source.status="never";source.observedAt=null;source.summary=null;source.error=null;
+ });
+}
 export function observe(s,pid,id,status,summary=null,error=null){return change(s,x=>{const src=project(x,pid).sources.find(v=>v.id===id);if(!src)throw Error("Unknown source");src.status=status;src.observedAt=new Date().toISOString();if(status==="ok")src.summary=summary;src.error=status==="ok"?null:String(error||"Unavailable");})}
 export function summary(p){const total=p.items.length,done=p.items.filter(x=>x.state==="done").length;return {total,done,blocked:p.items.filter(x=>x.state==="blocked").length,progress:total?Math.round(done/total*100):null,sourceCount:p.sources.length,readiness:"not_assessed"}}
 export const serialize=s=>(validate(s),JSON.stringify(s,null,2));

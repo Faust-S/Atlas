@@ -144,3 +144,37 @@ test("existing source editor keeps an optional selected GitHub branch through sn
  assert.throws(()=>applyEditor(stored,project.id,"source",
   values({kind:"github",locator:"Faust-S/Atlas",branch:"work/../bad"})),/корректное имя ветки/);
 });
+
+test("existing GitHub source changes branch without carrying old CI evidence",()=>{
+ const project=createProject(empty(),{name:"Working project"});
+ const attached=applyEditor(project.state,project.id,"source",
+  values({kind:"github",locator:"Faust-S/Atlas",branch:"release/0.4"})).state;
+ const original=attached.projects[0].sources[0],id=original.id;
+ const spec=editorSpec(attached.projects[0],"source-branch:"+encodeURIComponent(id));
+ assert.equal(spec.fields[0].name,"branch");
+ assert.equal(spec.fields[0].value,"release/0.4");
+ const observed=structuredClone(attached);
+ observed.projects[0].sources[0].status="ok";
+ observed.projects[0].sources[0].observedAt="2026-11-09T12:00:00Z";
+ observed.projects[0].sources[0].summary={scope:"repository",ci:{state:"observed",branch:"release/0.4",conclusion:"success"}};
+ const changed=applyEditor(observed,project.id,"source-branch:"+encodeURIComponent(id),
+  values({branch:"work/2026-11-09-atlas-0-5"})).state;
+ const source=changed.projects[0].sources[0];
+ assert.equal(source.id,id);
+ assert.equal(source.locator,"Faust-S/Atlas");
+ assert.equal(source.branch,"work/2026-11-09-atlas-0-5");
+ assert.equal(source.status,"never");
+ assert.equal(source.observedAt,null);
+ assert.equal(source.summary,null,"Previous branch CI must not be reused");
+ assert.equal(source.error,null);
+ assert.equal(changed.revision,observed.revision+1);
+ const saved=deserialize(serialize(changed));
+ assert.equal(saved.projects[0].sources[0].branch,source.branch);
+ const cleared=applyEditor(saved,project.id,"source-branch:"+encodeURIComponent(id),
+  values({branch:""})).state;
+ assert.equal("branch" in cleared.projects[0].sources[0],false);
+ assert.equal(cleared.projects[0].sources[0].status,"never");
+ assert.equal(applyEditor(cleared,project.id,"source-branch:"+encodeURIComponent(id),
+  values({branch:""})).state,cleared,"Unchanged branch must not create another revision");
+ assert.throws(()=>editorSpec(cleared.projects[0],"source-branch:unknown"),/не найден/);
+});
