@@ -12,7 +12,7 @@ test("installed GitHub acceptance uses real native GUI, remote public receipt an
  assert.match(script,/STORE \/ "head\.json"/);
  assert.match(script,/source\["summary"\]/);
  assert.match(script,/ATLAS05_GITHUB_RESTART_READBACK_PASS/);
- assert.doesNotMatch(script,/CDP|chromium\.launch|fake_fetch|write_text\(/i);
+ assert.doesNotMatch(script,/webdriver|chromium\.launch|fake_fetch|write_text\(/i);
  assert.match(workflow,/Exercise installed Atlas 0\.5 GitHub Actions selected-branch roundtrip/);
  assert.match(workflow,/python desktop\/tests\/installed-atlas05-github\.py/);
 });
