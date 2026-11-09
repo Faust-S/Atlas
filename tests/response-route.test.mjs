@@ -49,8 +49,9 @@ test("invalid change transitions and forged links cannot pass validation",()=>{
 
 test("GitHub Actions discrepancy follows existing proposal, human decision and work chain",()=>{
  const made=createProject(empty(),{name:"Release planning",type:"engineering"});
- let state=attach(made.state,made.id,"github","example/release");
- const sourceId=state.projects[0].sources[0].id;
+ const attached=attach(made.state,made.id,"github","example/release");
+ let state=attached.state;
+ const sourceId=attached.id;
  state=observe(state,made.id,sourceId,"ok",{
   scope:"repository",complete:true,observedAt:"2026-11-09T15:00:00.000Z",
   defaultBranch:"main",branches:["main"],branchHeads:{main:"b".repeat(40)},
@@ -89,11 +90,11 @@ test("GitHub Actions discrepancy follows existing proposal, human decision and w
 });
 test("successful aligned CI is not a cause; failed or unavailable check is review-only",()=>{
  const made=createProject(empty(),{name:"CI states"}),attached=attach(made.state,made.id,"github","example/ci");
- const sid=attached.projects[0].sources[0].id;
+ const sid=attached.id;
  const base={scope:"repository",complete:true,branches:["main"],branchHeads:{main:"a".repeat(40)},
   observedAt:"2026-11-09T14:00:00.000Z"};
  function issue(ci){
-  const state=observe(attached,made.id,sid,"ok",{...base,ci});
+  const state=observe(attached.state,made.id,sid,"ok",{...base,ci});
   return responseState(state.projects[0],projectImpact(state.projects[0])).rows
    .find(x=>x.key==="source-issue:"+sid);
  }
@@ -106,5 +107,5 @@ test("successful aligned CI is not a cause; failed or unavailable check is revie
  assert.match(issue({state:"observed",branch:"main",headCurrent:"current",
   status:"completed",conclusion:"skipped"}).detail,/не подтвердила/);
  assert.match(issue({state:"unavailable",reason:"RATE_LIMITED"}).detail,/Не удалось подтвердить/);
- assert.equal(attached.projects[0].items.length,0);
+ assert.equal(attached.state.projects[0].items.length,0);
 });
