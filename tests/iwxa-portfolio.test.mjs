@@ -137,3 +137,34 @@ test("Atlas rejects a re-signed carrier with a different local project schema",a
  zip["manifest.json"]=strToU8(JSON.stringify(manifest));
  await assert.rejects(readIwxaPortfolio(zipSync(zip,{level:0})),/неверная схема данных/);
 });
+
+test("previous empty-portfolio IWXA copies stay readable; new copies use the canonical T2 object revision",async()=>{
+ const zip=unzipSync(await buildIwxaPortfolio(empty(),{now:"2026-11-09T10:00:00.000Z"}));
+ const path="content/objects.ndjson";
+ const object=JSON.parse(strFromU8(zip[path]));
+ assert.equal(object.revision,1);
+ object.revision=0; // A previously issued Atlas 0.5 dev archive.
+ zip[path]=strToU8(JSON.stringify(object)+"\n");
+ const sha=async bytes=>Array.from(new Uint8Array(
+  await crypto.subtle.digest("SHA-256",typeof bytes==="string"?new TextEncoder().encode(bytes):bytes)),
+  b=>b.toString(16).padStart(2,"0")).join("");
+ const manifest=JSON.parse(strFromU8(zip["manifest.json"]));
+ const file=manifest.files.find(f=>f.path===path);
+ file.size=zip[path].length;file.sha256=await sha(zip[path]);
+ manifest.package_digest=await sha(manifest.files.map(f=>f.path+"\t"+f.sha256+"\n").join(""));
+ zip["manifest.json"]=strToU8(JSON.stringify(manifest));
+ const restored=await readIwxaPortfolio(zipSync(zip,{level:0}));
+ assert.equal(restored.snapshot.revision,0);
+ assert.deepEqual(restored.snapshot.projects,[]);
+ const renewed=unzipSync(await buildIwxaPortfolio(restored.snapshot,{now:"2026-11-09T11:00:00.000Z"}));
+ assert.equal(JSON.parse(strFromU8(renewed[path])).revision,1);
+});
+test("Atlas refuses a manifest that claims excluded relations or history without carrying them",async()=>{
+ const zip=unzipSync(await make()),manifest=JSON.parse(strFromU8(zip["manifest.json"]));
+ manifest.options.include_history=true;
+ zip["manifest.json"]=strToU8(JSON.stringify(manifest));
+ await assert.rejects(readIwxaPortfolio(zipSync(zip,{level:0})),/состав портфеля не подтверждён/);
+ manifest.options.include_history=false;manifest.options.include_relations=true;
+ zip["manifest.json"]=strToU8(JSON.stringify(manifest));
+ await assert.rejects(readIwxaPortfolio(zipSync(zip,{level:0})),/состав портфеля не подтверждён/);
+});
