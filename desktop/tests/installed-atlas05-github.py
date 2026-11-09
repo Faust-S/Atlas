@@ -438,6 +438,7 @@ def verify_requirement_from_source(saved):
         screenshot("source-fact-save-timeout")
         raise AssertionError("Source-linked fact was not persisted")
     current = project(persisted)
+    before = project(saved)
     targets = [t for t in current.get("targets", []) if t["title"] == title]
     assert len(targets) == 1, "The required human-entered target is not persisted"
     target_id = targets[0]["id"]
@@ -451,8 +452,16 @@ def verify_requirement_from_source(saved):
     assert finding["revision"] == observed_sha
     assert finding["origin"] == "manual"
     assert finding["result"] == "partial"
-    assert current["changes"] == [], "A source fact created an unsolicited action"
-    assert current["decisions"] == [], "A source fact created an unsolicited approval"
+    # The installed 120-project fixture can contain historical decisions.
+    # Compare to the saved pre-action owner state, not an empty history.
+    assert current.get("changes", []) == before.get("changes", []), (
+        "Manual source evidence must not create or alter change proposals"
+    )
+    assert current.get("decisions", []) == before.get("decisions", []), (
+        "Manual source evidence must not create or alter earlier human decisions"
+    )
+    print("ATLAS05_GITHUB_EXISTING_DECISIONS_PRESERVED_PASS "
+          + "decisions=" + str(len(current.get("decisions", []))), flush=True)
     screenshot("source-fact-saved")
     print("ATLAS05_GITHUB_REQUIREMENT_MANUAL_FACT_NATIVE_PASS", flush=True)
     open_source_view()

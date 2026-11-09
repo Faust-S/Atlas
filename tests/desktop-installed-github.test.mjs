@@ -21,6 +21,9 @@ test("installed GitHub acceptance uses real native GUI, remote public receipt an
  assert.match(script,/target_select\.click_input\(\)/);
  assert.match(script,/keyboard\.send_keys\("\{END\}\{ENTER\}"\)/);
  assert.match(script,/finding\["revision"\] == observed_sha/);
+ assert.match(script,/current\.get\("changes", \[\]\) == before\.get\("changes", \[\]\)/);
+ assert.match(script,/current\.get\("decisions", \[\]\) == before\.get\("decisions", \[\]\)/);
+ assert.match(script,/ATLAS05_GITHUB_EXISTING_DECISIONS_PRESERVED_PASS/);
  assert.match(script,/assert head\(\) == persisted, "Navigating from linked source/);
  assert.match(script,/ATLAS05_GITHUB_CAUSE_TO_HUMAN_PROPOSAL_PASS/);
  assert.match(script,/ATLAS05_GITHUB_GREEN_CI_NO_FALSE_CAUSE_PASS/);
