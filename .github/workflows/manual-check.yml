@@ -37,6 +37,8 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Existing Atlas and new 0.3 regression suite
         run: npm test
+      - name: Independently read Atlas IWXA 1.0 ZIP carrier with Python
+        run: node tests/iwxa-python-carrier.mjs
       - name: Validate source syntax
         run: |
           node --check src/app.mjs

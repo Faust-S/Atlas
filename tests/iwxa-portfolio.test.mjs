@@ -73,3 +73,22 @@ test("IWXA exported source never invents organizational acceptance or signed tra
  assert.match(module,/iwxa\.package/);
  assert.doesNotMatch(module,/grantIssuer|signatureIssuer|organizationSigner/);
 });
+
+
+test("native IWXA Save As and import preserve Atlas native generation and explicit preview",()=>{
+ const rust=readFileSync(new URL("../desktop/src-tauri/src/lib.rs",import.meta.url),"utf8");
+ const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ assert.match(rust,/fn atlas_export_iwxa\(/);
+ assert.match(rust,/fn atlas_select_iwxa\(/);
+ assert.match(rust,/write_export_atomic\(&selected,&bytes\)/);
+ assert.match(rust,/head.generation!=expected_generation/);
+ assert.match(rust,/add_filter\("IWXA",&\["iwxa"\]\)/);
+ assert.match(ui,/const exportIwxa=async\(\)=>/);
+ assert.match(ui,/const importIwxa=async\(\)=>/);
+ assert.match(ui,/readSavedSnapshotForReference\(/);
+ assert.match(ui,/readIwxaPortfolio\(fromBase64\(selected\)\)/);
+ assert.match(ui,/prepareImportedSnapshot\(\s*startedWith,imported.snapshot,undefined,"iwxa.atlas.portfolio\/1.0.0"\)/);
+ assert.match(ui,/format:"iwxa"/);
+ assert.match(ui,/const applyPendingImport=async\(\)=>/);
+ assert.match(ui,/head.needsConfirmation\|\|head.generation!==candidate.expectedGeneration/);
+});

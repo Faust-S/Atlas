@@ -32,6 +32,8 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Test existing Atlas and branded icon
         run: npm test
+      - name: Independently inspect IWXA ZIP carrier with Python
+        run: node tests/iwxa-python-carrier.mjs
       - name: Build branded production GUI
         working-directory: desktop
         run: npm run build
