@@ -83,7 +83,9 @@ export function sourceReview(source,{limit=12}={}){
  if(supported){
   if(hasError)status="Последняя сверка завершилась ошибкой";
   else if(source.status==="never"||!lastAttempt)status="Ещё не наблюдался";
-  else if(source.status==="ok"&&source.summary?.complete===false)status="Неполное наблюдение";
+  else if(source.status==="ok"&&source.summary?.complete===false)
+   status=source.kind==="github"&&observedCommit(source)
+    ?"Выбранная ветка проверена; список остальных веток неполон":"Неполное наблюдение";
   else if(source.status==="ok"&&source.summary?.complete===true)status="Получены сведения GitHub";
   else status="Состояние источника не установлено";
  }

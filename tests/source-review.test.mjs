@@ -212,3 +212,16 @@ test("source review distinguishes unverified partial-list branch lookup from a m
  assert.match(missing.ci.label,/ветка не найдена/);
  assert.equal(missing.ci.url,null);
 });
+
+test("partially enumerated GitHub branch can be verified without claiming complete source enumeration",()=>{
+ const model=source({scope:"repository",complete:false,defaultBranch:"main",
+  branchHeads:{"work/feature":shaB},branches:["work/feature"],
+  observedAt:"2026-11-09T17:00:00.000Z",ci:{state:"none",branch:"work/feature"}});
+ model.branch="work/feature";
+ const result=sourceReview(model);
+ assert.equal(result.status,"Выбранная ветка проверена; список остальных веток неполон");
+ assert.equal(result.observedCommit.sha,shaB);
+ assert.equal(result.authority,"OBSERVATION_ONLY");
+ assert.equal(sourceReview(source({scope:"repository",complete:false,
+  branchHeads:{},branches:[]})).status,"Неполное наблюдение");
+});

@@ -118,7 +118,7 @@ test("partially listed GitHub repository resolves the exact selected branch befo
   calls.push(url);
   if(url.endsWith("/repos/example/demo"))return ok({id:31,private:false,default_branch:"main"});
   if(url.includes("/branches?"))return ok(firstHundred);
-  if(url.endsWith("/branches/"+encodeURIComponent(hidden)))return ok({name:hidden,commit:{sha}});
+  if(url.endsWith("/branches/"+hidden))return ok({name:hidden,commit:{sha}});
   if(url.includes("/actions/runs?"))return ok({workflow_runs:[workflow({head_branch:hidden,head_sha:sha})]});
   throw Error("Unexpected API "+url);
  };
@@ -130,7 +130,9 @@ test("partially listed GitHub repository resolves the exact selected branch befo
  assert.equal(result.ci.branch,hidden);
  assert.equal(result.ci.headCurrent,"current");
  assert.equal(result.ci.conclusion,"success");
- assert.ok(calls.some(url=>url.endsWith("/branches/work%2F2026-11-09-atlas-0-5")));
+ assert.ok(calls.some(url=>url.endsWith("/branches/work/2026-11-09-atlas-0-5")));
+ assert.ok(calls.every(url=>url.startsWith("https://api.github.com/repos/example/demo")),
+  "Exact lookup remains on the public GitHub API");
  assert.equal(calls.filter(url=>url.includes("/actions/runs?")).length,1);
  assert.equal(calls.length,4,"repository, capped list, exact branch and its Actions");
 });

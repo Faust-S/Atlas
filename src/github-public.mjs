@@ -91,7 +91,7 @@ export async function observePublicRepo(value,fetcher=globalThis.fetch,{maxPages
   // back to the default branch's successful Actions run.
   if(branch&&!branches.includes(branch)&&!complete){
    try{
-    const exact=await request(base+"/branches/"+encodeURIComponent(branch),fetcher,signal);
+    const exact=await request(base+"/branches/"+branch.split("/").map(encodeURIComponent).join("/"),fetcher,signal);
     if(exact?.name===branch&&typeof exact.commit?.sha==="string"&&
        /^[a-f0-9]{40}$/i.test(exact.commit.sha)){
       branches.push(branch);
