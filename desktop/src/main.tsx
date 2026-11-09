@@ -1499,7 +1499,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
               r.freshness==="incomplete"?" · Требуется дополнительная сверка источника":""}</small>
            </div>)}
            {linkedRequirements.length>5&&<button type="button" className="text-link"
-             onClick={()=>view("overview")}>Все требования проекта ({linkedRequirements.length})</button>}</>
+             onClick={()=>view("overview")}>Открыть полный список требований</button>}</>
           :<p className="minor">Пока нет требований с фактами из этого репозитория. Проверка кода сама по себе не подтверждает выполнение требований.</p>}
         </div>}
         {sourceIssue&&<div className="atlas-source-response" aria-label="Решение по наблюдению источника">

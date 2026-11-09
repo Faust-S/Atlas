@@ -224,7 +224,7 @@ test("source choice never presents a branch as checked without its observed revi
  assert.match(options[1].label,/редакция не подтверждена/);
  assert.doesNotMatch(options[1].label,/редакция наблюдалась/);
  const recorded=applyEditor(observed,project.id,"finding-target:"+target.id,values({
-  targetId:target.id,result:"partial",sourceRef:source.id+"::"+preferred
+  targetId:target.id,result:"partial",level:"implementation",sourceRef:source.id+"::"+preferred
  }));
  assert.equal(recorded.state.projects[0].findings[0].revision,null);
  assert.equal(recorded.state.projects[0].findings[0].origin,"manual");

@@ -275,6 +275,30 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .atlas-source-details .atlas-source-table{min-width:480px}
 .atlas-source-details .atlas-source-table td{overflow-wrap:anywhere}
 .atlas-source-error{color:#a6323d!important}
+/* Read-only GitHub source -> existing requirement evidence, no new surface. */
+.atlas-source-related-requirements,.atlas-source-response{
+ margin:10px 0 12px;padding:11px 13px;border:1px solid #dce6f1;
+ border-radius:9px;background:#fbfdff;max-width:100%;overflow-wrap:anywhere
+}
+.atlas-source-related-requirements>strong,.atlas-source-response>strong{
+ display:block;font-size:12px;color:#27486b;line-height:1.45
+}
+.atlas-source-related-requirements>.minor,.atlas-source-response>.minor{line-height:1.5}
+.atlas-source-related-row{
+ display:flex;flex-wrap:wrap;gap:6px 14px;justify-content:space-between;
+ align-items:baseline;padding:8px 0;border-top:1px solid #e6edf5
+}
+.atlas-source-related-row .text-link{font-size:12px;max-width:100%;overflow-wrap:anywhere}
+.atlas-source-related-row small{color:#5b7190;font-size:11px;line-height:1.4}
+.atlas-source-related-row .text-link:focus-visible{
+ outline:2px solid #4c8afc;outline-offset:3px;border-radius:3px
+}
+.atlas-source-response>p{margin:7px 0;color:#506887;font-size:12px;line-height:1.5}
+@media(max-width:760px){
+ .atlas-source-related-row{display:block}
+ .atlas-source-related-row small{display:block;margin-top:4px}
+}
+
 
 /* Same project UI when mounted inside another host; contain overlays. */
 :host{display:block;min-height:0;height:100%;--ink:#1b2d49;--muted:#607590;--line:#dbe4f0;--strong:#284b80;--blue:#326fe3;--card:#fff;--sidebar:#27384f;--soft:#eff4fb;--red:#a33c49;--green:#227a5e;--radius:12px}
