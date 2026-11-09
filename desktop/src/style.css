@@ -500,3 +500,7 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 /* The same work editor is the only path from an unlinked task to evidence. */
 .atlas-work-target-hint{display:block;margin-top:7px;font-size:11px;line-height:1.5;color:#715421;
  border-left:2px solid #d2b87c;padding-left:9px}
+
+/* The result count is visible and accessible at the filter itself; the
+   bottom-of-list footer remains useful after scrolling through long lists. */
+.atlas-work-filter-count{display:inline;font-weight:700;color:#245f9f}

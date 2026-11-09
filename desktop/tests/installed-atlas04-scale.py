@@ -506,22 +506,25 @@ def inspect_work_observation_filter(saved_generation):
             count_line = f"Показано {count} из {count} работ по фильтру"
             screenshot("observation-filter-" + name + "-selected")
             found = False
-            # Physically scroll the actual workspace through the work cards
-            # until the footer count is onscreen and exposed to UIA.
-            for attempt in range(9):
+            # The result count is now visible adjacent to the filter and
+            # exposed as an aria-labelled <output>. Inspect ALL UIA control
+            # types because WebView2 may map output to Group, Text or Status.
+            for attempt in range(10):
                 try:
-                    nodes = window.descendants(control_type="Text")
-                    if any(count_line in node.window_text() for node in nodes):
-                        found = True
+                    nodes = window.descendants()
+                    found = any(count_line in (node.window_text() or "") for node in nodes)
+                    if found:
                         break
                 except Exception:
                     pass
-                activate()
-                mouse.scroll(coords=wheel_point, wheel_dist=-10)
-                time.sleep(0.23)
+                if attempt == 3:
+                    # Reading the virtual UIA tree sometimes needs a window
+                    # focus change. Never scroll away from the nearby count.
+                    activate()
+                time.sleep(0.25)
             if not found:
                 screenshot("observation-filter-" + name + "-count-hold")
-                print("ATLAS04_OBSERVATION_FILTER_UIA_HOLD footer inaccessible mode=" + name, flush=True)
+                print("ATLAS04_OBSERVATION_FILTER_UIA_HOLD visible count unavailable mode=" + name, flush=True)
                 return False
             assert native()[0]["generation"] == saved_generation, "Changing work filter mutated native Store"
             screenshot("observation-filter-" + name + "-count")
@@ -567,11 +570,25 @@ def inspect_unlinked_work_editor(saved_generation):
     screenshot("unlinked-work-editor")
     select = window.child_window(title="Связать с ожидаемым результатом", control_type="ComboBox")
     available = select.exists(timeout=3)
-    cancel = window.child_window(title="Отмена", control_type="Button")
-    assert cancel.exists(timeout=3), "Work editor has no cancel button"
+    # The bottom "Отмена" is off-screen in the 1024px editor. Use the
+    # visible header close button and verify the form actually disappeared.
+    cancel = window.child_window(title="Закрыть редактор", control_type="Button")
+    if not cancel.exists(timeout=3):
+        screenshot("unlinked-work-close-missing")
+        raise AssertionError("Work editor has no visible Close button")
     cancel.click_input()
-    wait_title("Project 119 — Таблица", timeout=15)
+    until = now() + 10
+    while now() < until:
+        if "Форма:" not in current_title() and not cancel.exists(timeout=0.4):
+            break
+        time.sleep(0.2)
+    else:
+        screenshot("unlinked-work-close-failed")
+        raise AssertionError("Work editor remained open after clicking Close")
+    assert "Project 119 — Таблица" in current_title()
+    screenshot("unlinked-work-editor-closed")
     assert native()[0]["generation"] == saved_generation, "Opening unlinked work editor changed native data"
+    print("ATLAS04_UNLINKED_WORK_EDITOR_CLOSE_UIA_PASS", flush=True)
     if not available:
         print("ATLAS04_UNLINKED_WORK_UIA_HOLD target selector inaccessible", flush=True)
         return False
@@ -929,31 +946,26 @@ def inspect_cause_proposal_and_decision(saved_generation):
     # the native head. This check runs before opening the history disclosure.
     filter_checked = inspect_work_observation_filter(recorded_head["generation"])
     if not filter_checked:
-        print("ATLAS04_OBSERVATION_FILTER_NATIVE_DATA_PASS_UIA_HOLD", flush=True)
-    inspect_unlinked_work_editor(recorded_head["generation"])
-    history = visible_uia_action(window, "История наблюдений по работе: "+work["title"])
+        raise AssertionError("Installed observation filter lacks UIA evidence")
+    if not inspect_unlinked_work_editor(recorded_head["generation"]):
+        raise AssertionError("Installed unlinked work editor remains unqualified")
+    history = visible_uia_action(window, "История наблюдений по работе: "+work["title"], attempts=22)
     if history is None:
-        assert native()[0]["generation"] == recorded_head["generation"]
         screenshot("work-history-disclosure-hold")
-        print("ATLAS04_WORK_HISTORY_UIA_HOLD disclosure unavailable", flush=True)
-        return True
+        raise AssertionError("Installed work history is not reachable after closing work editor")
     history.click_input()
     screenshot("work-history-expanded")
     print("ATLAS04_WORK_HISTORY_DISCLOSURE_UIA_PASS", flush=True)
     to_requirement = visible_uia_action(window, "Открыть требование из наблюдения: "+work["title"]+" — Expected result")
     if to_requirement is None:
-        assert native()[0]["generation"] == recorded_head["generation"]
         screenshot("work-history-link-hold")
-        print("ATLAS04_WORK_HISTORY_UIA_HOLD target link unavailable", flush=True)
-        return True
+        raise AssertionError("Installed history target link unavailable")
     to_requirement.click_input()
     wait_title("Project 119 — Обзор", timeout=15)
     card = window.child_window(title="Требование: Expected result — Project 119")
     if not card.exists(timeout=3) or not card.is_visible():
-        assert native()[0]["generation"] == recorded_head["generation"]
         screenshot("work-history-target-hold")
-        print("ATLAS04_WORK_HISTORY_UIA_HOLD target card inaccessible", flush=True)
-        return True
+        raise AssertionError("Installed target card inaccessible after history navigation")
     screenshot("work-history-requirement-focused")
     assert native()[0]["generation"] == recorded_head["generation"], "Navigating observation history wrote native data"
     print("ATLAS04_WORK_HISTORY_TO_REQUIREMENT_UIA_PASS", flush=True)

@@ -1161,7 +1161,11 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
        <option value="state">По состоянию</option>
       </select></label></div>
      <p className="minor atlas-work-evidence-summary" role="status">
-      Без наблюдений по работе: {workObservationCounts.without}; завершены без наблюдений: {workObservationCounts.doneWithout}.
+      <output className="atlas-work-filter-count" aria-live="polite"
+       aria-label={"Показано "+Math.min(filteredWork.length,workLimit)+" из "+filteredWork.length+" работ по фильтру"}>
+       Показано {Math.min(filteredWork.length,workLimit)} из {filteredWork.length} работ по фильтру.
+      </output>
+      {" "}Без наблюдений по работе: {workObservationCounts.without}; завершены без наблюдений: {workObservationCounts.doneWithout}.
       Это поиск заявленных фактов, не независимая приёмка.
      </p>
      <div className="table-scroll atlas-work-table-scroll"><table className="atlas-work-table" aria-label="Работы проекта"><thead><tr><th>Работа</th><th>Состояние</th><th>Длительность</th><th>Ответственный</th><th>Срок</th><th>Изменить</th></tr></thead>

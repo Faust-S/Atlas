@@ -286,9 +286,11 @@ test("installed Win32 filter selects source-bound observation modes without alte
  assert.match(script,/\("done_without", 3, done_without\)/);
  assert.match(script,/\("all", 0, len\(works\)\)/);
  assert.match(script,/keyboard\.send_keys\("\{HOME\}"\)/);
- assert.match(script,/mouse\.scroll\(coords=wheel_point, wheel_dist=-10\)/);
+ assert.match(script,/nodes = window\.descendants\(\)/);
  assert.match(script,/count_line = f"Показано \{count\} из \{count\} работ по фильтру"/);
- assert.match(script,/footer inaccessible mode=/);
+ assert.match(script,/visible count unavailable mode=/);
+ assert.match(script,/Installed observation filter lacks UIA evidence/);
+ assert.match(script,/Installed work history is not reachable after closing work editor/);
  assert.match(script,/finally:\s*# Always restore/);
  assert.match(script,/if not choose_option\(0\):/);
  assert.match(script,/ATLAS04_OBSERVATION_FILTER_MODE_UIA_PASS/);
@@ -306,6 +308,9 @@ test("installed Windows gives unlinked work a precise route to the existing targ
  assert.match(script,/label = "Указать требование для работы: " \+ work\["title"\]/);
  assert.match(script,/wait_title\("Форма: Работа: " \+ work\["title"\], timeout=15\)/);
  assert.match(script,/title="Связать с ожидаемым результатом", control_type="ComboBox"/);
+ assert.match(script,/title="Закрыть редактор", control_type="Button"/);
+ assert.match(script,/not cancel\.exists\(timeout=0\.4\)/);
+ assert.match(script,/ATLAS04_UNLINKED_WORK_EDITOR_CLOSE_UIA_PASS/);
  assert.match(script,/assert native\(\)\[0\]\["generation"\] == saved_generation/);
  assert.match(script,/ATLAS04_UNLINKED_WORK_EDITOR_UIA_PASS/);
  assert.match(script,/ATLAS04_UNLINKED_WORK_UIA_HOLD/);

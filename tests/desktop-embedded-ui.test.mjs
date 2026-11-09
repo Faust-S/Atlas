@@ -235,3 +235,10 @@ test("unlinked work explains why a fact cannot be attached and reuses its existi
  assert.match(main,/Указать требование":"Открыть"/);
  assert.match(css,/\.atlas-work-target-hint\{display:block/);
 });
+
+test("filter shows the selected row count next to controls even when zero",()=>{
+ assert.match(main,/className="atlas-work-filter-count" aria-live="polite"/);
+ assert.match(main,/aria-label=\{"Показано "\+Math\.min\(filteredWork\.length,workLimit\)\+" из "\+filteredWork\.length\+" работ по фильтру"\}/);
+ assert.match(main,/Показано \{Math\.min\(filteredWork\.length,workLimit\)\} из \{filteredWork\.length\} работ по фильтру\./);
+ assert.match(css,/\.atlas-work-filter-count\{display:inline;font-weight:700/);
+});
