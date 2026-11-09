@@ -265,7 +265,7 @@ export function editorSpec(project,action,snapshot=null){
  if(action==="decision")return {title:"Зафиксировать решение",fields:[field("text","Решение и основание","textarea")]};
  if(action.startsWith("source-branch:")){
   const id=decodeURIComponent(action.slice("source-branch:".length));
-  const source=p?.sources?.find(s=>s.id===id&&s.kind==="github");
+  const source=project?.sources?.find(s=>s.id===id&&s.kind==="github");
   if(!source)throw Error("Репозиторий для изменения ветки не найден");
   return {title:"Ветка проверок GitHub",hint:"Если оставить поле пустым, будет выбрана основная ветка. Результаты наблюдения прежней ветки не переносятся. Предыдущие сохранения остаются в истории.",
    fields:[field("branch","Название ветки","text",source.branch||"",false)]};
