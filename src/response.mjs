@@ -35,8 +35,25 @@ export function projectSignals(project,impact){
   add('target-review:'+row.targetId,title,reason,row.assessment==='gap_reported'||row.assessment==='partial_reported'?'planning':'review',[row.targetId]);
  }
  for(const source of project.sources||[]){
-  if(source.status==='error'||source.status==='never'||source.summary?.complete===false)
-   add('source-issue:'+source.id,'Источник требует сверки: '+source.locator,source.error||'Наблюдение отсутствует, неполно или устарело','review');
+  // Existing cause-bound response chain also covers public GitHub CI evidence.
+  // CI failure concerns the code check, never automatically a product verdict.
+  const check=source.kind==='github'?source.summary?.ci:null;
+  let detail=null;
+  if(source.status==='error'||source.status==='never')
+   detail=source.error||'Наблюдение отсутствует или недоступно';
+  else if(check?.state==='observed'&&check.headCurrent==='previous')
+   detail='Проверка GitHub Actions относится к другой редакции ветки. Нужно сопоставить версии и требования проекта';
+  else if(check?.state==='observed'&&check.status==='completed'&&
+     ['failure','timed_out','action_required','stale'].includes(check.conclusion))
+   detail='Проверка исходного кода GitHub завершилась с ошибкой. Уточните причину, но не делайте вывод о готовности проекта';
+  else if(check?.state==='observed'&&check.status==='completed'&&
+     ['cancelled','neutral','skipped'].includes(check.conclusion))
+   detail='Проверка GitHub не подтвердила успешную сборку. Уточните состояние исходного кода';
+  else if(check?.state==='invalid'||check?.state==='unavailable')
+   detail='Не удалось подтвердить состояние GitHub Actions для выбранной ветки';
+  else if(source.summary?.complete===false)
+   detail='Список источников неполон. Проверьте, достаточно ли выбранной ветки для решения';
+  if(detail)add('source-issue:'+source.id,'Источник требует сверки: '+source.locator,detail,'review');
  }
  if(!(project.targets||[]).some(t=>t.intent==='committed'))add('criteria-missing','Не определены обязательные результаты','Уточнить требования и критерии достижения цели','planning');
  if(project.status==='completed')add('completion-review','Завершение проекта заявлено','Для принятия результата нужна независимая проверка','review');

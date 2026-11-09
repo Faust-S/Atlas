@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {empty,createProject,createItem,editItem,serialize,deserialize} from "../src/core.mjs";
+import {empty,createProject,createItem,editItem,serialize,deserialize,attach,observe} from "../src/core.mjs";
 import {addTarget} from "../src/trace.mjs";
 import {editorSpec,applyEditor} from "../src/editor.mjs";
 import {projectImpact} from "../src/impact.mjs";
@@ -45,4 +45,66 @@ test("invalid change transitions and forged links cannot pass validation",()=>{
  const damaged=structuredClone(state);
  damaged.projects[0].decisions.push({id:"bad",changeId:"fake",text:"Unlinked"});
  assert.throws(()=>serialize(damaged),/Invalid decision changeId/);
+});
+
+test("GitHub Actions discrepancy follows existing proposal, human decision and work chain",()=>{
+ const made=createProject(empty(),{name:"Release planning",type:"engineering"});
+ let state=attach(made.state,made.id,"github","example/release");
+ const sourceId=state.projects[0].sources[0].id;
+ state=observe(state,made.id,sourceId,"ok",{
+  scope:"repository",complete:true,observedAt:"2026-11-09T15:00:00.000Z",
+  defaultBranch:"main",branches:["main"],branchHeads:{main:"b".repeat(40)},
+  ci:{state:"observed",branch:"main",headCurrent:"previous",
+   headSha:"a".repeat(40),status:"completed",conclusion:"success",runId:10}
+ });
+ const p=state.projects[0],issue=responseState(p,projectImpact(p)).rows
+  .find(r=>r.key==="source-issue:"+sourceId);
+ assert.ok(issue,"Mismatched CI SHA should become an existing source-issue signal");
+ assert.match(issue.detail,/другой редакции/);
+ assert.equal(issue.needsProposal,true);
+ const initial=JSON.stringify(state);
+ const action="respond:"+encodeURIComponent(issue.key);
+ assert.match(editorSpec(p,action).title,/Источник требует сверки/);
+ state=applyEditor(state,made.id,action,input({
+  title:"Check workflow and compare evidence",
+  description:"Review build result before deciding whether to update requirements"
+ })).state;
+ const proposal=state.projects[0].changes[0];
+ assert.equal(proposal.causeKey,issue.key);
+ assert.equal(proposal.status,"proposed");
+ assert.equal(state.projects[0].items.length,0);
+ assert.equal(state.projects[0].decisions.length,0);
+ assert.notEqual(JSON.stringify(state),initial);
+ assert.throws(()=>applyEditor(state,made.id,action,input({title:"Duplicate"})),/уже существует/);
+ state=applyEditor(state,made.id,"change:"+proposal.id,input({
+  status:"approved",rationale:"Checked both revisions and approved investigation"
+ })).state;
+ assert.equal(state.projects[0].decisions.length,1);
+ assert.equal(state.projects[0].items.length,0,"Approval is not automatic work");
+ const restored=deserialize(serialize(state));
+ assert.equal(restored.projects[0].changes[0].causeKey,issue.key);
+ assert.equal(restored.projects[0].decisions[0].status,"approved");
+ assert.equal(responseState(restored.projects[0],projectImpact(restored.projects[0]))
+  .rows.find(r=>r.key===issue.key).needsProposal,false);
+});
+test("successful aligned CI is not a cause; failed or unavailable check is review-only",()=>{
+ const made=createProject(empty(),{name:"CI states"}),attached=attach(made.state,made.id,"github","example/ci");
+ const sid=attached.projects[0].sources[0].id;
+ const base={scope:"repository",complete:true,branches:["main"],branchHeads:{main:"a".repeat(40)},
+  observedAt:"2026-11-09T14:00:00.000Z"};
+ function issue(ci){
+  const state=observe(attached,made.id,sid,"ok",{...base,ci});
+  return responseState(state.projects[0],projectImpact(state.projects[0])).rows
+   .find(x=>x.key==="source-issue:"+sid);
+ }
+ assert.equal(issue({state:"observed",branch:"main",headCurrent:"current",
+  status:"completed",conclusion:"success"}),undefined);
+ assert.equal(issue({state:"observed",branch:"main",headCurrent:"current",
+  status:"in_progress",conclusion:null}),undefined);
+ assert.match(issue({state:"observed",branch:"main",headCurrent:"current",
+  status:"completed",conclusion:"failure"}).detail,/ошибкой/);
+ assert.match(issue({state:"observed",branch:"main",headCurrent:"current",
+  status:"completed",conclusion:"skipped"}).detail,/не подтвердила/);
+ assert.match(issue({state:"unavailable",reason:"RATE_LIMITED"}).detail,/Не удалось подтвердить/);
+ assert.equal(attached.projects[0].items.length,0);
 });

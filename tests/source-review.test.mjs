@@ -225,3 +225,12 @@ test("partially enumerated GitHub branch can be verified without claiming comple
  assert.equal(sourceReview(source({scope:"repository",complete:false,
   branchHeads:{},branches:[]})).status,"Неполное наблюдение");
 });
+
+test("source review exposes existing cause-bound proposal route with no automatic task",()=>{
+ const source=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ assert.match(source,/const sourceIssue=sourceResponseById.get\(s.id\)/);
+ assert.match(source,/sourceIssue\.needsProposal/);
+ assert.match(source,/openEditor\("respond:"\+encodeURIComponent\(sourceIssue.key\)\)/);
+ assert.match(source,/openProjectTab\(project.id,"changes",sourceIssue.activeChanges.at\(-1\)\?\.id\|\|null\)/);
+ assert.match(source,/Работа и приёмка автоматически не создаются/);
+});

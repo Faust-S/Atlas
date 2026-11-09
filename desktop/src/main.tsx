@@ -8,6 +8,7 @@ import {compareProject,decideChange} from "../../src/trace.mjs";
 import {projectImpact,projectNextStep} from "../../src/impact.mjs";
 import {buildPortfolioCommand,filterPortfolioCommand} from "../../src/portfolio-command.mjs";
 import {realityOverview,workObservationIndex} from "../../src/reality-overview.mjs";
+import {responseState} from "../../src/response.mjs";
 import {scheduleProject} from "../../src/planning.mjs";
 import {portfolioSchedule,projectedFinishLabel} from "../../src/portfolio-schedule.mjs";
 import {portfolioResources} from "../../src/portfolio-resources.mjs";
@@ -250,6 +251,11 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const impact=project?impactByProject.get(project.id)||null:null;
  const nextStep=useMemo(()=>project&&impact?projectNextStep(project,impact):null,[project,impact]);
  const realityMap=useMemo(()=>project&&reality&&impact?realityOverview(project,reality,impact):null,[project,reality,impact]);
+ const sourceResponseById=useMemo(()=>{
+  const relevant=project&&impact?responseState(project,impact).rows:[];
+  return new Map<string,any>(relevant.filter(r=>r.key.startsWith("source-issue:"))
+   .map(r=>[r.key.slice("source-issue:".length),r]));
+ },[project,impact]);
  const targetById=useMemo(()=>new Map<string,any>((project?.targets||[]).map((t:any)=>[t.id,t])),[project]);
  const findingsByWork=useMemo(()=>project?workObservationIndex(project):new Map<string,any[]>(),[project]);
  const workObservationCounts=useMemo(()=>{
@@ -1411,6 +1417,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      <Action onClick={()=>openEditor("source")} primary>＋ Источник</Action></div>
      {(project.sources||[]).map((s:any)=>{
       const review=sourceReview(s,{limit:sourceRowLimits[s.id]||12});
+      const sourceIssue=sourceResponseById.get(s.id);
       return <div className="atlas-source-review" key={s.id}>
        <div className="attention-row"><div><strong>{sourceNames[s.kind]||"Источник"}: {s.locator}</strong>
         {s.kind==="github"&&<small>Ветка проверок: {s.branch||s.summary?.defaultBranch||"основная ветка репозитория"}</small>}
@@ -1461,6 +1468,15 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
         {review.remaining>0&&<Action onClick={()=>setSourceRowLimits(prev=>({...prev,[s.id]:Math.min(review.total,(prev[s.id]||12)+24)}))}>
          Показать ещё изменения ({review.remaining})
         </Action>}
+        {sourceIssue&&<div className="atlas-source-response" aria-label="Решение по наблюдению источника">
+         <strong>Требует рассмотрения</strong>
+         <p>{sourceIssue.detail}</p>
+         {sourceIssue.needsProposal
+          ?<Action onClick={()=>openEditor("respond:"+encodeURIComponent(sourceIssue.key))}>Предложить действие по причине</Action>
+          :<Action onClick={()=>openProjectTab(project.id,"changes",sourceIssue.activeChanges.at(-1)?.id||null)}>
+            Открыть связанное изменение</Action>}
+         <p className="minor">Сначала предложение, затем отдельное решение. Работа и приёмка автоматически не создаются.</p>
+        </div>}
         <p className="minor">Наблюдение источника не подтверждает готовность проекта, выполнение работы или приёмку результата.</p>
        </div>}
       </div>
