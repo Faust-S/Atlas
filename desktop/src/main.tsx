@@ -1261,18 +1261,18 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
        </tr>)}</tbody></table></div>
       {project.dependencies.length===0&&<p className="minor">Связей пока нет. Добавьте зависимости между работами для расчёта критического пути.</p>}
      </section>}
-    {tab==="reality"&&<section className="surface"><div className="section-heading"><div><h2>Матрица «должно быть / известно»</h2>
-     <p>Показывает заявления, происхождение, свежесть, но не выдумывает процент подтверждённой готовности.</p></div>
+    {tab==="reality"&&<section className="surface"><div className="section-heading"><div><h2>Что известно о результате</h2>
+     <p>Посмотрите, что подтверждено записями, какие сведения устарели и что ещё нужно проверить.</p></div>
      <div className="button-row"><Action onClick={()=>openEditor("target")}>＋ Требование</Action><Action onClick={()=>openEditor("finding")} disabled={!project.targets?.length}>＋ Наблюдение</Action></div></div>
-     <div className="table-scroll"><table><thead><tr><th>Ожидаемый результат</th><th>Фактическое заявление</th><th>Свежесть</th><th>Редакция источника</th><th></th></tr></thead>
+     <div className="table-scroll"><table><thead><tr><th>Ожидаемый результат</th><th>Что известно</th><th>Состояние источника</th><th></th></tr></thead>
       <tbody>{(reality?.rows||[]).map((r:any)=><tr key={r.id}><td><strong>{r.title}</strong><small>{r.desired}</small></td>
        <td><Badge tone={["unknown","stale","conflict"].includes(r.assessment)?"warning":"neutral"}>{evidence[r.assessment]||r.assessment}</Badge></td>
-       <td>{r.freshness?.state||"Неизвестно"}</td><td className="mono">{r.latest?.revision?.slice(0,12)||"—"}</td>
+       <td>{r.freshness?.state||"Неизвестно"}{r.latest?.revision&&<details className="atlas-technical-details"><summary>Версия источника</summary><code>{r.latest.revision}</code></details>}</td>
        <td><Action onClick={()=>openEditor("finding-target:"+r.id)}>Новый факт</Action></td></tr>)}</tbody></table></div>
      <div className="section-heading"><h3>Факты на изменившихся исходных ревизиях</h3></div>
      {recheckRows.slice(0,recheckLimit).map((r:any)=>
       <div className="attention-row" key={r.id}><div><strong>{r.targetTitle}</strong>
-       <small>{r.locator} / {r.ref} · {r.claimedSha?.slice(0,12)} → {r.observedSha?.slice(0,12)||"неизвестно"}</small></div>
+       <small>{r.locator} / {r.ref}</small><details className="atlas-technical-details"><summary>Версии для повторной проверки</summary><code>{r.claimedSha||"неизвестно"} → {r.observedSha||"неизвестно"}</code></details></div>
        {r.canRecheck?<Action onClick={()=>openEditor(recheckAction(project.id,r.claimId,r.observedSha))}>Повторно проверить</Action>:
         <Badge tone="warning">Обновите источник</Badge>}</div>)}
      {recheckRows.length>0&&<p className="minor">Показано {Math.min(recheckLimit,recheckRows.length)} из {recheckRows.length} повторных проверок.</p>}
@@ -1347,7 +1347,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      {history.slice(0,historyLimit).map((entry:any)=><div className="history-entry" key={entry.kind+"-"+entry.id}>
       <small>{readable(entry.at)} · {entry.kind==="decision"?"Решение":"Заявление"}{entry.source?" · "+entry.source:""}</small>
       <p>{entry.text||"Без пояснения"}</p>
-      {entry.revision&&<small className="mono" title={entry.revision}>SHA: {entry.revision}</small>}
+      {entry.revision&&<details className="atlas-technical-details"><summary>Версия источника</summary><code>{entry.revision}</code></details>}
      </div>)}
      {!history.length&&<Fallback message={(project.decisions.length+(project.findings||[]).length)>0?
       "По фильтру записей нет. Измените параметры, чтобы увидеть историю.":"История пуста. Добавьте решение или наблюдение."}/>}
@@ -1375,10 +1375,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
         </p>
         {review.previousObservation&&<p className="minor">Предыдущее наблюдение сохранено, но последняя сверка завершилась ошибкой.</p>}
         {review.rows.length>0&&<div className="table-scroll"><table className="atlas-source-table"><thead><tr>
-         <th>Изменение</th><th>Объект</th><th>Предыдущий SHA</th><th>Новый SHA</th>
+         <th>Изменение</th><th>Объект</th><th>Данные проверки</th>
         </tr></thead><tbody>{review.rows.map((row:any,i:number)=><tr key={i}>
-         <td>{row.kind}</td><td>{row.title}</td><td className="mono">{row.before||"—"}</td>
-         <td className="mono">{row.after||"—"}</td>
+         <td>{row.kind}</td><td>{row.title}</td><td>{(row.before||row.after)?<details className="atlas-technical-details"><summary>Версии</summary><code>До: {row.before||"—"} · После: {row.after||"—"}</code></details>:"—"}</td>
         </tr>)}</tbody></table></div>}
         {review.remaining>0&&<Action onClick={()=>setSourceRowLimits(prev=>({...prev,[s.id]:Math.min(review.total,(prev[s.id]||12)+24)}))}>
          Показать ещё изменения ({review.remaining})
@@ -1393,15 +1392,16 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    {savedRefPreview!==null&&savedRefPreview.generation===generation&&savedRefPreview.revision===String(data.revision)&&!dirty&&<div className="atlas-close-overlay">
     <section className="atlas-close-dialog" role="dialog" aria-modal="true" aria-labelledby="atlas-saved-ref-title">
      <h2 id="atlas-saved-ref-title">{savedRefPreview.label}</h2>
-     <p>Ссылка на сохранённую редакцию {savedRefPreview.revision} локального Atlas. Это не пакет .iwxa,
-      не поручение и не подтверждение подключения Agent или Center.</p>
-     <label className="atlas-ref-label">Скопируйте выбранный объект ProjectRef / WorkRef
-      <textarea className="atlas-ref-text" aria-label="Сохранённая ссылка Atlas" readOnly
-       rows={5} value={savedRefPreview.json} onFocus={event=>event.currentTarget.select()}/>
-     </label>
-     <p className="minor">Для привязки в Admin Center откройте тот же сохранённый JSON-портфель. Центр сверяет ID и редакцию файла; самостоятельный Atlas не подключается к организации автоматически.</p>
+     <p>Эта ссылка относится к сохранённой версии проекта. Её можно использовать для ручной привязки в Admin Center.</p>
+     <details className="atlas-technical-details"><summary>Данные для ручного подключения</summary>
+      <label className="atlas-ref-label">Скопировать сведения о выбранном проекте или работе
+       <textarea className="atlas-ref-text" aria-label="Сохранённая ссылка Atlas" readOnly
+        rows={5} value={savedRefPreview.json} onFocus={event=>event.currentTarget.select()}/>
+      </label>
+      <p className="minor">Для проверки в Admin Center понадобится тот же сохранённый JSON-файл портфеля. Эта операция не создаёт автоматическое соединение.</p>
+     </details>
      <div className="button-row">
-      <Action onClick={()=>void exportJson("center")} disabled={busy}>JSON для Admin Center</Action>
+      <Action onClick={()=>void exportJson("center")} disabled={busy}>Сохранить файл для Admin Center</Action>
       <Action autoFocus onClick={()=>setSavedRefPreview(null)}>Закрыть</Action>
      </div>
     </section>
@@ -1418,7 +1418,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      </tbody></table></div>
      <p><strong>Исключено:</strong> {pendingImport.summary.removed} проектов.
       <strong> Добавлено:</strong> {pendingImport.summary.added}.
-      <strong> Совпадают по ID:</strong> {pendingImport.summary.matchingIds} (их данные заменятся содержимым архива).</p>
+      <strong> Найдены в обоих портфелях:</strong> {pendingImport.summary.matchingIds} (их данные будут заменены содержимым копии).</p>
      {pendingImport.summary.removed>0&&<p className="atlas-schedule-warning">Будут исключены:
       {pendingImport.summary.removedExamples.join(", ")}
       {pendingImport.summary.removed>pendingImport.summary.removedExamples.length?" и другие.":"."}
@@ -1479,7 +1479,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      </div>
     </section>
    </div>}
-   <footer className="workspace-footer"><span>IWXA Atlas 0.4 · проекты хранятся на этом компьютере</span>
+   <footer className="workspace-footer"><span>IWXA Atlas 0.5 · проекты хранятся на этом компьютере</span>
     <span>Вы сами решаете, какие изменения сохранить и принять.</span></footer>
   </main>
   {inspector&&<aside className="inspector">
