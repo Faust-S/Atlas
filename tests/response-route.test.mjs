@@ -140,3 +140,18 @@ test("partial GitHub branch enumeration does not create a false source issue if 
   .find(r=>r.key==="source-issue:"+sourceId).detail,/Список источников неполон/);
 });
 
+
+test("partial branch snapshots require a real scoped branch observation, not just a SHA",()=>{
+ const p=createProject(empty(),{name:"No phantom GitHub source proof"});
+ const linked=attach(p.state,p.id,"github","example/app",{branch:"work/verified"});
+ const sha="a".repeat(40);
+ for(const branches of [[],["main"]]){
+  const state=observe(linked.state,p.id,linked.id,"ok",{
+   scope:"repository",complete:false,defaultBranch:"main",branches,
+   branchHeads:{"work/verified":sha},
+   ci:{state:"none",branch:"work/verified"}
+  });
+  assert.match(responseState(state.projects[0],projectImpact(state.projects[0]))
+   .rows.find(row=>row.key==="source-issue:"+linked.id).detail,/Список источников неполон/);
+ }
+});

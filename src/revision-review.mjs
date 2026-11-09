@@ -1,7 +1,7 @@
 // Revision-review projection from the existing Atlas portfolio snapshot.
 // No new ledger or authority: source revisions are observations, findings remain claims.
 import {validatePortfolioLinks} from "./portfolio.mjs";
-import {compareProject} from "./trace.mjs";
+import {compareProject,selectedGitHubBranchSeen} from "./trace.mjs";
 const esc=x=>String(x??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const rank={revision_changed:0,ref_removed:1,source_unavailable:2,source_incomplete:3,source_outdated:4};
 const labels={revision_changed:"Ветка изменилась",ref_removed:"Ветка не обнаружена",source_unavailable:"Источник недоступен",source_incomplete:"Неполное наблюдение",source_outdated:"Наблюдение устарело"};
@@ -22,7 +22,7 @@ export function recheckCandidate(project,findingId,expectedSha=null,{now=new Dat
  const row=evidence.find(x=>x.latest?.id===findingId);
  const claim=row?.latest,source=project.sources.find(x=>x.id===claim?.sourceId);
  if(!claim||!claim.ref||!claim.revision||source?.kind!=="github"||source.status!=="ok"||
-    source.summary?.complete!==true)return null;
+    (source.summary?.complete!==true&&!selectedGitHubBranchSeen(source,claim.ref)))return null;
  const seen=Date.parse(source.observedAt||""),current=Date.parse(now);
  const observedSha=source.summary.branchHeads?.[claim.ref];
  if(!Number.isFinite(seen)||!Number.isFinite(current)||seen>current+300000||current-seen>maxAgeMs||

@@ -45,3 +45,33 @@ test("observations cannot forge a work link or change to a requirement outside i
  forged.projects[0].findings[0].workId="unknown";
  assert.throws(()=>deserialize(JSON.stringify(forged)),/Invalid finding workId/);
 });
+
+test("verified selected GitHub branch stays comparable when other branches are paginated",()=>{
+ const x=make(),ref="work/2026-11-09-atlas-0-5",sha="a".repeat(40);
+ const linked=attach(x.state,x.pid,"github","example/product",{branch:ref});
+ const observed=observe(linked.state,x.pid,linked.id,"ok",{
+  scope:"repository",complete:false,defaultBranch:"main",
+  branches:["main",ref],branchHeads:{main:"b".repeat(40),[ref]:sha},
+  ci:{state:"observed",branch:ref,runId:99,headSha:sha,headCurrent:"current",
+   status:"completed",conclusion:"success"},observedAt:asOf
+ });
+ observed.projects[0].sources[0].observedAt=asOf;
+ const finding=recordFinding(observed,x.pid,{targetId:x.tid,result:"present",
+  level:"test",sourceId:linked.id,ref,revision:sha,observedAt:asOf});
+ const current=compareProject(finding.state.projects[0],{now:asOf}).rows[0];
+ assert.equal(current.freshness.state,"current_revision");
+ assert.equal(current.assessment,"test_claim","Source agreement is not acceptance");
+ const revisionChanged=structuredClone(finding.state);
+ revisionChanged.projects[0].sources[0].summary.branchHeads[ref]="c".repeat(40);
+ assert.equal(compareProject(revisionChanged.projects[0],{now:asOf}).rows[0].freshness.state,
+  "revision_changed");
+ const missing=structuredClone(finding.state);
+ missing.projects[0].sources[0].summary.branches=["main"];
+ assert.equal(compareProject(missing.projects[0],{now:asOf}).rows[0].freshness.state,
+  "incomplete","A SHA alone is not proof that the selected branch was observed");
+ const unselected=recordFinding(observed,x.pid,{targetId:x.tid,result:"partial",
+  level:"test",sourceId:linked.id,ref:"main",revision:"b".repeat(40),observedAt:asOf});
+ assert.equal(compareProject(unselected.state.projects[0],{now:asOf}).rows[0].freshness.state,
+  "incomplete","Unrelated branches stay unverified while enumeration is partial");
+ assert.deepEqual(deserialize(serialize(finding.state)),finding.state);
+});

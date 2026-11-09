@@ -53,10 +53,11 @@ export function recordFinding(snapshot,projectId,{targetId,result,level="impleme
     throw Error("Revision review must reference the latest matching finding on an older SHA");
    const source=p.sources.find(s=>s.id===sourceId),seen=Date.parse(source?.observedAt||"");
    const now=Date.now();
-   if(source?.kind!=="github"||source.status!=="ok"||source.summary?.complete!==true||
+   if(source?.kind!=="github"||source.status!=="ok"||
+      (source.summary?.complete!==true&&!selectedGitHubBranchSeen(source,ref))||
       !ref||!revision||source.summary.branchHeads?.[ref]!==revision||
       !Number.isFinite(seen)||seen>now+5*MINUTE||now-seen>7*DAY)
-    throw Error("Refresh the complete public source before revision review");
+    throw Error("Refresh the checked public source branch before revision review");
    if(!String(note||"").trim())throw Error("Revision review note required");
   }
   const e={id:id(),targetId,result,level,sourceId:optional(sourceId),ref:optional(ref),revision:optional(revision),reference:optional(reference),observedAt:observedAt?timestamp(observedAt,"evidence date"):new Date().toISOString(),note:String(note||""),origin:"manual",...(workId!=null?{workId}:{}),...(reviewOfFindingId!=null?{reviewOfFindingId}:{})};
@@ -102,13 +103,25 @@ export function decideChange(snapshot,projectId,changeId,{status,rationale}){
  });
 }
 
+// A capped GitHub branch list does not invalidate an independently observed
+// selected branch. This only establishes the saved branch/SHA observation,
+// never completion of a requirement or independent product acceptance.
+export function selectedGitHubBranchSeen(source,ref){
+ if(source?.kind!=="github"||source.status!=="ok"||
+    source.summary?.scope!=="repository"||typeof ref!=="string"||!ref)return false;
+ const selected=source.branch||source.summary.ci?.branch||source.summary.defaultBranch;
+ const branches=source.summary.branches,sha=source.summary.branchHeads?.[ref];
+ return ref===selected&&Array.isArray(branches)&&branches.includes(ref)&&
+  typeof sha==="string"&&/^[a-f0-9]{40}$/i.test(sha);
+}
 function sourceFreshness(e,source,nowMs,maxAgeMs) {
  if(!e.sourceId) return {state:"unlinked",note:"Manual claim; no external source"};
  if(!source)return {state:"missing_source",note:"Linked source not available"};
  if(source.status!=="ok")return {state:"unavailable",note:"Source is not currently readable"};
  const sourceTime=Date.parse(source.observedAt||"");
  if(!Number.isFinite(sourceTime)||sourceTime>nowMs+5*MINUTE||nowMs-sourceTime>maxAgeMs) return {state:"outdated",note:"Source observation is out of date"};
- if(source.summary?.complete!==true)return {state:"incomplete",note:"Source enumeration was not proven complete"};
+ if(source.summary?.complete!==true&&!selectedGitHubBranchSeen(source,e.ref))
+  return {state:"incomplete",note:"Selected branch was not verified within the partial source snapshot"};
  const refs=source.summary?.branchHeads;
  if(e.ref&&e.revision&&refs&&Object.hasOwn(refs,e.ref)) {
    if(refs[e.ref]!==e.revision)return {state:"revision_changed",note:"Evidence references an older/different source revision"};

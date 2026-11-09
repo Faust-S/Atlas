@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {empty,createProject,attach,observe,serialize,deserialize} from "../src/core.mjs";
 import {addTarget,recordFinding} from "../src/trace.mjs";
 import {addPortfolioLink} from "../src/portfolio.mjs";
-import {revisionReview,renderRevisionReview} from "../src/revision-review.mjs";
+import {revisionReview,renderRevisionReview,recheckCandidate} from "../src/revision-review.mjs";
 const at="2026-11-02T07:00:00.000Z";
 function fixture(){
  const a=createProject(empty(),{name:"Upstream"});
@@ -67,4 +67,31 @@ test("untrusted Git names are escaped, not executable HTML",()=>{
  const html=renderRevisionReview(data,{now:at});
  assert.match(html,/&lt;img/);
  assert.doesNotMatch(html,/<img/);
+});
+
+test("human recheck works for an individually observed selected branch in an incomplete GitHub listing",()=>{
+ const f=fixture(),state=structuredClone(f.state),sha="b".repeat(40);
+ const source=state.projects[0].sources[0],finding=state.projects[0].findings[0];
+ const checkedAt=new Date().toISOString();
+ source.summary.complete=false;
+ source.summary.defaultBranch="main";
+ source.summary.ci={state:"observed",branch:"main",runId:4,headSha:sha,
+  headCurrent:"current",status:"completed",conclusion:"success"};
+ source.summary.branchHeads.main=sha;
+ source.observedAt=checkedAt;
+ const project=state.projects[0];
+ const report=revisionReview(state,{now:checkedAt});
+ assert.equal(report.totals.changed,1);
+ assert.equal(report.rows[0].reason,"revision_changed");
+ assert.equal(report.rows[0].canRecheck,true);
+ assert.equal(recheckCandidate(project,finding.id,sha,{now:checkedAt})?.observedSha,sha);
+ const reviewed=recordFinding(state,f.projectId,{targetId:f.targetId,result:"partial",
+  level:"test",sourceId:f.sourceId,ref:"main",revision:sha,note:"Human reviewed new SHA",
+  reviewOfFindingId:finding.id,observedAt:checkedAt});
+ assert.equal(reviewed.state.projects[0].findings.length,2);
+ assert.equal(reviewed.state.projects[0].findings[1].reviewOfFindingId,finding.id);
+ const after=revisionReview(reviewed.state,{now:checkedAt});
+ assert.equal(after.totals.changed,0,"Recheck does not imply product acceptance");
+ assert.equal(reviewed.state.projects[0].items.length,0);
+ assert.deepEqual(deserialize(serialize(reviewed.state)),reviewed.state);
 });

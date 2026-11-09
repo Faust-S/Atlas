@@ -56,8 +56,10 @@ export function projectSignals(project,impact){
    const sha=typeof branch==='string'?source.summary?.branchHeads?.[branch]:null;
    // A partial repository-wide list can still verify the specific selected
    // branch. Don't create a management discrepancy from pagination alone.
-   const selectedBranchSeen=source.kind==='github'&&typeof sha==='string'&&
-    /^[a-f0-9]{40}$/i.test(sha);
+   const selectedBranchSeen=source.kind==='github'&&
+    source.summary?.scope==='repository'&&
+    Array.isArray(source.summary?.branches)&&source.summary.branches.includes(branch)&&
+    typeof sha==='string'&&/^[a-f0-9]{40}$/i.test(sha);
    if(!selectedBranchSeen)
     detail='Список источников неполон. Проверьте выбранную ветку перед решением';
   }
