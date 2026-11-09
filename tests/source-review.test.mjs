@@ -133,3 +133,23 @@ test("source screen can edit a connected branch without rebuilding the source",(
  const editor=readFileSync(new URL("../src/editor.mjs",import.meta.url),"utf8");
  assert.match(editor,/Результаты наблюдения прежней ветки не переносятся/);
 });
+
+
+test("source navigation opens only a normalized official GitHub page",()=>{
+ const repo=sourceReview(source(null,"never"));
+ assert.equal(repo.sourceUrl,"https://github.com/Faust-S/Atlas");
+ const owner=sourceReview({kind:"github_owner",locator:"Faust-S",status:"never"});
+ assert.equal(owner.sourceUrl,"https://github.com/Faust-S");
+ const old=sourceReview({kind:"github_owner",locator:"https://github.com/Faust-S",status:"never"});
+ assert.equal(old.sourceUrl,owner.sourceUrl);
+ const suspect=sourceReview({...source(null,"never"),locator:"javascript:alert(1)"});
+ assert.equal(suspect.sourceUrl,null);
+ assert.equal(sourceReview({kind:"obsidian",locator:"https://github.com/a/b",status:"never"}).sourceUrl,null);
+});
+test("desktop source screen provides direct official GitHub navigation without write authority",()=>{
+ const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ assert.match(ui,/href={review.sourceUrl}/);
+ assert.match(ui,/Открыть репозиторий на GitHub/);
+ assert.match(ui,/Открыть страницу на GitHub/);
+ assert.match(ui,/rel="noopener noreferrer"/);
+});

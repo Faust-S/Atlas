@@ -4,7 +4,15 @@ const asArray=value=>Array.isArray(value)?value:[];
 const isString=value=>typeof value==="string"&&value.length>0;
 const isSupported=kind=>kind==="github"||kind==="github_owner";
 const clipSha=value=>isString(value)?value.slice(0,12):null;
-import {repoName} from "./github-public.mjs";
+import {repoName,ownerName} from "./github-public.mjs";
+
+function sourceWebUrl(source){
+ try{
+  if(source.kind==="github")return "https://github.com/"+repoName(source.locator);
+  if(source.kind==="github_owner")return "https://github.com/"+ownerName(source.locator);
+ }catch{}
+ return null;
+}
 function checkReview(source){
  if(source.kind!=="github"||source.status==="never")return null;
  const check=source.summary?.ci;
@@ -84,6 +92,7 @@ export function sourceReview(source,{limit=12}={}){
  }
  return Object.freeze({
   supported,status,lastAttempt,lastSuccess,
+  sourceUrl:supported?sourceWebUrl(source):null,
   error:hasError?String(source.error||"Источник недоступен"):null,
   comparison:comparable?"COMPARABLE":change?.baseline?"BASELINE":"NOT_COMPARABLE",
   totals,total,rows,

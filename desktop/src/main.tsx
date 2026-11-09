@@ -1421,6 +1421,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
        <div className="button-row">
         {s.kind==="github"&&<Action onClick={()=>openEditor("source-branch:"+encodeURIComponent(s.id))} disabled={busy}>Изменить ветку</Action>}
         {review.supported&&<Action onClick={()=>void syncPublic({projectId:project.id,sourceId:s.id})} disabled={busy}>{s.kind==="github"?"Проверить код и сборку":"Обновить список"}</Action>}
+        {review.sourceUrl&&<a className="text-link" href={review.sourceUrl} target="_blank"
+          rel="noopener noreferrer">{s.kind==="github"?"Открыть репозиторий на GitHub":"Открыть страницу на GitHub"}</a>}
        </div>
        </div>
        {review.supported&&<div className="atlas-source-details">
