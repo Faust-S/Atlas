@@ -63,3 +63,44 @@ test("overview of latest source observations is explicitly visible in desktop so
  assert.match(ui,/Показать ещё изменения/);
  assert.match(ui,/Наблюдение источника не подтверждает готовность/);
 });
+
+test("CI review distinguishes current, obsolete and unavailable GitHub Actions states",()=>{
+ const base={scope:"repository",complete:true,branches:["main"],branchHeads:{main:shaB}};
+ const current=sourceReview(source({...base,ci:{state:"observed",branch:"main",runId:100,
+  headCurrent:"current",status:"completed",conclusion:"success"}}));
+ assert.match(current.ci.label,/этой версии успешно/);
+ assert.equal(current.ci.url,"https://github.com/Faust-S/Atlas/actions/runs/100");
+ assert.equal(current.ci.authority,"OBSERVATION_ONLY");
+ assert.equal(current.authority,"OBSERVATION_ONLY");
+ const stale=sourceReview(source({...base,ci:{state:"observed",branch:"main",runId:101,
+  headCurrent:"previous",status:"completed",conclusion:"success"}}));
+ assert.match(stale.ci.label,/предыдущей версии/);
+ assert.doesNotMatch(stale.ci.label,/этой версии успешно/);
+ const running=sourceReview(source({...base,ci:{state:"observed",branch:"main",runId:102,
+  headCurrent:"current",status:"in_progress",conclusion:null}}));
+ assert.match(running.ci.label,/выполняется/);
+ const unavailable=sourceReview(source({...base,ci:{state:"unavailable",reason:"RATE_LIMITED"}}));
+ assert.match(unavailable.ci.label,/Не удалось получить/);
+ assert.equal(unavailable.ci.url,null);
+ const failed=sourceReview(source({...base,ci:{state:"observed",branch:"main",runId:103,
+  headCurrent:"current",status:"completed",conclusion:"failure"}},"error"));
+ assert.match(failed.ci.label,/Предыдущее наблюдение/);
+ assert.match(failed.ci.label,/ошибкой/);
+ const legacy=sourceReview(source(base));
+ assert.match(legacy.ci.label,/ещё не запрашивались/);
+ const owner=sourceReview({kind:"github_owner",locator:"example",status:"ok",summary:base});
+ assert.equal(owner.ci,null);
+});
+test("untrusted source URL is never used as an Actions link",()=>{
+ const bad=source({ci:{state:"observed",status:"completed",conclusion:"success",
+  runId:10,headCurrent:"current"}});bad.locator="javascript:alert(1)";
+ const model=sourceReview(bad);
+ assert.equal(model.ci.url,null);
+});
+test("GitHub Actions appears in the existing read-only source screen",()=>{
+ const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ assert.match(ui,/review\.ci&&<div className="atlas-source-ci"/);
+ assert.match(ui,/Проверки GitHub Actions/);
+ assert.match(ui,/Сборка на GitHub не подтверждает выполнение требований/);
+ assert.match(ui,/rel="noopener noreferrer"/);
+});
