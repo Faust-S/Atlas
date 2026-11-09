@@ -91,6 +91,20 @@ export function sourceReview(source,{limit=12}={}){
  }
  const change=source.summary?.changes;
  const comparable=change?.comparable===true;
+ const branchDelta=change?.selectedRevision;
+ let selectedRevision=null;
+ if(source.kind==="github"&&source.status==="ok"&&!comparable&&
+    source.summary?.scope==="repository"&&isString(branchDelta?.branch)&&
+    typeof branchDelta?.previousSha==="string"&&typeof branchDelta?.currentSha==="string"&&
+    /^[a-f0-9]{40}$/i.test(branchDelta.previousSha)&&/^[a-f0-9]{40}$/i.test(branchDelta.currentSha)&&
+    branchDelta.previousSha.toLowerCase()!==branchDelta.currentSha.toLowerCase()){
+  const base=sourceWebUrl(source);
+  if(base){
+   const previousSha=branchDelta.previousSha.toLowerCase(),currentSha=branchDelta.currentSha.toLowerCase();
+   selectedRevision={branch:branchDelta.branch,previousSha,currentSha,
+    previousUrl:base+"/commit/"+previousSha,currentUrl:base+"/commit/"+currentSha};
+  }
+ }
  const revisions=new Map(asArray(change?.revisions).filter(x=>isString(x?.ref)).map(x=>[x.ref,x]));
  const totals={
   changed:comparable?asArray(change.changed).length:0,
@@ -120,6 +134,7 @@ export function sourceReview(source,{limit=12}={}){
  return Object.freeze({
   supported,status,lastAttempt,lastSuccess,
   sourceUrl:supported?sourceWebUrl(source):null,
+  selectedRevision,
   observedCommit:supported?observedCommit(source):null,
   error:hasError?String(source.error||"Источник недоступен"):null,
   comparison:comparable?"COMPARABLE":change?.baseline?"BASELINE":"NOT_COMPARABLE",

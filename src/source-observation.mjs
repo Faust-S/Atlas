@@ -3,10 +3,32 @@ import {observe,attach} from "./core.mjs";
 import {repoName} from "./github-public.mjs";
 const identity=entry=>entry.id==null?"name:"+entry.name.toLowerCase():"id:"+entry.id;
 const label=entry=>entry.name;
+// A bounded branch listing cannot prove changes elsewhere in the repository.
+// However, two independently observed SHA values for the SAME selected branch
+// can still be compared without declaring the entire repository comparable.
+function exactSelectedBranch(snapshot){
+ const branch=snapshot?.ci?.branch??snapshot?.defaultBranch;
+ const sha=typeof branch==="string"&&Array.isArray(snapshot?.branches)&&snapshot.branches.includes(branch)
+  ?snapshot.branchHeads?.[branch]:null;
+ return typeof branch==="string"&&branch&&typeof sha==="string"&&/^[a-f0-9]{40}$/i.test(sha)
+  ?{branch,sha:sha.toLowerCase()}:null;
+}
+function selectedBranchDelta(previous,next){
+ if(previous?.scope!=="repository"||next.scope!=="repository"||
+    typeof previous.repository!=="string"||typeof next.repository!=="string"||
+    previous.repository.toLowerCase()!==next.repository.toLowerCase())return null;
+ const before=exactSelectedBranch(previous),after=exactSelectedBranch(next);
+ return before&&after&&before.branch===after.branch&&before.sha!==after.sha
+  ?{branch:before.branch,previousSha:before.sha,currentSha:after.sha}:null;
+}
 export function sourceChanges(previous,next){
  if(!next||!["owner","repository"].includes(next.scope))throw Error("Invalid source observation scope");
- if(!previous||previous.scope!==next.scope||previous.complete!==true||next.complete!==true)
-  return {baseline:!previous,comparable:false,added:[],removed:[],renamed:[],changed:[],reason:"Comparison requires two complete source snapshots"};
+ if(!previous||previous.scope!==next.scope||previous.complete!==true||next.complete!==true){
+  const selectedRevision=selectedBranchDelta(previous,next);
+  return {baseline:!previous,comparable:false,added:[],removed:[],renamed:[],changed:[],
+   reason:"Comparison requires two complete source snapshots",
+   ...(selectedRevision?{selectedRevision}:{})};
+ }
  if(next.scope==="owner"){
   const old=new Map(previous.repositories.map(x=>[identity(x),x]));
   const fresh=new Map(next.repositories.map(x=>[identity(x),x]));

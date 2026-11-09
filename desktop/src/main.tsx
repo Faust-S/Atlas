@@ -1472,6 +1472,15 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
           :review.comparison==="BASELINE"?"Первое наблюдение: сравнение с предыдущей редакцией отсутствует."
           :"Сравнение редакций недоступно: отсутствуют два полных наблюдения."}
         </p>
+        {review.selectedRevision&&<p className="minor" aria-label="Изменение выбранной ветки GitHub">
+         Ветка <strong>{review.selectedRevision.branch}</strong> изменилась:{" "}
+         <a className="text-link" href={review.selectedRevision.previousUrl} target="_blank" rel="noopener noreferrer">
+          было {review.selectedRevision.previousSha.slice(0,12)}</a>{" → "}
+         <a className="text-link" href={review.selectedRevision.currentUrl} target="_blank" rel="noopener noreferrer">
+          стало {review.selectedRevision.currentSha.slice(0,12)}</a>.
+         Полный список веток не сопоставлялся.{" "}
+         <button type="button" className="text-link" onClick={()=>view("reality")}>Проверить связанные требования</button>
+        </p>}
         {review.previousObservation&&<p className="minor">Предыдущее наблюдение сохранено, но последняя сверка завершилась ошибкой.</p>}
         {review.rows.length>0&&<div className="table-scroll"><table className="atlas-source-table"><thead><tr>
          <th>Изменение</th><th>Объект</th><th>Данные проверки</th>

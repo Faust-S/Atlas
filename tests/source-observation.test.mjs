@@ -59,3 +59,22 @@ test("repo discovery records checked branch SHA but does not infer acceptance",a
  assert.equal(observation.branchHeads.main,"abc");
  assert.equal(observation.readiness,"not_assessed");
 });
+
+test("exact selected branch revision can change across partial lists without a false full diff",()=>{
+ const shaA="a".repeat(40),shaB="b".repeat(40);
+ const first={scope:"repository",repository:"Example/Repo",complete:false,defaultBranch:"main",
+  branches:["main","other"],branchHeads:{main:shaA,other:shaA},
+  ci:{state:"none",branch:"main"}};
+ const second={...first,repository:"example/repo",branches:["main"],
+  branchHeads:{main:shaB}};
+ const delta=sourceChanges(first,second);
+ assert.equal(delta.comparable,false);
+ assert.deepEqual([delta.added,delta.removed,delta.changed],[[],[],[]]);
+ assert.deepEqual(delta.selectedRevision,{branch:"main",previousSha:shaA,currentSha:shaB});
+ assert.deepEqual(sourceChanges({...first,complete:true},second).selectedRevision,delta.selectedRevision);
+ assert.equal(sourceChanges(first,{...second,repository:"example/unrelated"}).selectedRevision,undefined);
+ assert.equal(sourceChanges(first,{...second,ci:{state:"none",branch:"other"}}).selectedRevision,undefined);
+ assert.equal(sourceChanges(first,{...second,branches:[]}).selectedRevision,undefined);
+ assert.equal(sourceChanges(first,{...second,branchHeads:{main:"invalid"}}).selectedRevision,undefined);
+ assert.equal(sourceChanges(first,{...second,branchHeads:{main:shaA}}).selectedRevision,undefined);
+});

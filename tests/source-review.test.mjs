@@ -244,3 +244,24 @@ test("source review links only latest source-bound facts to exact requirement ca
  assert.match(ui,/setRequirementJump\(\{projectId:project\.id,targetId:r\.id\}\)/);
  assert.match(ui,/Проверка кода сама по себе не подтверждает выполнение требований/);
 });
+
+test("source card shows an exact partial-list branch change, not a full repository diff",()=>{
+ const delta={branch:"main",previousSha:shaA,currentSha:shaB};
+ const summary={scope:"repository",repository:"Faust-S/Atlas",complete:false,
+  defaultBranch:"main",branches:["main"],branchHeads:{main:shaB},
+  changes:{baseline:false,comparable:false,added:[],removed:[],changed:[],renamed:[],
+   selectedRevision:delta}};
+ const model=sourceReview(source(summary));
+ assert.equal(model.comparison,"NOT_COMPARABLE");
+ assert.equal(model.total,0);
+ assert.deepEqual(model.selectedRevision,{...delta,
+  previousUrl:"https://github.com/Faust-S/Atlas/commit/"+shaA,
+  currentUrl:"https://github.com/Faust-S/Atlas/commit/"+shaB});
+ assert.equal(sourceReview(source({...summary,changes:{comparable:false}})).selectedRevision,null);
+ assert.equal(sourceReview(source(summary,"error")).selectedRevision,null);
+ assert.equal(sourceReview({...source(summary),locator:"javascript:alert(1)"}).selectedRevision,null);
+ const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ assert.match(ui,/review\.selectedRevision&&<p className="minor"/);
+ assert.match(ui,/Полный список веток не сопоставлялся/);
+ assert.match(ui,/Проверить связанные требования/);
+});

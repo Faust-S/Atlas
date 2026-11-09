@@ -171,3 +171,23 @@ test("same GitHub repository with distinct selected branches is refreshed separa
   ["release/0.4","work/2026-11-09-atlas-0-5","work/2026-11-09-atlas-0-5"]);
  assert.equal(publicSourceQueue(restored).unique,2);
 });
+
+test("a partial GitHub list preserves exact selected branch drift across save and restore",async()=>{
+ const sampleState=sample().state,shaA="a".repeat(40),shaB="b".repeat(40);
+ const partial=(name,sha)=>({...observed(name,sha),complete:false,
+  ci:{state:"none",branch:"main"}});
+ const first=await reconcilePublicSources(sampleState,{
+  repoObserver:async name=>partial(name,shaA)});
+ const second=await reconcilePublicSources(first.state,{
+  plan:planPublicRefresh(first.state,{maxAgeMs:0}),
+  repoObserver:async name=>partial(name,shaB)});
+ const before=first.state.projects[0].sources[0],after=second.state.projects[0].sources[0];
+ assert.equal(before.summary.changes.selectedRevision,undefined);
+ assert.equal(after.summary.changes.comparable,false);
+ assert.deepEqual(after.summary.changes.selectedRevision,
+  {branch:"main",previousSha:shaA,currentSha:shaB});
+ assert.deepEqual([after.summary.changes.added,after.summary.changes.removed],[[],[]]);
+ assert.equal(after.summary.readiness,"not_assessed");
+ assert.deepEqual(deserialize(serialize(second.state)),second.state);
+ assert.equal(second.state.projects[0].findings.length,0);
+});
