@@ -38,8 +38,8 @@ test("desktop exposes saved references only after persistence and without false 
  assert.match(ui,/disabled=\{busy\|\|dirty\|\|!persisted\|\|!!editor\}/);
  assert.match(ui,/onClick=\{\(\)=>showSavedReference\(project\.id,w\.id\)\}/);
  assert.match(ui,/savedRefPreview\.revision===String\(data\.revision\)&&!dirty/);
- assert.match(ui,/не пакет \.iwxa/);
- assert.match(ui,/не подтверждение подключения Agent или Center/);
+ assert.match(ui,/Эта ссылка относится к сохранённой версии проекта/);
+ assert.match(ui,/Эта операция не создаёт автоматическое соединение/);
 });
 
 test("handoff GUI reopens exact native snapshot and exports existing JSON for Center",()=>{
@@ -55,8 +55,8 @@ test("handoff GUI reopens exact native snapshot and exports existing JSON for Ce
 
 test("standalone development UI identifies 0.4 without changing the frozen release",()=>{
  const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
- assert.match(ui,/Нативный Atlas 0\.4 запускается как установленное приложение Tauri/);
- assert.doesNotMatch(ui,/Нативный Atlas 0\.3 запускается как установленное приложение Tauri/);
+ assert.match(ui,/Откройте установленное приложение Atlas в отдельном окне Windows/);
+ assert.doesNotMatch(ui,/Нативный Atlas 0\.4 запускается как установленное приложение Tauri/);
 });
 
 test("saved-reference modal has native title and keyboard/close protection",()=>{
