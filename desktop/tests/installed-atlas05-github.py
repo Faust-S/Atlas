@@ -42,7 +42,16 @@ def screenshot(label):
 
 
 def head():
-    return json.loads((STORE / "head.json").read_text(encoding="utf-8"))
+    # Native Rust atomically replaces the manifest; a Windows sharing
+    # violation during publication is transient, but invalid JSON is not.
+    deadline = time.monotonic() + 6
+    while True:
+        try:
+            return json.loads((STORE / "head.json").read_text(encoding="utf-8"))
+        except PermissionError:
+            if time.monotonic() >= deadline:
+                raise
+            time.sleep(0.1)
 
 
 def project(manifest, project_id=PROJECT):
@@ -212,10 +221,10 @@ def refresh_source():
     until = time.monotonic() + 95
     while time.monotonic() < until:
         names = visible_texts()
-        if any("Последняя сверка завершилась ошибкой" in name for name in names):
+        if any("Ошибка" in name and "GitHub" in name for name in names):
             screenshot("refresh-error")
             raise AssertionError("Installed GitHub refresh failed; inspect source screen")
-        if any("Получены сведения GitHub" in name for name in names):
+        if any("Публичные наблюдения обновлены в черновике" in name for name in names):
             if any("Проверки GitHub Actions" in name for name in names):
                 screenshot("actions-observed")
                 assert not project(head())["sources"], "Network refresh unexpectedly saved without consent"

@@ -36,7 +36,16 @@ def screenshot(name):
         print("ATLAS05_IWXA_SCREENSHOT_ERROR "+str(error)[:100],flush=True)
 
 def head():
-    return json.loads((STORE/"head.json").read_text(encoding="utf-8"))
+    # Windows may briefly deny a read while Rust atomically replaces head.json.
+    # Retry ONLY that sharing violation; malformed content remains a failure.
+    deadline=time.monotonic()+6
+    while True:
+        try:
+            return json.loads((STORE/"head.json").read_text(encoding="utf-8"))
+        except PermissionError:
+            if time.monotonic()>=deadline:
+                raise
+            time.sleep(0.1)
 
 def activation():
     win32gui.ShowWindow(handle,win32con.SW_RESTORE)
