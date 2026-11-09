@@ -23,6 +23,7 @@ with zipfile.ZipFile(path) as z:
     manifest=json.loads(z.read('manifest.json'))
     assert manifest['format']=='iwxa.package'
     assert manifest['format_version']=='1.0'
+    assert manifest['options']['include_history'] is False
     assert manifest['encryption']=='none'
     files=manifest['files']
     assert [row['path'] for row in files]==sorted(expected[1:])

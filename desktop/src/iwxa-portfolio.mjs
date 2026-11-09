@@ -96,7 +96,7 @@ export async function buildIwxaPortfolio(raw,{now=new Date().toISOString()}={}){
  const packageDigest=await digest(files.map(f=>f.path+"\t"+f.sha256+"\n").join(""));
  const manifest={format:PACKAGE,format_version:VERSION,encryption:"none",created_at:now,
   workspaces:[workspaceId],workspace_states:[{workspace_id:workspaceId,updated_at:now}],
-  options:{include_history:true,include_assets:false,include_relations:false,include_schemas:true},
+  options:{include_history:false,include_assets:false,include_relations:false,include_schemas:true},
   counts:{workspaces:1,objects:1,events:0,relations:0,assets:0,schemas:1},
   files,package_digest:packageDigest,semantic_digest:await digestObject(model)};
  const archive=zipSync({"manifest.json":strToU8(JSON.stringify(manifest,null,2)+"\n"),...contents},{level:0});

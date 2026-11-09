@@ -833,17 +833,21 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      }}>
       <summary>Сохранение и копии</summary>
       <div className="atlas-file-menu-actions">
-       <Action onClick={()=>{fileMenuRef.current?.removeAttribute("open");void exportIwxa()}}
-        disabled={busy||dirty||!!editor||!persisted}>Сохранить архив .iwxa</Action>
-       <Action onClick={()=>{fileMenuRef.current?.removeAttribute("open");void importIwxa()}}
-        disabled={busy||!!editor||pendingImport!==null}>Открыть архив .iwxa</Action>
+       {!embedded&&<>
+        <Action onClick={()=>{fileMenuRef.current?.removeAttribute("open");void exportIwxa()}}
+         disabled={busy||dirty||!!editor||!persisted}>Сохранить архив .iwxa</Action>
+        <Action onClick={()=>{fileMenuRef.current?.removeAttribute("open");void importIwxa()}}
+         disabled={busy||!!editor||pendingImport!==null}>Открыть архив .iwxa</Action>
+       </>}
        <Action onClick={()=>{fileMenuRef.current?.removeAttribute("open");void exportJson()}}
         disabled={busy||dirty||!!editor||!persisted}>Сохранить копию JSON</Action>
        <Action onClick={()=>{fileMenuRef.current?.removeAttribute("open");void importJson()}}
         disabled={busy||!!editor||pendingImport!==null}>Открыть копию JSON</Action>
        <Action onClick={()=>{fileMenuRef.current?.removeAttribute("open");void showNativeHistory()}}
         disabled={busy||dirty||!!editor||!persisted||savedVersions!==null}>История сохранений</Action>
-       <p className="atlas-file-menu-note">Архив .iwxa переносит проекты между копиями Atlas. JSON остаётся для совместимости с Admin Center. Обмен с другими программами IWXA пока не подключён.</p>
+       <p className="atlas-file-menu-note">{embedded
+        ?"Файловый обмен .iwxa доступен в самостоятельном Atlas. Встроенный режим работает через разрешения своей программы."
+        :"Архив .iwxa переносит проекты между копиями Atlas. История сохранений в него не входит. JSON остаётся для совместимости с Admin Center. Обмен с другими программами IWXA пока не подключён."}</p>
       </div>
      </details>
      <button disabled={!!editor} className="icon-button inspector-button" aria-label={inspector?"Скрыть инспектор":"Показать инспектор"}

@@ -27,7 +27,7 @@ test("IWXA 1.0 ZIP carrier roundtrip preserves Atlas work, Unicode and project I
  assert.equal(result.manifest.counts.objects,1);
  assert.equal(result.manifest.counts.schemas,1);
  assert.equal(result.manifest.files.length,3);
- assert.equal(result.manifest.options.include_history,true);
+ assert.equal(result.manifest.options.include_history,false);
  assert.equal(result.manifest.options.include_schemas,true);
  assert.equal(result.manifest.options.include_assets,false);
  assert.equal(toBase64(fromBase64(toBase64(archive))),toBase64(archive));
@@ -91,4 +91,13 @@ test("native IWXA Save As and import preserve Atlas native generation and explic
  assert.match(ui,/format:"iwxa"/);
  assert.match(ui,/const applyPendingImport=async\(\)=>/);
  assert.match(ui,/head.needsConfirmation\|\|head.generation!==candidate.expectedGeneration/);
+});
+
+test("native IWXA exchange remains disabled inside a host without file-picker commands",()=>{
+ const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ const host=readFileSync(new URL("../desktop/src/embedded-host.ts",import.meta.url),"utf8");
+ assert.match(ui,/\{!embedded&&<>/);
+ assert.match(ui,/Файловый обмен \.iwxa доступен в самостоятельном Atlas/);
+ assert.doesNotMatch(host,/atlas_export_iwxa|atlas_select_iwxa/);
+ assert.match(ui,/История сохранений в него не входит/);
 });

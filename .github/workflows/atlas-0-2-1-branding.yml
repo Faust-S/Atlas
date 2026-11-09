@@ -112,6 +112,11 @@ jobs:
         shell: pwsh
         timeout-minutes: 8
         run: python desktop/tests/installed-atlas04-scale.py
+      - name: Exercise native Atlas 0.5 IWXA Save As and safe import preview
+        if: github.ref_name == 'work/2026-11-09-atlas-0-5'
+        shell: pwsh
+        timeout-minutes: 6
+        run: python desktop/tests/installed-atlas05-iwxa.py
       - name: Checkout real Center consumer at audited revision
         if: github.ref_name == 'work/2026-11-04-atlas-0-3'
         uses: actions/checkout@v4

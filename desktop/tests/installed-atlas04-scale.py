@@ -15,7 +15,7 @@ from pathlib import Path
 import win32con
 import win32gui
 import win32process
-from pywinauto import keyboard, mouse
+from pywinauto import keyboard, mouse, Desktop
 from PIL import ImageGrab
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -181,7 +181,14 @@ def import_fixture(ids):
     # The physical coordinates are grounded in 0.4 installed 1024px PNGs.
     click(847, 65)   # File & versions dropdown
     screenshot("files-menu-open")
-    click(829, 116)  # Open JSON, first dropdown action
+    # Atlas 0.5 adds IWXA actions above legacy JSON. Prefer the named
+    # visible action, with a screenshot-verified physical fallback at y=252.
+    action=Desktop(backend="uia").window(handle=handle).child_window(
+        title="Открыть копию JSON", control_type="Button")
+    if action.exists(timeout=3) and action.is_visible():
+        action.click_input()
+    else:
+        click(829, 252)  # 0.5 menu, fourth action (real installed screenshot)
     choose_json()
     time.sleep(1.1)
     screenshot("import-preview")
