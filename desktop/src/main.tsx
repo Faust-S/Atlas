@@ -337,7 +337,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   return false;
  };
  useEffect(()=>{
-  if(!native){setError("Нативный Atlas 0.4 запускается как установленное приложение Tauri. Для работы с данными откройте его через собственное окно Windows.");return}
+  if(!native){setError("Откройте установленное приложение Atlas в отдельном окне Windows, чтобы работать с проектами.");return}
   invoke<OpenResult>("atlas_open").then(result=>{
    if(result.needsConfirmation){setRecovery(true);setError("Обнаружена повреждённая текущая редакция. Предыдущая версия доступна для явного восстановления.");return}
    const snapshot=deserialize(JSON.stringify(result.snapshot));
