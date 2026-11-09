@@ -7,7 +7,7 @@ const css=readFileSync(new URL("../desktop/src/style.css",import.meta.url),"utf8
 const source=readFileSync(new URL("../src/github-public.mjs",import.meta.url),"utf8");
 const refresh=readFileSync(new URL("../src/public-refresh.mjs",import.meta.url),"utf8");
 
-test("Atlas 0.4 shows human-first copy without leaking project schema",()=>{
+test("Atlas 0.5 shows human-first copy without leaking project schema",()=>{
  assert.doesNotMatch(ui,/Схема:\s*atlas\.project\/1/);
  assert.doesNotMatch(ui,/локальный черновик\s*→\s*нативная запись\s*→\s*readback/);
  assert.match(ui,/<h2>План, факты и решения<\/h2>/);
@@ -35,4 +35,15 @@ test("project source review describes only actual read-only, manually initiated 
  assert.match(ui,/const syncPublic=async/);
  assert.match(source,/Public GitHub REST observation only; never accepts tokens or writes to source/);
  assert.match(refresh,/const supported=new Set\(\["github","github_owner"\]\)/);
+});
+
+
+test("technical source revisions are opt-in, not permanent UI columns",()=>{
+ assert.match(ui,/<h2>Что известно о результате<\/h2>/);
+ assert.doesNotMatch(ui,/<th>Предыдущий SHA<\/th>/);
+ assert.doesNotMatch(ui,/<th>Новый SHA<\/th>/);
+ assert.match(ui,/className="atlas-technical-details"/);
+ assert.match(ui,/<summary>Версии источника<\/summary>/);
+ assert.match(ui,/<summary>Данные для ручного подключения<\/summary>/);
+ assert.match(css,/\.atlas-technical-details>summary:focus-visible/);
 });
