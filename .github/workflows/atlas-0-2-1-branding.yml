@@ -128,19 +128,8 @@ jobs:
           New-Item -ItemType Directory -Path $directory -Force | Out-Null
           $package = Join-Path $directory 'atlas05-synthetic-portfolio.iwxa'
           Copy-Item -LiteralPath $source -Destination $package -ErrorAction Stop
-          $checksum = (Get-FileHash -LiteralPath $package -Algorithm SHA256).Hash.ToLowerInvariant()
-          $receipt = @(
-            'source=installed Atlas 0.5 Windows qualification'
-            "source_commit=$env:GITHUB_SHA"
-            'data=synthetic fixture: 120 projects and 1200 works'
-            'carrier=iwxa.package/1.0'
-            'profile=iwxa.atlas.portfolio/1.0.0'
-            'profile_status=consumer-local-pending-owner'
-            'cross_product_import=NOT_QUALIFIED'
-            "sha256=$checksum"
-          )
-          [System.IO.File]::WriteAllLines((Join-Path $directory 'RECEIPT.txt'), $receipt, [System.Text.UTF8Encoding]::new($false))
-          Write-Output "ATLAS05_IWXA_CONSUMER_SAMPLE_READY_PASS sha256=$checksum"
+          python desktop/tests/atlas05-consumer-receipt.py $package (Join-Path $directory 'RECEIPT.txt') $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { throw 'IWXA consumer sample receipt verification failed' }
       - name: Publish synthetic Atlas IWXA consumer sample for independent import tests
         if: github.ref_name == 'work/2026-11-09-atlas-0-5'
         uses: actions/upload-artifact@v4

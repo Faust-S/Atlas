@@ -1,6 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {readFileSync} from "node:fs";
+import {readFileSync,mkdtempSync,writeFileSync,rmSync,existsSync} from "node:fs";
+import {tmpdir} from "node:os";
+import {join} from "node:path";
+import {fileURLToPath} from "node:url";
+import {spawnSync} from "node:child_process";
+import {createHash} from "node:crypto";
+import {desktopLoadPortfolio} from "./fixtures/desktop-portfolio-120.mjs";
 import {createRequire} from "node:module";
 const {zipSync,unzipSync,strToU8,strFromU8}=createRequire(new URL("../desktop/package.json",import.meta.url))("fflate");
 import {empty,createProject,createItem,createDecision,serialize} from "../src/core.mjs";
@@ -169,11 +175,46 @@ test("Atlas refuses a manifest that claims excluded relations or history without
  await assert.rejects(readIwxaPortfolio(zipSync(zip,{level:0})),/состав портфеля не подтверждён/);
 });
 
-test("installed IWXA export provides a synthetic consumer fixture without implying profile adoption",()=>{
+test("installed IWXA export publishes a verified consumer fixture without claiming profile adoption",()=>{
  const workflow=readFileSync(new URL("../.github/workflows/atlas-0-2-1-branding.yml",import.meta.url),"utf8");
- assert.match(workflow,/ATLAS05_IWXA_CONSUMER_SAMPLE_READY_PASS/);
+ const receiptScript=readFileSync(new URL("../desktop/tests/atlas05-consumer-receipt.py",import.meta.url),"utf8");
  assert.match(workflow,/atlas05-human-portfolio\.iwxa/);
  assert.match(workflow,/atlas05-iwxa-consumer-sample/);
- assert.match(workflow,/profile_status=consumer-local-pending-owner/);
- assert.match(workflow,/cross_product_import=NOT_QUALIFIED/);
+ assert.match(workflow,/atlas05-consumer-receipt\.py/);
+ assert.doesNotMatch(workflow,/data=synthetic fixture: 120 projects and 1200 works/);
+ assert.match(receiptScript,/ATLAS05_IWXA_CONSUMER_SAMPLE_READY_PASS/);
+ assert.match(receiptScript,/profile_status=consumer-local-pending-owner/);
+ assert.match(receiptScript,/cross_product_import=NOT_QUALIFIED/);
+});
+
+test("installed IWXA consumer receipt counts real archive works and rejects changed content",async()=>{
+ const snapshot=desktopLoadPortfolio();
+ snapshot.projects[0].items.push({...snapshot.projects[0].items[0],
+  id:"load-work-added-from-gui",title:"Work added by GUI qualification"});
+ const archive=await buildIwxaPortfolio(snapshot,{now:"2026-11-09T10:00:00.000Z"});
+ const dir=mkdtempSync(join(tmpdir(),"atlas05-consumer-receipt-"));
+ const path=join(dir,"actual.iwxa"),receipt=join(dir,"RECEIPT.txt");
+ const script=fileURLToPath(new URL("../desktop/tests/atlas05-consumer-receipt.py",import.meta.url));
+ const commit="a".repeat(40);
+ const run=(input,output)=>spawnSync("python3",[script,input,output,commit],{encoding:"utf8"});
+ try{
+  writeFileSync(path,archive);
+  const good=run(path,receipt);
+  assert.equal(good.status,0,good.stderr+" "+good.stdout);
+  const content=readFileSync(receipt,"utf8");
+  assert.match(content,/^data=synthetic fixture: 120 projects and 1201 works$/m);
+  assert.match(content,/^projects=120$/m);
+  assert.match(content,/^works=1201$/m);
+  assert.match(content,/^portfolio_revision=0$/m);
+  assert.match(content,/^cross_product_import=NOT_QUALIFIED$/m);
+  assert.match(content,new RegExp("^sha256="+createHash("sha256").update(archive).digest("hex")+"$","m"));
+  const files=unzipSync(archive);
+  files["content/objects.ndjson"]=strToU8(strFromU8(files["content/objects.ndjson"]).replace("Work 0-0","Tampered 0-0"));
+  const tampered=join(dir,"tampered.iwxa"),invalidReceipt=join(dir,"INVALID.txt");
+  writeFileSync(tampered,zipSync(files,{level:0}));
+  const bad=run(tampered,invalidReceipt);
+  assert.notEqual(bad.status,0,"Payload tampering must not produce a successful receipt");
+  assert.match(bad.stderr,/ATLAS05_IWXA_CONSUMER_SAMPLE_HOLD/);
+  assert.equal(existsSync(invalidReceipt),false);
+ }finally{rmSync(dir,{recursive:true,force:true})}
 });
