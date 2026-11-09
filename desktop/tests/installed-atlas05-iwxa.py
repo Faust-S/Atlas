@@ -120,6 +120,73 @@ def dialog_picker(title,target):
     screenshot("picker-missing")
     raise AssertionError("Native IWXA file dialog not found: "+title)
 
+def dialog_cancel(title):
+    until=time.monotonic()+40
+    while time.monotonic()<until:
+        hwnd=win32gui.FindWindow("#32770",title)
+        if hwnd and win32gui.IsWindowVisible(hwnd):
+            win32gui.SetForegroundWindow(hwnd)
+            keyboard.send_keys("{ESC}")
+            for _ in range(30):
+                if not win32gui.IsWindowVisible(hwnd):
+                    print("ATLAS05_IWXA_NATIVE_CANCEL_DIALOG_PASS",flush=True)
+                    return
+                time.sleep(0.15)
+            raise AssertionError("Save As dialog did not close on Escape")
+        time.sleep(0.25)
+    screenshot("cancel-dialog-missing")
+    raise AssertionError("Cannot exercise cancellation: native Save As missing")
+
+def click_accessible_button(title):
+    until=time.monotonic()+35
+    window=Desktop(backend="uia").window(handle=handle)
+    while time.monotonic()<until:
+        control=window.child_window(title=title,control_type="Button")
+        if control.exists(timeout=0.5) and control.is_visible() and control.is_enabled():
+            control.click_input()
+            return
+        time.sleep(0.25)
+    screenshot("accessible-button-missing")
+    raise AssertionError("Native WebView2 button was not accessible: "+title)
+
+def save_for_center_from_reference():
+    before=head()
+    first=before["projects"][0]
+    project=json.loads((STORE/"blocks"/(first["sha256"]+".json")).read_text(encoding="utf-8"))
+    project_name=project["name"]
+    click_accessible_button(project_name)
+    click_accessible_button("Ссылка на проект")
+    click_accessible_button("Сохранить портфель .iwxa")
+    dialog_cancel("Сохранить архив проектов IWXA")
+    assert head()==before,"Cancelled Save As changed the native owner Store"
+    window=Desktop(backend="uia").window(handle=handle)
+    assert window.child_window(title="Сохранить портфель .iwxa",control_type="Button").exists(timeout=2), \
+        "Cancelling Save As closed the project reference dialog"
+    errors=[element.element_info.name for element in window.descendants()
+        if "Выбор файла отменён" in str(element.element_info.name)]
+    assert not errors,"Cancelled Save As was incorrectly presented as an error"
+    print("ATLAS05_IWXA_CANCEL_IS_NOT_ERROR_PASS",flush=True)
+    destination=Path(os.environ["RUNNER_TEMP"])/"atlas05-center-from-reference.iwxa"
+    assert not destination.exists(),"Prior handoff archive on clean runner"
+    click_accessible_button("Сохранить портфель .iwxa")
+    dialog_picker("Сохранить архив проектов IWXA",destination)
+    end=time.monotonic()+35
+    while time.monotonic()<end:
+        if destination.exists() and destination.stat().st_size>100:break
+        time.sleep(0.25)
+    else:raise AssertionError("IWXA reference action did not save an archive")
+    verify_zip(destination)
+    assert head()==before,"Reference export changed the native owner Store"
+    end=time.monotonic()+12
+    while time.monotonic()<end:
+        if not window.child_window(title="Сохранить портфель .iwxa",control_type="Button").exists(timeout=0.5):
+            break
+        time.sleep(0.2)
+    else:raise AssertionError("Successful IWXA export left the reference dialog open")
+    screenshot("center-handoff-saved")
+    print("ATLAS05_REFERENCE_TO_CENTER_IWXA_GUI_PASS",flush=True)
+
+
 def wait_file():
     end=time.monotonic()+35
     while time.monotonic()<end:
@@ -128,8 +195,8 @@ def wait_file():
     screenshot("no-export")
     raise AssertionError("IWXA archive not saved by native dialog")
 
-def verify_zip():
-    with zipfile.ZipFile(ARCHIVE) as z:
+def verify_zip(path=ARCHIVE):
+    with zipfile.ZipFile(path) as z:
         m=json.loads(z.read("manifest.json"))
         assert m["format"]=="iwxa.package" and m["format_version"]=="1.0"
         assert len(z.namelist())==4
@@ -228,6 +295,7 @@ try:
     reopened=head()
     assert reopened==saved,"Native store changed after reopening the IWXA import"
     screenshot("import-reopened")
+    save_for_center_from_reference()
     print("ATLAS05_IWXA_INSTALLED_RESTART_PASS",flush=True)
     print("ATLAS05_IWXA_INSTALLED_EXCHANGE_PASS",flush=True)
 except Exception as error:

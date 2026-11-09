@@ -38,8 +38,9 @@ test("desktop exposes saved references only after persistence and without false 
  assert.match(ui,/disabled=\{busy\|\|dirty\|\|!persisted\|\|!!editor\}/);
  assert.match(ui,/onClick=\{\(\)=>showSavedReference\(project\.id,w\.id\)\}/);
  assert.match(ui,/savedRefPreview\.revision===String\(data\.revision\)&&!dirty/);
- assert.match(ui,/Эта ссылка относится к сохранённой версии проекта/);
- assert.match(ui,/Эта операция не создаёт автоматическое соединение/);
+ assert.match(ui,/Сохраните архив \.iwxa, затем откройте его в Admin Center/);
+ assert.match(ui,/В архив попадут все проекты портфеля/);
+ assert.match(ui,/синхронизация и права не передаются/);
 });
 
 test("handoff GUI reopens exact native snapshot and exports existing JSON for Center",()=>{
