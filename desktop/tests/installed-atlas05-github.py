@@ -304,6 +304,54 @@ def save_source(initial):
     raise AssertionError("Live GitHub source was not saved to the native Atlas store")
 
 
+
+def qualify_source_decision_route(saved):
+    source = project(saved)["sources"][0]
+    ci = source.get("summary", {}).get("ci") or {}
+    # The UI only creates a human-review signal for a real source issue,
+    # not for an in-progress, successful/current or unobserved code check.
+    need_review = (
+        source["status"] in ("never", "error")
+        or source.get("summary", {}).get("complete") is False
+        or ci.get("state") in ("invalid", "unavailable")
+        or (ci.get("state") == "observed" and (
+            ci.get("headCurrent") == "previous"
+            or (ci.get("status") == "completed" and
+                ci.get("conclusion") in (
+                    "failure", "timed_out", "action_required", "stale",
+                    "cancelled", "neutral", "skipped"))
+        ))
+    )
+    if not need_review:
+        assert not any(item.window_text() == "Предложить действие по причине"
+                       for item in window().descendants(control_type="Button")), \
+            "Green/current or pending CI must not create an automatic discrepancy"
+        print("ATLAS05_GITHUB_GREEN_CI_NO_FALSE_CAUSE_PASS", flush=True)
+        return
+    for attempt in range(12):
+        available = [item for item in window().descendants(control_type="Button")
+                     if item.window_text() == "Предложить действие по причине"
+                     and item.is_visible() and item.is_enabled()]
+        if available:
+            available[0].click_input()
+            break
+        activate()
+        keyboard.send_keys("{PGDN}")
+        time.sleep(0.3)
+    else:
+        screenshot("source-cause-action-missing")
+        raise AssertionError("Observed CI/source discrepancy has no human decision route")
+    wait_title("Форма: Изменение для устранения:")
+    names = visible_texts()
+    assert any("Что предлагается изменить?" in name for name in names), \
+        "Existing proposal editor was not opened"
+    assert head() == saved, "Opening a source proposal unexpectedly modified native Atlas storage"
+    screenshot("source-cause-proposal")
+    click_button("Отмена")
+    wait_title("Project 0 — Источники")
+    assert head() == saved, "Discarding a source proposal changed native owner storage"
+    print("ATLAS05_GITHUB_CAUSE_TO_HUMAN_PROPOSAL_PASS", flush=True)
+
 def reopened_check(saved, identity):
     stop()
     launch()
@@ -320,6 +368,7 @@ def reopened_check(saved, identity):
         raise AssertionError("Saved GitHub branch revision is not visible in installed Atlas")
     screenshot("actions-reopened")
     print("ATLAS05_GITHUB_RESTART_READBACK_PASS", flush=True)
+    qualify_source_decision_route(saved)
     # The source review must lead to the existing plan/fact screen even if
     # this project has no declared targets yet. Navigation is read-only.
     activate()

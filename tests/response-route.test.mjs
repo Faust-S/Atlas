@@ -87,6 +87,19 @@ test("GitHub Actions discrepancy follows existing proposal, human decision and w
  assert.equal(restored.projects[0].decisions[0].status,"approved");
  assert.equal(responseState(restored.projects[0],projectImpact(restored.projects[0]))
   .rows.find(r=>r.key===issue.key).needsProposal,false);
+ const newer=observe(restored,made.id,sourceId,"ok",{
+  scope:"repository",complete:true,observedAt:"2026-11-09T16:00:00.000Z",
+  defaultBranch:"main",branches:["main"],branchHeads:{main:"b".repeat(40)},
+  ci:{state:"observed",branch:"main",headCurrent:"current",
+   headSha:"b".repeat(40),status:"completed",conclusion:"success",runId:11}
+ });
+ const resolved=responseState(newer.projects[0],projectImpact(newer.projects[0]));
+ assert.equal(resolved.rows.find(row=>row.key===issue.key),undefined);
+ assert.equal(resolved.resolved,1,"Previously investigated cause remains in decision history");
+ assert.equal(newer.projects[0].changes[0].id,proposal.id);
+ assert.equal(newer.projects[0].decisions.length,1);
+ assert.equal(newer.projects[0].items.length,0,"A refreshed green CI does not create work");
+
 });
 test("successful aligned CI is not a cause; failed or unavailable check is review-only",()=>{
  const made=createProject(empty(),{name:"CI states"}),attached=attach(made.state,made.id,"github","example/ci");
