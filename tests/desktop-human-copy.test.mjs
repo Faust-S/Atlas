@@ -47,3 +47,16 @@ test("technical source revisions are opt-in, not permanent UI columns",()=>{
  assert.match(ui,/<summary>Данные для ручного подключения<\/summary>/);
  assert.match(css,/\.atlas-technical-details>summary:focus-visible/);
 });
+
+
+test("installed Windows Save clicks the visible button, never its adjacent file menu",()=>{
+ const driver=readFileSync(new URL("../desktop/tests/installed-windows-keyboard.ps1",import.meta.url),"utf8");
+ const fn=driver.match(/function Click-AtlasSave\([\s\S]*?\n\}/)?.[0];
+ assert.ok(fn,"Windows native Save interaction is present");
+ const offset=Number(fn.match(/\$rect\.Right - \[int\]\[Math\]::Round\((\d+) \* \$scale\)/)?.[1]);
+ assert.ok(offset>0,"Windows Save offset must be explicit");
+ const clickedX=1024-offset;
+ assert.ok(clickedX>=696&&clickedX<=786,"Save must hit the screenshot-confirmed button, not the adjacent file menu");
+ assert.match(fn,/SetCursorPos/);
+ assert.match(fn,/mouse_event/);
+});
