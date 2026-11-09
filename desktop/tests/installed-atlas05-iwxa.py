@@ -141,10 +141,16 @@ def click_accessible_button(title):
     until=time.monotonic()+35
     window=Desktop(backend="uia").window(handle=handle)
     while time.monotonic()<until:
-        control=window.child_window(title=title,control_type="Button")
-        if control.exists(timeout=0.5) and control.is_visible() and control.is_enabled():
-            control.click_input()
-            return
+        # Portfolio overview may show the same project twice (sidebar and table).
+        # Choose a visible enabled button, not an ambiguous UIA specification.
+        for control in window.descendants(control_type="Button"):
+            try:
+                if (control.element_info.name==title and control.is_visible()
+                    and control.is_enabled()):
+                    control.click_input()
+                    return
+            except Exception:
+                continue
         time.sleep(0.25)
     screenshot("accessible-button-missing")
     raise AssertionError("Native WebView2 button was not accessible: "+title)

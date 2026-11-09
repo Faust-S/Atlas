@@ -82,3 +82,12 @@ test("saved project and work links export a real IWXA portfolio for Center",()=>
  assert.match(ui,/Сохранить копию JSON<\/Action>/);
  assert.doesNotMatch(ui,/>Сохранить копию JSON для старой версии Center<\/Action>/);
 });
+
+test("installed Atlas exercises handoff from saved project reference and silent cancellation",()=>{
+ const driver=readFileSync(new URL("../desktop/tests/installed-atlas05-iwxa.py",import.meta.url),"utf8");
+ assert.match(driver,/ATLAS05_REFERENCE_TO_CENTER_IWXA_GUI_PASS/);
+ assert.match(driver,/ATLAS05_IWXA_CANCEL_IS_NOT_ERROR_PASS/);
+ assert.match(driver,/click_accessible_button\("Сохранить портфель \.iwxa"\)/);
+ assert.match(driver,/window\.descendants\(control_type="Button"\)/);
+ assert.match(driver,/verify_zip\(destination\)/);
+});

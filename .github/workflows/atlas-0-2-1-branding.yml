@@ -30,6 +30,8 @@ jobs:
       - name: Install pinned React dependencies
         working-directory: desktop
         run: npm ci --no-audit --no-fund
+      - name: Compile installed IWXA Windows acceptance driver
+        run: python -m py_compile desktop/tests/installed-atlas05-iwxa.py
       - name: Test existing Atlas and branded icon
         run: npm test
       - name: Independently inspect IWXA ZIP carrier with Python
