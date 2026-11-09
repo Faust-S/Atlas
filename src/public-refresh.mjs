@@ -56,7 +56,7 @@ export function planPublicRefresh(snapshot,{
 
 const isRateLimited=e=>/\b(?:403|429)\b|rate.limit|rate-limit/i.test(String(e?.message||e));
 export async function reconcilePublicSources(snapshot,{
- plan=planPublicRefresh(snapshot),repoObserver=observePublicRepo,ownerObserver=observePublicOwner
+ plan=planPublicRefresh(snapshot),repoObserver=name=>observePublicRepo(name,globalThis.fetch,{includeActions:true}),ownerObserver=observePublicOwner
 }={}){
  validate(snapshot);
  const state=structuredClone(snapshot),projects=new Map(state.projects.map(x=>[x.id,x]));
