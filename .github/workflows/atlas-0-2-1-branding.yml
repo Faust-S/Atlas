@@ -42,7 +42,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: Faust-S/Center
-          ref: b05fa2d0d0711c67a2e7ea7c88e02caa82dd463a
+          ref: 199421bf24006bb85ae5cbe06f3f92bf3468fcdc
           path: center-public
           persist-credentials: false
       - name: Checkout Center-pinned canonical Atlas source (no fork)
@@ -50,9 +50,13 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: Faust-S/Atlas
-          ref: 7a0a2c8a458617a011a3db78b72c3dd1adbc12c2
+          ref: 0de3b6058526021aeecee6f445acf89b956d10c9
           path: center-public/vendor/atlas
           persist-credentials: false
+      - name: Install exact Center-pinned Atlas IWXA reader
+        if: github.ref_name == 'work/2026-11-09-atlas-0-5'
+        working-directory: center-public/vendor/atlas/desktop
+        run: npm ci --no-audit --no-fund
       - name: Read IWXA through real Center 0.3 source consumer
         if: github.ref_name == 'work/2026-11-09-atlas-0-5'
         run: node tests/atlas05-center-iwxa-consumer.mjs
@@ -162,7 +166,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: Faust-S/Center
-          ref: b05fa2d0d0711c67a2e7ea7c88e02caa82dd463a
+          ref: 199421bf24006bb85ae5cbe06f3f92bf3468fcdc
           path: center-public
           persist-credentials: false
       - name: Checkout Center-pinned canonical Atlas source (no fork)
@@ -170,9 +174,14 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: Faust-S/Atlas
-          ref: 7a0a2c8a458617a011a3db78b72c3dd1adbc12c2
+          ref: 0de3b6058526021aeecee6f445acf89b956d10c9
           path: center-public/vendor/atlas
           persist-credentials: false
+      - name: Install Center-pinned IWXA reader for installed archive verification
+        if: github.ref_name == 'work/2026-11-09-atlas-0-5'
+        working-directory: center-public/vendor/atlas/desktop
+        shell: pwsh
+        run: npm ci --no-audit --no-fund
       - name: Read installed Atlas IWXA in actual Center 0.3 source consumer
         if: github.ref_name == 'work/2026-11-09-atlas-0-5'
         shell: pwsh

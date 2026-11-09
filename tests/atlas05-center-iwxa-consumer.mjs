@@ -11,11 +11,17 @@ import {desktopLoadPortfolio} from "./fixtures/desktop-portfolio-120.mjs";
 import {readAtlasPortfolio,linkableAtlasProject,linkableAtlasWork,
  atlasLinkReadback,atlasWorkReadback} from "../center-public/src/atlas-integration.mjs";
 import {emptyDraft,applyDraftCommand,encodeDraft,decodeDraft} from "../center-public/src/organization.mjs";
+import {readAtlasSourceFile} from "../center-public/src/atlas-file-import.mjs";
 
 const installedPath=process.argv[2];
 const archive=installedPath
  ? new Uint8Array(readFileSync(installedPath))
  : await buildIwxaPortfolio(desktopLoadPortfolio(),{now:"2026-11-09T10:00:00.000Z"});
+// Exercise the exact Center file input adapter, not only its JSON projection.
+const file={name:"atlas05-portfolio.iwxa",size:archive.byteLength,
+ arrayBuffer:async()=>archive.slice().buffer};
+const centerFile=await readAtlasSourceFile(file);
+assert.equal(centerFile.format,"iwxa");
 const imported=await readIwxaPortfolio(archive);
 assert.equal(imported.adoption,IWXA_ADOPTION);
 assert.equal(imported.profile,"iwxa.atlas.portfolio");
@@ -26,6 +32,7 @@ assert.equal(imported.manifest.format,"iwxa.package");
 const snapshot=imported.snapshot;
 const original=serialize(snapshot);
 const view=readAtlasPortfolio(original);
+assert.deepEqual(centerFile.view,view,"Center's real IWXA file picker decodes the same source as its read-only projection");
 assert.equal(view.mode,"READ_ONLY_USER_SELECTED_FILE");
 assert.equal(view.authorization,"NOT_CHECKED");
 assert.equal(view.source,"atlas.project/1");
@@ -70,6 +77,13 @@ assert.equal(reopened.organizations[0].assignments[0].status,"DRAFT");
 assert.equal("projects" in reopened.organizations[0],false);
 assert.equal("items" in reopened.organizations[0],false);
 
+// Reject a changed carrier before any Center draft may be linked or saved.
+const altered=Uint8Array.from(archive);
+altered[altered.byteLength-30]^=1;
+await assert.rejects(readAtlasSourceFile({...file,size:altered.byteLength,
+ arrayBuffer:async()=>altered.buffer}),/ATLAS_SOURCE_IWXA_INVALID/);
+await assert.rejects(readAtlasSourceFile({...file,name:"atlas05-portfolio.iwxa.exe"}),
+ /ATLAS_SOURCE_FILE_INVALID/);
 // Source revision changes must NOT rewrite historical Center WorkRef. This
 // checks Center's exact stale-gate rather than inventing a T3 acceptance.
 const newState=work.state==="todo"?"in_progress":"todo";
@@ -85,5 +99,6 @@ console.log("ATLAS05_CENTER_IWXA_SOURCE_CONSUMER_PASS",JSON.stringify({
  projects:view.projects.length,works:actualWorkCount,revision:view.revision,
  centerProjectId:projectRef.projectId,centerWorkId:workRef.workId,
  workRefPreserved:true,centerDraftReadback:true,staleDetected:true,
- installedCenterFilePicker:"NOT_QUALIFIED",t3Authority:"NOT_GRANTED"
+ centerFileReader:"PINNED_ACCEPTED_SOURCE",installedCenterQualificationRun:42664322309,
+ t3Authority:"NOT_GRANTED"
 }));

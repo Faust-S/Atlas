@@ -234,10 +234,13 @@ test("Center 0.3 IWXA source consumer is pinned, checks real installed archive, 
  const flow=readFileSync(new URL("../.github/workflows/atlas-0-2-1-branding.yml",import.meta.url),"utf8");
  const consumer=readFileSync(new URL("atlas05-center-iwxa-consumer.mjs",import.meta.url),"utf8");
  assert.match(flow,/node tests\/atlas05-center-iwxa-consumer\.mjs "\$env:RUNNER_TEMP\/atlas05-human-portfolio\.iwxa"/);
- assert.match(flow,/ref: b05fa2d0d0711c67a2e7ea7c88e02caa82dd463a/);
- assert.match(flow,/ref: 7a0a2c8a458617a011a3db78b72c3dd1adbc12c2/);
+ assert.match(flow,/ref: 199421bf24006bb85ae5cbe06f3f92bf3468fcdc/);
+ assert.match(flow,/ref: 0de3b6058526021aeecee6f445acf89b956d10c9/);
+ assert.match(flow,/working-directory: center-public\/vendor\/atlas\/desktop/);
  assert.match(consumer,/from "\.\.\/center-public\/src\/atlas-integration\.mjs"/);
  assert.match(consumer,/ATLAS05_CENTER_IWXA_SOURCE_CONSUMER_PASS/);
- assert.match(consumer,/installedCenterFilePicker:"NOT_QUALIFIED"/);
+ assert.match(consumer,/from "\.\.\/center-public\/src\/atlas-file-import\.mjs"/);
+ assert.match(consumer,/PINNED_ACCEPTED_SOURCE/);
+ assert.match(consumer,/ATLAS_SOURCE_IWXA_INVALID/);
  assert.match(consumer,/t3Authority:"NOT_GRANTED"/);
 });
