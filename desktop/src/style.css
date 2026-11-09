@@ -513,3 +513,12 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .atlas-technical-details>summary{display:list-item;cursor:pointer;min-height:23px;line-height:1.5;font-weight:600}
 .atlas-technical-details>summary:focus-visible{outline:2px solid #4c8afc;outline-offset:2px;border-radius:3px}
 .atlas-technical-details code{display:block;margin:6px 0;padding:7px 9px;background:#f2f6fc;border:1px solid #dce6f2;border-radius:6px;overflow-wrap:anywhere;white-space:normal;color:#375779}
+
+/* The last public CI observation is a contextual source fact, not a project verdict. */
+.atlas-source-ci{margin:9px 0 13px;padding:12px 14px;border:1px solid #cddff1;
+ border-radius:10px;background:#f6faff;color:#2d496a}
+.atlas-source-ci>strong{font-size:13px;display:block;margin-bottom:5px}
+.atlas-source-ci>p{font-size:13px;line-height:1.5;margin:5px 0}
+.atlas-source-ci>.minor{font-size:11px;color:#607896}
+.atlas-source-ci>.text-link{font-size:12px;display:inline-block;margin-top:3px}
+.atlas-source-ci>.text-link:focus-visible{outline:2px solid #4c8afc;outline-offset:3px;border-radius:4px}
