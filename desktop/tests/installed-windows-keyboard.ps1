@@ -68,7 +68,7 @@ function Wait-AtlasState([int]$count, [string[]]$required) {
         if ($state.projects.Count -eq $count -and $present) { return $state }
     }
     Capture-AtlasView 'installed-save-no-expected-projects'
-    throw "Installed GUI did not commit the expected $count projects via Ctrl+S; check the retained real-window screenshot"
+    throw "Installed GUI did not save the expected $count projects through the visible Save button; see retained screenshot"
 }
 function Wait-AtlasOpen([System.Diagnostics.Process]$process) {
     $receipt = Join-Path $env:TEMP ("iwxa-atlas-renderer-" + $process.Id + ".probe")
@@ -240,7 +240,9 @@ function Click-AtlasSave([System.Diagnostics.Process]$process) {
     }
     $dpi = [AtlasWindowsInput]::GetDpiForWindow($handle)
     $scale = if ($dpi -gt 0) { [double]$dpi / 96.0 } else { 1.0 }
-    $x = $rect.Right - [int][Math]::Round(191 * $scale)
+    # Installed 0.5 at 1024px: blue Save button is x=696..786. The prior
+    # right-191 position clicked the adjacent file menu, leaving Save unsent.
+    $x = $rect.Right - [int][Math]::Round(282 * $scale)
     $y = $rect.Top + [int][Math]::Round(61 * $scale)
     if (![AtlasWindowsInput]::SetCursorPos($x,$y)) { throw 'Cannot move pointer to Save control' }
     Start-Sleep -Milliseconds 200
