@@ -105,3 +105,25 @@ test("work editor preserves secondary target links on ordinary edits and when pr
   "Clearing primary must not erase secondary work outcomes");
  assert.deepEqual(deserialize(serialize(cleared.state)).projects[0].items[0].targetIds,[b.id]);
 });
+
+
+test("GitHub source editor keeps human labels and validates repository before writing",()=>{
+ const made=createProject(empty(),{name:"Source connection"}),s=made.state,pid=made.id;
+ const spec=editorSpec(s.projects[0],"source");
+ assert.equal(spec.title,"Добавить источник проекта");
+ assert.equal(spec.fields[0].options[0].label,"Репозиторий GitHub");
+ assert.equal(spec.fields[0].options[1].label,"Организация или пользователь GitHub");
+ const invalid=serialize(s);
+ assert.throws(()=>applyEditor(s,pid,"source",values({kind:"github",locator:"not-a-repository"})),/Введите адрес открытого репозитория/);
+ assert.throws(()=>applyEditor(s,pid,"source",values({kind:"github_owner",locator:"https:\/\/invalid.example"})),/Введите имя или адрес/);
+ assert.equal(serialize(s),invalid,"Invalid input may not change the project");
+ const linked=applyEditor(s,pid,"source",values({kind:"github",locator:"https://github.com/example/project"})).state;
+ assert.equal(linked.projects[0].sources[0].kind,"github");
+ assert.equal(linked.projects[0].sources[0].locator,"https://github.com/example/project");
+ assert.equal(linked.projects[0].sources[0].status,"never");
+ const owner=applyEditor(linked,pid,"source",values({kind:"github_owner",locator:"example"})).state;
+ assert.equal(owner.projects[0].sources[1].kind,"github_owner");
+ const other=applyEditor(owner,pid,"source",values({kind:"gitlab",locator:"https://gitlab.com/example/project"})).state;
+ assert.equal(other.projects[0].sources[2].kind,"gitlab");
+ assert.equal(other.projects[0].sources[2].status,"never");
+});
