@@ -33,7 +33,28 @@ async function request(url,fetcher,signal){
  }
  return response.json();
 }
-export async function observePublicRepo(value,fetcher=globalThis.fetch,{maxPages=20,signal}={}){
+// The public Actions API is evidence about a particular revision, not an
+// assessment of project readiness. Do not trust a run from another branch.
+export function publicWorkflowObservation(payload,repository,branch,currentSha,branchesComplete){
+ if(!payload||!Array.isArray(payload.workflow_runs))return {state:"invalid",branch};
+ if(payload.workflow_runs.length===0)return {state:"none",branch};
+ const run=payload.workflow_runs[0];
+ const states=new Set(["queued","in_progress","completed","waiting","pending","requested"]);
+ if(!run||!Number.isSafeInteger(run.id)||run.id<=0||
+    run.head_branch!==branch||typeof run.head_sha!=="string"||
+    !/^[a-f0-9]{40}$/i.test(run.head_sha)||!states.has(run.status)||
+    (run.conclusion!=null&&typeof run.conclusion!=="string"))
+   return {state:"invalid",branch};
+ const validConclusions=new Set(["success","failure","cancelled","timed_out","skipped","neutral","action_required","stale"]);
+ const conclusion=run.status==="completed"&&validConclusions.has(run.conclusion)?run.conclusion:null;
+ const headCurrent=branchesComplete&&typeof currentSha==="string"&&/^[a-f0-9]{40}$/i.test(currentSha)
+  ?(run.head_sha.toLowerCase()===currentSha.toLowerCase()?"current":"previous")
+  :"unknown";
+ return {state:"observed",branch,runId:run.id,status:run.status,conclusion,
+  headSha:run.head_sha.toLowerCase(),headCurrent,
+  url:"https://github.com/"+repoName(repository)+"/actions/runs/"+run.id};
+}
+export async function observePublicRepo(value,fetcher=globalThis.fetch,{maxPages=20,signal,includeActions=false}={}){
  const name=repoName(value),base=API+"/repos/"+name;
  if(!Number.isInteger(maxPages)||maxPages<1||maxPages>50)throw Error("Invalid GitHub pagination limit");
  const repo=await request(base,fetcher,signal);
@@ -50,10 +71,30 @@ export async function observePublicRepo(value,fetcher=globalThis.fetch,{maxPages
   }
   if(batch.length<100){complete=true;break}
  }
+ let ci=null;
+ if(includeActions){
+  const branch=typeof repo.default_branch==="string"?repo.default_branch:null;
+  if(!branch||!branches.includes(branch)){
+   ci={state:"unavailable",branch,reason:"NO_DEFAULT_BRANCH"};
+  }else{
+   try{
+    const payload=await request(base+"/actions/runs?branch="+encodeURIComponent(branch)+
+     "&per_page=1&exclude_pull_requests=true",fetcher,signal);
+    ci=publicWorkflowObservation(payload,name,branch,branchHeads[branch],complete);
+   }catch(error){
+    // An unavailable Actions endpoint never turns a successful branch
+    // observation into a failed project/source statement.
+    const message=String(error?.message||error);
+    ci={state:"unavailable",branch,
+     reason:/\\b(?:403|429)\\b|rate.limit|rate-limit/i.test(message)?"RATE_LIMITED":"SOURCE_UNAVAILABLE"};
+   }
+  }
+ }
  return {
   scope:"repository",repository:name,repositoryId:Number.isSafeInteger(repo.id)?repo.id:null,
   defaultBranch:repo.default_branch||null,branches:[...new Set(branches)].sort(),branchHeads,complete,
   pushedAt:repo.pushed_at||null,observedAt:new Date().toISOString(),
+  ...(includeActions?{ci}:{}),
   provenance:{provider:"github",access:"public",endpoint:base,authority:"GitHub REST API"},
   readiness:"not_assessed"
  };
