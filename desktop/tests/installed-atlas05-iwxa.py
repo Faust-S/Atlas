@@ -1,4 +1,4 @@
-"""Installed Atlas 0.5 .iwxa Save As and preview/cancel via real Windows GUI.
+"""Installed Atlas 0.5 .iwxa Save As, preview, confirm, save and restart.
 
 Uses the accepted native Atlas store as independent readback, ordinary Win32
 input and Python zipfile. No browser debugger, synthetic stores or test IPC.
@@ -136,6 +136,49 @@ def verify_zip():
         assert snapshot["revision"]==head()["revision"]
     print("ATLAS05_IWXA_INSTALLED_ARCHIVE_PYTHON_PASS",flush=True)
 
+def confirm_and_save_import(original):
+    window=Desktop(backend="uia").window(handle=handle)
+    until=time.monotonic()+40
+    while time.monotonic()<until:
+        accept=window.child_window(title="Заменить портфель в черновике",control_type="Button")
+        if accept.exists(timeout=1) and accept.is_visible() and accept.is_enabled():
+            accept.click_input()
+            print("ATLAS05_IWXA_INSTALLED_CONFIRM_PASS",flush=True)
+            break
+        time.sleep(0.35)
+    else:
+        screenshot("confirm-missing")
+        raise AssertionError("IWXA import confirmation not accessible")
+    # Applying an import must only change the draft, never the native store.
+    assert head()["generation"]==original["generation"],"Import confirmation bypassed native Save"
+    until=time.monotonic()+40
+    while time.monotonic()<until:
+        save=window.child_window(title="Сохранить",control_type="Button")
+        if save.exists(timeout=1) and save.is_visible() and save.is_enabled():
+            screenshot("import-draft")
+            save.click_input()
+            break
+        time.sleep(0.35)
+    else:
+        screenshot("save-missing")
+        raise AssertionError("IWXA imported draft cannot be saved")
+    until=time.monotonic()+45
+    while time.monotonic()<until:
+        updated=head()
+        if updated["generation"]!=original["generation"]:
+            assert updated["revision"]>original["revision"],"IWXA import lost the next revision"
+            assert updated["projects"]==original["projects"],"IWXA roundtrip changed project content"
+            assert updated.get("portfolioLinks")==original.get("portfolioLinks"),"IWXA roundtrip changed project links"
+            provenance=updated.get("importProvenance") or {}
+            assert provenance.get("source")=="iwxa.atlas.portfolio/1.0.0","IWXA import source was lost"
+            assert provenance.get("originalRevision")==original["revision"],"IWXA original revision was lost"
+            screenshot("import-saved")
+            print("ATLAS05_IWXA_INSTALLED_SAVE_READBACK_PASS",flush=True)
+            return updated
+        time.sleep(0.35)
+    screenshot("save-readback-missing")
+    raise AssertionError("Confirmed IWXA import was not persisted in native Store")
+
 def verify_preview():
     window=Desktop(backend="uia").window(handle=handle)
     until=time.monotonic()+40
@@ -166,6 +209,17 @@ try:
     dialog_picker("Открыть архив проектов IWXA",ARCHIVE)
     verify_preview()
     assert head()["generation"]==original["generation"],"Preview/cancel changed native Store"
+    print("ATLAS05_IWXA_INSTALLED_PREVIEW_SAFE_PASS",flush=True)
+    # Repeat the actual native chooser, then accept, Save, and reopen from disk.
+    menu_action("Открыть архив .iwxa",184)
+    dialog_picker("Открыть архив проектов IWXA",ARCHIVE)
+    saved=confirm_and_save_import(original)
+    stop()
+    launch()
+    reopened=head()
+    assert reopened==saved,"Native store changed after reopening the IWXA import"
+    screenshot("import-reopened")
+    print("ATLAS05_IWXA_INSTALLED_RESTART_PASS",flush=True)
     print("ATLAS05_IWXA_INSTALLED_EXCHANGE_PASS",flush=True)
 except Exception as error:
     print("ATLAS05_IWXA_INSTALLED_HOLD "+repr(error),flush=True)
