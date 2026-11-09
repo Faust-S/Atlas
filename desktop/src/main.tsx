@@ -616,7 +616,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  };
  const syncPublic=async(source?:{projectId:string;sourceId:string})=>{
   if(!requireClosedForm()||busyRef.current)return;
-  if(!confirmAction("Запросить публичные сведения GitHub? Наблюдение не подтверждает готовность проекта."))return;
+  if(!confirmAction("Обновить открытые источники GitHub? Для репозиториев Atlas также покажет последнюю сборку основной ветки. На GitHub ничего не изменится."))return;
   busyRef.current=true;setBusy(true);
   try{
    const startedWith=data;
@@ -1355,7 +1355,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      {history.length>historyLimit&&<Action onClick={()=>setHistoryLimit(n=>Math.min(history.length,n+120))}>Показать ещё записи</Action>}
     </section>}
     {tab==="sources"&&<section className="surface"><div className="section-heading"><div><h2>Источники проекта</h2>
-     <p>Проверка открытых репозиториев GitHub запускается вручную. Другие источники пока можно добавить как ссылки.</p></div>
+     <p>Проверяйте изменения и сборки открытых репозиториев GitHub по своему запросу. Другие источники пока можно добавлять как ссылки.</p></div>
      <Action onClick={()=>openEditor("source")} primary>＋ Источник</Action></div>
      {(project.sources||[]).map((s:any)=>{
       const review=sourceReview(s,{limit:sourceRowLimits[s.id]||12});
@@ -1365,11 +1365,11 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
         {review.lastSuccess&&<small>Последнее успешное наблюдение: {review.lastSuccess}</small>}
         {review.error&&<small className="atlas-source-error">{review.error}</small>}
        </div>
-       {review.supported&&<Action onClick={()=>void syncPublic({projectId:project.id,sourceId:s.id})} disabled={busy}>Проверить</Action>}
+       {review.supported&&<Action onClick={()=>void syncPublic({projectId:project.id,sourceId:s.id})} disabled={busy}>{s.kind==="github"?"Проверить код и сборку":"Обновить список"}</Action>}
        </div>
        {review.supported&&<div className="atlas-source-details">
         {review.ci&&<div className="atlas-source-ci" aria-label="Проверки исходного кода GitHub">
-         <strong>Проверки GitHub Actions</strong>
+         <strong>Проверки GitHub Actions · {s.summary?.defaultBranch||"основная ветка"}</strong>
          <p>{review.ci.label}</p>
          {review.ci.url&&<a className="text-link" href={review.ci.url}
           target="_blank" rel="noopener noreferrer">Открыть проверку на GitHub</a>}
