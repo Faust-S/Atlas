@@ -73,3 +73,12 @@ test("selected GitHub branch is an ordinary project source option, not a separat
  assert.match(ui,/выбранной ветки/);
  assert.doesNotMatch(ui,/Выбор маршрутизатора GitHub Actions/);
 });
+
+test("saved project and work links export a real IWXA portfolio for Center",()=>{
+ assert.match(ui,/<Action primary autoFocus onClick=\{\(\)=>void exportIwxa\(\)\} disabled=\{busy\}>Сохранить портфель \.iwxa<\/Action>/);
+ assert.match(ui,/В архив попадут все проекты портфеля, а не только выбранная работа/);
+ assert.match(ui,/Center сможет читать копию и готовить поручения/);
+ assert.match(ui,/синхронизация и права не передаются/);
+ assert.match(ui,/Сохранить копию JSON<\/Action>/);
+ assert.doesNotMatch(ui,/>Сохранить копию JSON для старой версии Center<\/Action>/);
+});

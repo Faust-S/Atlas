@@ -546,9 +546,11 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    const archive=await buildIwxaPortfolio(checked);
    if(latestSnapshot.current!==startedWith||dirtyRef.current||editorOpenRef.current)
     throw Error("Проекты изменились во время подготовки архива. Сохранение отменено.");
-   const message=await invoke<string>("atlas_export_iwxa",{
+   const message=await invoke<string|null>("atlas_export_iwxa",{
     expectedGeneration,archiveBase64:toBase64(archive)});
-   setMessage(message+" Вы сможете открыть этот файл в Atlas. Совместимый Admin Center может открыть этот архив для просмотра проектов и подготовки поручений. Синхронизация и передача прав не включаются.");
+   if(message===null){setError("");return}
+   setSavedRefPreview(null);
+   setMessage(message+" В Admin Center откройте «Планы Atlas» → «Открыть портфель Atlas» и выберите этот файл. Это просмотр копии для подготовки поручений, без синхронизации и передачи прав.");
    setError("");
   }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
  };
@@ -1453,17 +1455,20 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    {savedRefPreview!==null&&savedRefPreview.generation===generation&&savedRefPreview.revision===String(data.revision)&&!dirty&&<div className="atlas-close-overlay">
     <section className="atlas-close-dialog" role="dialog" aria-modal="true" aria-labelledby="atlas-saved-ref-title">
      <h2 id="atlas-saved-ref-title">{savedRefPreview.label}</h2>
-     <p>Эта ссылка относится к сохранённой версии проекта. Её можно использовать для ручной привязки в Admin Center.</p>
-     <details className="atlas-technical-details"><summary>Данные для ручного подключения</summary>
-      <label className="atlas-ref-label">Скопировать сведения о выбранном проекте или работе
+     <p>Сохраните архив .iwxa, затем откройте его в Admin Center через «Планы Atlas» → «Открыть портфель Atlas».</p>
+     <p className="minor">В архив попадут все проекты портфеля, а не только выбранная работа. Center сможет читать копию и готовить поручения; синхронизация и права не передаются.</p>
+     <details className="atlas-technical-details"><summary>Данные для ручного подключения и старых версий</summary>
+      <label className="atlas-ref-label">Сведения о выбранном проекте или работе
        <textarea className="atlas-ref-text" aria-label="Сохранённая ссылка Atlas" readOnly
         rows={5} value={savedRefPreview.json} onFocus={event=>event.currentTarget.select()}/>
       </label>
-      <p className="minor">В совместимом Admin Center откройте архив .iwxa из меню «Сохранение и копии». Для старых версий можно сохранить копию JSON. Эта операция не создаёт автоматическое соединение.</p>
+      <p className="minor">Для старых версий Admin Center можно отдельно сохранить копию JSON.</p>
      </details>
+     {error&&<p className="error" role="alert">{error}</p>}
      <div className="button-row">
-      <Action onClick={()=>void exportJson("center")} disabled={busy}>Сохранить копию JSON для старой версии Center</Action>
-      <Action autoFocus onClick={()=>setSavedRefPreview(null)}>Закрыть</Action>
+      <Action primary autoFocus onClick={()=>void exportIwxa()} disabled={busy}>Сохранить портфель .iwxa</Action>
+      <Action onClick={()=>void exportJson("center")} disabled={busy}>Сохранить копию JSON</Action>
+      <Action onClick={()=>setSavedRefPreview(null)} disabled={busy}>Закрыть</Action>
      </div>
     </section>
    </div>}

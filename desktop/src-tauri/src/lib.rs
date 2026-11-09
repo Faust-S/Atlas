@@ -420,7 +420,7 @@ fn atlas_export_json(app:AppHandle, expected_generation:String)->Result<String,S
 #[tauri::command]
 fn atlas_export_iwxa(
     app: AppHandle, expected_generation: String, archive_base64: String
-)->Result<String,String>{
+)->Result<Option<String>,String>{
     if archive_base64.len() > (MAX_IWXA_BYTES / 3 + 1) * 4 + 4 {
         return Err("Архив IWXA слишком большой (максимум 32 МБ)".into());
     }
@@ -432,7 +432,8 @@ fn atlas_export_iwxa(
         .set_file_name("atlas-projects.iwxa")
         .add_filter("IWXA", &["iwxa"]).blocking_save_file();
     let Some(FilePath::Path(selected))=chosen else {
-        return Err("Выбор файла отменён".into());
+        // Closing Save As is a user choice, not a failed export.
+        return Ok(None);
     };
     if selected.extension().and_then(|x|x.to_str()).map(|x|x.to_ascii_lowercase())
       !=Some("iwxa".into()) {return Err("Разрешён только файл .iwxa".into());}
@@ -447,7 +448,7 @@ fn atlas_export_iwxa(
         decode(&root,&head)?;
     }
     write_export_atomic(&selected,&bytes)?;
-    Ok(format!("Архив IWXA сохранён: {}",selected.display()))
+    Ok(Some(format!("Архив IWXA сохранён: {}",selected.display())))
 }
 #[tauri::command]
 fn atlas_select_iwxa(app:AppHandle)->Result<Option<String>,String>{

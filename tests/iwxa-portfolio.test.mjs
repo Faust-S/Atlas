@@ -85,6 +85,11 @@ test("native IWXA Save As and import preserve Atlas native generation and explic
  const rust=readFileSync(new URL("../desktop/src-tauri/src/lib.rs",import.meta.url),"utf8");
  const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
  assert.match(rust,/fn atlas_export_iwxa\(/);
+ assert.ok(rust.includes('->Result<Option<String>,String>{'),"native Save As can be cancelled without an error");
+ assert.ok(rust.includes('return Ok(None);'),"native Save As exposes cancelled choice as null");
+ assert.ok(ui.includes('invoke<string|null>("atlas_export_iwxa"'),"Atlas UI handles user cancellation");
+ assert.ok(ui.includes('if(message===null){setError("");return}'),"cancel does not claim a saved archive");
+ assert.ok(ui.includes('setSavedRefPreview(null);'),"successful archive export closes the saved-link dialog");
  assert.match(rust,/fn atlas_select_iwxa\(/);
  assert.match(rust,/write_export_atomic\(&selected,&bytes\)/);
  assert.match(rust,/head.generation!=expected_generation/);
