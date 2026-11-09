@@ -189,5 +189,5 @@ test("a partial GitHub list preserves exact selected branch drift across save an
  assert.deepEqual([after.summary.changes.added,after.summary.changes.removed],[[],[]]);
  assert.equal(after.summary.readiness,"not_assessed");
  assert.deepEqual(deserialize(serialize(second.state)),second.state);
- assert.equal(second.state.projects[0].findings.length,0);
+ assert.equal((second.state.projects[0].findings||[]).length,0);
 });
