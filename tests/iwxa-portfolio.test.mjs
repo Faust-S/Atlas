@@ -168,3 +168,12 @@ test("Atlas refuses a manifest that claims excluded relations or history without
  zip["manifest.json"]=strToU8(JSON.stringify(manifest));
  await assert.rejects(readIwxaPortfolio(zipSync(zip,{level:0})),/состав портфеля не подтверждён/);
 });
+
+test("installed IWXA export provides a synthetic consumer fixture without implying profile adoption",()=>{
+ const workflow=readFileSync(new URL("../.github/workflows/atlas-0-2-1-branding.yml",import.meta.url),"utf8");
+ assert.match(workflow,/ATLAS05_IWXA_CONSUMER_SAMPLE_READY_PASS/);
+ assert.match(workflow,/atlas05-human-portfolio\.iwxa/);
+ assert.match(workflow,/atlas05-iwxa-consumer-sample/);
+ assert.match(workflow,/profile_status=consumer-local-pending-owner/);
+ assert.match(workflow,/cross_product_import=NOT_QUALIFIED/);
+});

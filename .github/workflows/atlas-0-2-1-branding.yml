@@ -117,6 +117,38 @@ jobs:
         shell: pwsh
         timeout-minutes: 6
         run: python desktop/tests/installed-atlas05-iwxa.py
+      - name: Retain installed Atlas IWXA consumer qualification sample
+        if: github.ref_name == 'work/2026-11-09-atlas-0-5'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $source = Join-Path $env:RUNNER_TEMP 'atlas05-human-portfolio.iwxa'
+          if (!(Test-Path -LiteralPath $source)) { throw 'Installed IWXA export fixture was not created' }
+          $directory = Join-Path $env:RUNNER_TEMP 'atlas05-iwxa-consumer-sample'
+          New-Item -ItemType Directory -Path $directory -Force | Out-Null
+          $package = Join-Path $directory 'atlas05-synthetic-portfolio.iwxa'
+          Copy-Item -LiteralPath $source -Destination $package -ErrorAction Stop
+          $checksum = (Get-FileHash -LiteralPath $package -Algorithm SHA256).Hash.ToLowerInvariant()
+          $receipt = @(
+            'source=installed Atlas 0.5 Windows qualification'
+            "source_commit=$env:GITHUB_SHA"
+            'data=synthetic fixture: 120 projects and 1200 works'
+            'carrier=iwxa.package/1.0'
+            'profile=iwxa.atlas.portfolio/1.0.0'
+            'profile_status=consumer-local-pending-owner'
+            'cross_product_import=NOT_QUALIFIED'
+            "sha256=$checksum"
+          )
+          [System.IO.File]::WriteAllLines((Join-Path $directory 'RECEIPT.txt'), $receipt, [System.Text.UTF8Encoding]::new($false))
+          Write-Output "ATLAS05_IWXA_CONSUMER_SAMPLE_READY_PASS sha256=$checksum"
+      - name: Publish synthetic Atlas IWXA consumer sample for independent import tests
+        if: github.ref_name == 'work/2026-11-09-atlas-0-5'
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas05-iwxa-consumer-sample
+          path: ${{ runner.temp }}/atlas05-iwxa-consumer-sample/*
+          if-no-files-found: error
+          retention-days: 7
       - name: Exercise installed Atlas 0.5 GitHub Actions selected-branch roundtrip
         if: github.ref_name == 'work/2026-11-09-atlas-0-5'
         shell: pwsh
