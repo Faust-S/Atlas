@@ -37,6 +37,25 @@ jobs:
       - name: Build branded production GUI
         working-directory: desktop
         run: npm run build
+      - name: Checkout exact public Center 0.3 read-only consumer
+        if: github.ref_name == 'work/2026-11-09-atlas-0-5'
+        uses: actions/checkout@v4
+        with:
+          repository: Faust-S/Center
+          ref: b05fa2d0d0711c67a2e7ea7c88e02caa82dd463a
+          path: center-public
+          persist-credentials: false
+      - name: Checkout Center-pinned canonical Atlas source (no fork)
+        if: github.ref_name == 'work/2026-11-09-atlas-0-5'
+        uses: actions/checkout@v4
+        with:
+          repository: Faust-S/Atlas
+          ref: 7a0a2c8a458617a011a3db78b72c3dd1adbc12c2
+          path: center-public/vendor/atlas
+          persist-credentials: false
+      - name: Read IWXA through real Center 0.3 source consumer
+        if: github.ref_name == 'work/2026-11-09-atlas-0-5'
+        run: node tests/atlas05-center-iwxa-consumer.mjs
   windows-installer:
     permissions:
       contents: write
@@ -138,6 +157,27 @@ jobs:
           path: ${{ runner.temp }}/atlas05-iwxa-consumer-sample/*
           if-no-files-found: error
           retention-days: 7
+      - name: Checkout exact public Center 0.3 read-only consumer
+        if: github.ref_name == 'work/2026-11-09-atlas-0-5'
+        uses: actions/checkout@v4
+        with:
+          repository: Faust-S/Center
+          ref: b05fa2d0d0711c67a2e7ea7c88e02caa82dd463a
+          path: center-public
+          persist-credentials: false
+      - name: Checkout Center-pinned canonical Atlas source (no fork)
+        if: github.ref_name == 'work/2026-11-09-atlas-0-5'
+        uses: actions/checkout@v4
+        with:
+          repository: Faust-S/Atlas
+          ref: 7a0a2c8a458617a011a3db78b72c3dd1adbc12c2
+          path: center-public/vendor/atlas
+          persist-credentials: false
+      - name: Read installed Atlas IWXA in actual Center 0.3 source consumer
+        if: github.ref_name == 'work/2026-11-09-atlas-0-5'
+        shell: pwsh
+        timeout-minutes: 3
+        run: node tests/atlas05-center-iwxa-consumer.mjs "$env:RUNNER_TEMP/atlas05-human-portfolio.iwxa"
       - name: Exercise installed Atlas 0.5 GitHub Actions selected-branch roundtrip
         if: github.ref_name == 'work/2026-11-09-atlas-0-5'
         shell: pwsh

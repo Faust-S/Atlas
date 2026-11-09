@@ -218,3 +218,16 @@ test("installed IWXA consumer receipt counts real archive works and rejects chan
   assert.equal(existsSync(invalidReceipt),false);
  }finally{rmSync(dir,{recursive:true,force:true})}
 });
+
+
+test("Center 0.3 IWXA source consumer is pinned, checks real installed archive, and preserves owner authority",()=>{
+ const flow=readFileSync(new URL("../.github/workflows/atlas-0-2-1-branding.yml",import.meta.url),"utf8");
+ const consumer=readFileSync(new URL("atlas05-center-iwxa-consumer.mjs",import.meta.url),"utf8");
+ assert.match(flow,/node tests\/atlas05-center-iwxa-consumer\.mjs "\$env:RUNNER_TEMP\/atlas05-human-portfolio\.iwxa"/);
+ assert.match(flow,/ref: b05fa2d0d0711c67a2e7ea7c88e02caa82dd463a/);
+ assert.match(flow,/ref: 7a0a2c8a458617a011a3db78b72c3dd1adbc12c2/);
+ assert.match(consumer,/from "\.\.\/center-public\/src\/atlas-integration\.mjs"/);
+ assert.match(consumer,/ATLAS05_CENTER_IWXA_SOURCE_CONSUMER_PASS/);
+ assert.match(consumer,/installedCenterFilePicker:"NOT_QUALIFIED"/);
+ assert.match(consumer,/t3Authority:"NOT_GRANTED"/);
+});
