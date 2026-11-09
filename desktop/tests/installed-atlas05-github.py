@@ -133,9 +133,22 @@ def wait_title(text, timeout=25):
 def wait_button(title, timeout=25):
     until = time.monotonic() + timeout
     while time.monotonic() < until:
-        target = window().child_window(title=title, control_type="Button")
-        if target.exists(timeout=0.6) and target.is_visible() and target.is_enabled():
-            return target
+        matches = [item for item in window().descendants(control_type="Button")
+                   if item.window_text() == title and item.is_visible() and item.is_enabled()]
+        if len(matches) == 1:
+            return matches[0]
+        if len(matches) > 1 and title == "Project 0":
+            # The project also appears as an overview action. The sidebar's
+            # project button is the leftmost, within the installed 1024px sidebar.
+            screen_left = win32gui.GetWindowRect(handle)[0]
+            sidebar = [item for item in matches
+                       if item.rectangle().left - screen_left < 260]
+            if len(sidebar) == 1:
+                return sidebar[0]
+            raise AssertionError("Project sidebar button ambiguous: " +
+                                 repr([str(item.rectangle()) for item in matches]))
+        if len(matches) > 1:
+            raise AssertionError("GUI button name ambiguous: " + title)
         time.sleep(0.25)
     screenshot("button-not-found")
     raise AssertionError("Required native GUI button not accessible: " + title)
