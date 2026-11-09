@@ -122,3 +122,21 @@ test("successful aligned CI is not a cause; failed or unavailable check is revie
  assert.match(issue({state:"unavailable",reason:"RATE_LIMITED"}).detail,/Не удалось подтвердить/);
  assert.equal(attached.state.projects[0].items.length,0);
 });
+test("partial GitHub branch enumeration does not create a false source issue if the selected branch was observed",()=>{
+ const made=createProject(empty(),{name:"Scoped branch review"});
+ const attached=attach(made.state,made.id,"github","example/repo",{branch:"work/integration"});
+ const sourceId=attached.id,sha="a".repeat(40);
+ const projectFor=branchHeads=>observe(attached.state,made.id,sourceId,"ok",{
+  scope:"repository",complete:false,defaultBranch:"main",
+  branches:Object.keys(branchHeads),branchHeads,
+  ci:{state:"observed",branch:"work/integration",status:"completed",
+   conclusion:"success",headCurrent:"current",headSha:sha,runId:42}
+ }).projects[0];
+ const seen=projectFor({"work/integration":sha});
+ assert.equal(responseState(seen,projectImpact(seen)).rows
+  .find(r=>r.key==="source-issue:"+sourceId),undefined);
+ const missing=projectFor({main:sha});
+ assert.match(responseState(missing,projectImpact(missing)).rows
+  .find(r=>r.key==="source-issue:"+sourceId).detail,/Список источников неполон/);
+});
+

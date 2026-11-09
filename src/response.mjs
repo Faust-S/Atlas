@@ -51,8 +51,16 @@ export function projectSignals(project,impact){
    detail='Проверка GitHub не подтвердила успешную сборку. Уточните состояние исходного кода';
   else if(check?.state==='invalid'||check?.state==='unavailable')
    detail='Не удалось подтвердить состояние GitHub Actions для выбранной ветки';
-  else if(source.summary?.complete===false)
-   detail='Список источников неполон. Проверьте, достаточно ли выбранной ветки для решения';
+  else if(source.summary?.complete===false){
+   const branch=source.branch||source.summary?.ci?.branch||source.summary?.defaultBranch;
+   const sha=typeof branch==='string'?source.summary?.branchHeads?.[branch]:null;
+   // A partial repository-wide list can still verify the specific selected
+   // branch. Don't create a management discrepancy from pagination alone.
+   const selectedBranchSeen=source.kind==='github'&&typeof sha==='string'&&
+    /^[a-f0-9]{40}$/i.test(sha);
+   if(!selectedBranchSeen)
+    detail='Список источников неполон. Проверьте выбранную ветку перед решением';
+  }
   if(detail)add('source-issue:'+source.id,'Источник требует сверки: '+source.locator,detail,'review');
  }
  if(!(project.targets||[]).some(t=>t.intent==='committed'))add('criteria-missing','Не определены обязательные результаты','Уточнить требования и критерии достижения цели','planning');
