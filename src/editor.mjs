@@ -8,7 +8,7 @@ import {addPortfolioLink} from "./portfolio.mjs";
 import {parsePlanReviewAction,parsePlanProposalAction,planReviewContext,decidePlanReview,planProposalContext} from "./plan-review.mjs";
 import {setPlanDates,setPlanWork,addPlanWork,checkPlanAmendment} from "./plan-amendment.mjs";
 import {addPlanningResource,editPlanningResource,resourceChoiceOptions} from "./resource-planning.mjs";
-import {repoName,ownerName} from "./github-public.mjs";
+import {repoName,ownerName,branchName} from "./github-public.mjs";
 
 const option=(value,label)=>({value:String(value),label});
 const choice=(name,label,items,value="",required=true)=>({name,label,type:"select",options:items,value,required});
@@ -263,11 +263,12 @@ export function editorSpec(project,action,snapshot=null){
    choice("status","Состояние",[option("open","Открыт"),option("closed","Закрыт")],risk.status)]};
  }
  if(action==="decision")return {title:"Зафиксировать решение",fields:[field("text","Решение и основание","textarea")]};
- if(action==="source")return {title:"Добавить источник проекта",hint:"Atlas может проверить открытый репозиторий GitHub и показать изменения. Другие сервисы можно добавить как ссылки. Приватный доступ пока не подключён.",fields:[choice("kind","Тип источника",[
+ if(action==="source")return {title:"Добавить источник проекта",hint:"Atlas проверяет выбранную ветку открытого репозитория GitHub. Оставьте поле ветки пустым для основной ветки. Приватный доступ пока не подключён.",fields:[choice("kind","Тип источника",[
   option("github","Репозиторий GitHub"),option("github_owner","Организация или пользователь GitHub"),
   option("gitlab","GitLab (ссылка)"),option("forgejo","Forgejo (ссылка)"),option("gitea","Gitea (ссылка)"),
   option("obsidian","Obsidian (ссылка)"),option("anytype","Anytype (ссылка)"),option("jira","Jira (ссылка)"),
-  option("file","Файл"),option("other","Другой источник")],"github"),field("locator","Адрес репозитория или источника")]};
+  option("file","Файл"),option("other","Другой источник")],"github"),field("locator","Адрес репозитория или источника"),
+  field("branch","Ветка GitHub для проверок (необязательно)","text","",false)]};
  throw Error("Неизвестная форма: "+action);
 }
 // One select may control fields in the same form, e.g. which work item is
@@ -398,12 +399,14 @@ export function applyEditor(snapshot,projectId,action,input){
  if(action==="risk")return {state:createRisk(snapshot,projectId,get("text"))};
  if(action==="decision")return {state:createDecision(snapshot,projectId,get("text"))};
  if(action==="source"){
-  const kind=get("kind"),locator=get("locator");
+  const kind=get("kind"),locator=get("locator"),branch=get("branch");
+  if(branch&&kind!=="github")throw Error("Выбор ветки доступен только для репозитория GitHub.");
+  if(branch)try{branchName(branch)}catch{throw Error("Укажите корректное имя ветки GitHub.");}
   if(kind==="github"||kind==="github_owner"){
    try{kind==="github"?repoName(locator):ownerName(locator)}
    catch{throw Error(kind==="github"?"Введите адрес открытого репозитория в формате github.com/владелец/репозиторий.":"Введите имя или адрес открытой организации либо пользователя GitHub.");}
   }
-  return {state:attach(snapshot,projectId,kind,locator).state};
+  return {state:attach(snapshot,projectId,kind,locator,branch?{branch}:{}).state};
  }
  throw Error("Неизвестное действие");
 }

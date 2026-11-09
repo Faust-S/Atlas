@@ -147,5 +147,27 @@ test("public workflow receipt survives saved Atlas snapshot without accepting wo
  assert.equal(serialize(fixture.state),before);
  assert.equal(restored.projects[0].sources[0].summary.readiness,"not_assessed");
  const ui=readFileSync(new URL("../src/public-refresh.mjs",import.meta.url),"utf8");
- assert.match(ui,/repoObserver=name=>observePublicRepo\(name,globalThis\.fetch,\{includeActions:true\}\)/);
+ assert.match(ui,/repoObserver=\(name,branch\)=>observePublicRepo\(name,globalThis\.fetch,\{includeActions:true,actionsBranch:branch\}\)/);
+});
+
+test("same GitHub repository with distinct selected branches is refreshed separately",async()=>{
+ const p=createProject(empty(),{name:"Atlas"});
+ const a=attach(p.state,p.id,"github","Faust-S/Atlas",{branch:"release/0.4"});
+ const b=attach(a.state,p.id,"github","Faust-S/Atlas",{branch:"work/2026-11-09-atlas-0-5"});
+ const c=attach(b.state,p.id,"github","Faust-S/Atlas",{branch:"work/2026-11-09-atlas-0-5"});
+ const plan=planPublicRefresh(c.state,{maxAgeMs:0});
+ assert.equal(plan.unique,2);
+ assert.equal(plan.selected,3);
+ const called=[];
+ const next=await reconcilePublicSources(c.state,{plan,repoObserver:async(name,branch)=>{
+  called.push([name,branch]);
+  return {...observed(name),ci:{state:"none",branch}};
+ }});
+ assert.deepEqual(called.map(([_,branch])=>branch).sort(),["release/0.4","work/2026-11-09-atlas-0-5"]);
+ assert.equal(next.report.requests,2);
+ assert.equal(next.report.updated,3);
+ const restored=deserialize(serialize(next.state));
+ assert.deepEqual(restored.projects[0].sources.map(source=>source.summary.ci.branch),
+  ["release/0.4","work/2026-11-09-atlas-0-5","work/2026-11-09-atlas-0-5"]);
+ assert.equal(publicSourceQueue(restored).unique,2);
 });

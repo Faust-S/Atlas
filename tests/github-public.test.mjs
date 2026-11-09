@@ -1,4 +1,4 @@
-import test from "node:test";import assert from "node:assert/strict";import{repoName,observePublicRepo}from"../src/github-public.mjs";
+import test from "node:test";import assert from "node:assert/strict";import{repoName,branchName,observePublicRepo}from"../src/github-public.mjs";
 test("normalizes plain names and urls",()=>{assert.equal(repoName("owner/repo"),"owner/repo");assert.equal(repoName("https://github.com/owner/repo.git"),"owner/repo")});
 test("rejects invalid path",()=>{assert.throws(()=>repoName("https://evil.org/o/r"));assert.throws(()=>repoName("owner/../repo"))});
 test("discovers working branches",async()=>{const f=async url=>({ok:true,json:async()=>url.includes("branches?")?[{name:"main"},{name:"work/feature"}]:{visibility:"public",default_branch:"main"}});const r=await observePublicRepo("o/r",f);assert.deepEqual(r.branches,["main","work/feature"]);assert.equal(r.readiness,"not_assessed")});
@@ -79,4 +79,34 @@ test("old read-only repo call remains unchanged without extra Actions requests",
  const result=await observePublicRepo("example/demo",f.fetcher);
  assert.equal(f.calls.length,2);
  assert.equal("ci" in result,false);
+});
+
+test("user-selected development branch retrieves its own Actions, not inactive main",async()=>{
+ const selected="work/2026-11-09-atlas-0-5",urls=[];
+ const fetcher=async url=>{
+  urls.push(url);
+  if(url.endsWith("/repos/example/demo"))return ok({id:31,private:false,default_branch:"main"});
+  if(url.includes("/branches?"))return ok([{name:"main",commit:{sha:shaA}},{name:selected,commit:{sha:shaB}}]);
+  if(url.includes("/actions/runs?"))return ok({workflow_runs:[workflow({head_branch:selected,head_sha:shaB})]});
+  throw Error("Unexpected URL "+url);
+ };
+ const r=await observePublicRepo("example/demo",fetcher,{includeActions:true,actionsBranch:selected});
+ assert.equal(r.defaultBranch,"main");
+ assert.equal(r.ci.branch,selected);
+ assert.equal(r.ci.headCurrent,"current");
+ assert.equal(r.ci.conclusion,"success");
+ assert.ok(urls.at(-1).includes("branch=work%2F2026-11-09-atlas-0-5"));
+ assert.equal(r.readiness,"not_assessed");
+});
+test("unknown or invalid requested branch cannot borrow success from main",async()=>{
+ const selected="work/nonexistent",f=publicGitHubWithActions(workflow());
+ const notFound=await observePublicRepo("example/demo",f.fetcher,{includeActions:true,actionsBranch:selected});
+ assert.equal(notFound.ci.state,"unavailable");
+ assert.equal(notFound.ci.reason,"BRANCH_NOT_FOUND");
+ assert.equal(notFound.ci.branch,selected);
+ assert.equal(f.calls.length,2,"no Actions request for an absent branch");
+ for(const invalid of ["../main","a..b","-danger",".hidden","a.lock","a//b","topic?x",""])
+  assert.throws(()=>branchName(invalid),/Invalid public GitHub branch/);
+ assert.equal(branchName("feature/Atlas-0.5"),"feature/Atlas-0.5");
+ await assert.rejects(observePublicRepo("example/demo",f.fetcher,{includeActions:true,actionsBranch:"a..b"}),/Invalid public GitHub branch/);
 });

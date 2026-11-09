@@ -8,11 +8,13 @@ import {repoName} from "./github-public.mjs";
 function checkReview(source){
  if(source.kind!=="github"||source.status==="never")return null;
  const check=source.summary?.ci;
- if(!check)return {state:"unobserved",label:"Проверки GitHub Actions ещё не запрашивались",url:null,headCurrent:"unknown"};
+ if(!check)return {state:"unobserved",label:"Проверки GitHub Actions ещё не запрашивались",
+  url:null,branch:source.branch??source.summary?.defaultBranch??null,headCurrent:"unknown"};
  let label="Сведения о проверках пока недоступны";
- if(check.state==="none")label="На основной ветке нет запусков GitHub Actions";
+ if(check.state==="none")label="На выбранной ветке нет запусков GitHub Actions";
  if(check.state==="invalid")label="GitHub вернул неполные сведения о проверке";
- if(check.state==="unavailable")label="Не удалось получить состояние GitHub Actions";
+ if(check.state==="unavailable")label=check.reason==="BRANCH_NOT_FOUND"?
+  "Выбранная ветка не найдена в открытом репозитории":"Не удалось получить состояние GitHub Actions";
  if(check.state==="observed"){
   if(check.status==="in_progress")label="Проверка GitHub выполняется";
   else if(["queued","waiting","pending","requested"].includes(check.status))label="Проверка GitHub ожидает запуска";
@@ -32,7 +34,7 @@ function checkReview(source){
   catch{url=null}
  }
  if(source.status==="error")label="Предыдущее наблюдение: "+label;
- return {state:check.state,label,url,headCurrent:check.headCurrent||"unknown",
+ return {state:check.state,label,url,branch:check.branch??null,headCurrent:check.headCurrent||"unknown",
   // No workflow state can authorize a readiness or acceptance verdict.
   authority:"OBSERVATION_ONLY"};
 }

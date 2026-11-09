@@ -658,7 +658,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  };
  const syncPublic=async(source?:{projectId:string;sourceId:string})=>{
   if(!requireClosedForm()||busyRef.current)return;
-  if(!confirmAction("Обновить открытые источники GitHub? Для репозиториев Atlas также покажет последнюю сборку основной ветки. На GitHub ничего не изменится."))return;
+  if(!confirmAction("Обновить открытые источники GitHub? Для репозиториев Atlas также покажет последнюю проверку выбранной ветки. На GitHub ничего не изменится."))return;
   busyRef.current=true;setBusy(true);
   try{
    const startedWith=data;
@@ -973,7 +973,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       <Action onClick={()=>void syncPublic()} disabled={busy||!sourceQueue.bindings}>Проверить обновления</Action></div>
      {refreshReport&&<p className="minor">Последняя попытка: {refreshReport.updated} обновлено · {refreshReport.failed} ошибок · {refreshReport.remaining} отложено.</p>}
      <div className="summary-line"><span>Всего привязок: {sourceQueue.bindings}</span><span>Требуют проверки: {sourceQueue.pending}</span><span>Ошибки: {sourceQueue.errors}</span></div>
-     {sourceQueue.rows.slice(0,sourceLimit).map((r:any,i:number)=><div key={i} className="attention-row"><div><strong>{r.locator}</strong><small>{r.error?"Ошибка":r.stale?"Требует обновления":"Наблюдался"} · {r.count} привязок</small></div>
+     {sourceQueue.rows.slice(0,sourceLimit).map((r:any,i:number)=><div key={i} className="attention-row"><div><strong>{r.locator}{r.branch?" · "+r.branch:""}</strong><small>{r.error?"Ошибка":r.stale?"Требует обновления":"Наблюдался"} · {r.count} привязок</small></div>
       <Action onClick={()=>selectProject(r.projectId)}>Открыть</Action></div>)}
      {sourceQueue.rows.length>0&&<p className="minor">Показано {Math.min(sourceLimit,sourceQueue.rows.length)} из {sourceQueue.rows.length} источников.</p>}
      {sourceQueue.rows.length>sourceLimit&&<Action onClick={()=>setSourceLimit(n=>Math.min(sourceQueue.rows.length,n+15))}>Показать ещё источники ({sourceQueue.rows.length-sourceLimit})</Action>}
@@ -1411,6 +1411,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       const review=sourceReview(s,{limit:sourceRowLimits[s.id]||12});
       return <div className="atlas-source-review" key={s.id}>
        <div className="attention-row"><div><strong>{sourceNames[s.kind]||"Источник"}: {s.locator}</strong>
+        {s.kind==="github"&&<small>Ветка проверок: {s.branch||s.summary?.defaultBranch||"основная ветка репозитория"}</small>}
         <small>{review.status} · Попытка: {review.lastAttempt||"не выполнялась"}</small>
         {review.lastSuccess&&<small>Последнее успешное наблюдение: {review.lastSuccess}</small>}
         {review.error&&<small className="atlas-source-error">{review.error}</small>}
@@ -1419,7 +1420,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
        </div>
        {review.supported&&<div className="atlas-source-details">
         {review.ci&&<div className="atlas-source-ci" aria-label="Проверки исходного кода GitHub">
-         <strong>Проверки GitHub Actions · {s.summary?.defaultBranch||"основная ветка"}</strong>
+         <strong>Проверки GitHub Actions · {review.ci.branch||s.branch||s.summary?.defaultBranch||"основная ветка"}</strong>
          <p>{review.ci.label}</p>
          {review.ci.url&&<a className="text-link" href={review.ci.url}
           target="_blank" rel="noopener noreferrer">Открыть проверку на GitHub</a>}

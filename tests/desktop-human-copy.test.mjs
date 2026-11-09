@@ -63,3 +63,11 @@ test("installed Windows Save clicks the visible button, never its adjacent file 
  assert.match(fn,/SetCursorPos/);
  assert.match(fn,/mouse_event/);
 });
+
+test("selected GitHub branch is an ordinary project source option, not a separate subsystem",()=>{
+ const editor=readFileSync(new URL("../src/editor.mjs",import.meta.url),"utf8");
+ assert.match(editor,/Ветка GitHub для проверок/);
+ assert.match(ui,/Ветка проверок:/);
+ assert.match(ui,/выбранной ветки/);
+ assert.doesNotMatch(ui,/Выбор маршрутизатора GitHub Actions/);
+});

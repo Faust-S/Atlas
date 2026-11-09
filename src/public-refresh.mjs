@@ -11,7 +11,8 @@ function canonical(source){
  try{return (source.kind==="github"?repoName(source.locator):ownerName(source.locator)).toLowerCase()}
  catch{return String(source.locator).trim().toLowerCase()}
 }
-const keyOf=s=>s.kind+":"+canonical(s);
+const keyOf=s=>s.kind+":"+canonical(s)+
+ (s.kind==="github"&&typeof s.branch==="string"?"#"+s.branch:"");
 const timestamp=source=>{
  const value=source.observedAt?Date.parse(source.observedAt):NaN;
  return Number.isFinite(value)?value:Number.NEGATIVE_INFINITY;
@@ -45,6 +46,7 @@ export function planPublicRefresh(snapshot,{
   if(!groups.has(key)){
    if(groups.size===maxRequests)continue;
    groups.set(key,{key,kind:candidate.source.kind,locator:canonical(candidate.source),
+    branch:candidate.source.kind==="github"?candidate.source.branch??null:null,
     bindings:[]});
   }
   groups.get(key).bindings.push({projectId:candidate.projectId,sourceId:candidate.sourceId});
@@ -56,7 +58,7 @@ export function planPublicRefresh(snapshot,{
 
 const isRateLimited=e=>/\b(?:403|429)\b|rate.limit|rate-limit/i.test(String(e?.message||e));
 export async function reconcilePublicSources(snapshot,{
- plan=planPublicRefresh(snapshot),repoObserver=name=>observePublicRepo(name,globalThis.fetch,{includeActions:true}),ownerObserver=observePublicOwner
+ plan=planPublicRefresh(snapshot),repoObserver=(name,branch)=>observePublicRepo(name,globalThis.fetch,{includeActions:true,actionsBranch:branch}),ownerObserver=observePublicOwner
 }={}){
  validate(snapshot);
  const state=structuredClone(snapshot),projects=new Map(state.projects.map(x=>[x.id,x]));
@@ -66,7 +68,8 @@ export async function reconcilePublicSources(snapshot,{
  for(const group of plan.groups){
   let observation,error;
   report.requests++;
-  try{observation=await (group.kind==="github"?repoObserver:ownerObserver)(group.locator)}
+  try{observation=await (group.kind==="github"?
+   repoObserver(group.locator,group.branch):ownerObserver(group.locator))}
   catch(e){error=e instanceof Error?e:Error(String(e))}
   for(const binding of group.bindings){
    const source=projects.get(binding.projectId)?.sources.find(s=>s.id===binding.sourceId);
@@ -106,7 +109,7 @@ export function publicSourceQueue(snapshot,{now=Date.now(),maxAgeMs=DEFAULT_AGE}
   total++;
   const key=keyOf(source);
   if(!groups.has(key))groups.set(key,{key,kind:source.kind,locator:canonical(source),
-   count:0,never:0,error:0,stale:0,incomplete:0,changed:0,lastObserved:null,
+   branch:source.kind==="github"?source.branch??null:null,count:0,never:0,error:0,stale:0,incomplete:0,changed:0,lastObserved:null,
    projectId:project.id});
   const row=groups.get(key);
   row.count++;
@@ -140,7 +143,7 @@ export function renderPublicSourceQueue(snapshot,{now=Date.now(),lastReport=null
    r.count>1?"Привязок в проектах: "+r.count:null,
    r.lastObserved?"Последняя попытка: "+r.lastObserved:null
   ].filter(Boolean).join(" · ");
-  return '<tr><td>'+escape(r.locator)+'</td><td>'+escape(state)+'</td>'+
+  return '<tr><td>'+escape(r.locator+(r.branch?" · "+r.branch:""))+'</td><td>'+escape(state)+'</td>'+
    '<td><small>'+escape(details||"Готовность проекта не оценивалась")+'</small></td>'+
    '<td><button data-action="inspect:'+encodeURIComponent(r.projectId)+':sources">Открыть</button></td></tr>';
  }).join("");

@@ -127,3 +127,20 @@ test("GitHub source editor keeps human labels and validates repository before wr
  assert.equal(other.projects[0].sources[2].kind,"gitlab");
  assert.equal(other.projects[0].sources[2].status,"never");
 });
+
+test("existing source editor keeps an optional selected GitHub branch through snapshots",()=>{
+ const project=createProject(empty(),{name:"IWXA Atlas"});
+ const editor=editorSpec(project.state.projects[0],"source");
+ assert.ok(editor.fields.some(field=>field.name==="branch"&&!field.required));
+ const updated=applyEditor(project.state,project.id,"source",
+  values({kind:"github",locator:"Faust-S/Atlas",branch:"work/2026-11-09-atlas-0-5"})).state;
+ const stored=deserialize(serialize(updated));
+ assert.equal(stored.projects[0].sources[0].branch,"work/2026-11-09-atlas-0-5");
+ const legacy=applyEditor(stored,project.id,"source",
+  values({kind:"github",locator:"Faust-S/Center",branch:""})).state;
+ assert.equal("branch" in legacy.projects[0].sources[1],false);
+ assert.throws(()=>applyEditor(stored,project.id,"source",
+  values({kind:"github_owner",locator:"Faust-S",branch:"main"})),/только для репозитория/);
+ assert.throws(()=>applyEditor(stored,project.id,"source",
+  values({kind:"github",locator:"Faust-S/Atlas",branch:"work/../bad"})),/корректное имя ветки/);
+});

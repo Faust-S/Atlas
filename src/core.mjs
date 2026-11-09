@@ -49,7 +49,9 @@ export function validate(s){
   if(itemIds.size!==p.items.length||stageIds.size!==p.stages.length||sourceIds.size!==p.sources.length)throw Error("Duplicate ID");
   for(const x of p.items){if(!x||typeof x.id!=="string"||!x.id||typeof x.title!=="string"||!x.title.trim()||
     !workStates.has(x.state)||!priorities.has(x.priority)||x.stageId&&!stageIds.has(x.stageId)||x.sourceId&&!sourceIds.has(x.sourceId))throw Error("Invalid work item");if(x.estimateDays!==undefined&&(!Number.isSafeInteger(x.estimateDays)||x.estimateDays<0||x.estimateDays>36500))throw Error("Invalid work estimateDays");if(!validDate(x.dueDate))throw Error("Invalid work dueDate");if(!validResource(x.resourceId)||!validAllocation(x.allocationPct))throw Error("Invalid work resource commitment");if(x.targetIds!==undefined&&(!Array.isArray(x.targetIds)||new Set(x.targetIds).size!==x.targetIds.length||x.targetIds.some(id=>!targetIds.has(id))))throw Error("Invalid work targetIds");if(x.changeId!=null&&!changeIds.has(x.changeId))throw Error("Invalid work changeId");}
-  for(const x of p.sources)if(!kinds.has(x.kind)||!x.locator)throw Error("Invalid source");
+  for(const x of p.sources)if(!kinds.has(x.kind)||!x.locator||
+   (x.branch!==undefined&&(x.kind!=="github"||typeof x.branch!=="string"||
+    !x.branch.trim()||x.branch.length>200)))throw Error("Invalid source");
   for(const k of ["targets","findings","changes"])if(p[k]!==undefined&&!Array.isArray(p[k]))throw Error("Invalid "+k);
   const targets=p.targets||[],findings=p.findings||[],changes=p.changes||[];
   const findingIds=new Set(findings.map(x=>x.id));
@@ -217,8 +219,11 @@ export function editRisk(s,pid,id,patch){return change(s,x=>{
  if("status" in patch){if(!["open","closed"].includes(patch.status))throw Error("Invalid risk status");risk.status=patch.status;}
 })}
 export function createDecision(s,pid,desc){return change(s,x=>project(x,pid).decisions.push({id:uid(),text:nonempty(desc,"Decision"),at:new Date().toISOString()}))}
-export function attach(s,pid,kind,locator){if(!kinds.has(kind))throw Error("Invalid source kind");
- const id=uid();return{id,state:change(s,x=>project(x,pid).sources.push({id,kind,locator:nonempty(locator,"Source"),status:"never",observedAt:null,summary:null,error:null}))};
+export function attach(s,pid,kind,locator,{branch=null}={}){if(!kinds.has(kind))throw Error("Invalid source kind");
+ if(branch!==null&&(kind!=="github"||typeof branch!=="string"||!branch.trim()||branch.length>200))
+  throw Error("Invalid source branch");
+ const id=uid();return{id,state:change(s,x=>project(x,pid).sources.push({id,kind,locator:nonempty(locator,"Source"),
+  ...(branch===null?{}:{branch}),status:"never",observedAt:null,summary:null,error:null}))};
 }
 export function observe(s,pid,id,status,summary=null,error=null){return change(s,x=>{const src=project(x,pid).sources.find(v=>v.id===id);if(!src)throw Error("Unknown source");src.status=status;src.observedAt=new Date().toISOString();if(status==="ok")src.summary=summary;src.error=status==="ok"?null:String(error||"Unavailable");})}
 export function summary(p){const total=p.items.length,done=p.items.filter(x=>x.state==="done").length;return {total,done,blocked:p.items.filter(x=>x.state==="blocked").length,progress:total?Math.round(done/total*100):null,sourceCount:p.sources.length,readiness:"not_assessed"}}

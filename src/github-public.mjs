@@ -23,6 +23,16 @@ export function repoName(value){
  if(parts.length!==2||!ownerRe.test(parts[0])||!repoRe.test(parts[1])||parts[1]==="."||parts[1]===".."||parts[1].includes(".."))throw Error("Invalid repository name");
  return parts.join("/");
 }
+export function branchName(value){
+ const branch=String(value??"").trim();
+ const parts=branch.split("/");
+ if(!branch||branch.length>200||branch.startsWith("-")||branch==="@"||
+    branch.includes("@{")||branch.includes("..")||
+    /[\x00-\x20\x7f~^:?*\\]/.test(branch)||branch.includes("[")||
+    parts.some(part=>!part||part.startsWith(".")||part.endsWith(".")||part.endsWith(".lock")))
+  throw Error("Invalid public GitHub branch");
+ return branch;
+}
 async function request(url,fetcher,signal){
  const response=await fetcher(url,{headers:{Accept:"application/vnd.github+json"},signal});
  if(!response?.ok){
@@ -54,9 +64,10 @@ export function publicWorkflowObservation(payload,repository,branch,currentSha,b
   headSha:run.head_sha.toLowerCase(),headCurrent,
   url:"https://github.com/"+repoName(repository)+"/actions/runs/"+run.id};
 }
-export async function observePublicRepo(value,fetcher=globalThis.fetch,{maxPages=20,signal,includeActions=false}={}){
+export async function observePublicRepo(value,fetcher=globalThis.fetch,{maxPages=20,signal,includeActions=false,actionsBranch=null}={}){
  const name=repoName(value),base=API+"/repos/"+name;
  if(!Number.isInteger(maxPages)||maxPages<1||maxPages>50)throw Error("Invalid GitHub pagination limit");
+ const selectedBranch=actionsBranch===null?null:branchName(actionsBranch);
  const repo=await request(base,fetcher,signal);
  if(repo?.private||repo?.visibility==="private")throw Error("Private repositories require an authorized host");
  const branches=[],branchHeads=Object.create(null);
@@ -73,14 +84,16 @@ export async function observePublicRepo(value,fetcher=globalThis.fetch,{maxPages
  }
  let ci=null;
  if(includeActions){
-  const branch=typeof repo.default_branch==="string"?repo.default_branch:null;
+  const branch=selectedBranch??(typeof repo.default_branch==="string"?repo.default_branch:null);
   if(!branch||!branches.includes(branch)){
-   ci={state:"unavailable",branch,reason:"NO_DEFAULT_BRANCH"};
+   ci={state:"unavailable",branch,
+    reason:selectedBranch?"BRANCH_NOT_FOUND":"NO_DEFAULT_BRANCH"};
   }else{
    try{
     const payload=await request(base+"/actions/runs?branch="+encodeURIComponent(branch)+
      "&per_page=1&exclude_pull_requests=true",fetcher,signal);
-    ci=publicWorkflowObservation(payload,name,branch,branchHeads[branch],complete);
+    ci=publicWorkflowObservation(payload,name,branch,branchHeads[branch],
+     complete||typeof branchHeads[branch]==="string");
    }catch(error){
     // An unavailable Actions endpoint never turns a successful branch
     // observation into a failed project/source statement.

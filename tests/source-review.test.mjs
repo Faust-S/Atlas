@@ -104,3 +104,24 @@ test("GitHub Actions appears in the existing read-only source screen",()=>{
  assert.match(ui,/Сборка на GitHub не подтверждает выполнение требований/);
  assert.match(ui,/rel="noopener noreferrer"/);
 });
+
+test("selected branch Actions display is not confused with repository default",()=>{
+ const model=source({scope:"repository",complete:true,defaultBranch:"main",
+  ci:{state:"none",branch:"work/2026-11-09-atlas-0-5"}});
+ model.branch="work/2026-11-09-atlas-0-5";
+ const review=sourceReview(model);
+ assert.match(review.ci.label,/выбранной ветке нет запусков/);
+ const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ assert.match(ui,/Ветка проверок: \{s\.branch\|\|s\.summary\?\.defaultBranch/);
+ assert.match(ui,/review\.ci\.branch\|\|s\.branch/);
+});
+
+test("unavailable selected branch is shown as missing, not as a failed product",()=>{
+ const model=source({scope:"repository",complete:true,defaultBranch:"main",
+  ci:{state:"unavailable",branch:"work/removed",reason:"BRANCH_NOT_FOUND"}});
+ model.branch="work/removed";
+ const review=sourceReview(model);
+ assert.match(review.ci.label,/ветка не найдена/);
+ assert.equal(review.ci.branch,"work/removed");
+ assert.equal(review.authority,"OBSERVATION_ONLY");
+});
