@@ -69,7 +69,7 @@ test("installed Windows project creation uses the visible GUI action, not an int
 
 test("Windows installed GUI saves using the visible control rather than unverified Ctrl+S",()=>{
  assert.match(windowsTest,/function Click-AtlasSave\(/);
- assert.match(windowsTest,/\$x = \$rect\.Right - \[int\]\[Math\]::Round\(191 \* \$scale\)/);
+ assert.match(windowsTest,/\$x = \$rect\.Right - \[int\]\[Math\]::Round\(282 \* \$scale\)/);
  assert.match(windowsTest,/Click-AtlasSave \$process/);
  assert.doesNotMatch(windowsTest,/SendWait\('\^s'\)/);
  assert.match(windowsTest,/Wait-AtlasState \$attempt/);
