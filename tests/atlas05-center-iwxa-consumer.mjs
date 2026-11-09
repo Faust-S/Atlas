@@ -9,7 +9,7 @@ import {readIwxaPortfolio,buildIwxaPortfolio,IWXA_ADOPTION} from "../desktop/src
 import {serialize,editItem} from "../src/core.mjs";
 import {desktopLoadPortfolio} from "./fixtures/desktop-portfolio-120.mjs";
 import {readAtlasPortfolio,linkableAtlasProject,linkableAtlasWork,
- atlasLinkReadback,atlasWorkReadback} from "../center-public/src/atlas-integration.mjs";
+ atlasLinkReadback,atlasWorkReadback,selectAtlasReferenceSource} from "../center-public/src/atlas-integration.mjs";
 import {emptyDraft,applyDraftCommand,encodeDraft,decodeDraft} from "../center-public/src/organization.mjs";
 import {readAtlasSourceFile} from "../center-public/src/atlas-file-import.mjs";
 
@@ -37,6 +37,15 @@ assert.equal(view.mode,"READ_ONLY_USER_SELECTED_FILE");
 assert.equal(view.authorization,"NOT_CHECKED");
 assert.equal(view.source,"atlas.project/1");
 assert.equal(view.revision,String(snapshot.revision));
+assert.match(centerFile.contentSha256,/^[a-f0-9]{64}$/);
+const localCenterView={...view,mode:"NATIVE_ATLAS_LOCAL_ORGANIZATION"};
+const installedAtlasView={...view,mode:"NATIVE_ATLAS_PUBLIC_READ_ONLY"};
+assert.equal(selectAtlasReferenceSource(null,localCenterView,"native"),null,
+ "Center local plans must not verify the installed Atlas owner's work");
+assert.equal(selectAtlasReferenceSource(view,localCenterView,"native"),view,
+ "A local Center plan must not displace a user-selected IWXA file");
+assert.equal(selectAtlasReferenceSource(view,installedAtlasView,"native"),installedAtlasView,
+ "Only a direct installed Atlas read can supersede the selected file by choice");
 assert.equal(view.projects.length,snapshot.projects.length);
 assert.ok(view.projects.length>=120,"Installed Atlas test portfolio must have 120 projects");
 const actualWorkCount=snapshot.projects.reduce((sum,p)=>sum+p.items.length,0);
@@ -99,6 +108,7 @@ console.log("ATLAS05_CENTER_IWXA_SOURCE_CONSUMER_PASS",JSON.stringify({
  projects:view.projects.length,works:actualWorkCount,revision:view.revision,
  centerProjectId:projectRef.projectId,centerWorkId:workRef.workId,
  workRefPreserved:true,centerDraftReadback:true,staleDetected:true,
- centerFileReader:"PINNED_ACCEPTED_SOURCE",installedCenterQualificationRun:42664322309,
+ centerFileReader:"PINNED_CENTER_SOURCE",centerContractSha:"0fad3fb13245b87fefc54ddc5fdf3835004d23c0",
+ installedCenterQualificationRun:42678610864,
  t3Authority:"NOT_GRANTED"
 }));

@@ -44,7 +44,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: Faust-S/Center
-          ref: 199421bf24006bb85ae5cbe06f3f92bf3468fcdc
+          ref: 0fad3fb13245b87fefc54ddc5fdf3835004d23c0
           path: center-public
           persist-credentials: false
       - name: Checkout Center-pinned canonical Atlas source (no fork)
@@ -168,7 +168,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: Faust-S/Center
-          ref: 199421bf24006bb85ae5cbe06f3f92bf3468fcdc
+          ref: 0fad3fb13245b87fefc54ddc5fdf3835004d23c0
           path: center-public
           persist-credentials: false
       - name: Checkout Center-pinned canonical Atlas source (no fork)
