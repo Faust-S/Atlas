@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {empty,createProject,attach,serialize,deserialize} from "../src/core.mjs";
+import {readFileSync} from "node:fs";
 import {planPublicRefresh,reconcilePublicSources,publicSourceQueue,renderPublicSourceQueue} from "../src/public-refresh.mjs";
 function sample(){
  const a=createProject(empty(),{name:"A"}),b=createProject(a.state,{name:"B"});
@@ -126,4 +127,25 @@ test("failed and pending bindings do not become claimed delivery",async()=>{
  assert.equal(result.report.remaining,1);
  assert.ok(result.state.projects.every(p=>p.sources.every(s=>!s.summary?.qualified)));
  assert.match(renderPublicSourceQueue(result.state,{lastReport:result.report}),/GitHub API ограничил запросы/);
+});
+
+test("public workflow receipt survives saved Atlas snapshot without accepting work",async()=>{
+ const fixture=sample(),before=serialize(fixture.state);
+ const sha="d".repeat(40);
+ const result=await reconcilePublicSources(fixture.state,{repoObserver:async name=>({
+  ...observed(name,sha),ci:{state:"observed",branch:"main",runId:42,
+   headSha:sha,headCurrent:"current",status:"completed",conclusion:"success",
+   url:"https://github.com/"+name+"/actions/runs/42"}
+ })});
+ const restored=deserialize(serialize(result.state));
+ const ci=restored.projects[0].sources[0].summary.ci;
+ assert.equal(ci.headSha,sha);
+ assert.equal(ci.runId,42);
+ assert.equal(ci.headCurrent,"current");
+ assert.equal(restored.projects[0].items.length,0);
+ assert.equal(result.report.updated,3);
+ assert.equal(serialize(fixture.state),before);
+ assert.equal(restored.projects[0].sources[0].summary.readiness,"not_assessed");
+ const ui=readFileSync(new URL("../src/public-refresh.mjs",import.meta.url),"utf8");
+ assert.match(ui,/repoObserver=name=>observePublicRepo\(name,globalThis\.fetch,\{includeActions:true\}\)/);
 });
