@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {empty,createProject,createItem,connect,editItem,serialize,deserialize} from "../src/core.mjs";
+import {empty,createProject,createItem,connect,editItem,serialize,deserialize,attach,observe} from "../src/core.mjs";
 import {editorSpec,renderEditor,applyEditor} from "../src/editor.mjs";
 import {addTarget} from "../src/trace.mjs";
 import {renderDependencyGraph,renderTimeline} from "../src/graph.mjs";
@@ -177,4 +177,55 @@ test("existing GitHub source changes branch without carrying old CI evidence",()
  assert.equal(applyEditor(cleared,project.id,"source-branch:"+encodeURIComponent(id),
   values({branch:""})).state,cleared,"Unchanged branch must not create another revision");
  assert.throws(()=>editorSpec(cleared.projects[0],"source-branch:unknown"),/не найден/);
+});
+
+test("finding editor keeps explicitly checked nested branch outside paginated GitHub list",()=>{
+ const project=createProject(empty(),{name:"Repository evidence",type:"engineering"});
+ const target=addTarget(project.state,project.id,{title:"CI criteria",desired:"Reviewed result"});
+ const selected="work/2026-11-09-atlas-0-5",sha="c".repeat(40);
+ const linked=attach(target.state,project.id,"github","Faust-S/Atlas",{branch:selected});
+ const enumerated=Array.from({length:100},(_,i)=>"old-branch-"+i);
+ const observed=observe(linked.state,project.id,linked.id,"ok",{
+  scope:"repository",complete:false,branches:enumerated,
+  defaultBranch:"main",branchHeads:{[selected]:sha},observedAt:new Date().toISOString(),
+  ci:{state:"observed",branch:selected,headSha:sha,headCurrent:"current",
+   status:"completed",conclusion:"success",runId:3}
+ });
+ const spec=editorSpec(observed.projects[0],"finding-target:"+target.id);
+ const options=spec.fields.find(x=>x.name==="sourceRef")?.options||[];
+ assert.equal(options[1].value,linked.id+"::"+selected);
+ assert.match(options[1].label,/редакция наблюдалась/);
+ assert.equal(options.filter(x=>x.value===linked.id+"::"+selected).length,1);
+ assert.equal(options.length,102,"User's selected branch supplements capped list exactly once");
+ const recorded=applyEditor(observed,project.id,"finding-target:"+target.id,values({
+  targetId:target.id,result:"partial",level:"test",
+  sourceRef:linked.id+"::"+selected,note:"Human-reviewed test results"
+ }));
+ const finding=recorded.state.projects[0].findings[0];
+ assert.equal(finding.ref,selected);
+ assert.equal(finding.revision,sha);
+ assert.equal(finding.sourceId,linked.id);
+ assert.equal(finding.origin,"manual");
+ assert.equal(recorded.state.projects[0].items.length,0);
+ assert.deepEqual(deserialize(serialize(recorded.state)),recorded.state);
+});
+test("source choice never presents a branch as checked without its observed revision",()=>{
+ const project=createProject(empty(),{name:"Source evidence",type:"engineering"});
+ const target=addTarget(project.state,project.id,{title:"Evidence",desired:"Known state"});
+ const preferred="release/0.5";
+ const source=attach(target.state,project.id,"github","Faust-S/Atlas",{branch:preferred});
+ const observed=observe(source.state,project.id,source.id,"ok",{
+  scope:"repository",complete:false,branches:["main"],branchHeads:{main:"b".repeat(40)},
+  observedAt:new Date().toISOString()
+ });
+ const spec=editorSpec(observed.projects[0],"finding-target:"+target.id);
+ const options=spec.fields.find(x=>x.name==="sourceRef").options;
+ assert.equal(options[1].value,source.id+"::"+preferred);
+ assert.match(options[1].label,/редакция не подтверждена/);
+ assert.doesNotMatch(options[1].label,/редакция наблюдалась/);
+ const recorded=applyEditor(observed,project.id,"finding-target:"+target.id,values({
+  targetId:target.id,result:"partial",sourceRef:source.id+"::"+preferred
+ }));
+ assert.equal(recorded.state.projects[0].findings[0].revision,null);
+ assert.equal(recorded.state.projects[0].findings[0].origin,"manual");
 });

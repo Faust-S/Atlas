@@ -24,8 +24,21 @@ const sourceOptions=p=>{
  const all=[option("","Заявление без внешней привязки")];
  for(const source of p.sources){
   if(source.kind==="github_owner")continue; // Catalog discovery does not attest a revision.
-  const branches=source.summary?.branches?.length?source.summary.branches:[source.summary?.defaultBranch||""];
-  for(const branch of branches)all.push(option(source.id+"::"+branch,(source.kind==="github"?"GitHub":source.kind)+" · "+source.locator+(branch?" / "+branch:"")+" ("+(source.status==="ok"?"проверен":source.status==="error"?"ошибка проверки":"не проверен")+")"));
+  const listed=Array.isArray(source.summary?.branches)?source.summary.branches:[];
+  const preferred=source.kind==="github"?
+   source.branch||source.summary?.ci?.branch||source.summary?.defaultBranch:null;
+  const branches=[...new Set([preferred,...listed].filter(x=>typeof x==="string"&&x.length>0))];
+  if(!branches.length)branches.push(source.summary?.defaultBranch||"");
+  for(const branch of branches){
+   const sha=source.summary?.branchHeads?.[branch];
+   const observed=source.status==="ok"&&typeof sha==="string"&&/^[a-f0-9]{40}$/i.test(sha);
+   const status=source.kind==="github"?(observed?"редакция наблюдалась":
+    source.status==="error"?"последняя сверка не удалась":"редакция не подтверждена"):
+    source.status==="ok"?"источник доступен":source.status==="error"?"ошибка проверки":"не проверен";
+   all.push(option(source.id+"::"+branch,
+    (source.kind==="github"?"GitHub":source.kind)+" · "+source.locator+
+    (branch?" / "+branch:"")+" ("+status+")"));
+  }
  }
  return all;
 };
