@@ -504,3 +504,6 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 /* The result count is visible and accessible at the filter itself; the
    bottom-of-list footer remains useful after scrolling through long lists. */
 .atlas-work-filter-count{display:inline;font-weight:700;color:#245f9f}
+
+/* User-facing backup format is disclosed beside the existing actions. */
+.atlas-file-menu-note{font-size:12px;line-height:1.45;color:#526987;margin:3px 4px 2px;max-width:290px}
