@@ -29,7 +29,7 @@ test("user sees explicit native revision selection and must confirm replacement"
  assert.match(ui,/setData\(checked\);setGeneration\(result\.generation\);setSavedVersions\(null\);\s*\/\/[^\n]*\n\s*\/\/[^\n]*\n\s*selectProject\(null,true\)/);
  assert.match(ui,/if\(savedVersionsOpenRef\.current\)\{[\s\S]*?event\.preventDefault\(\);/);
  assert.match(ui,/savedVersionsOpenRef\.current=savedVersions!==null/);
- assert.match(ui,/disabled=\{busy\|\|dirty\|\|!!editor\|\|!persisted\|\|savedVersions!==null\}>Версии на диске/);
+ assert.match(ui,/disabled=\{busy\|\|dirty\|\|!!editor\|\|!persisted\|\|savedVersions!==null\}>История сохранений/);
  assert.match(ui,/aria-labelledby="atlas-versions-title"/);
  assert.match(ui,/if\(savedVersions!==null\)/);
  assert.match(ui,/setSavedVersions\(null\);return/);
