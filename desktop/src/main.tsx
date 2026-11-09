@@ -1368,6 +1368,13 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
        {review.supported&&<Action onClick={()=>void syncPublic({projectId:project.id,sourceId:s.id})} disabled={busy}>Проверить</Action>}
        </div>
        {review.supported&&<div className="atlas-source-details">
+        {review.ci&&<div className="atlas-source-ci" aria-label="Проверки исходного кода GitHub">
+         <strong>Проверки GitHub Actions</strong>
+         <p>{review.ci.label}</p>
+         {review.ci.url&&<a className="text-link" href={review.ci.url}
+          target="_blank" rel="noopener noreferrer">Открыть проверку на GitHub</a>}
+         <p className="minor">Сборка на GitHub не подтверждает выполнение требований и приёмку проекта.</p>
+        </div>}
         <p className="minor">{review.comparison==="COMPARABLE"
           ?`Изменения GitHub: ${review.total}. Изменено: ${review.totals.changed} · Добавлено: ${review.totals.added} · Удалено: ${review.totals.removed} · Переименовано: ${review.totals.renamed}.`
           :review.comparison==="BASELINE"?"Первое наблюдение: сравнение с предыдущей редакцией отсутствует."
