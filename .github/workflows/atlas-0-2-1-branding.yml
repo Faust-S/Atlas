@@ -90,23 +90,23 @@ jobs:
           "ATLAS_INSTALLED_EXE=$exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           Write-Output 'ATLAS_INSTALLED_ICON_PASS'
       - name: Regression installed GUI save and restart
-        if: github.ref_name != 'work/2026-11-08-atlas-0-4' && github.ref_name != 'release/0.4'
+        if: github.ref_name != 'work/2026-11-08-atlas-0-4' && github.ref_name != 'release/0.4' && github.ref_name != 'work/2026-11-09-atlas-0-5'
         shell: pwsh
         timeout-minutes: 5
         run: ./desktop/tests/installed-windows-keyboard.ps1
-      - name: Qualify Atlas 0.4 installed GUI and full restart
-        if: github.ref_name == 'work/2026-11-08-atlas-0-4' || github.ref_name == 'release/0.4'
+      - name: Qualify Atlas 0.4/0.5 installed GUI and full restart
+        if: github.ref_name == 'work/2026-11-08-atlas-0-4' || github.ref_name == 'release/0.4' || github.ref_name == 'work/2026-11-09-atlas-0-5'
         shell: pwsh
         timeout-minutes: 6
         run: ./desktop/tests/installed-atlas04-ux.ps1
       - name: Install existing Windows GUI test driver for the large-portfolio import
-        if: github.ref_name == 'work/2026-11-08-atlas-0-4' || github.ref_name == 'release/0.4'
+        if: github.ref_name == 'work/2026-11-08-atlas-0-4' || github.ref_name == 'release/0.4' || github.ref_name == 'work/2026-11-09-atlas-0-5'
         shell: pwsh
         run: |
           python -m pip install pywinauto==0.6.9 pillow==11.3.0
           python -m py_compile desktop/tests/installed-atlas04-scale.py
-      - name: Measure real 120-project / 1200-work installed Atlas 0.4 UI
-        if: github.ref_name == 'work/2026-11-08-atlas-0-4' || github.ref_name == 'release/0.4'
+      - name: Measure real 120-project / 1200-work installed Atlas 0.4/0.5 UI
+        if: github.ref_name == 'work/2026-11-08-atlas-0-4' || github.ref_name == 'release/0.4' || github.ref_name == 'work/2026-11-09-atlas-0-5'
         shell: pwsh
         timeout-minutes: 8
         run: python desktop/tests/installed-atlas04-scale.py
