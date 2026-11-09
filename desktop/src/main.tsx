@@ -774,7 +774,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     </button>}
     {!filtered.length&&<small className="nav-hint">Проекты не найдены</small>}
    </div>
-   <div className="sidebar-foot"><div className="foot-title">{embedded?"Atlas в Personal Agent":"Локальная работа"}</div><p>{embedded?"Полный интерфейс Atlas. Хранилище принадлежит Atlas; команды разрешает host.":"Без Agent и сервера. Данные сохраняются по вашей команде."}</p><small>Схема: atlas.project/1</small></div>
+   <div className="sidebar-foot"><div className="foot-title">{embedded?"Atlas в Personal Agent":"Мои проекты"}</div><p>{embedded?"Работайте с проектами в своём рабочем пространстве.":"Проекты хранятся на этом компьютере. Сохраняйте изменения, когда работа завершена."}</p></div>
   </aside>
   <main className="workspace">
    <header className="commandbar">
