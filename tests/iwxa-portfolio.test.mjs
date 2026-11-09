@@ -106,7 +106,7 @@ test("native IWXA exchange remains disabled inside a host without file-picker co
  assert.match(ui,/Файловый обмен \.iwxa доступен в самостоятельном Atlas/);
  assert.doesNotMatch(host,/atlas_export_iwxa|atlas_select_iwxa/);
  assert.match(ui,/История сохранений в него не входит/);
- assert.match(ui,/в совместимом Admin Center/);
+ assert.match(ui,/В совместимом Admin Center/);
  assert.match(ui,/Сохранить копию JSON для старой версии Center/);
  assert.doesNotMatch(ui,/Обмен с другими программами IWXA пока не подключён/);
  assert.doesNotMatch(ui,/Передача в другие программы IWXA пока не подключена/);

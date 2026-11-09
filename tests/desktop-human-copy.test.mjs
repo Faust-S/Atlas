@@ -25,7 +25,9 @@ test("portable IWXA archives are primary, legacy JSON remains visibly separate",
  assert.match(ui,/>Сохранить архив \.iwxa<\/Action>/);
  assert.match(ui,/>Сохранить копию JSON<\/Action>/);
  assert.match(ui,/Архив \.iwxa переносит проекты между копиями Atlas/);
- assert.match(ui,/Обмен с другими программами IWXA пока не подключён/);
+ assert.match(ui,/В совместимом Admin Center архив открывается для просмотра и подготовки поручений/);
+ assert.match(ui,/Для прежних версий остаётся копия JSON/);
+ assert.doesNotMatch(ui,/Обмен с другими программами IWXA пока не подключён/);
  assert.match(ui,/>История сохранений<\/Action>/);
  assert.match(css,/\.atlas-file-menu-note\{/);
  assert.match(ui,/invoke<string>\("atlas_export_json"/);
