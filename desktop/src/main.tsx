@@ -1416,6 +1416,12 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
         {s.kind==="github"&&<small>Ветка проверок: {s.branch||s.summary?.defaultBranch||"основная ветка репозитория"}</small>}
         <small>{review.status} · Попытка: {review.lastAttempt||"не выполнялась"}</small>
         {review.lastSuccess&&<small>Последнее успешное наблюдение: {review.lastSuccess}</small>}
+        {review.observedCommit&&<small>Редакция при последней сверке: {review.observedCommit.branch} ·
+          <a className="text-link" href={review.observedCommit.url} target="_blank" rel="noopener noreferrer"
+            aria-label={"Открыть проверенный коммит источника "+review.observedCommit.sha}>
+            {review.observedCommit.sha.slice(0,12)}
+          </a>
+        </small>}
         {review.error&&<small className="atlas-source-error">{review.error}</small>}
        </div>
        <div className="button-row">
@@ -1431,6 +1437,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
          <p>{review.ci.label}</p>
          {review.ci.url&&<a className="text-link" href={review.ci.url}
           target="_blank" rel="noopener noreferrer">Открыть проверку на GitHub</a>}
+         {project.targets?.length>0&&<button type="button" className="text-link"
+           onClick={()=>view("reality")}>Сверить с требованиями проекта</button>}
          <p className="minor">Сборка на GitHub не подтверждает выполнение требований и приёмку проекта.</p>
         </div>}
         <p className="minor">{review.comparison==="COMPARABLE"

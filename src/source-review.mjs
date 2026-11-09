@@ -13,6 +13,19 @@ function sourceWebUrl(source){
  }catch{}
  return null;
 }
+function observedCommit(source){
+ if(source.kind!=="github"||!source.summary||source.status==="never")return null;
+ // The selected branch and SHA belong to the previously saved observation,
+ // not a live repository state or an assertion about completion.
+ const branch=source.branch||source.summary.ci?.branch||source.summary.defaultBranch;
+ const sha=typeof branch==="string"?source.summary.branchHeads?.[branch]:null;
+ if(typeof branch!=="string"||!branch||typeof sha!=="string"||
+    !/^[a-f0-9]{40}$/i.test(sha))return null;
+ try{
+  const name=repoName(source.locator),revision=sha.toLowerCase();
+  return {branch,sha:revision,url:"https://github.com/"+name+"/commit/"+revision};
+ }catch{return null}
+}
 function checkReview(source){
  if(source.kind!=="github"||source.status==="never")return null;
  const check=source.summary?.ci;
@@ -93,6 +106,7 @@ export function sourceReview(source,{limit=12}={}){
  return Object.freeze({
   supported,status,lastAttempt,lastSuccess,
   sourceUrl:supported?sourceWebUrl(source):null,
+  observedCommit:supported?observedCommit(source):null,
   error:hasError?String(source.error||"Источник недоступен"):null,
   comparison:comparable?"COMPARABLE":change?.baseline?"BASELINE":"NOT_COMPARABLE",
   totals,total,rows,

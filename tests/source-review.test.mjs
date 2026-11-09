@@ -153,3 +153,28 @@ test("desktop source screen provides direct official GitHub navigation without w
  assert.match(ui,/Открыть страницу на GitHub/);
  assert.match(ui,/rel="noopener noreferrer"/);
 });
+
+test("GitHub source review links to exact observed commit, not latest guess",()=>{
+ const observed=source({scope:"repository",complete:true,defaultBranch:"main",
+  branchHeads:{main:shaA,"work/atlas-0.5":shaB},observedAt:"2026-11-09T17:00:00.000Z"});
+ observed.branch="work/atlas-0.5";
+ const report=sourceReview(observed);
+ assert.deepEqual(report.observedCommit,{
+  branch:"work/atlas-0.5",sha:shaB,
+  url:"https://github.com/Faust-S/Atlas/commit/"+shaB
+ });
+ const old=sourceReview({...observed,status:"error",error:"temporary error"});
+ assert.deepEqual(old.observedCommit,report.observedCommit);
+ assert.equal(old.status,"Последняя сверка завершилась ошибкой");
+ assert.equal(sourceReview({...observed,status:"never"}).observedCommit,null);
+ assert.equal(sourceReview({...observed,summary:{...observed.summary,branchHeads:{"work/atlas-0.5":"wrong"}}}).observedCommit,null);
+ assert.equal(sourceReview({...observed,locator:"https://evil.example/repo"}).observedCommit,null);
+});
+test("source screen offers read-only journey from GitHub evidence to project reality",()=>{
+ const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ assert.match(ui,/review\.observedCommit&&<small>Редакция при последней сверке/);
+ assert.match(ui,/href={review.observedCommit.url}/);
+ assert.match(ui,/Сверить с требованиями проекта/);
+ assert.match(ui,/onClick=\{\(\)=>view\("reality"\)\}/);
+ assert.match(ui,/Сборка на GitHub не подтверждает выполнение требований/);
+});
