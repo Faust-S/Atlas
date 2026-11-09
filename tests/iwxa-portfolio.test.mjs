@@ -14,7 +14,7 @@ const fixture=()=>{
 };
 const make=()=>buildIwxaPortfolio(fixture(),{now:"2026-11-09T10:00:00.000Z"});
 test("IWXA 1.0 ZIP carrier roundtrip preserves Atlas work, Unicode and project IDs",async()=>{
- const snapshot=fixture(),archive=await make();
+ const snapshot=fixture(),archive=await buildIwxaPortfolio(snapshot,{now:"2026-11-09T10:00:00.000Z"});
  assert.ok(archive instanceof Uint8Array);
  assert.deepEqual(Array.from(archive.slice(0,4)),[80,75,3,4]);
  const result=await readIwxaPortfolio(archive);
@@ -49,7 +49,7 @@ test("IWXA 1.0 object archive is inspectable by external ZIP readers, not a rena
 });
 test("IWXA import rejects modified payload bytes, missing manifest and unknown profiles",async()=>{
  const archive=await make(),files=unzipSync(archive);
- const changed={...files,"content/objects.ndjson":strToU8(strFromU8(files["content/objects.ndjson"]).replace("Проект Ω","Заменён"))};
+ const changed={...files,"content/objects.ndjson":strToU8(strFromU8(files["content/objects.ndjson"]).replace("Проект Ω","Проект Ψ"))};
  await assert.rejects(readIwxaPortfolio(zipSync(changed,{level:0})),/контрольная сумма файла/);
  const noManifest={...files};delete noManifest["manifest.json"];
  await assert.rejects(readIwxaPortfolio(zipSync(noManifest,{level:0})),/повреждённый список файлов/);
