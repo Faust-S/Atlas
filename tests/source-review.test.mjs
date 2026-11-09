@@ -234,3 +234,13 @@ test("source review exposes existing cause-bound proposal route with no automati
  assert.match(source,/openProjectTab\(project.id,"changes",sourceIssue.activeChanges.at\(-1\)\?\.id\|\|null\)/);
  assert.match(source,/Работа и приёмка автоматически не создаются/);
 });
+
+test("source review links only latest source-bound facts to exact requirement cards",()=>{
+ const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ assert.match(ui,/const sourceRequirementLinks=useMemo\(\(\)=>\{/);
+ assert.match(ui,/const sourceId=row\.observation\?\.sourceId/);
+ assert.match(ui,/const linkedRequirements=sourceRequirementLinks\.get\(s\.id\)\|\|\[\]/);
+ assert.match(ui,/Требования, связанные с этим источником/);
+ assert.match(ui,/setRequirementJump\(\{projectId:project\.id,targetId:r\.id\}\)/);
+ assert.match(ui,/Проверка кода сама по себе не подтверждает выполнение требований/);
+});

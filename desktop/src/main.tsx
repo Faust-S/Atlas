@@ -256,6 +256,18 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   return new Map<string,any>(relevant.filter(r=>r.key.startsWith("source-issue:"))
    .map(r=>[r.key.slice("source-issue:".length),r]));
  },[project,impact]);
+ const sourceRequirementLinks=useMemo(()=>{
+  const grouped=new Map<string,any[]>();
+  for(const row of realityMap?.rows||[]){
+   const sourceId=row.observation?.sourceId;
+   if(!sourceId)continue;
+   const list=grouped.get(sourceId)||[];
+   list.push({id:row.id,title:row.title,assessment:row.assessment,
+    freshness:row.source?.freshness||"unknown"});
+   grouped.set(sourceId,list);
+  }
+  return grouped;
+ },[realityMap]);
  const targetById=useMemo(()=>new Map<string,any>((project?.targets||[]).map((t:any)=>[t.id,t])),[project]);
  const findingsByWork=useMemo(()=>project?workObservationIndex(project):new Map<string,any[]>(),[project]);
  const workObservationCounts=useMemo(()=>{
@@ -1418,6 +1430,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      {(project.sources||[]).map((s:any)=>{
       const review=sourceReview(s,{limit:sourceRowLimits[s.id]||12});
       const sourceIssue=sourceResponseById.get(s.id);
+      const linkedRequirements=sourceRequirementLinks.get(s.id)||[];
       return <div className="atlas-source-review" key={s.id}>
        <div className="attention-row"><div><strong>{sourceNames[s.kind]||"Источник"}: {s.locator}</strong>
         {s.kind==="github"&&<small>Ветка проверок: {s.branch||s.summary?.defaultBranch||"основная ветка репозитория"}</small>}
@@ -1468,6 +1481,27 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
         {review.remaining>0&&<Action onClick={()=>setSourceRowLimits(prev=>({...prev,[s.id]:Math.min(review.total,(prev[s.id]||12)+24)}))}>
          Показать ещё изменения ({review.remaining})
         </Action>}
+        {s.kind==="github"&&<div className="atlas-source-related-requirements"
+          aria-label="Требования со сведениями из этого GitHub-источника">
+         <strong>Требования, связанные с этим источником: {linkedRequirements.length}</strong>
+         {linkedRequirements.length>0?
+          <><p className="minor">Показаны требования, чей последний записанный факт относится к этому репозиторию.</p>
+           {linkedRequirements.slice(0,5).map((r:any)=><div key={r.id} className="atlas-source-related-row">
+            <button type="button" className="text-link"
+              aria-label={"Открыть требование из источника: "+r.title}
+              onClick={()=>{
+               if(!requireClosedForm())return;
+               view("overview");
+               setRequirementJump({projectId:project.id,targetId:r.id});
+              }}>{r.title}</button>
+            <small>{evidence[r.assessment]||r.assessment}
+             {r.freshness==="revision_changed"?" · Редакция источника изменилась":
+              r.freshness==="incomplete"?" · Требуется дополнительная сверка источника":""}</small>
+           </div>)}
+           {linkedRequirements.length>5&&<button type="button" className="text-link"
+             onClick={()=>view("overview")}>Все требования проекта ({linkedRequirements.length})</button>}</>
+          :<p className="minor">Пока нет требований с фактами из этого репозитория. Проверка кода сама по себе не подтверждает выполнение требований.</p>}
+        </div>}
         {sourceIssue&&<div className="atlas-source-response" aria-label="Решение по наблюдению источника">
          <strong>Требует рассмотрения</strong>
          <p>{sourceIssue.detail}</p>

@@ -22,6 +22,7 @@ test('claims carry provenance without turning manual acceptance into verified ev
  assert.equal(o.rows[0].source.revision,'abc');
  assert.equal(o.rows[0].assessment,'acceptance_claim');
  assert.equal(o.rows[0].observation.level,'acceptance');
+ assert.equal(o.rows[0].observation.sourceId,'s','latest claim retains its original source identity');
  assert.equal(o.independentAcceptance,false);
 });
 test('stale and affected requirements take priority, actual plan apply and linked decision remain distinct',()=>{
@@ -233,4 +234,25 @@ test("work-specific observation index is read-only, chronological and preserves 
  assert.equal(workObservationIndex(legacy).size,0,"Legacy project without trace arrays must remain readable");
  assert.throws(()=>workObservationIndex({items:[],findings:{}}),/Invalid work observation index input/);
  assert.throws(()=>workObservationIndex(null),/Invalid work observation index input/);
+});
+
+test('latest requirement observation retains exact source identity without mixing older claims',()=>{
+ const p=project();
+ p.sources=[{id:'repo-one',locator:'example/one'},{id:'repo-two',locator:'example/two'}];
+ const old={sourceId:'repo-one',result:'present',level:'test',
+  observedAt:'2026-11-08T13:00:00.000Z',ref:'main',revision:'a'};
+ const recent={sourceId:'repo-two',result:'partial',level:'test',
+  observedAt:'2026-11-09T13:00:00.000Z',ref:'main',revision:'b'};
+ const report=realityOverview(p,trace([
+  target('one',{latest:old,assessment:'stale'}),
+  target('two',{latest:recent,assessment:'partial_reported'}),
+  target('three')
+ ]),impact([
+  impactRow('one',{priority:true}),impactRow('two',{priority:false}),
+  impactRow('three',{priority:false})
+ ]));
+ assert.deepEqual(report.rows.filter(row=>row.observation?.sourceId==='repo-one').map(row=>row.id),['one']);
+ assert.deepEqual(report.rows.filter(row=>row.observation?.sourceId==='repo-two').map(row=>row.id),['two']);
+ assert.equal(report.rows.find(row=>row.id==='three').observation,null);
+ assert.equal(report.independentAcceptance,false);
 });

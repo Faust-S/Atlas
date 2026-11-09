@@ -37,6 +37,7 @@ export function realityOverview(project, trace, impact) {
       assessment: target.assessment,
       needsAttention: target.intent === 'committed' && Boolean(linked?.priority),
       observation: observation ? {
+        sourceId: observation.sourceId||null,
         result: observation.result, level: observation.level,
         observedAt: observation.observedAt, note: observation.note || '',
         reference: observation.reference || null,
