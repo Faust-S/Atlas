@@ -290,7 +290,7 @@ export function ProjectSourcePlanMap({projection,onOpenWork,onEditStage,onSugges
           className="text-link" onClick={()=>onOpenWork(previous.id)}>{previous.title}</button>)}
          {work.predecessorTotal>work.predecessors.length&&<button type="button"
           className="text-link" onClick={onOpenGraph}>Открыть остальные зависимости</button>}
-        </details>
+        </details>}
        </div>
        <span className="atlas-source-plan-arrow" aria-hidden="true">→</span>
        <div className="atlas-source-plan-stage">
