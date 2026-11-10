@@ -60,6 +60,11 @@ test('Setup Core includes original private T3 only by explicit verified local op
  assert.match(setup,/Get-FileHash -LiteralPath \$copy -Algorithm SHA256/);
  assert.match(setup,/ATLAS_PERSON_PRIVATE_CONSUMER_NOT_STAGED/);
  assert.match(setup,/ATLAS_PERSON_ORIGINAL_T3_COMPONENT_STAGED_SHA256_PASS/);
+ assert.match(setup,/ATLAS_PERSON_PUBLIC_TRUST_STAGED_SHA256_PASS/);
+ assert.match(setup,/PersonTrustFile/);
+ assert.match(bridge,/install_original_owner_public_trust\(&app\)/);
+ assert.match(bridge,/ATLAS_PERSON_PREINSTALLED_TRUST_MISSING/);
+ assert.match(bridge,/ATLAS_PERSON_SETUP_TRUST_CHANGED_REQUIRES_REVIEW/);
  assert.match(bridge,/super::setup_core_data_root\(\)/);
  assert.doesNotMatch(config.identifier,/publisher|admin-center/);
 });
