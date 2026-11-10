@@ -119,6 +119,14 @@ fn receipt(value:Value,operation:&str)->Result<Value,String>{
     }
     Ok(value)
 }
+// Presentation-only capability: reveal "My License" exclusively in the
+// intentionally licensed native edition. All actual WORKSPACE decisions are
+// still enforced independently at the Rust storage-write boundary.
+#[tauri::command]
+pub fn atlas_person_license_edition() -> bool {
+    cfg!(feature="person-license-enforced")
+}
+
 #[tauri::command]
 pub async fn atlas_person_license_capabilities(app:AppHandle)->Result<Value,String>{
     receipt(execute(app,"person-local-capabilities",vec![]).await?,
@@ -281,6 +289,10 @@ pub fn require_atlas_workspace(_app:&AppHandle)->Result<(),String>{Ok(())}
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test] fn person_license_ui_matches_native_enforcement_edition(){
+        assert_eq!(atlas_person_license_edition(),
+            cfg!(feature="person-license-enforced"));
+    }
     #[test] fn bridge_never_accepts_unbounded_identity_or_unsigned_receipts(){
         assert!(identifier("person:atlas:one"));
         assert!(!identifier("../relative"));
