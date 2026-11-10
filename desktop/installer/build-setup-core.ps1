@@ -170,15 +170,29 @@ try {
             throw 'ATLAS_SETUP_CORE_OWNED_FILES_NOT_VERIFIED'
         }
         $locations = Inspect '--locations-file' (Join-Path $temporary 'locations.json')
-        $expectedData = Join-Path $env:LOCALAPPDATA 'ru.iwxa.atlas'
-        if ($locations.status -ne 'LOCATIONS_VERIFIED' -or
+        # Setup Core's actual registered locations are authoritative,
+        # including installations using user-selected folders. Do not guess
+        # the default LOCALAPPDATA path or silently substitute another root.
+        $registered = Get-ItemProperty -LiteralPath (
+            'HKCU:\Software\IWXA\SetupCore\Products\iwxa.atlas') -ErrorAction Stop
+        $registeredData = [string]$registered.DataLocation
+        $registeredProgram = [string]$registered.InstallLocation
+        if (-not [IO.Path]::IsPathRooted($registeredData) -or
+            -not [IO.Path]::IsPathRooted($registeredProgram) -or
+            $locations.status -ne 'LOCATIONS_VERIFIED' -or
             [IO.Path]::GetFullPath([string]$locations.dataRoot).TrimEnd('\') -ine
-            [IO.Path]::GetFullPath($expectedData).TrimEnd('\')) {
-            throw 'ATLAS_SETUP_CORE_DATA_ROOT_MISMATCH'
+            [IO.Path]::GetFullPath($registeredData).TrimEnd('\') -or
+            [IO.Path]::GetFullPath([string]$locations.programRoot).TrimEnd('\') -ine
+            [IO.Path]::GetFullPath($registeredProgram).TrimEnd('\')) {
+            throw 'ATLAS_SETUP_CORE_REGISTERED_LOCATIONS_MISMATCH'
         }
-        $installedExe = Join-Path $locations.programRoot $product.entrypoint
+        $installedExe = Join-Path $registeredProgram $product.entrypoint
         if (!(Test-Path -LiteralPath $installedExe -PathType Leaf)) {
             throw 'ATLAS_SETUP_CORE_INSTALLED_EXE_MISSING'
+        }
+        if ((Get-FileHash -LiteralPath $installedExe -Algorithm SHA256).Hash -ne
+            (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash) {
+            throw 'ATLAS_SETUP_CORE_INSTALLED_EXE_HASH_MISMATCH'
         }
         Add-Type -AssemblyName System.Drawing
         $nativeIcon = [Drawing.Icon]::ExtractAssociatedIcon($installedExe)
