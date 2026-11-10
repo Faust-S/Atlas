@@ -281,3 +281,50 @@ test("Project type names in navigation match the existing human-readable editor 
  assert.match(main,/PROJECT_TYPE_LABELS\[project\.type\]\|\|"Другой проект"/);
  assert.doesNotMatch(main,/<\/button> \/ \{project\.type\}/);
 });
+
+
+test("Stage-only projects reveal saved stages without inventing work or dependencies",()=>{
+ const project=createProject(empty(),{name:"План встречи",type:"other"});
+ const a=createStage(project.state,project.id,"Подготовить площадку");
+ const b=createStage(a.state,project.id,"Провести встречу");
+ const c=createStage(b.state,project.id,"Подвести итоги");
+ const before=serialize(c.state);
+ const compact=projectSourcePlanProjection(c.state,project.id,{maxUnassignedStages:2});
+ assert.equal(compact.sources.length,0);
+ assert.equal(compact.workTotal,0);
+ assert.equal(compact.stageTotal,3);
+ assert.equal(compact.dependencyTotal,0);
+ assert.deepEqual(compact.unassignedStages.map(stage=>stage.name),
+  ["Подготовить площадку","Провести встречу"]);
+ assert.equal(compact.hiddenUnassignedStages,1);
+ const full=projectSourcePlanProjection(c.state,project.id,{maxUnassignedStages:3});
+ assert.deepEqual(full.unassignedStages.map(stage=>stage.name),
+  ["Подготовить площадку","Провести встречу","Подвести итоги"]);
+ assert.equal(serialize(c.state),before);
+});
+test("An assigned stage no longer appears as stage without work",()=>{
+ const p=createProject(empty(),{name:"План",type:"personal"});
+ const a=createStage(p.state,p.id,"Проверка");
+ const b=createStage(a.state,p.id,"Без работ");
+ const work=createItem(b.state,p.id,{title:"Проверить готовность",stageId:a.id});
+ const before=serialize(work.state);
+ const map=projectSourcePlanProjection(work.state,p.id);
+ assert.equal(map.stageTotal,2);
+ assert.equal(map.otherWorks.length,1);
+ assert.deepEqual(map.unassignedStages.map(stage=>stage.name),["Без работ"]);
+ assert.equal(map.hiddenUnassignedStages,0);
+ assert.equal(serialize(work.state),before);
+});
+test("Stage-only projects display the existing map and link to all saved stages",()=>{
+ const main=read("../desktop/src/main.tsx");
+ const guide=read("../desktop/src/ProjectOrganizationGuide.tsx");
+ const visual=read("../desktop/src/ProjectVisuals.tsx");
+ assert.match(main,/project\.items\.length>0\|\|project\.stages\.length>0/);
+ assert.match(main,/id="atlas-project-stages"/);
+ assert.match(guide,/projection\.stageTotal>0/);
+ assert.match(guide,/maxUnassignedStages:4/);
+ assert.match(guide,/maxUnassignedStages:16/);
+ assert.match(visual,/Этапы без работ/);
+ assert.match(visual,/onEditStage\(stage\.id\)/);
+ assert.match(visual,/Открыть все этапы/);
+});

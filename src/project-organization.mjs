@@ -133,10 +133,11 @@ export function selectedSourceFolder(snapshot,projectId,action){
 // It never creates tasks, infers dependencies, or considers a source folder
 // to be a required project component. Historical work links remain visible.
 export function projectSourcePlanProjection(snapshot,projectId,{
- maxSources=8,maxFoldersPerSource=16,maxWorksPerFolder=8,maxOtherWorks=20
+ maxSources=8,maxFoldersPerSource=16,maxWorksPerFolder=8,maxOtherWorks=20,
+ maxUnassignedStages=16
 }={}){
  validate(snapshot);
- for(const n of [maxSources,maxFoldersPerSource,maxWorksPerFolder,maxOtherWorks]){
+ for(const n of [maxSources,maxFoldersPerSource,maxWorksPerFolder,maxOtherWorks,maxUnassignedStages]){
   if(!Number.isInteger(n)||n<1||n>120)throw Error("Некорректный предел схемы проекта");
  }
  const project=snapshot.projects.find(p=>p.id===projectId);
@@ -144,6 +145,11 @@ export function projectSourcePlanProjection(snapshot,projectId,{
  const overview=projectStructureGuide(snapshot,projectId,{
   maxSources,maxFolders:maxFoldersPerSource,linkedFirst:true
  });
+ const assignedStageIds=new Set(project.items.map(work=>work.stageId).filter(Boolean));
+ const unassigned=project.stages.filter(stage=>!assignedStageIds.has(stage.id));
+ const unassignedStages=unassigned.slice(0,maxUnassignedStages).map(stage=>({
+  id:stage.id,name:stage.name,status:stage.status
+ }));
  const stageById=new Map(project.stages.map(s=>[s.id,s]));
  const workById=new Map(project.items.map(w=>[w.id,w]));
  const incoming=new Map();
@@ -205,6 +211,8 @@ export function projectSourcePlanProjection(snapshot,projectId,{
   sourceCount:project.sources.filter(s=>entryRepo(s)).length,
   hiddenSources:overview.hiddenSources,
   mappedTotal,workTotal:project.items.length,
-  stageTotal:project.stages.length,dependencyTotal:project.dependencies.length,
+  stageTotal:project.stages.length,
+  unassignedStages,hiddenUnassignedStages:unassigned.length-unassignedStages.length,
+  dependencyTotal:project.dependencies.length,
   shownDependencies:links,hiddenDependencies:project.dependencies.length-links.length};
 }

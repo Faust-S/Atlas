@@ -713,6 +713,17 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
  .atlas-source-plan-other-list>.atlas-source-plan-other-row{
   grid-template-columns:minmax(0,1fr);gap:6px}
 }
+.atlas-source-plan-unused-stages{border-top:1px solid #dce7f3;
+ margin-top:12px;padding-top:12px}
+.atlas-source-plan-unused-stages h4{font-size:13px;margin:0}
+.atlas-source-plan-unused-stage-list{display:grid;
+ grid-template-columns:repeat(auto-fit,minmax(min(100%,175px),1fr));
+ gap:8px;margin:10px 0}
+.atlas-source-plan-unused-stage-list>.text-link{
+ display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;
+ overflow:hidden;text-overflow:ellipsis;overflow-wrap:anywhere;
+ background:#fff;text-align:left;padding:10px 12px;border:1px solid #dce7f3;
+ border-radius:8px;line-height:1.4}
 .atlas-source-plan-actions{display:flex;align-items:center;gap:8px;
  flex-wrap:wrap;border-top:1px solid #dce7f3;padding-top:12px;margin-top:8px}
 @media(max-width:900px){

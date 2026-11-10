@@ -120,3 +120,12 @@ test("Installed universal editor uses physical input and explicit native title r
  assert.match(visual,/A control already on screen must be used in place/);
  assert.doesNotMatch(script,/execute_script\(|invoke\(|write_bytes\(STORE/);
 });
+
+
+test("Native Windows witness covers an existing unused stage in a source-free project",()=>{
+ const universal=read("../desktop/tests/installed-atlas06-universal.py");
+ assert.match(universal,/ATLAS06_UNIVERSAL_UNUSED_STAGE_VISIBLE_PASS/);
+ assert.match(universal,/ATLAS06_UNIVERSAL_UNUSED_STAGE_EDITOR_PASS/);
+ assert.match(universal,/open_editor_by_visible_control\("Подвести итоги"\)/);
+ assert.match(universal,/assert d\.head\(\)==saved,"Opening an unassigned stage modified native Store"/);
+});

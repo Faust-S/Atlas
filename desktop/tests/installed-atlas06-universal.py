@@ -37,7 +37,7 @@ def snapshot_from_archive():
     assert project["name"]==NAME and project["type"]=="other"
     assert len(project["sources"])==0
     assert len(project["items"])==3
-    assert len(project["stages"])==2
+    assert len(project["stages"])==3
     assert len(project["dependencies"])==2
     return project
 
@@ -89,6 +89,9 @@ def qualify():
     assert d.saved_project(d.head())==expected
     v.select_project()
     d.wait_text("Схема проекта: работы и этапы",35)
+    d.wait_text("Этапы без работ",35)
+    d.wait_text("Подвести итоги",35)
+    print("ATLAS06_UNIVERSAL_UNUSED_STAGE_VISIBLE_PASS",flush=True)
     d.wait_text("Другое",35)
     print("ATLAS06_UNIVERSAL_HUMAN_PROJECT_TYPE_PASS",flush=True)
     d.wait_text("Работы и этапы",35)
@@ -126,6 +129,12 @@ def qualify():
     v.capture("universal-project-820")
     assert d.head()==saved
     print("ATLAS06_UNIVERSAL_WORK_STAGE_NAVIGATION_PASS",flush=True)
+    open_editor_by_visible_control("Подвести итоги")
+    assert d.head()==saved,"Opening an unassigned stage modified native Store"
+    keyboard.send_keys("{ESC}")
+    v.await_no_form()
+    assert d.head()==saved
+    print("ATLAS06_UNIVERSAL_UNUSED_STAGE_EDITOR_PASS",flush=True)
     print("ATLAS06_UNIVERSAL_NATIVE_NO_UNREQUESTED_WRITE_PASS",flush=True)
 
 if __name__=="__main__":

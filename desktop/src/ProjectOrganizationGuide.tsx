@@ -6,25 +6,26 @@ import {ProjectSourcePlanMap} from "./ProjectVisuals";
 // stage and dependency links remain usable in any project without GitHub.
 // Suggested roles are explanations to review, never new project entities.
 export function ProjectOrganizationGuide({snapshot,projectId,onEdit,onRefresh,onOpenProject,
- onOpenSources,onOpenWorks,onAddRelation,onOpenTimeline,onOpenGraph,busy=false}:{
+ onOpenSources,onOpenWorks,onOpenStages,onAddRelation,onOpenTimeline,onOpenGraph,busy=false}:{
  snapshot:any;projectId:string;onEdit:(action:string)=>void;
  onRefresh:(sourceId:string)=>void;onOpenProject:(id:string)=>void;
- onOpenSources:()=>void;onOpenWorks:()=>void;onAddRelation:()=>void;
+ onOpenSources:()=>void;onOpenWorks:()=>void;onOpenStages:()=>void;onAddRelation:()=>void;
  onOpenTimeline:()=>void;onOpenGraph:()=>void;busy?:boolean;
 }){
  const [moreLinks,setMoreLinks]=useState(false);
  useEffect(()=>setMoreLinks(false),[projectId]);
  const guide=projectStructureGuide(snapshot,projectId);
  const projection=projectSourcePlanProjection(snapshot,projectId,moreLinks?
-  {maxSources:8,maxFoldersPerSource:16,maxWorksPerFolder:8,maxOtherWorks:20}:
-  {maxSources:2,maxFoldersPerSource:4,maxWorksPerFolder:3,maxOtherWorks:6});
+  {maxSources:8,maxFoldersPerSource:16,maxWorksPerFolder:8,maxOtherWorks:20,maxUnassignedStages:16}:
+  {maxSources:2,maxFoldersPerSource:4,maxWorksPerFolder:3,maxOtherWorks:6,maxUnassignedStages:4});
  const suggested=guide.nextAction;
  const hasSources=guide.sources.length>0;
  const project=snapshot.projects.find((p:any)=>p.id===projectId);
  const recordedSources=project?.sources.length??0;
  const linkedFolderWorks=project?.items.some((work:any)=>work.sourceId&&work.sourcePath)??false;
- const showMap=hasSources||projection.workTotal>0;
+ const showMap=hasSources||projection.workTotal>0||projection.stageTotal>0;
  const hasMoreLinks=projection.hiddenSources>0||projection.hiddenOtherWorks>0||
+  projection.hiddenUnassignedStages>0||
   projection.sources.some((source:any)=>source.incomplete||
    source.folders.some((folder:any)=>folder.hiddenWorks>0));
  return <section className="surface atlas-project-organization" aria-label="Состав проекта и возможные следующие действия">
@@ -40,9 +41,9 @@ export function ProjectOrganizationGuide({snapshot,projectId,onEdit,onRefresh,on
    {" "}<button type="button" className="text-link" onClick={onOpenSources}>
     Посмотреть источники</button>
   </p>}
-  {!showMap&&<p className="minor">Добавьте работу, чтобы увидеть её связь с этапом.</p>}
+  {!showMap&&<p className="minor">Добавьте этап или работу, чтобы увидеть план проекта.</p>}
   {showMap&&<details className="atlas-source-plan-disclosure"
-   open={projection.workTotal>0||linkedFolderWorks||undefined}>
+   open={projection.workTotal>0||projection.stageTotal>0||linkedFolderWorks||undefined}>
    <summary>{hasSources?"Схема проекта: каталоги, работы и этапы":
     "Схема проекта: работы и этапы"}</summary>
    <ProjectSourcePlanMap projection={projection}
@@ -54,6 +55,7 @@ export function ProjectOrganizationGuide({snapshot,projectId,onEdit,onRefresh,on
      onEdit(folderWorkAction(sourceId,commitSha,folder))}
     onOpenTimeline={onOpenTimeline} onOpenGraph={onOpenGraph}
     onOpenWorks={onOpenWorks} onOpenSources={onOpenSources}
+    onOpenStages={onOpenStages}
     onCreateStage={()=>onEdit("stage")}
     onAddDependency={()=>onEdit("dep")}/>
   </details>}

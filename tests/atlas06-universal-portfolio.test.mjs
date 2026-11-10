@@ -11,7 +11,7 @@ test("Universal saved plan has no source and retains actual stage/dependency lin
  assert.equal(project.type,"other");
  assert.equal(project.sources.length,0);
  assert.equal(project.items.length,3);
- assert.equal(project.stages.length,2);
+ assert.equal(project.stages.length,3);
  assert.equal(project.dependencies.length,2);
  const initial=projectSourcePlanProjection(snapshot,project.id,{maxOtherWorks:2});
  assert.equal(initial.sources.length,0);
@@ -22,6 +22,7 @@ test("Universal saved plan has no source and retains actual stage/dependency lin
  assert.equal(full.otherWorks[2].title,"Открыть площадку");
  assert.equal(full.otherWorks[2].stageName,"Проведение");
  assert.equal(full.otherWorks[2].predecessorTotal,2);
+ assert.deepEqual(full.unassignedStages.map(stage=>stage.name),["Подвести итоги"]);
  assert.deepEqual(full.otherWorks[2].predecessors.map(p=>p.title),
   ["Подготовить помещение","Согласовать программу"]);
  assert.equal(serialize(snapshot),before);

@@ -1144,13 +1144,14 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      </details>
     </nav>
     {tab==="overview"&&<>
-     {(project.items.length>0||project.type==="engineering"||
+     {(project.items.length>0||project.stages.length>0||project.type==="engineering"||
        project.sources.some((source:any)=>source.kind==="github"))&&
      <ProjectOrganizationGuide snapshot={data} projectId={project.id}
       onEdit={openEditor}
       onRefresh={sourceId=>void syncPublic({projectId:project.id,sourceId})}
       onOpenSources={()=>view("sources")}
       onOpenWorks={()=>view("work")}
+      onOpenStages={()=>document.getElementById("atlas-project-stages")?.scrollIntoView({behavior:"smooth",block:"start"})}
       onOpenTimeline={()=>view("timeline")}
       onOpenGraph={()=>view("graph")}
       onOpenProject={id=>selectProject(id)}
@@ -1312,7 +1313,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
         Поставка заблокирована: {projected.unavailableOrigins.map((o:any)=>o.name+" ("+(o.status==="cancelled"?"отменён":"приостановлен")+")").join(", ")}. Корректировка зависимостей требует решения человека.
        </p>}
      </section>
-     <section className="surface"><div className="section-heading"><div><h2>Этапы проекта</h2>
+     <section className="surface" id="atlas-project-stages"><div className="section-heading"><div><h2>Этапы проекта</h2>
       <p>Этапы связывают работы с принятым планом; завершение этапа не означает приёмку результата.</p></div>
       <Action onClick={()=>openEditor("stage")}>＋ Этап</Action></div>
       {project.stages.length?<div className="table-scroll"><table><thead><tr><th>Этап</th><th>Состояние</th><th>Срок</th><th>Работ</th><th>Действия</th></tr></thead>

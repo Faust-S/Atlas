@@ -10,7 +10,8 @@ export function atlas06UniversalPortfolio(){
  const base=createProject(empty(),{name:UNIVERSAL_NAME,type:"other",goal:"Подготовить встречу"});
  const preparation=createStage(base.state,base.id,"Подготовка");
  const event=createStage(preparation.state,base.id,"Проведение");
- const room=createItem(event.state,base.id,
+ const review=createStage(event.state,base.id,"Подвести итоги");
+ const room=createItem(review.state,base.id,
   {title:"Подготовить помещение",stageId:preparation.id});
  const agenda=createItem(room.state,base.id,
   {title:"Согласовать программу",stageId:preparation.id});
@@ -30,5 +31,5 @@ if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  const decoded=await readIwxaPortfolio(bytes);
  if(serialize(decoded.snapshot)!==serialize(snapshot))throw Error("Universal fixture IWXA roundtrip mismatch");
  writeFileSync(output,bytes);
- process.stdout.write("ATLAS06_UNIVERSAL_FIXTURE_PASS projects=1 works=3 stages=2 sources=0 dependencies=2 bytes="+bytes.length+"\n");
+ process.stdout.write("ATLAS06_UNIVERSAL_FIXTURE_PASS projects=1 works=3 stages=3 sources=0 dependencies=2 bytes="+bytes.length+"\n");
 }

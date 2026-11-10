@@ -242,12 +242,12 @@ export function PortfolioNetworkMap({snapshot,onOpenProject}:{
 // The connectors illustrate only confirmed user-created work/stage assignments.
 // No component or dependency is created by opening the diagram.
 export function ProjectSourcePlanMap({projection,onOpenWork,onEditStage,onSuggestFolder,
- onOpenTimeline,onOpenGraph,onOpenWorks,onOpenSources,onCreateStage,onAddDependency,
+ onOpenTimeline,onOpenGraph,onOpenWorks,onOpenSources,onOpenStages,onCreateStage,onAddDependency,
  expanded,hasMoreLinks,onToggleExpansion}:{
  projection:any;onOpenWork:(id:string)=>void;onEditStage:(id:string)=>void;
  onSuggestFolder:(sourceId:string,commitSha:string,folder:string)=>void;
  onOpenTimeline:()=>void;onOpenGraph:()=>void;
- onOpenWorks:()=>void;onOpenSources:()=>void;
+ onOpenWorks:()=>void;onOpenSources:()=>void;onOpenStages:()=>void;
  onCreateStage:()=>void;onAddDependency:()=>void;
  expanded:boolean;hasMoreLinks:boolean;onToggleExpansion:()=>void;
 }){
@@ -360,6 +360,20 @@ export function ProjectSourcePlanMap({projection,onOpenWork,onEditStage,onSugges
     Ещё {projection.hiddenOtherWorks} работ. {" "}
     <button type="button" className="text-link" onClick={onOpenWorks}>
      Открыть все работы</button></p>}
+  </div>}
+  {projection.unassignedStages.length>0&&<div className="atlas-source-plan-unused-stages">
+   <h4>Этапы без работ</h4>
+   <p className="minor">Эти этапы уже записаны в проекте. Работы к ним пока не привязаны.</p>
+   <div className="atlas-source-plan-unused-stage-list">
+    {projection.unassignedStages.map((stage:any)=><button type="button" key={stage.id}
+     className="text-link" title={stage.name} onClick={()=>onEditStage(stage.id)}>
+     {stage.name}</button>)}
+   </div>
+   {projection.hiddenUnassignedStages>0&&<p className="minor">
+    Ещё {projection.hiddenUnassignedStages} этапов. {" "}
+    <button type="button" className="text-link" onClick={onOpenStages}>
+     Открыть все этапы</button>
+   </p>}
   </div>}
   {projection.hiddenSources>0&&<p className="minor">Ещё {projection.hiddenSources} источников.
    {" "}<button type="button" className="text-link" onClick={onOpenSources}>
