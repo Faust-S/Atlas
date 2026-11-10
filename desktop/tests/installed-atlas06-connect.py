@@ -11,6 +11,7 @@ import os
 import subprocess
 import sys
 import time
+import urllib.request
 from pathlib import Path
 
 import win32con
@@ -180,6 +181,102 @@ def saved_project(manifest):
     assert project["id"]==descriptor["id"]
     return project
 
+def window_title_contains(text,timeout=25):
+    deadline=time.monotonic()+timeout
+    while time.monotonic()<deadline:
+        if process.poll() is not None:raise AssertionError("Atlas closed before "+text)
+        if text in win32gui.GetWindowText(handle):return
+        time.sleep(0.2)
+    screenshot("unexpected-window-title")
+    raise AssertionError("Missing window title "+text+": "+win32gui.GetWindowText(handle))
+
+def open_source_view():
+    # The project is also present in the portfolio list; use the actual
+    # sidebar control rather than a potentially ambiguous project button.
+    activate()
+    options=[item for item in window().descendants(control_type="Button")
+             if item.window_text()=="Atlas" and item.is_visible() and item.is_enabled()]
+    left=win32gui.GetWindowRect(handle)[0]
+    sidebar=[item for item in options if item.rectangle().left-left<260]
+    if len(sidebar)!=1:
+        screenshot("project-navigation-missing")
+        raise AssertionError("Expected one Atlas project in installed sidebar")
+    sidebar[0].click_input()
+    window_title_contains("Atlas — Обзор")
+    # The detailed views are in the existing collapsible tab group.
+    summary=window().child_window(title="Дополнительные представления проекта")
+    if summary.exists(timeout=2) and summary.is_visible():
+        summary.click_input()
+    else:
+        rect=win32gui.GetWindowRect(handle)
+        dpi=ctypes.windll.user32.GetDpiForWindow(handle)
+        scale=dpi/96 if dpi else 1
+        mouse.click(coords=(rect[0]+round(624*scale),rect[1]+round(253*scale)))
+    click_button("Источники")
+    window_title_contains("Atlas — Источники")
+    print("ATLAS06_CONNECT_INSTALLED_SOURCES_PASS",flush=True)
+
+def inspect_commit_tree(revision,tree):
+    request=urllib.request.Request(
+        "https://api.github.com/repos/"+REPO+"/git/commits/"+revision,
+        headers={"Accept":"application/vnd.github+json",
+                 "User-Agent":"IWXA-Atlas-0.6-Windows-qualification"})
+    with urllib.request.urlopen(request,timeout=35) as response:
+        assert response.status==200,"GitHub commit API unavailable"
+        payload=json.load(response)
+    assert payload["sha"].lower()==revision,"Root observation belongs to another commit"
+    assert payload["tree"]["sha"].lower()==tree,"Observed Git tree is not from the selected commit"
+
+def verify_refresh(previous,original_project):
+    open_source_view()
+    # A normal human refresh must update the currently selected branch/tree,
+    # not just the CI receipt or the timestamp.
+    click_scrolled_button("Проверить код и сборку")
+    time.sleep(0.6)
+    keyboard.send_keys("{ENTER}")
+    wait_text("Публичные наблюдения обновлены в черновике",110)
+    assert head()==previous,"GitHub observation wrote native data without Save"
+    screenshot("source-refreshed-draft")
+    click_button("Сохранить")
+    deadline=time.monotonic()+45
+    while time.monotonic()<deadline:
+        current=head()
+        if current["generation"]!=previous["generation"]:break
+        time.sleep(0.25)
+    else:
+        screenshot("source-refresh-save-timeout")
+        raise AssertionError("Native Save did not publish refreshed GitHub observation")
+    project=saved_project(current)
+    for key in ("id","name","type","items","stages","dependencies","decisions","targets","findings"):
+        assert project.get(key)==original_project.get(key),"Refresh changed plan field "+key
+    assert len(project["sources"])==1
+    source=project["sources"][0]
+    assert source["status"]=="ok" and source["branch"]==BRANCH
+    evidence=source["summary"]
+    assert evidence["readiness"]=="not_assessed","Root or CI observation promoted readiness"
+    assert evidence["structure"]["status"]=="observed","Root tree not refreshed"
+    assert evidence["structure"]["branch"]==BRANCH
+    assert evidence["structure"]["commitSha"]==evidence["branchHeads"][BRANCH]
+    assert evidence["structure"]["treeSha"]!=None
+    inspect_commit_tree(evidence["structure"]["commitSha"],evidence["structure"]["treeSha"])
+    delta=evidence.get("changes",{}).get("structureDelta")
+    before=original_project["sources"][0]["summary"]["structure"]
+    after=evidence["structure"]
+    if delta:
+        assert delta["previousSha"]==before["commitSha"]
+        assert delta["currentSha"]==after["commitSha"]
+        for field in ("Folders","Files"):
+            key="folders" if field=="Folders" else "files"
+            assert set(delta["added"+field])==set(after[key])-set(before[key])
+            assert set(delta["removed"+field])==set(before[key])-set(after[key])
+    print("ATLAS06_CONNECT_LIVE_ROOT_REFRESH_SAVE_PASS",flush=True)
+    stop()
+    launch()
+    assert head()==current,"Refreshed native project changed after restart"
+    assert saved_project(head())==project,"Refreshed project block changed after restart"
+    screenshot("refreshed-source-reopened")
+    print("ATLAS06_CONNECT_LIVE_ROOT_REFRESH_RESTART_PASS",flush=True)
+
 def qualify():
     if (STORE/"head.json").exists():
         raise AssertionError("Wizard acceptance requires a new empty Atlas profile")
@@ -233,6 +330,7 @@ def qualify():
     assert saved_project(second)==project,"Project block changed after restart"
     screenshot("reopened-project")
     print("ATLAS06_CONNECT_BRANCH_TREE_RESTART_PASS",flush=True)
+    verify_refresh(second,project)
 
 try:
     qualify()

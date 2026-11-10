@@ -29,6 +29,12 @@ test("Native GUI test requires a read-only public discovery and explicit native 
  assert.match(installed,/observation\["structure"\]\["commitSha"\]==observation\["branchHeads"\]\[BRANCH\]/);
  assert.match(installed,/assert second==first/);
  assert.match(installed,/ATLAS06_CONNECT_BRANCH_TREE_RESTART_PASS/);
+ assert.match(installed,/ATLAS06_CONNECT_LIVE_ROOT_REFRESH_SAVE_PASS/);
+ assert.match(installed,/ATLAS06_CONNECT_LIVE_ROOT_REFRESH_RESTART_PASS/);
+ assert.match(installed,/click_scrolled_button\("Проверить код и сборку"\)/);
+ assert.match(installed,/assert head\(\)==previous/);
+ assert.match(installed,/inspect_commit_tree\(evidence\["structure"\]\["commitSha"\]/);
+ assert.match(installed,/assert head\(\)==current/);
  assert.doesNotMatch(installed,/CDP|test-only app API|fake fetch responses/);
 });
 test("The user can switch development branches without silently accepting stale preview",()=>{
