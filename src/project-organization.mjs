@@ -59,7 +59,7 @@ export function projectStructureGuide(snapshot,projectId,{maxFolders=24,maxSourc
     workCount:project.items.filter(item=>
      item.sourceId===source.id&&item.sourcePath===name).length,
     url:"https://github.com/"+repo+"/tree/"+tree.commitSha+"/"+encodeURIComponent(name)
-   })):[];
+   }));
   const knownFiles=tree&&Array.isArray(tree.detected)?
    tree.detected.filter(rootName).slice(0,8):[];
   const linkedWorks=project.items.filter(item=>item.sourceId===source.id);
