@@ -117,7 +117,7 @@ test("Atlas uses its existing editors, schedule, and dependency graph from a nav
  assert.match(visual,/onAddDependency/);
  assert.match(visual,/source\.status==="current"/);
  assert.match(guide,/projectSourcePlanProjection\(snapshot,projectId,moreLinks\?/);
- assert.match(guide,/open=\{projection\.workTotal>0\|\|linkedFolderWorks\|\|undefined\}/);
+ assert.match(guide,/open=\{projection\.workTotal>0\|\|projection\.stageTotal>0\|\|linkedFolderWorks\|\|undefined\}/);
  assert.match(guide,/onOpenWork=\{id=>onEdit\("work:"\+id\)\}/);
  assert.match(guide,/onEditStage=\{id=>onEdit\("stage-edit:"\+id\)\}/);
  assert.match(guide,/onCreateStage=\{\(\)=>onEdit\("stage"\)\}/);
@@ -257,7 +257,7 @@ test("The overview offers its existing plan diagram in non-engineering projects"
  const guide=read("../desktop/src/ProjectOrganizationGuide.tsx");
  const visual=read("../desktop/src/ProjectVisuals.tsx");
  const css=read("../desktop/src/style.css");
- assert.match(main,/project\.items\.length>0\|\|project\.type==="engineering"/);
+ assert.match(main,/project\.items\.length>0\|\|project\.stages\.length>0\|\|project\.type==="engineering"/);
  assert.match(guide,/showMap=hasSources\|\|projection\.workTotal>0/);
  assert.match(guide,/Схема проекта: работы и этапы/);
  assert.match(guide,/Здесь показаны ваши работы, этапы и записанные зависимости/);
