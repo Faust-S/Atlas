@@ -152,15 +152,15 @@ export function ProjectConnect({snapshot,onApply,onCancel,disabled=false}:{
       onClick={()=>void inspect(null,branchChoice)}>Изучить выбранную ветку</button>
     </div>
     {branchChoice!==preview.branch&&<p className="minor">Выбрана другая ветка. Нажмите «Изучить выбранную ветку», чтобы обновить предпросмотр.</p>}
+    {existing&&<p className="minor">Уже включён в проект «{existing.name}».
+     Повторного проекта не будет: откроется существующий.</p>}
+    {confirmActions}
     <div className="summary-line">
      <span>Исходники: {preview.branch||"не определена"}</span>
      {preview.summary.defaultBranch!==preview.branch&&<span>Основная ветка: {preview.summary.defaultBranch||"не определена"}</span>}
      <span>{ciLabel}</span>
      <span>{preview.summary.complete?"Перечень веток получен":"Перечень веток неполный"}</span>
     </div>
-    {existing&&<p className="minor">Уже включён в проект «{existing.name}».
-     Повторного проекта не будет: откроется существующий.</p>}
-    {confirmActions}
     {structure?.status==="observed"?<details className="atlas-connect-root-preview">
      <summary>Корневая структура · {structure.totalFolders} каталогов · {structure.totalFiles} файлов</summary>
      <div className="atlas-connect-root">

@@ -101,19 +101,22 @@ def click_scrolled_button(name):
                  if element.window_text()==name and element.is_visible() and element.is_enabled()]
         if len(matches)>1:
             raise AssertionError("Ambiguous installed action: "+name)
+        bounds=win32gui.GetWindowRect(handle)
         if len(matches)==1:
-            activate()
-            matches[0].click_input()
-            time.sleep(0.3)
-            return
+            button_rect=matches[0].rectangle()
+            # UIA IsVisible can be true for an element below a scroll viewport.
+            # Click only when the entire physical button is inside the window.
+            if (button_rect.top >= bounds[1]+108 and
+                    button_rect.bottom <= bounds[3]-38 and
+                    button_rect.left >= bounds[0]+236):
+                activate()
+                matches[0].click_input()
+                time.sleep(0.35)
+                return
         activate()
-        rect=win32gui.GetWindowRect(handle)
-        dpi=ctypes.windll.user32.GetDpiForWindow(handle)
-        scale=dpi/96 if dpi else 1
-        # Left margin of the central scrolling workspace, outside nested
-        # file-tree panels, so scroll targets the whole wizard view.
-        mouse.scroll(coords=(rect[0]+round(245*scale),rect[1]+round(485*scale)),
-                     wheel_dist=-4)
+        # Scroll inside the main workspace, not over the fixed sidebar.
+        mouse.scroll(coords=(bounds[2]-92,bounds[1]+min(515,bounds[3]-bounds[1]-95)),
+                     wheel_dist=-3)
         time.sleep(0.35)
     screenshot("scrolled-action-missing")
     raise AssertionError("Installed action not accessible after scrolling: "+name)
@@ -306,6 +309,7 @@ def qualify():
     screenshot("selected-branch-preview")
     assert not (STORE/"head.json").exists(),"Read-only inspection wrote native storage"
     click_scrolled_button("Добавить в Atlas")
+    window_title_contains("Atlas — Обзор",35)
     wait_button("Сохранить")
     assert not (STORE/"head.json").exists(),"Creating a project draft unexpectedly saved"
     click_button("Сохранить")

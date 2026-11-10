@@ -78,3 +78,11 @@ test("Atlas connection wizard stays focused: no duplicate portfolio dashboards, 
  assert.match(connect,/Исходники: \{preview\.branch\|\|"не определена"\}/);
  assert.match(connect,/Основная ветка: \{preview\.summary\.defaultBranch/);
 });
+
+test("Project confirmation stays before the long branch and file details, visible at ordinary Windows height",()=>{
+ const branch=connect.indexOf('className="atlas-connect-branch button-row"');
+ const approve=connect.indexOf('    {confirmActions}',branch);
+ const summary=connect.indexOf('    <div className="summary-line">',branch);
+ const tree=connect.indexOf('<details className="atlas-connect-root-preview">',branch);
+ assert.ok(branch>=0 && branch<approve && approve<summary && summary<tree);
+});
