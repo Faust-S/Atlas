@@ -180,7 +180,7 @@ test("The first screen prioritizes real project links and permits controlled exp
  const tipIndex=ui.indexOf('<section className="surface atlas-next-step"',mapIndex);
  assert.ok(mapIndex>0&&metricsIndex>mapIndex&&tipIndex>mapIndex);
  assert.match(guide,/maxSources:2,maxFoldersPerSource:4,maxWorksPerFolder:3,maxOtherWorks:6/);
- assert.match(guide,/Показать больше связей/);
+ assert.match(visual,/Показать больше связей/);
  assert.match(guide,/Каталоги и сведения об источниках/);
  assert.match(visual,/Ожидает \{work\.predecessorTotal\} работ/);
  assert.match(visual,/onOpenWork\(previous\.id\)/);
