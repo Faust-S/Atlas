@@ -165,3 +165,38 @@ export async function observePublicOwner(value,fetcher=globalThis.fetch,{maxPage
   readiness:"not_assessed"
  };
 }
+
+
+// Inspect just the *root* of an explicitly selected public repository.
+// Directory names and manifest filenames are evidence of structure, not tasks,
+// phases, product boundaries, or a verified build. No filesystem checkout.
+export async function observePublicRootTree(value,branch,fetcher=globalThis.fetch,
+ {maxEntries=48,signal}={}){
+ const name=repoName(value),selected=branchName(branch);
+ if(!Number.isInteger(maxEntries)||maxEntries<1||maxEntries>120)
+  throw Error("Invalid GitHub tree preview limit");
+ const payload=await request(API+"/repos/"+name+"/git/trees/"+encodeURIComponent(selected),fetcher,signal);
+ if(!payload||!Array.isArray(payload.tree)||typeof payload.sha!=="string"||
+    !/^[a-f\d]{40}$/i.test(payload.sha))
+  throw Error("GitHub не вернул структуру выбранной ветки");
+ const seen=new Set(),folders=[],files=[];
+ for(const entry of payload.tree){
+  if(!entry||typeof entry.path!=="string"||!entry.path||
+     entry.path.includes("/")||entry.path==="."||entry.path===".."||
+     !["tree","blob"].includes(entry.type))continue;
+  const key=entry.path.toLowerCase();
+  if(seen.has(key))continue;
+  seen.add(key);
+  (entry.type==="tree"?folders:files).push(entry.path);
+ }
+ folders.sort((a,b)=>a.localeCompare(b));files.sort((a,b)=>a.localeCompare(b));
+ const manifests=new Set(["package.json","pnpm-workspace.yaml","Cargo.toml","pyproject.toml",
+   "go.mod","pom.xml","build.gradle","build.gradle.kts","composer.json",
+   "Gemfile","CMakeLists.txt","*.sln","README.md","AGENTS.md","Dockerfile"]);
+ const detected=files.filter(file=>manifests.has(file)||file.endsWith(".sln")).slice(0,15);
+ return {status:"observed",branch:selected,treeSha:payload.sha.toLowerCase(),
+  truncated:payload.truncated===true,folders:folders.slice(0,maxEntries),
+  files:files.slice(0,maxEntries),detected,
+  totalFolders:folders.length,totalFiles:files.length,
+  limited:folders.length>maxEntries||files.length>maxEntries};
+}
