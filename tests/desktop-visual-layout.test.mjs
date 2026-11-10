@@ -89,7 +89,7 @@ test('empty portfolio and zero-day schedule can render without invented dates',(
 test('desktop workbench actually mounts existing Gantt/DAG and preserves real editing actions',()=>{
  const entry=readFileSync(new URL('../desktop/src/main.tsx',import.meta.url),'utf8');
  const component=readFileSync(new URL('../desktop/src/ProjectVisuals.tsx',import.meta.url),'utf8');
- assert.match(entry,/import\s*\{ProjectGantt,ProjectDependencyDiagram\}\s*from\s*["']\.\/ProjectVisuals["']/);
+ assert.match(entry,/import\s*\{ProjectGantt,ProjectDependencyDiagram(?:,PortfolioNetworkMap)?\}\s*from\s*["']\.\/ProjectVisuals["']/);
  assert.match(entry,/tab==="timeline"[\s\S]*?<ProjectGantt/);
  assert.match(entry,/tab==="graph"[\s\S]*?<ProjectDependencyDiagram/);
  assert.match(entry,/onEditDates=\{\(\)=>openEditor\("dates"\)\}/);
