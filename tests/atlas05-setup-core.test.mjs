@@ -1,0 +1,48 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+const read=p=>readFileSync(new URL(p,import.meta.url),"utf8");
+const product=JSON.parse(read("../desktop/installer/atlas.json"));
+const tauri=JSON.parse(read("../desktop/src-tauri/tauri.conf.json"));
+const workflow=read("../.github/workflows/atlas-0-2-1-branding.yml");
+const setup=read("../desktop/installer/build-setup-core.ps1");
+const native=read("../desktop/src-tauri/src/lib.rs");
+test("Atlas 0.5 defines the Setup Core product and does not package a second NSIS",()=>{
+ assert.equal(product.schema,"IWXA_SETUP_PRODUCT/1");
+ assert.equal(product.id,"iwxa.atlas");
+ assert.equal(product.display_name,"IWXA Atlas");
+ assert.equal(product.architecture,"windows-x64");
+ assert.equal(product.data_namespace,tauri.identifier);
+ assert.equal(product.version,"0.5.0");
+ assert.equal(product.version,tauri.version);
+ assert.equal(product.entrypoint,"iwxa-atlas-desktop.exe");
+ assert.deepEqual(product.requirements,["webview2-evergreen"]);
+ assert.equal(tauri.bundle.active,false);
+ assert.deepEqual(tauri.bundle.icon,["icons/icon.ico"]);
+ assert.doesNotMatch(JSON.stringify(tauri.bundle),/nsis/i);
+});
+test("Setup Core is pinned and compiled from original Center, not copied or forked",()=>{
+ assert.match(setup,/installer\/build_bundle\.py/);
+ assert.match(setup,/installer\/windows\/build-stub\.ps1/);
+ assert.match(setup,/build-resource/);
+ assert.match(setup,/-Icon \$icon/);
+ assert.match(setup,/PE_RESOURCE_V2/);
+ assert.match(setup,/--source-commit/);
+ assert.match(setup,/--source-tree/);
+ assert.match(setup,/--inspect-file/);
+ assert.match(setup,/--stage-test-file/);
+ assert.match(setup,/--verify-installed-file/);
+ assert.match(setup,/--locations-file/);
+ assert.match(setup,/ATLAS05_SETUP_CORE_NATIVE_INSTALL_PASS/);
+ assert.match(workflow,/ref: 0ef7544e2a6fd5fab5994f7f25abbb960063908c/);
+ assert.match(workflow,/repository: Faust-S\/Center/);
+ assert.match(workflow,/desktop\/installer\/build-setup-core\.ps1/);
+ assert.match(workflow,/IWXA-Atlas-0\.5\.0-Setup\.exe/);
+});
+test("Setup Core data location is read from registry and old NSIS store is the fallback",()=>{
+ assert.match(native,/Software\\\\IWXA\\\\SetupCore\\\\Products\\\\iwxa\.atlas/);
+ assert.match(native,/RegGetValueW\(HKEY_CURRENT_USER/);
+ assert.match(native,/DataLocation/);
+ assert.match(native,/setup_core_data_root\(\)\?\.unwrap_or\(original\)/);
+ assert.match(native,/root\.join\("atlas-store-v1"\)/);
+});

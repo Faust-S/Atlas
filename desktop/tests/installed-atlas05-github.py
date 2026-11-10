@@ -491,6 +491,30 @@ def verify_requirement_from_source(saved):
         raise AssertionError("Saved GitHub source requirement not restored to GUI")
     screenshot("linked-requirement-reopened")
     print("ATLAS05_GITHUB_REQUIREMENT_SOURCE_LINK_RESTART_PASS", flush=True)
+    # The installed Plan / fact screen must show explanatory source states,
+    # and its exact requirement link must not write to the native owner store.
+    click_button("Project 0")
+    wait_title("Project 0 — Обзор")
+    summary = window().child_window(title="Дополнительные представления проекта")
+    if summary.exists(timeout=2) and summary.is_visible():
+        summary.click_input()
+    else:
+        click(624, 253)
+    click_button("План / факт")
+    wait_title("Project 0 — План / факт")
+    if not any("Редакция совпадает; факт остаётся заявлением" in name
+               for name in visible_texts()):
+        screenshot("plan-fact-freshness-missing")
+        raise AssertionError("Installed Plan/fact did not explain the current source revision")
+    assert head() == persisted, "Viewing source freshness wrote data without user consent"
+    click_button(title)
+    wait_title("Project 0 — Обзор")
+    if not any("Требование: " + title in name for name in visible_texts()):
+        screenshot("plan-fact-target-jump-missing")
+        raise AssertionError("Plan/fact did not open the exact saved requirement")
+    assert head() == persisted, "Navigating to the source-linked requirement changed saved data"
+    screenshot("plan-fact-target-readonly")
+    print("ATLAS05_PLAN_FACT_FRESHNESS_TARGET_JUMP_NATIVE_PASS", flush=True)
 
 
 initial = head()
