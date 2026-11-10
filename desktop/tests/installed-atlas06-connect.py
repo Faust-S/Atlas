@@ -4,6 +4,7 @@ No Tauri test-only IPC, synthetic native writes, browser debugger, or fake
 GitHub fetch. GUI creates a draft; independent Rust store readback proves Save
 and restart. On API infrastructure failure this scenario is HOLD, not PASS.
 """
+import ctypes
 import hashlib
 import json
 import os
@@ -16,7 +17,7 @@ import win32con
 import win32gui
 import win32process
 from PIL import ImageGrab
-from pywinauto import Desktop, keyboard
+from pywinauto import Desktop, keyboard, mouse
 
 sys.stdout.reconfigure(encoding="utf-8",errors="replace")
 APP=Path(os.environ["ATLAS_INSTALLED_EXE"])
@@ -89,6 +90,32 @@ def click_button(name,timeout=35):
     activate()
     wait_button(name,timeout).click_input()
     time.sleep(0.3)
+
+def click_scrolled_button(name):
+    # The selection controls are intentionally after the discovered tree.
+    # Wheel scrolling in the main workspace is ordinary real user input;
+    # off-screen UIA controls must not be treated as missing buttons.
+    for _ in range(12):
+        matches=[element for element in window().descendants(control_type="Button")
+                 if element.window_text()==name and element.is_visible() and element.is_enabled()]
+        if len(matches)>1:
+            raise AssertionError("Ambiguous installed action: "+name)
+        if len(matches)==1:
+            activate()
+            matches[0].click_input()
+            time.sleep(0.3)
+            return
+        activate()
+        rect=win32gui.GetWindowRect(handle)
+        dpi=ctypes.windll.user32.GetDpiForWindow(handle)
+        scale=dpi/96 if dpi else 1
+        # Left margin of the central scrolling workspace, outside nested
+        # file-tree panels, so scroll targets the whole wizard view.
+        mouse.scroll(coords=(rect[0]+round(245*scale),rect[1]+round(485*scale)),
+                     wheel_dist=-4)
+        time.sleep(0.35)
+    screenshot("scrolled-action-missing")
+    raise AssertionError("Installed action not accessible after scrolling: "+name)
 
 def set_text(name,value):
     # HTML input[list] is represented by Windows UIA as ComboBox, while
@@ -170,7 +197,7 @@ def qualify():
     wait_text("Корневая структура",90)
     screenshot("selected-branch-preview")
     assert not (STORE/"head.json").exists(),"Read-only inspection wrote native storage"
-    click_button("Добавить в Atlas")
+    click_scrolled_button("Добавить в Atlas")
     wait_button("Сохранить")
     assert not (STORE/"head.json").exists(),"Creating a project draft unexpectedly saved"
     click_button("Сохранить")
