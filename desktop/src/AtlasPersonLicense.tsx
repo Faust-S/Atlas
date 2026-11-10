@@ -45,6 +45,7 @@ const status=(license:License)=>{
 };
 const date=(value:string)=>new Date(value).toLocaleDateString("ru-RU");
 export function AtlasPersonLicense({enabled}:{enabled:boolean}){
+ const [editionEnabled,setEditionEnabled]=useState(false);
  const [opened,setOpened]=useState(false);
  const [busy,setBusy]=useState(false);
  const [needsIdentity,setNeedsIdentity]=useState(false);
@@ -55,6 +56,17 @@ export function AtlasPersonLicense({enabled}:{enabled:boolean}){
  const [failure,setFailure]=useState("");
  const closeRef=useRef<HTMLButtonElement|null>(null);
  const openRef=useRef<HTMLButtonElement|null>(null);
+ useEffect(()=>{
+   if(!enabled){setEditionEnabled(false);return;}
+   let live=true;
+   // Only the native Tauri build knows whether workspace license enforcement
+   // is compiled in. This hides an unusable licensing surface in regular Atlas;
+   // it never substitutes for the separate native authorization check.
+   void invoke<boolean>("atlas_person_license_edition")
+     .then(value=>{if(live)setEditionEnabled(value===true);})
+     .catch(()=>{if(live)setEditionEnabled(false);});
+   return()=>{live=false;};
+ },[enabled]);
  async function refresh(){
   setBusy(true);setFailure("");setNeedsIdentity(false);
   try{
@@ -135,7 +147,7 @@ export function AtlasPersonLicense({enabled}:{enabled:boolean}){
    }catch(e){setFailure(describe(code(e)));}
    finally{setBusy(false);}
  }
- if(!enabled)return null;
+ if(!enabled||!editionEnabled)return null;
  return <>
    <button ref={openRef} type="button" className="action-button"
      data-testid="atlas-person-license-open" onClick={()=>setOpened(true)}>
