@@ -26,9 +26,15 @@ fn identifier(s:&str)->bool{
         b.is_ascii_alphanumeric()||(i>0&&b"._:/@-".contains(&b)))
 }
 fn root(app:&AppHandle)->Result<PathBuf,String>{
-    app.path().app_local_data_dir()
-        .map_err(|_|"ATLAS_PERSON_LOCAL_DATA_UNAVAILABLE".to_string())
-        .map(|d|d.join("t3-consumer-person"))
+    let original=app.path().app_local_data_dir()
+        .map_err(|_|"ATLAS_PERSON_LOCAL_DATA_UNAVAILABLE".to_string())?;
+    // Use the SAME user-selected Setup Core data root as Atlas projects;
+    // never create a second hidden application data location.
+    #[cfg(windows)]
+    let data=super::setup_core_data_root()?.unwrap_or(original);
+    #[cfg(not(windows))]
+    let data=original;
+    Ok(data.join("t3-consumer-person"))
 }
 fn binary(app:&AppHandle)->Result<PathBuf,String>{
     let base=app.path().resource_dir()
