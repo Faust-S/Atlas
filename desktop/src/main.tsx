@@ -29,6 +29,7 @@ import {projectHistoryRows} from "./history-view.mjs";
 import {sortWorkRows,filterWorkRowsByObservation} from "./work-sorting.mjs";
 import {createAtlasSavedRef} from "../../src/project-host-port.mjs";
 import {invokeAtlasHost,type AtlasEmbeddedHost} from "./embedded-host";
+import {AtlasPersonLicense} from "./AtlasPersonLicense";
 
 type Atlas = any;
 type HistoryEntry = {generation:string;revision:number;projects:number};
@@ -911,6 +912,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
         :"Архив .iwxa переносит проекты между копиями Atlas. История сохранений в него не входит. В совместимом Admin Center архив открывается для просмотра и подготовки поручений. Для прежних версий остаётся копия JSON."}</p>
       </div>
      </details>
+     {!embedded&&<AtlasPersonLicense enabled={native}/>}
      <button disabled={!!editor} className="icon-button inspector-button" aria-label={inspector?"Скрыть инспектор":"Показать инспектор"}
       title="Инспектор" onClick={()=>setInspector(!inspector)}>◧</button>
     </div>
