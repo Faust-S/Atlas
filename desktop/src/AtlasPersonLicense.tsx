@@ -43,7 +43,9 @@ const status=(license:License)=>{
  if(license.status==="EXPIRED")return "Срок лицензии истёк";
  return "Подписанный статус действителен";
 };
-const date=(value:string)=>new Date(value).toLocaleDateString("ru-RU");
+const localDeadline=(value:string)=>new Date(value).toLocaleString("ru-RU",{
+  dateStyle:"short",timeStyle:"short"
+});
 export function AtlasPersonLicense({enabled}:{enabled:boolean}){
  const [editionEnabled,setEditionEnabled]=useState(false);
  const [opened,setOpened]=useState(false);
@@ -192,7 +194,7 @@ export function AtlasPersonLicense({enabled}:{enabled:boolean}){
              className="atlas-person-license-entry">
              <strong>Лицензия {i+1}</strong>
              <span>{status(l)}</span>
-             <small>Срок лицензии: до {date(l.licenseExpiresAt)}. Подписанное подтверждение статуса: до {date(l.statusValidUntil)}. Версия статуса: {l.sequence}.</small>
+             <small>Срок лицензии: до {localDeadline(l.licenseExpiresAt)}. Подписанное подтверждение статуса: до {localDeadline(l.statusValidUntil)}. Версия статуса: {l.sequence}. Время указано по часам этого компьютера.</small>
            </article>)}
          <p className="minor" data-testid="atlas-person-workspace-access">
           Право WORKSPACE: {workspaceAllowed?"подтверждено подписанной лицензией и статусом":
