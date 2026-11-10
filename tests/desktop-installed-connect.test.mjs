@@ -82,3 +82,19 @@ test("Atlas 0.6 visual stress uses real installed .iwxa import and checks source
  assert.match(installed,/if __name__=="__main__":/);
  assert.doesNotMatch(script,/invoke\(|execute_script\(|setItem\(|write_bytes\(STORE/);
 });
+
+
+test("Atlas 0.6 qualifies project visualization without GitHub on installed Windows",()=>{
+ const universal=read("../desktop/tests/installed-atlas06-universal.py");
+ const fixture=read("../tests/fixtures/atlas06-universal-portfolio.mjs");
+ const visual=read("../desktop/tests/installed-atlas06-visual-scale.py");
+ assert.match(workflow,/atlas06-universal-portfolio\.mjs/);
+ assert.match(workflow,/installed-atlas06-universal\.py/);
+ assert.match(universal,/ATLAS06_UNIVERSAL_NO_GITHUB_MAP_PASS/);
+ assert.match(universal,/ATLAS06_UNIVERSAL_IWXA_NATIVE_SAVE_PASS/);
+ assert.match(universal,/ATLAS06_UNIVERSAL_DEPENDENCY_DETAILS_PASS/);
+ assert.match(universal,/ATLAS06_UNIVERSAL_NATIVE_NO_UNREQUESTED_WRITE_PASS/);
+ assert.match(visual,/if __name__=="__main__":/);
+ assert.match(fixture,/type:"other"/);
+ assert.doesNotMatch(universal,/write_bytes\(STORE|execute_script\(|localStorage|fake GitHub/);
+});

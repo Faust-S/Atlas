@@ -232,7 +232,7 @@ def qualify_visual():
 
     # Dependency disclosure must reveal the first three recorded predecessors
     # and the existing graph for further ones. No inferred edges.
-    expand=find_control("Ожидает 5 работ")
+    expand=find_control("Предшествующих работ: 5")
     expand.click_input()
     prior=find_control("Работа 0 / 4",types={"Button"})
     prior.click_input()
@@ -249,11 +249,12 @@ def qualify_visual():
     assert d.head()==saved
     print("ATLAS06_VISUAL_INSTALLED_NO_UNREQUESTED_WRITE_PASS",flush=True)
 
-try:
-    qualify_visual()
-except Exception as exc:
-    print("ATLAS06_VISUAL_WINDOWS_HOLD "+repr(exc),flush=True)
-    capture("failure")
-    raise
-finally:
-    d.stop()
+if __name__=="__main__":
+    try:
+        qualify_visual()
+    except Exception as exc:
+        print("ATLAS06_VISUAL_WINDOWS_HOLD "+repr(exc),flush=True)
+        capture("failure")
+        raise
+    finally:
+        d.stop()

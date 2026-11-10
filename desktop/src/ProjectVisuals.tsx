@@ -294,7 +294,7 @@ export function ProjectSourcePlanMap({projection,onOpenWork,onEditStage,onSugges
          onClick={()=>onOpenWork(work.id)}>{work.title}</button>
         {!work.sameRevision&&<small>Работа связана с прежней редакцией исходников</small>}
         {work.predecessorTotal>0&&<details className="atlas-source-plan-dependencies">
-         <summary>Ожидает {work.predecessorTotal} работ</summary>
+         <summary>Предшествующих работ: {work.predecessorTotal}</summary>
          {work.predecessors.map((previous:any)=><button key={previous.id} type="button"
           className="text-link" title={previous.title}
           onClick={()=>onOpenWork(previous.id)}>{previous.title}</button>)}
@@ -341,7 +341,7 @@ export function ProjectSourcePlanMap({projection,onOpenWork,onEditStage,onSugges
        onClick={()=>onOpenWork(work.id)}>{work.title}</button>
       {projection.sources.length>0&&<small>{work.reason}.</small>}
       {work.predecessorTotal>0&&<details className="atlas-source-plan-dependencies">
-       <summary>Ожидает {work.predecessorTotal} работ</summary>
+       <summary>Предшествующих работ: {work.predecessorTotal}</summary>
        {work.predecessors.map((previous:any)=><button key={previous.id}
         type="button" className="text-link" title={previous.title}
         onClick={()=>onOpenWork(previous.id)}>{previous.title}</button>)}

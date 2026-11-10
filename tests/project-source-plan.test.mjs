@@ -182,7 +182,7 @@ test("The first screen prioritizes real project links and permits controlled exp
  assert.match(guide,/maxSources:2,maxFoldersPerSource:4,maxWorksPerFolder:3,maxOtherWorks:6/);
  assert.match(visual,/Показать больше связей/);
  assert.match(guide,/Каталоги и сведения об источниках/);
- assert.match(visual,/Ожидает \{work\.predecessorTotal\} работ/);
+ assert.match(visual,/Предшествующих работ: \{work\.predecessorTotal\}/);
  assert.match(visual,/onOpenWork\(previous\.id\)/);
  assert.match(visual,/Открыть все источники/);
  assert.match(css,/\.atlas-source-plan-map \.text-link,\.atlas-source-plan-map \.action-button\{[^}]*overflow-wrap:anywhere/);
