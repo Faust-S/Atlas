@@ -187,10 +187,14 @@ export function projectSourcePlanProjection(snapshot,projectId,{
  // Keep genuine unassigned work ahead of links merely hidden by preview limits.
  const other=[...outside.filter(w=>!w.sourceId||!w.sourcePath),
   ...outside.filter(w=>w.sourceId&&w.sourcePath)];
+ const shownSources=new Map(overview.sources.map(s=>[s.sourceId,s]));
  const otherRows=other.slice(0,maxOtherWorks).map(w=>({
   ...toWork(w),reason:!w.sourceId?"Каталог не указан":
    !w.sourcePath?"Привязка к каталогу пока не показана":
-   "Связанный каталог вне показанной части схемы"
+   !shownSources.has(w.sourceId)?"Источник не показан в схеме":
+   shownSources.get(w.sourceId).status!=="current"?
+    "Структура источника пока недоступна":
+    "Связанный каталог вне показанной части схемы"
  }));
  const renderedWorkIds=new Set([...sources.flatMap(s=>s.folders.flatMap(f=>f.works.map(w=>w.id))),
   ...otherRows.map(w=>w.id)]);

@@ -700,7 +700,19 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .atlas-source-plan-other{border-top:1px solid #dce7f3;margin-top:8px;padding-top:12px}
 .atlas-source-plan-other h4{font-size:13px;margin:0}
 .atlas-source-plan-other-list{display:grid;gap:6px;margin:10px 0}
-.atlas-source-plan-other-list>div{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.atlas-source-plan-other-list>.atlas-source-plan-other-row{
+ display:grid;grid-template-columns:minmax(0,1fr) minmax(110px,30%);
+ gap:12px;align-items:start;border:1px solid #dce7f3;border-radius:8px;
+ background:#fff;padding:10px 12px}
+.atlas-source-plan-other-work{display:flex;flex-direction:column;gap:5px;min-width:0}
+.atlas-source-plan-other-stage{display:flex;align-items:start;min-width:0}
+.atlas-source-plan-other-work>.text-link,.atlas-source-plan-other-stage>.text-link{
+ display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;
+ overflow:hidden;text-overflow:ellipsis;overflow-wrap:anywhere;line-height:1.4}
+@media(max-width:640px){
+ .atlas-source-plan-other-list>.atlas-source-plan-other-row{
+  grid-template-columns:minmax(0,1fr);gap:6px}
+}
 .atlas-source-plan-actions{display:flex;align-items:center;gap:8px;
  flex-wrap:wrap;border-top:1px solid #dce7f3;padding-top:12px;margin-top:8px}
 @media(max-width:900px){

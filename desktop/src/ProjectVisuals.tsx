@@ -251,9 +251,13 @@ export function ProjectSourcePlanMap({projection,onOpenWork,onEditStage,onSugges
  onCreateStage:()=>void;onAddDependency:()=>void;
  expanded:boolean;hasMoreLinks:boolean;onToggleExpansion:()=>void;
 }){
- return <div className="atlas-source-plan-map" aria-label="Схема каталогов, работ и этапов">
+ return <div className="atlas-source-plan-map"
+  aria-label={projection.sources.length?"Схема каталогов, работ и этапов":
+   "Схема работ, этапов и зависимостей"}>
   <div className="section-heading"><div><h3>Как связаны части проекта</h3>
-   <p>Каталог, работа и этап показаны рядом, если связь уже есть в плане.</p></div>
+   <p>{projection.sources.length?
+    "Каталог, работа и этап показаны рядом, если связь уже есть в плане.":
+    "Работы, этапы и зависимости показаны по сохранённому плану."}</p></div>
    <div className="button-row">
     <button type="button" className="action-button" disabled={!projection.workTotal}
      onClick={onOpenTimeline}>План-график</button>
@@ -326,21 +330,36 @@ export function ProjectSourcePlanMap({projection,onOpenWork,onEditStage,onSugges
     Работы остаются в плане. Обновите источник, чтобы сравнить их со структурой.</p>}
   </div>)}
   {!!projection.otherWorks.length&&<div className="atlas-source-plan-other">
-   <h4>Работы без показанной связи с каталогом</h4>
-   <p className="minor">Они остаются частью плана, даже если каталог не выбран
-    или сведения GitHub пока неполные.</p>
+   <h4>{projection.sources.length?"Работы без показанной связи с каталогом":
+    "Работы и этапы"}</h4>
+   {projection.sources.length>0&&<p className="minor">
+    Эти работы остаются в плане, даже если каталог не показан.</p>}
    <div className="atlas-source-plan-other-list">
-    {projection.otherWorks.map((work:any)=><div key={work.id}>
-     <button type="button" className="text-link"
-      onClick={()=>onOpenWork(work.id)}>{work.title}</button>
-     <small>{work.reason}.</small>
-     {work.stageId?<button type="button" className="text-link"
-      onClick={()=>onEditStage(work.stageId)}>{work.stageName}</button>:
-      <small>Без этапа</small>}
+    {projection.otherWorks.map((work:any)=><div key={work.id} className="atlas-source-plan-other-row">
+     <div className="atlas-source-plan-other-work">
+      <button type="button" className="text-link" title={work.title}
+       onClick={()=>onOpenWork(work.id)}>{work.title}</button>
+      {projection.sources.length>0&&<small>{work.reason}.</small>}
+      {work.predecessorTotal>0&&<details className="atlas-source-plan-dependencies">
+       <summary>Ожидает {work.predecessorTotal} работ</summary>
+       {work.predecessors.map((previous:any)=><button key={previous.id}
+        type="button" className="text-link" title={previous.title}
+        onClick={()=>onOpenWork(previous.id)}>{previous.title}</button>)}
+       {work.predecessorTotal>work.predecessors.length&&<button type="button"
+        className="text-link" onClick={onOpenGraph}>Открыть остальные зависимости</button>}
+      </details>}
+     </div>
+     <div className="atlas-source-plan-other-stage">
+      {work.stageId?<button type="button" className="text-link" title={work.stageName}
+       onClick={()=>onEditStage(work.stageId)}>{work.stageName}</button>:
+       <small>Без этапа</small>}
+     </div>
     </div>)}
    </div>
    {projection.hiddenOtherWorks>0&&<p className="minor">
-    Ещё {projection.hiddenOtherWorks} работ доступны во вкладке «Работы».</p>}
+    Ещё {projection.hiddenOtherWorks} работ. {" "}
+    <button type="button" className="text-link" onClick={onOpenWorks}>
+     Открыть все работы</button></p>}
   </div>}
   {projection.hiddenSources>0&&<p className="minor">Ещё {projection.hiddenSources} источников.
    {" "}<button type="button" className="text-link" onClick={onOpenSources}>

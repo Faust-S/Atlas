@@ -2,7 +2,8 @@ import React,{useEffect,useState} from "react";
 import {projectStructureGuide,projectSourcePlanProjection,folderWorkAction} from "../../src/project-organization.mjs";
 import {ProjectSourcePlanMap} from "./ProjectVisuals";
 
-// Existing project's saved GitHub observation is the only source of this view.
+// Saved GitHub observations enrich this view when available; existing work,
+// stage and dependency links remain usable in any project without GitHub.
 // Suggested roles are explanations to review, never new project entities.
 export function ProjectOrganizationGuide({snapshot,projectId,onEdit,onRefresh,onOpenProject,
  onOpenSources,onOpenWorks,onAddRelation,onOpenTimeline,onOpenGraph,busy=false}:{
@@ -19,22 +20,31 @@ export function ProjectOrganizationGuide({snapshot,projectId,onEdit,onRefresh,on
   {maxSources:2,maxFoldersPerSource:4,maxWorksPerFolder:3,maxOtherWorks:6});
  const suggested=guide.nextAction;
  const hasSources=guide.sources.length>0;
- const linkedFolderWorks=snapshot.projects.find((p:any)=>p.id===projectId)?.items
-  .some((work:any)=>work.sourceId&&work.sourcePath)??false;
+ const project=snapshot.projects.find((p:any)=>p.id===projectId);
+ const recordedSources=project?.sources.length??0;
+ const linkedFolderWorks=project?.items.some((work:any)=>work.sourceId&&work.sourcePath)??false;
+ const showMap=hasSources||projection.workTotal>0;
  const hasMoreLinks=projection.hiddenSources>0||projection.hiddenOtherWorks>0||
   projection.sources.some((source:any)=>source.incomplete||
    source.folders.some((folder:any)=>folder.hiddenWorks>0));
  return <section className="surface atlas-project-organization" aria-label="Состав проекта и возможные следующие действия">
   <div className="section-heading"><div>
    <h2>Состав проекта</h2>
-   <p>Atlas нашёл части исходников. Проверьте их назначение и решите, что включить в работу.</p>
-  </div>{!hasSources&&<button type="button" className="action-button"
-   onClick={onOpenSources}>Подключить источник</button>}</div>
-  {!hasSources&&<p className="minor">Подключите исходники, чтобы увидеть их каталоги и связанные проекты.
-   План проекта можно составлять и без GitHub.</p>}
-  {hasSources&&<details className="atlas-source-plan-disclosure"
-   open={projection.mappedTotal>0||linkedFolderWorks||undefined}>
-   <summary>Схема проекта: каталоги, работы и этапы</summary>
+   <p>{hasSources?
+    "Здесь показаны найденные каталоги и связи, которые уже записаны в плане.":
+    "Здесь показаны ваши работы, этапы и записанные зависимости."}</p>
+  </div>{!recordedSources&&project?.type==="engineering"&&<button type="button"
+   className="action-button" onClick={onOpenSources}>Подключить источник</button>}</div>
+  {!hasSources&&recordedSources>0&&<p className="minor">
+   Структура подключённых источников пока не показана. Работы и этапы остаются доступными.
+   {" "}<button type="button" className="text-link" onClick={onOpenSources}>
+    Посмотреть источники</button>
+  </p>}
+  {!showMap&&<p className="minor">Добавьте работу, чтобы увидеть её связь с этапом.</p>}
+  {showMap&&<details className="atlas-source-plan-disclosure"
+   open={projection.workTotal>0||linkedFolderWorks||undefined}>
+   <summary>{hasSources?"Схема проекта: каталоги, работы и этапы":
+    "Схема проекта: работы и этапы"}</summary>
    <ProjectSourcePlanMap projection={projection}
     expanded={moreLinks} hasMoreLinks={hasMoreLinks}
     onToggleExpansion={()=>setMoreLinks(value=>!value)}

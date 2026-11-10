@@ -1144,7 +1144,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      </details>
     </nav>
     {tab==="overview"&&<>
-     {(project.type==="engineering"||project.sources.some((source:any)=>source.kind==="github"))&&
+     {(project.items.length>0||project.type==="engineering"||
+       project.sources.some((source:any)=>source.kind==="github"))&&
      <ProjectOrganizationGuide snapshot={data} projectId={project.id}
       onEdit={openEditor}
       onRefresh={sourceId=>void syncPublic({projectId:project.id,sourceId})}

@@ -228,3 +228,43 @@ test("Very long diagram labels remain available without unbounded card heights",
  assert.match(css,/\.atlas-source-plan-folder strong,[\s\S]*?-webkit-line-clamp:2;/);
  assert.match(css,/overflow:hidden;text-overflow:ellipsis;overflow-wrap:anywhere;line-height:1\.4/);
 });
+
+
+test("Any project can display saved work-stage and predecessor links without GitHub",()=>{
+ const p=createProject(empty(),{name:"Открытие пространства",type:"business",goal:"Провести встречу"});
+ const stage=createStage(p.state,p.id,"Подготовка");
+ const one=createItem(stage.state,p.id,{title:"Подготовить помещение",stageId:stage.id});
+ const two=createItem(one.state,p.id,{title:"Открыть площадку",stageId:stage.id});
+ const linked=connect(two.state,p.id,one.id,two.id);
+ const before=serialize(linked);
+ const map=projectSourcePlanProjection(linked,p.id,{maxOtherWorks:1});
+ assert.equal(map.sources.length,0);
+ assert.equal(map.sourceCount,0);
+ assert.equal(map.workTotal,2);
+ assert.equal(map.stageTotal,1);
+ assert.equal(map.dependencyTotal,1);
+ assert.equal(map.otherWorks[0].title,"Подготовить помещение");
+ assert.equal(map.hiddenOtherWorks,1);
+ assert.equal(serialize(linked),before);
+ const full=projectSourcePlanProjection(linked,p.id,{maxOtherWorks:2});
+ assert.equal(full.otherWorks[1].stageName,"Подготовка");
+ assert.deepEqual(full.otherWorks[1].predecessors,[{id:one.id,title:"Подготовить помещение"}]);
+ assert.equal(full.otherWorks[1].predecessorTotal,1);
+ assert.equal(serialize(linked),before);
+});
+test("The overview offers its existing plan diagram in non-engineering projects",()=>{
+ const main=read("../desktop/src/main.tsx");
+ const guide=read("../desktop/src/ProjectOrganizationGuide.tsx");
+ const visual=read("../desktop/src/ProjectVisuals.tsx");
+ const css=read("../desktop/src/style.css");
+ assert.match(main,/project\.items\.length>0\|\|project\.type==="engineering"/);
+ assert.match(guide,/showMap=hasSources\|\|projection\.workTotal>0/);
+ assert.match(guide,/Схема проекта: работы и этапы/);
+ assert.match(guide,/Здесь показаны ваши работы, этапы и записанные зависимости/);
+ assert.match(visual,/Работы, этапы и зависимости показаны по сохранённому плану/);
+ assert.match(visual,/projection\.sources\.length\?"Работы без показанной связи с каталогом"/);
+ assert.match(visual,/work\.predecessors\.map\(\(previous:any\)=>/);
+ assert.match(visual,/Открыть все работы/);
+ assert.match(css,/\.atlas-source-plan-other-list>\.atlas-source-plan-other-row/);
+ assert.doesNotMatch(visual.slice(visual.indexOf("export function ProjectSourcePlanMap")),/createItem\(|mutate\(|localStorage/);
+});
