@@ -147,3 +147,21 @@ export function sourceReview(source,{limit=12}={}){
   authority:"OBSERVATION_ONLY"
  });
 }
+
+const freshnessCopy=Object.freeze({
+ never:"Факт ещё не записан",
+ unlinked:"Факт без внешнего источника",
+ missing_source:"Источник больше не подключён",
+ unavailable:"Источник недоступен",
+ outdated:"Сведения об источнике устарели",
+ incomplete:"Недостаточно сведений о ветке",
+ revision_changed:"Редакция источника изменилась",
+ ref_not_found:"Ветка не найдена при полной сверке",
+ current_revision:"Редакция совпадает; факт остаётся заявлением",
+ source_fresh:"Источник наблюдался; результат не подтверждён"
+});
+// Source-status codes stay in the existing model; people see explanatory text.
+export function sourceFreshnessLabel(state){
+ return typeof state==="string"&&Object.hasOwn(freshnessCopy,state)
+  ?freshnessCopy[state]:"Состояние источника не установлено";
+}

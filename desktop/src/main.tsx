@@ -16,7 +16,7 @@ import {planReviewQueue,planReviewAction,planProposalAction} from "../../src/pla
 import {revisionReview,recheckAction} from "../../src/revision-review.mjs";
 import {previewPlanAmendment,applyPlanAmendment,removePlanAmendment} from "../../src/plan-amendment.mjs";
 import {planPublicRefresh,reconcilePublicSources,publicSourceQueue} from "../../src/public-refresh.mjs";
-import {sourceReview} from "../../src/source-review.mjs";
+import {sourceReview,sourceFreshnessLabel} from "../../src/source-review.mjs";
 import {ProjectGantt,ProjectDependencyDiagram} from "./ProjectVisuals";
 import {prepareImportedSnapshot} from "./import-snapshot.mjs";
 import {buildIwxaPortfolio,readIwxaPortfolio,toBase64,fromBase64} from "./iwxa-portfolio.mjs";
@@ -1335,16 +1335,24 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      <p>Посмотрите, что подтверждено записями, какие сведения устарели и что ещё нужно проверить.</p></div>
      <div className="button-row"><Action onClick={()=>openEditor("target")}>＋ Требование</Action><Action onClick={()=>openEditor("finding")} disabled={!project.targets?.length}>＋ Наблюдение</Action></div></div>
      <div className="table-scroll"><table><thead><tr><th>Ожидаемый результат</th><th>Что известно</th><th>Состояние источника</th><th></th></tr></thead>
-      <tbody>{(reality?.rows||[]).map((r:any)=><tr key={r.id}><td><strong>{r.title}</strong><small>{r.desired}</small></td>
+      <tbody>{(reality?.rows||[]).map((r:any)=><tr key={r.id}><td><strong><button type="button" className="text-link" onClick={()=>{
+        if(!requireClosedForm())return;
+        view("overview");setRequirementJump({projectId:project.id,targetId:r.id});
+       }}>{r.title}</button></strong><small>{r.desired}</small></td>
        <td><Badge tone={["unknown","stale","conflict"].includes(r.assessment)?"warning":"neutral"}>{evidence[r.assessment]||r.assessment}</Badge></td>
-       <td>{r.freshness?.state||"Неизвестно"}{r.latest?.revision&&<details className="atlas-technical-details"><summary>Версия источника</summary><code>{r.latest.revision}</code></details>}</td>
+       <td>{sourceFreshnessLabel(r.freshness?.state)}{r.latest?.revision&&<details className="atlas-technical-details"><summary>Версия источника</summary><code>{r.latest.revision}</code></details>}</td>
        <td><Action onClick={()=>openEditor("finding-target:"+r.id)}>Новый факт</Action></td></tr>)}</tbody></table></div>
      <div className="section-heading"><h3>Факты на изменившихся исходных ревизиях</h3></div>
      {recheckRows.slice(0,recheckLimit).map((r:any)=>
-      <div className="attention-row" key={r.id}><div><strong>{r.targetTitle}</strong>
+      <div className="attention-row" key={r.id}><div><strong><button type="button" className="text-link"
+        aria-label={"Открыть требование для повторной проверки: "+r.targetTitle}
+        onClick={()=>{
+         if(!requireClosedForm())return;
+         view("overview");setRequirementJump({projectId:project.id,targetId:r.targetId});
+        }}>{r.targetTitle}</button></strong>
        <small>{r.locator} / {r.ref}</small><details className="atlas-technical-details"><summary>Версии для повторной проверки</summary><code>{r.claimedSha||"неизвестно"} → {r.observedSha||"неизвестно"}</code></details></div>
        {r.canRecheck?<Action onClick={()=>openEditor(recheckAction(project.id,r.claimId,r.observedSha))}>Повторно проверить</Action>:
-        <Badge tone="warning">Обновите источник</Badge>}</div>)}
+        <Action disabled={busy} onClick={()=>void syncPublic({projectId:project.id,sourceId:r.sourceId})}>Проверить источник</Action>}</div>)}
      {recheckRows.length>0&&<p className="minor">Показано {Math.min(recheckLimit,recheckRows.length)} из {recheckRows.length} повторных проверок.</p>}
      {recheckRows.length>recheckLimit&&<Action onClick={()=>setRecheckLimit(n=>Math.min(recheckRows.length,n+25))}>Показать ещё проверки ({recheckRows.length-recheckLimit})</Action>}
      </section>}

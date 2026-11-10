@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
-import {sourceReview} from "../src/source-review.mjs";
+import {sourceReview,sourceFreshnessLabel} from "../src/source-review.mjs";
 import {sourceChanges} from "../src/source-observation.mjs";
 
 const shaA="a".repeat(40),shaB="b".repeat(40);
@@ -264,4 +264,37 @@ test("source card shows an exact partial-list branch change, not a full reposito
  assert.match(ui,/review\.selectedRevision&&<p className="minor"/);
  assert.match(ui,/Полный список веток не сопоставлялся/);
  assert.match(ui,/Проверить связанные требования/);
+});
+
+test("reality screen explains source freshness without exposing internal state codes",()=>{
+ const copy={
+  never:"Факт ещё не записан",
+  unlinked:"Факт без внешнего источника",
+  missing_source:"Источник больше не подключён",
+  unavailable:"Источник недоступен",
+  outdated:"Сведения об источнике устарели",
+  incomplete:"Недостаточно сведений о ветке",
+  revision_changed:"Редакция источника изменилась",
+  ref_not_found:"Ветка не найдена при полной сверке",
+  current_revision:"Редакция совпадает; факт остаётся заявлением",
+  source_fresh:"Источник наблюдался; результат не подтверждён"
+ };
+ for(const [state,label] of Object.entries(copy)){
+  assert.equal(sourceFreshnessLabel(state),label);
+  assert.doesNotMatch(label,/^(unknown|stale|source_|revision_|current_)/);
+ }
+ assert.equal(sourceFreshnessLabel(undefined),"Состояние источника не установлено");
+ assert.equal(sourceFreshnessLabel("future_state"),"Состояние источника не установлено");
+ const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ assert.match(ui,/sourceFreshnessLabel\(r\.freshness\?\.state\)/);
+ assert.doesNotMatch(ui,/\{r\.freshness\?\.state\|\|"Неизвестно"\}/);
+});
+test("facts and stale-branch reviews offer direct, non-writing navigation and scoped refresh",()=>{
+ const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ assert.match(ui,/setRequirementJump\(\{projectId:project\.id,targetId:r\.id\}\)/);
+ assert.match(ui,/setRequirementJump\(\{projectId:project\.id,targetId:r\.targetId\}\)/);
+ assert.match(ui,/aria-label=\{"Открыть требование для повторной проверки: "/);
+ assert.match(ui,/syncPublic\(\{projectId:project\.id,sourceId:r\.sourceId\}\)/);
+ assert.match(ui,/Проверить источник/);
+ assert.match(ui,/Публичные наблюдения обновлены в черновике\. Сохраните результат на диск/);
 });
