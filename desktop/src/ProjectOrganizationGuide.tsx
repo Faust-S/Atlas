@@ -42,6 +42,7 @@ export function ProjectOrganizationGuide({snapshot,projectId,onEdit,onRefresh,on
         <a className="text-link" href={folder.url} target="_blank" rel="noopener noreferrer">
          Открыть каталог</a>
         <button type="button" className="action-button"
+         aria-label={"Предложить работу по каталогу "+folder.name}
          onClick={()=>onEdit(folderWorkAction(source.sourceId,folder.commitSha,folder.name))}
          disabled={busy}>Предложить работу</button>
        </div>

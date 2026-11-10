@@ -33,6 +33,10 @@ test("Native GUI test requires a read-only public discovery and explicit native 
  assert.match(installed,/ATLAS06_CONNECT_BRANCH_TREE_RESTART_PASS/);
  assert.match(installed,/ATLAS06_CONNECT_LIVE_ROOT_REFRESH_SAVE_PASS/);
  assert.match(installed,/ATLAS06_CONNECT_LIVE_ROOT_REFRESH_RESTART_PASS/);
+ assert.match(installed,/ATLAS06_USER_APPROVED_SOURCE_WORK_NATIVE_SAVE_PASS/);
+ assert.match(installed,/ATLAS06_USER_APPROVED_SOURCE_WORK_RESTART_PASS/);
+ assert.match(installed,/click_scrolled_button\("Предложить работу по каталогу src",main=True\)/);
+ assert.match(installed,/assert task\["sourceId"\]==original_project\["sources"\]\[0\]\["id"\]/);
  assert.match(installed,/wait_text\("Портфель проектов",45\)/);
  assert.match(installed,/Saved Atlas project did not appear in installed sidebar/);
  assert.match(installed,/click_scrolled_button\("Проверить код и сборку"\)/);

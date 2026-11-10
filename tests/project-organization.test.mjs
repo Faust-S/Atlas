@@ -120,6 +120,7 @@ test("Author voice: everyday UI text, with clear boundaries and no technical use
  assert.match(ui,/Состав проекта/);
  assert.match(ui,/Назначение каталогов требует уточнения/);
  assert.match(ui,/Предложить работу/);
+ assert.match(ui,/aria-label=\{"Предложить работу по каталогу "\+folder.name\}/);
  assert.match(ui,/onEdit\(folderWorkAction\(/);
  assert.match(ui,/не означает зависимость/);
  assert.match(ui,/Открыть связанные работы/);

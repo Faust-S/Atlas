@@ -92,7 +92,7 @@ def click_button(name,timeout=35):
     wait_button(name,timeout).click_input()
     time.sleep(0.3)
 
-def click_scrolled_button(name):
+def click_scrolled_button(name,main=False):
     # The selection controls are intentionally after the discovered tree.
     # Wheel scrolling in the main workspace is ordinary real user input;
     # off-screen UIA controls must not be treated as missing buttons.
@@ -115,7 +115,8 @@ def click_scrolled_button(name):
                 return
         activate()
         # Scroll inside the main workspace, not over the fixed sidebar.
-        mouse.scroll(coords=(bounds[2]-92,bounds[1]+min(515,bounds[3]-bounds[1]-95)),
+        x=bounds[0]+440 if main else bounds[2]-92
+        mouse.scroll(coords=(x,bounds[1]+min(515,bounds[3]-bounds[1]-95)),
                      wheel_dist=-3)
         time.sleep(0.35)
     screenshot("scrolled-action-missing")
@@ -290,6 +291,53 @@ def verify_refresh(previous,original_project):
     assert saved_project(head())==project,"Refreshed project block changed after restart"
     screenshot("refreshed-source-reopened")
     print("ATLAS06_CONNECT_LIVE_ROOT_REFRESH_RESTART_PASS",flush=True)
+    verify_organization_work(current,project)
+
+def verify_organization_work(previous,original_project):
+    # A source folder is visible before the plan has any work.
+    open_source_view()
+    click_button("Обзор")
+    window_title_contains("Atlas — Обзор")
+    wait_text("Состав проекта",35)
+    screenshot("suggested-structure")
+    assert head()==previous,"Viewing project parts changed native storage"
+    click_scrolled_button("Предложить работу по каталогу src",main=True)
+    wait_text("Работа по каталогу: src",35)
+    assert head()==previous,"Opening a work editor wrote a task before confirmation"
+    set_text("Что нужно сделать?","Проверить исходники сайта")
+    screenshot("source-work-editor")
+    click_button("Применить к черновику")
+    assert head()==previous,"Applying the form silently saved the project"
+    wait_button("Сохранить")
+    click_button("Сохранить")
+    until=time.monotonic()+45
+    while time.monotonic()<until:
+        current=head()
+        if current["generation"]!=previous["generation"]:break
+        time.sleep(0.2)
+    else:
+        screenshot("source-work-save-timeout")
+        raise AssertionError("Accepted source work was not saved")
+    project=saved_project(current)
+    assert len(project["items"])==1,"One form produced an unexpected number of works"
+    task=project["items"][0]
+    assert task["title"]=="Проверить исходники сайта"
+    assert task["sourceId"]==original_project["sources"][0]["id"]
+    assert task["state"]=="todo" and task["targetIds"]==[]
+    assert project["sources"]==original_project["sources"]
+    for field in ("stages","dependencies","decisions","targets","findings"):
+        assert project.get(field)==original_project.get(field), "Form modified "+field
+    print("ATLAS06_USER_APPROVED_SOURCE_WORK_NATIVE_SAVE_PASS",flush=True)
+    stop()
+    launch()
+    wait_text("Портфель проектов",45)
+    assert head()==current,"Accepted work changed after restart"
+    assert saved_project(current)==project,"Source-linked work changed after restart"
+    open_source_view()
+    click_button("Таблица")
+    wait_text("Проверить исходники сайта",35)
+    screenshot("source-linked-work-reopened")
+    print("ATLAS06_USER_APPROVED_SOURCE_WORK_RESTART_PASS",flush=True)
 
 def qualify():
     if (STORE/"head.json").exists():
