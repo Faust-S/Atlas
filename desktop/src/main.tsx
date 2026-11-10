@@ -1160,6 +1160,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       onRefresh={sourceId=>void syncPublic({projectId:project.id,sourceId})}
       onOpenSources={()=>view("sources")}
       onOpenWorks={()=>view("work")}
+      onOpenTimeline={()=>view("timeline")}
+      onOpenGraph={()=>view("graph")}
       onOpenProject={id=>selectProject(id)}
       onAddRelation={()=>openEditor("portfolio-link")}
       busy={busy}/>}

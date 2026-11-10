@@ -236,3 +236,105 @@ export function PortfolioNetworkMap({snapshot,onOpenProject}:{
    {" "}Заявленное завершение предшественника требует проверки: {network.needsReview}.</p>
  </div>;
 }
+
+
+// A navigable projection of saved GitHub observations and existing Atlas work.
+// The connectors illustrate only confirmed user-created work/stage assignments.
+// No component or dependency is created by opening the diagram.
+export function ProjectSourcePlanMap({projection,onOpenWork,onEditStage,onSuggestFolder,
+ onOpenTimeline,onOpenGraph,onCreateStage,onAddDependency}:{
+ projection:any;onOpenWork:(id:string)=>void;onEditStage:(id:string)=>void;
+ onSuggestFolder:(sourceId:string,commitSha:string,folder:string)=>void;
+ onOpenTimeline:()=>void;onOpenGraph:()=>void;
+ onCreateStage:()=>void;onAddDependency:()=>void;
+}){
+ return <div className="atlas-source-plan-map" aria-label="Схема каталогов, работ и этапов">
+  <div className="section-heading"><div><h3>Как связаны части проекта</h3>
+   <p>Каталог, работа и этап показаны рядом, если связь уже есть в плане.</p></div>
+   <div className="button-row">
+    <button type="button" className="action-button" disabled={!projection.workTotal}
+     onClick={onOpenTimeline}>План-график</button>
+    <button type="button" className="action-button" disabled={!projection.workTotal}
+     onClick={onOpenGraph}>Зависимости работ</button>
+   </div>
+  </div>
+  {projection.sources.map((source:any)=><div className="atlas-source-plan-source" key={source.sourceId}>
+   <div className="atlas-source-plan-source-title">
+    <strong>{source.repository}</strong>
+    <small>{source.branch||"Ветка не указана"}</small>
+   </div>
+   {source.status==="current"?<>
+    <div className="atlas-source-plan-legend" aria-hidden="true">
+     <span>Каталог исходников</span><span>Работа</span><span>Этап</span>
+    </div>
+    {source.folders.map((folder:any)=><div className="atlas-source-plan-flow"
+     key={source.sourceId+"/"+folder.name}>
+     <div className="atlas-source-plan-folder">
+      <strong title={folder.name}>{folder.name}</strong>
+      <small>{folder.role}</small>
+      <a className="text-link" href={folder.url} target="_blank"
+       rel="noopener noreferrer">Открыть в GitHub</a>
+     </div>
+     <span className="atlas-source-plan-arrow" aria-hidden="true">→</span>
+     <div className="atlas-source-plan-works">
+      {folder.works.length?folder.works.map((work:any)=><div
+       className="atlas-source-plan-assignment" key={work.id}>
+       <div className="atlas-source-plan-work">
+        <button type="button" className="text-link" onClick={()=>onOpenWork(work.id)}>
+         {work.title}</button>
+        {!work.sameRevision&&<small>Работа связана с прежней редакцией исходников</small>}
+        {work.predecessorTotal>0&&<small>
+         Зависит от других работ: {work.predecessorTotal}</small>}
+       </div>
+       <span className="atlas-source-plan-arrow" aria-hidden="true">→</span>
+       <div className="atlas-source-plan-stage">
+        {work.stageId?
+         <button type="button" className="text-link"
+          onClick={()=>onEditStage(work.stageId)}>{work.stageName}</button>:
+         <button type="button" className="action-button"
+          onClick={()=>onOpenWork(work.id)}>Выбрать этап</button>}
+       </div>
+      </div>):
+      <div className="atlas-source-plan-unassigned">
+       <small>Работ по этому каталогу ещё нет.</small>
+       <button type="button" className="action-button"
+        onClick={()=>onSuggestFolder(source.sourceId,folder.commitSha,folder.name)}>
+        Добавить работу</button>
+      </div>}
+      {folder.hiddenWorks>0&&<p className="minor">Ещё {folder.hiddenWorks} работ.
+       Полный список доступен во вкладке «Работы».</p>}
+     </div>
+    </div>)}
+    {!source.folders.length&&<p className="minor">На верхнем уровне этой ветки каталоги не найдены.</p>}
+    {source.incomplete&&<p className="minor">Показана часть каталогов.
+     Это не означает, что остальных нет.</p>}
+   </>:<p className="minor">Сведения о каталогах этой ветки сейчас недоступны.
+    Работы остаются в плане. Обновите источник, чтобы сравнить их со структурой.</p>}
+  </div>)}
+  {!!projection.otherWorks.length&&<div className="atlas-source-plan-other">
+   <h4>Работы без показанной связи с каталогом</h4>
+   <p className="minor">Они остаются частью плана, даже если каталог не выбран
+    или сведения GitHub пока неполные.</p>
+   <div className="atlas-source-plan-other-list">
+    {projection.otherWorks.map((work:any)=><div key={work.id}>
+     <button type="button" className="text-link"
+      onClick={()=>onOpenWork(work.id)}>{work.title}</button>
+     <small>{work.reason}. {work.stageName}</small>
+    </div>)}
+   </div>
+   {projection.hiddenOtherWorks>0&&<p className="minor">
+    Ещё {projection.hiddenOtherWorks} работ доступны во вкладке «Работы».</p>}
+  </div>}
+  {projection.hiddenSources>0&&<p className="minor">Не показано источников: {projection.hiddenSources}.
+   Полный список доступен во вкладке «Источники».</p>}
+  <div className="atlas-source-plan-actions">
+   <button type="button" className="action-button"
+    onClick={onCreateStage}>Добавить этап</button>
+   <button type="button" className="action-button"
+    disabled={projection.workTotal<2}
+    onClick={onAddDependency}>Связать работы</button>
+   <span className="minor">Связей между работами в плане: {projection.dependencyTotal}.
+    Изменения появятся только после вашего подтверждения.</span>
+  </div>
+ </div>;
+}

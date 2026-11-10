@@ -111,3 +111,69 @@ export function selectedSourceFolder(snapshot,projectId,action){
  return {sourceId,folder,repository:entryRepo(source),branch:selectedBranch(source),
   commitSha};
 }
+
+
+// A bounded, read-only view of actual source folder -> work -> stage links.
+// It never creates tasks, infers dependencies, or considers a source folder
+// to be a required project component. Historical work links remain visible.
+export function projectSourcePlanProjection(snapshot,projectId,{
+ maxSources=8,maxFoldersPerSource=16,maxWorksPerFolder=8,maxOtherWorks=20
+}={}){
+ validate(snapshot);
+ for(const n of [maxSources,maxFoldersPerSource,maxWorksPerFolder,maxOtherWorks]){
+  if(!Number.isInteger(n)||n<1||n>120)throw Error("Некорректный предел схемы проекта");
+ }
+ const project=snapshot.projects.find(p=>p.id===projectId);
+ if(!project)throw Error("Проект не найден");
+ const overview=projectStructureGuide(snapshot,projectId,{
+  maxSources,maxFolders:maxFoldersPerSource
+ });
+ const stageById=new Map(project.stages.map(s=>[s.id,s]));
+ const workById=new Map(project.items.map(w=>[w.id,w]));
+ const incoming=new Map();
+ for(const edge of project.dependencies){
+  if(!incoming.has(edge.to))incoming.set(edge.to,[]);
+  incoming.get(edge.to).push(edge.from);
+ }
+ const toWork=work=>({
+  id:work.id,title:work.title,state:work.state,
+  stageId:work.stageId||null,
+  stageName:stageById.get(work.stageId)?.name||"Без этапа",
+  sourcePath:work.sourcePath||null,sourceRevision:work.sourceRevision||null,
+  predecessors:(incoming.get(work.id)||[]).filter(id=>workById.has(id)).slice(0,3)
+   .map(id=>({id,title:workById.get(id).title})),
+  predecessorTotal:(incoming.get(work.id)||[]).length
+ });
+ const represented=new Set();
+ let mappedTotal=0;
+ const sources=overview.sources.map(source=>{
+  const folders=source.folders.map(folder=>{
+   const matching=project.items.filter(w=>w.sourceId===source.sourceId&&
+    w.sourcePath===folder.name);
+   mappedTotal+=matching.length;
+   for(const w of matching)represented.add(w.id);
+   const rows=matching.slice(0,maxWorksPerFolder).map(w=>({
+    ...toWork(w),sameRevision:w.sourceRevision?.toLowerCase()===folder.commitSha.toLowerCase()
+   }));
+   return {...folder,works:rows,totalWorks:matching.length,
+    hiddenWorks:matching.length-rows.length};
+  });
+  return {...source,folders};
+ });
+ const other=project.items.filter(w=>!represented.has(w.id));
+ const otherRows=other.slice(0,maxOtherWorks).map(w=>({
+  ...toWork(w),reason:w.sourceId?
+   "Привязка к каталогу пока не показана":"Каталог не указан"
+ }));
+ const renderedWorkIds=new Set([...sources.flatMap(s=>s.folders.flatMap(f=>f.works.map(w=>w.id))),
+  ...otherRows.map(w=>w.id)]);
+ const links=project.dependencies.filter(d=>renderedWorkIds.has(d.from)&&
+  renderedWorkIds.has(d.to)).map(d=>({from:d.from,to:d.to}));
+ return {projectId,projectName:project.name,sources,otherWorks:otherRows,
+  hiddenOtherWorks:other.length-otherRows.length,
+  sourceCount:project.sources.filter(s=>entryRepo(s)).length,
+  hiddenSources:overview.hiddenSources,
+  mappedTotal,workTotal:project.items.length,
+  stageTotal:project.stages.length,dependencyTotal:project.dependencies.length,
+  shownDependencies:links,hiddenDependencies:project.dependencies.length-links.length};
+}

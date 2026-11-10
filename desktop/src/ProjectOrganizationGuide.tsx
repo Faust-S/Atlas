@@ -1,15 +1,18 @@
 import React from "react";
-import {projectStructureGuide,folderWorkAction} from "../../src/project-organization.mjs";
+import {projectStructureGuide,projectSourcePlanProjection,folderWorkAction} from "../../src/project-organization.mjs";
+import {ProjectSourcePlanMap} from "./ProjectVisuals";
 
 // Existing project's saved GitHub observation is the only source of this view.
 // Suggested roles are explanations to review, never new project entities.
 export function ProjectOrganizationGuide({snapshot,projectId,onEdit,onRefresh,onOpenProject,
- onOpenSources,onOpenWorks,onAddRelation,busy=false}:{
+ onOpenSources,onOpenWorks,onAddRelation,onOpenTimeline,onOpenGraph,busy=false}:{
  snapshot:any;projectId:string;onEdit:(action:string)=>void;
  onRefresh:(sourceId:string)=>void;onOpenProject:(id:string)=>void;
- onOpenSources:()=>void;onOpenWorks:()=>void;onAddRelation:()=>void;busy?:boolean;
+ onOpenSources:()=>void;onOpenWorks:()=>void;onAddRelation:()=>void;
+ onOpenTimeline:()=>void;onOpenGraph:()=>void;busy?:boolean;
 }){
  const guide=projectStructureGuide(snapshot,projectId);
+ const projection=projectSourcePlanProjection(snapshot,projectId);
  const suggested=guide.nextAction;
  const hasSources=guide.sources.length>0;
  return <section className="surface atlas-project-organization" aria-label="Состав проекта и возможные следующие действия">
@@ -20,6 +23,18 @@ export function ProjectOrganizationGuide({snapshot,projectId,onEdit,onRefresh,on
    onClick={onOpenSources}>Подключить источник</button>}</div>
   {!hasSources&&<p className="minor">Подключите исходники, чтобы увидеть их каталоги и связанные проекты.
    План проекта можно составлять и без GitHub.</p>}
+  {hasSources&&<details className="atlas-source-plan-disclosure"
+   open={projection.mappedTotal>0||undefined}>
+   <summary>Схема проекта: каталоги, работы и этапы</summary>
+   <ProjectSourcePlanMap projection={projection}
+    onOpenWork={id=>onEdit("work:"+id)}
+    onEditStage={id=>onEdit("stage-edit:"+id)}
+    onSuggestFolder={(sourceId,commitSha,folder)=>
+     onEdit(folderWorkAction(sourceId,commitSha,folder))}
+    onOpenTimeline={onOpenTimeline} onOpenGraph={onOpenGraph}
+    onCreateStage={()=>onEdit("stage")}
+    onAddDependency={()=>onEdit("dep")}/>
+  </details>}
   {guide.sources.map((source:any)=><div key={source.sourceId} className="atlas-organization-source">
    <div className="atlas-organization-source-heading">
     <strong>{source.repository}</strong><span className="minor">Ветка: {source.branch||"не выбрана"}</span>
