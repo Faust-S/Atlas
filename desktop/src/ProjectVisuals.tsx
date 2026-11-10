@@ -1,5 +1,6 @@
 import React,{useEffect,useMemo,useState} from 'react';
 import {dependencyDiagram,ganttViewport,ganttFocusOffset} from './visual-layout.mjs';
+import {portfolioNetwork} from '../../src/portfolio.mjs';
 
 type CPM={durationDays:number;rows:Array<{id:string;title:string;earlyStart:number;earlyFinish:number;durationDays:number;critical:boolean;state:string;predecessors:string[];blockedBy:string[];floatDays:number}>};
 type Mode='fit'|'30'|'90';
@@ -181,5 +182,57 @@ export function ProjectDependencyDiagram({schedule,onOpenWork}:{schedule:CPM;onO
     </div>
     {display.partial&&<p className="minor">Визуально показано {display.shown} из {display.total} работ. {activeMatch?'Это окружение выбранной работы (до двух связей в каждую сторону).':'Для большого проекта найдите работу, чтобы увидеть её окружение.'} Полный список связей находится в таблице ниже.</p>}
    </>}
+ </div>;
+}
+
+/** Interactive projection of the existing portfolio dependency DAG.
+ * A planning arrow never certifies a product release or grants task execution. */
+export function PortfolioNetworkMap({snapshot,onOpenProject}:{
+ snapshot:any;onOpenProject:(projectId:string)=>void
+}){
+ const network=useMemo(()=>portfolioNetwork(snapshot),[snapshot]);
+ const markerId=React.useId().replace(/:/g,'');
+ const labels:Record<string,string>={planned:'Запланирован',active:'В работе',
+  paused:'Приостановлен',completed:'Завершён (заявлено)',cancelled:'Отменён'};
+ if(!network.links.length)return <p className="minor">Межпроектные зависимости ещё не заданы.
+  Свяжите проекты, чтобы видеть, чей результат необходим следующему продукту.</p>;
+ if(network.nodes.length>100)return <p className="minor">В портфеле больше 100 проектов.
+  Полная таблица связей находится ниже; интерактивная карта ограничена 100 узлами.</p>;
+ const byId=new Map<string,any>(network.nodes.map((node:any)=>[node.id,node]));
+ const width=Math.max(340,...network.nodes.map((node:any)=>node.x+230));
+ const height=Math.max(150,...network.nodes.map((node:any)=>node.y+104));
+ return <div className="atlas-portfolio-dependency-map" aria-label="Карта зависимостей проектов">
+  <p className="minor">Стрелка показывает плановую зависимость, а не подтверждённую передачу результата.
+   Нажмите на продукт, чтобы открыть его требования, работы и источники.</p>
+  <div className="atlas-dependency-scroll" role="region" tabIndex={0}
+   aria-label="Карта зависимостей продуктов с прокруткой">
+   <div className="atlas-dependency-layout" style={{width,height}}>
+    <svg className="atlas-dependency-lines" width={width} height={height}
+     viewBox={'0 0 '+width+' '+height} aria-hidden="true">
+     <defs><marker id={markerId} viewBox="0 0 10 10" refX="9" refY="5"
+      markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#7394bb"/>
+     </marker></defs>
+     {network.links.map((link:any)=>{
+      const from=byId.get(link.from),to=byId.get(link.to);
+      const x1=from.x+204,y1=from.y+39,x2=to.x,y2=to.y+39,middle=(x1+x2)/2;
+      return <path key={link.id} className="atlas-dependency-edge"
+       d={'M '+x1+' '+y1+' C '+middle+' '+y1+' '+middle+' '+y2+' '+x2+' '+y2}
+       markerEnd={'url(#'+markerId+')'}/>;
+     })}
+    </svg>
+    {network.nodes.map((node:any)=><button key={node.id} type="button"
+     className={'atlas-dependency-node'+(node.status==='completed'?' done':'')}
+     style={{left:node.x,top:node.y,width:204,height:78}}
+     title={node.name} aria-label={'Открыть проект: '+node.name}
+     onClick={()=>onOpenProject(node.id)}>
+     <strong>{trim(node.name,30)}</strong>
+     <small>{labels[node.status]||node.status} · требований: {node.targets}</small>
+    </button>)}
+   </div>
+  </div>
+  <p className="minor">Зависимых проектов: {network.affected}.
+   {" "}Ожидают результата предшественника: {network.pending}.
+   {" "}Заявленное завершение предшественника требует проверки: {network.needsReview}.</p>
  </div>;
 }

@@ -20,3 +20,14 @@ test("Observed GitHub owner catalog creates editable projects without a second s
  assert.match(ui,/Сохраните портфель на диск/);
  assert.match(ui,/includeDiscoveredProject\(project\.id,s\.id,repo\.name\)/);
 });
+
+test("Portfolio dependency visualisation reuses the existing DAG and opens original projects",()=>{
+ const visual=readFileSync(new URL("../desktop/src/ProjectVisuals.tsx",import.meta.url),"utf8");
+ assert.match(visual,/portfolioNetwork\(snapshot\)/);
+ assert.match(visual,/onOpenProject\(node\.id\)/);
+ assert.match(visual,/network\.links\.map/);
+ assert.match(visual,/network\.nodes\.map/);
+ assert.match(visual,/network\.nodes\.length>100/);
+ assert.match(visual,/Стрелка показывает плановую зависимость/);
+ assert.match(ui,/showDetails&&<PortfolioNetworkMap snapshot=\{data\} onOpenProject=\{id=>selectProject\(id\)\}/);
+});

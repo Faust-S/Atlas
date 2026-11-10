@@ -19,7 +19,7 @@ import {planPublicRefresh,reconcilePublicSources,publicSourceQueue} from "../../
 import {sourceReview,sourceFreshnessLabel} from "../../src/source-review.mjs";
 import {githubPortfolioCatalog,createProjectFromGitHubCatalog,githubPortfolioOverview,
  filterGithubPortfolioOverview} from "../../src/ecosystem.mjs";
-import {ProjectGantt,ProjectDependencyDiagram} from "./ProjectVisuals";
+import {ProjectGantt,ProjectDependencyDiagram,PortfolioNetworkMap} from "./ProjectVisuals";
 import {prepareImportedSnapshot} from "./import-snapshot.mjs";
 import {buildIwxaPortfolio,readIwxaPortfolio,toBase64,fromBase64} from "./iwxa-portfolio.mjs";
 import {commitWithReadback,readSavedSnapshotForReference} from "./native-save.mjs";
@@ -1067,6 +1067,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     </section>
     <section className="surface">
      <button className="text-link" onClick={()=>setShowDetails(!showDetails)}>{showDetails?"Скрыть":"Показать"} межпроектные зависимости</button>
+     {showDetails&&<PortfolioNetworkMap snapshot={data} onOpenProject={id=>selectProject(id)}/>}
      {showDetails&&<div className="table-scroll"><table><thead><tr><th>От проекта</th><th>К проекту</th><th>Условие</th><th>Действие</th></tr></thead><tbody>
       {(data.portfolioLinks||[]).map((l:any)=><tr key={l.id}><td>{data.projects.find((p:any)=>p.id===l.from)?.name}</td>
        <td>{data.projects.find((p:any)=>p.id===l.to)?.name}</td><td>{l.note||"Зависимость"}</td><td><Action onClick={()=>removePortfolioDependency(l.id)}>Удалить связь</Action></td></tr>)}</tbody></table></div>}
