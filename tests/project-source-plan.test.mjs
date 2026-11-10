@@ -217,3 +217,14 @@ test("Map expansion has a reversible visible control, without new plan state",()
  assert.match(projection,/sourceList\.sort\(/);
  assert.match(projection,/workByFolder=new Map\(\)/);
 });
+
+test("Very long diagram labels remain available without unbounded card heights",()=>{
+ const visual=read("../desktop/src/ProjectVisuals.tsx");
+ const css=read("../desktop/src/style.css");
+ assert.match(visual,/title=\{folder\.name\}/);
+ assert.match(visual,/title=\{work\.title\}/);
+ assert.match(visual,/title=\{work\.stageName\}/);
+ assert.match(visual,/title=\{previous\.title\}/);
+ assert.match(css,/\.atlas-source-plan-folder strong,[\s\S]*?-webkit-line-clamp:2;/);
+ assert.match(css,/overflow:hidden;text-overflow:ellipsis;overflow-wrap:anywhere;line-height:1\.4/);
+});

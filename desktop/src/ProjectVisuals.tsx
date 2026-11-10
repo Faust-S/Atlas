@@ -286,13 +286,14 @@ export function ProjectSourcePlanMap({projection,onOpenWork,onEditStage,onSugges
       {folder.works.length?folder.works.map((work:any)=><div
        className="atlas-source-plan-assignment" key={work.id}>
        <div className="atlas-source-plan-work">
-        <button type="button" className="text-link" onClick={()=>onOpenWork(work.id)}>
-         {work.title}</button>
+        <button type="button" className="text-link" title={work.title}
+         onClick={()=>onOpenWork(work.id)}>{work.title}</button>
         {!work.sameRevision&&<small>Работа связана с прежней редакцией исходников</small>}
         {work.predecessorTotal>0&&<details className="atlas-source-plan-dependencies">
          <summary>Ожидает {work.predecessorTotal} работ</summary>
          {work.predecessors.map((previous:any)=><button key={previous.id} type="button"
-          className="text-link" onClick={()=>onOpenWork(previous.id)}>{previous.title}</button>)}
+          className="text-link" title={previous.title}
+          onClick={()=>onOpenWork(previous.id)}>{previous.title}</button>)}
          {work.predecessorTotal>work.predecessors.length&&<button type="button"
           className="text-link" onClick={onOpenGraph}>Открыть остальные зависимости</button>}
         </details>}
@@ -300,7 +301,7 @@ export function ProjectSourcePlanMap({projection,onOpenWork,onEditStage,onSugges
        <span className="atlas-source-plan-arrow" aria-hidden="true">→</span>
        <div className="atlas-source-plan-stage">
         {work.stageId?
-         <button type="button" className="text-link"
+         <button type="button" className="text-link" title={work.stageName}
           onClick={()=>onEditStage(work.stageId)}>{work.stageName}</button>:
          <button type="button" className="action-button"
           onClick={()=>onOpenWork(work.id)}>Выбрать этап</button>}

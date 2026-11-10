@@ -686,8 +686,11 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .atlas-source-plan-stage>.action-button{min-width:0}
 .atlas-source-plan-map .text-link,.atlas-source-plan-map .action-button{
  min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere;word-break:break-word}
+.atlas-source-plan-folder strong,
 .atlas-source-plan-work>.text-link,.atlas-source-plan-stage>.text-link{
- display:block;text-align:left}
+ display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;
+ overflow:hidden;text-overflow:ellipsis;overflow-wrap:anywhere;line-height:1.4}
+.atlas-source-plan-work>.text-link,.atlas-source-plan-stage>.text-link{text-align:left}
 .atlas-source-plan-dependencies{font-size:11px;color:#657b95;min-width:0}
 .atlas-source-plan-dependencies>summary{cursor:pointer;outline-offset:2px;padding:2px 0}
 .atlas-source-plan-dependencies>.text-link{display:block;margin:4px 0;max-width:100%}
