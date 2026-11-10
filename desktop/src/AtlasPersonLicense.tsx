@@ -3,6 +3,8 @@ import {invoke} from "@tauri-apps/api/core";
 
 type License={licenseId:string;status:"ACTIVE"|"SUSPENDED"|"REVOKED"|"EXPIRED"|"STATUS_STALE";
   sequence:number;signatureVerified:true;statusVerified:true;
+  superseded:boolean;current:boolean;
+  licenseExpiresAt:string;statusValidUntil:string;
   productionActivation:false};
 type PersonView={schema:string;revision:number;productId:string;
   licenses:License[];productionActivation:false;activeSeats:0};
@@ -33,13 +35,15 @@ function describe(raw:string){
  };
  return matches[raw]??"Не удалось выполнить проверку: "+raw;
 }
-const status=(value:License["status"])=>{
- if(value==="REVOKED")return "Отозвана";
- if(value==="SUSPENDED")return "Приостановлена";
- if(value==="STATUS_STALE")return "Истёк подписанный срок подтверждения статуса";
- if(value==="EXPIRED")return "Срок лицензии истёк";
+const status=(license:License)=>{
+ if(license.status==="REVOKED")return "Отозвана";
+ if(license.superseded)return "Заменена новым выпуском";
+ if(license.status==="SUSPENDED")return "Приостановлена";
+ if(license.status==="STATUS_STALE")return "Истёк подписанный срок подтверждения статуса";
+ if(license.status==="EXPIRED")return "Срок лицензии истёк";
  return "Подписанный статус действителен";
 };
+const date=(value:string)=>new Date(value).toLocaleDateString("ru-RU");
 export function AtlasPersonLicense({enabled}:{enabled:boolean}){
  const [opened,setOpened]=useState(false);
  const [busy,setBusy]=useState(false);
@@ -66,7 +70,10 @@ export function AtlasPersonLicense({enabled}:{enabled:boolean}){
        result.view.activeSeats!==0||!Array.isArray(result.view.licenses))
       throw Error("ATLAS_PERSON_LICENSE_VIEW_INVALID");
     if(result.view.licenses.some(l=>!l.signatureVerified||!l.statusVerified||
-       l.productionActivation!==false||
+       l.productionActivation!==false||typeof l.superseded!=="boolean"||
+       typeof l.current!=="boolean"||
+       !Number.isFinite(Date.parse(l.licenseExpiresAt))||
+       !Number.isFinite(Date.parse(l.statusValidUntil))||
        !["ACTIVE","SUSPENDED","REVOKED","EXPIRED","STATUS_STALE"].includes(l.status)))
       throw Error("ATLAS_PERSON_LICENSE_ENTRY_INVALID");
     const access=await invoke<WorkspaceAccess>("atlas_person_license_workspace_access");
@@ -172,8 +179,8 @@ export function AtlasPersonLicense({enabled}:{enabled:boolean}){
            view.licenses.map((l,i)=><article key={l.licenseId}
              className="atlas-person-license-entry">
              <strong>Лицензия {i+1}</strong>
-             <span>{status(l.status)}</span>
-             <small>Подпись и статус проверены. Версия статуса: {l.sequence}.</small>
+             <span>{status(l)}</span>
+             <small>Срок лицензии: до {date(l.licenseExpiresAt)}. Подписанное подтверждение статуса: до {date(l.statusValidUntil)}. Версия статуса: {l.sequence}.</small>
            </article>)}
          <p className="minor" data-testid="atlas-person-workspace-access">
           Право WORKSPACE: {workspaceAllowed?"подтверждено подписанной лицензией и статусом":
