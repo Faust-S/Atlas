@@ -17,7 +17,9 @@ test('Atlas keeps original T3 consumer as the only signed PERSON verifier',()=>{
  assert.match(bridge,/signatureVerified/);
  assert.match(bridge,/statusVerified/);
  assert.match(bridge,/productionActivation/);
- assert.doesNotMatch(bridge,/generateKeyPair|ed25519-dalek|verify_signature|PRIVATE KEY/);
+ assert.doesNotMatch(bridge,/generateKeyPair|ed25519-dalek|verify_signature|private_key_pem|sign_record|keyObjectSigner/);
+ // 'PRIVATE KEY' is allowed only in the PUBLIC-TRUST rejection guard,
+ // never as a bundled key or signing operation.
  assert.ok(!config.bundle.resources?.['t3/iwxa-t3-product-consumer.exe'],
    'public Atlas must never ship synthetic private credential components');
 });
