@@ -80,6 +80,10 @@ export function findConnectedOwner(snapshot,locator){
 
 // All changes are ordinary Atlas snapshot changes and explicit user choices.
 // Adding a repository does not create a work, assert acceptance, or write to GitHub.
+/** @param {any} snapshot
+ * @param {any} preview
+ * @param {{name?:string,selectedRepositories?:string[]}} [options]
+ */
 export function applyPublicProjectPreview(snapshot,preview,{name="",selectedRepositories=[]}={}){
  validate(snapshot);
  if(!preview||!["repository","owner"].includes(preview.kind)||
