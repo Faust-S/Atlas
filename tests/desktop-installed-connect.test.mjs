@@ -98,3 +98,12 @@ test("Atlas 0.6 qualifies project visualization without GitHub on installed Wind
  assert.match(fixture,/type:"other"/);
  assert.doesNotMatch(universal,/write_bytes\(STORE|execute_script\(|localStorage|fake GitHub/);
 });
+
+
+test("Installed universal Atlas keeps internal project type codes out of navigation",()=>{
+ const driver=read("../desktop/tests/installed-atlas06-universal.py");
+ const main=read("../desktop/src/main.tsx");
+ assert.match(driver,/ATLAS06_UNIVERSAL_HUMAN_PROJECT_TYPE_PASS/);
+ assert.match(driver,/d\.wait_text\("Другое",35\)/);
+ assert.match(main,/PROJECT_TYPE_LABELS\[project\.type\]/);
+});

@@ -268,3 +268,16 @@ test("The overview offers its existing plan diagram in non-engineering projects"
  assert.match(css,/\.atlas-source-plan-other-list>\.atlas-source-plan-other-row/);
  assert.doesNotMatch(visual.slice(visual.indexOf("export function ProjectSourcePlanMap")),/createItem\(|mutate\(|localStorage/);
 });
+
+
+test("Project type names in navigation match the existing human-readable editor choices",()=>{
+ const {PROJECT_TYPE_LABELS,editorSpec}=await import("../src/editor.mjs");
+ const labels=["Личный","Команда","Бизнес","Разработка","Исследование",
+  "Здоровье (без медицинских записей)","Другое"];
+ const choices=editorSpec(null,"new").fields.find(field=>field.name==="type").options;
+ assert.deepEqual(choices.map(item=>item.label),labels);
+ assert.deepEqual(Object.values(PROJECT_TYPE_LABELS),labels);
+ const main=read("../desktop/src/main.tsx");
+ assert.match(main,/PROJECT_TYPE_LABELS\[project\.type\]\|\|"Другой проект"/);
+ assert.doesNotMatch(main,/<\/button> \/ \{project\.type\}/);
+});

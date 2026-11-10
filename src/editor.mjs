@@ -11,6 +11,12 @@ import {addPlanningResource,editPlanningResource,resourceChoiceOptions} from "./
 import {repoName,ownerName,branchName} from "./github-public.mjs";
 import {selectedSourceFolder} from "./project-organization.mjs";
 
+// One set of user-facing project type names for the form and navigation.
+export const PROJECT_TYPE_LABELS=Object.freeze({
+ personal:"Личный",team:"Команда",business:"Бизнес",
+ engineering:"Разработка",research:"Исследование",
+ care:"Здоровье (без медицинских записей)",other:"Другое"
+});
 const option=(value,label)=>({value:String(value),label});
 const choice=(name,label,items,value="",required=true)=>({name,label,type:"select",options:items,value,required});
 const field=(name,label,type="text",value="",required=true)=>({name,label,type,value:value??"",required});
@@ -147,7 +153,8 @@ export function editorSpec(project,action,snapshot=null){
  }
  if(action==="new")return {title:"Новый проект",fields:[
   field("name","Название проекта"),
-  choice("type","Тип проекта",["personal:Личный","team:Команда","business:Бизнес","engineering:Разработка","research:Исследование","care:Здоровье (без медицинских записей)","other:Другое"].map(s=>option(...s.split(":"))),"personal"),
+  choice("type","Тип проекта",Object.entries(PROJECT_TYPE_LABELS)
+   .map(([value,label])=>option(value,label)),"personal"),
   {...field("goal","Цель и ожидаемый результат","textarea","",false)}
  ]};
  if(!project)throw Error("Сначала выберите проект");

@@ -66,6 +66,8 @@ def qualify():
     assert d.saved_project(d.head())==expected
     v.select_project()
     d.wait_text("Схема проекта: работы и этапы",35)
+    d.wait_text("Другое",35)
+    print("ATLAS06_UNIVERSAL_HUMAN_PROJECT_TYPE_PASS",flush=True)
     d.wait_text("Работы и этапы",35)
     d.wait_text("Открыть площадку",35)
     assert d.head()==saved

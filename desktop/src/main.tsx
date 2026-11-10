@@ -3,7 +3,7 @@ import {invoke as nativeInvoke,isTauri} from "@tauri-apps/api/core";
 import {getCurrentWindow} from "@tauri-apps/api/window";
 import {empty,deserialize,serialize,editItem,removeStage,removeItem,disconnect,removeProject as dropProject} from "../../src/core.mjs";
 import {removePortfolioLink} from "../../src/portfolio.mjs";
-import {editorSpec,applyEditor,editorSelectionFields} from "../../src/editor.mjs";
+import {editorSpec,applyEditor,editorSelectionFields,PROJECT_TYPE_LABELS} from "../../src/editor.mjs";
 import {compareProject,decideChange} from "../../src/trace.mjs";
 import {projectImpact,projectNextStep} from "../../src/impact.mjs";
 import {buildPortfolioCommand,filterPortfolioCommand} from "../../src/portfolio-command.mjs";
@@ -1119,7 +1119,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
        <td>{data.projects.find((p:any)=>p.id===l.to)?.name}</td><td>{l.note||"Зависимость"}</td><td><Action onClick={()=>removePortfolioDependency(l.id)}>Удалить связь</Action></td></tr>)}</tbody></table></div>}
     </section>
    </>:<>
-    <div className="page-heading"><div><small><button className="breadcrumb" onClick={()=>selectProject(null)}>Портфель</button> / {project.type}</small>
+    <div className="page-heading"><div><small><button className="breadcrumb" onClick={()=>selectProject(null)}>Портфель</button> / {PROJECT_TYPE_LABELS[project.type]||"Другой проект"}</small>
      <h1>{project.name}</h1><p>{project.goal||"Цель пока не определена"}</p></div>
      <div className="button-row"><Badge>{statuses[project.status]||project.status}</Badge><Action disabled={busy||dirty||!persisted||!!editor} onClick={()=>showSavedReference(project.id)} title="Ctrl+Alt+P · Только сохранённая редакция">Ссылка на проект</Action><Action onClick={()=>openEditor("project-edit")}>Редактировать проект</Action></div>
     </div>
