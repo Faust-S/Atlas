@@ -10,6 +10,7 @@ export function ProjectOrganizationGuide({snapshot,projectId,onEdit,onRefresh,on
  onOpenSources:()=>void;onOpenWorks:()=>void;onAddRelation:()=>void;busy?:boolean;
 }){
  const guide=projectStructureGuide(snapshot,projectId);
+ const suggested=guide.nextAction;
  const hasSources=guide.sources.length>0;
  return <section className="surface atlas-project-organization" aria-label="Состав проекта и возможные следующие действия">
   <div className="section-heading"><div>
@@ -72,10 +73,10 @@ export function ProjectOrganizationGuide({snapshot,projectId,onEdit,onRefresh,on
    <button type="button" className="action-button" onClick={onAddRelation} disabled={busy}>
     Указать зависимость между проектами</button>
   </div>}
-  {guide.nextAction&&<div className="atlas-organization-next">
+  {suggested&&<div className="atlas-organization-next">
    <span className="minor">Что можно сделать дальше</span>
    <button type="button" className="action-button" disabled={busy}
-    onClick={()=>onEdit(guide.nextAction.action)}>{guide.nextAction.title}</button>
+    onClick={()=>onEdit(suggested.action)}>{suggested.title}</button>
   </div>}
   <p className="minor">Работы и связи появляются только после вашего выбора.
    Открытие каталогов и просмотр предложений план не меняют.</p>
