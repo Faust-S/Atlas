@@ -215,6 +215,11 @@ jobs:
         run: |
           python -m py_compile desktop/tests/installed-atlas05-github.py
           python desktop/tests/installed-atlas05-github.py
+      - name: Qualify selected Atlas data location, native GUI and preserved uninstall
+        if: github.ref_name == 'work/2026-11-09-atlas-0-5'
+        shell: pwsh
+        timeout-minutes: 8
+        run: ./desktop/installer/qualify-setup-core-lifecycle.ps1
       - name: Checkout real Center consumer at audited revision
         if: github.ref_name == 'work/2026-11-04-atlas-0-3'
         uses: actions/checkout@v4

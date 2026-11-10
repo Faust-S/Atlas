@@ -24,7 +24,9 @@ from pywinauto import Desktop, keyboard, mouse
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 APP = Path(os.environ["ATLAS_INSTALLED_EXE"])
-STORE = Path(os.environ["LOCALAPPDATA"]) / "ru.iwxa.atlas" / "atlas-store-v1"
+MIGRATED_DATA = os.environ.get("ATLAS_SETUP_MIGRATED_DATA_ROOT")
+STORE = (Path(MIGRATED_DATA) if MIGRATED_DATA else
+         Path(os.environ["LOCALAPPDATA"]) / "ru.iwxa.atlas") / "atlas-store-v1"
 OUT = Path("desktop/tests/visual-evidence")
 OUT.mkdir(parents=True, exist_ok=True)
 REPO = "Faust-S/Atlas"
@@ -516,6 +518,50 @@ def verify_requirement_from_source(saved):
     screenshot("plan-fact-target-readonly")
     print("ATLAS05_PLAN_FACT_FRESHNESS_TARGET_JUMP_NATIVE_PASS", flush=True)
 
+
+if MIGRATED_DATA:
+    # Qualify real GUI write/readback in the data directory selected by Setup Core.
+    # Neither the original location nor the installed application is mocked.
+    initial = head()
+    before = project(initial)
+    title = "IWXA Setup Core relocated data readback"
+    assert not any(t["title"] == title for t in before.get("targets", []))
+    try:
+        launch()
+        click_button("Project 0")
+        wait_title("Project 0 — Обзор")
+        click_button("＋ Требование")
+        wait_title("Форма: Ожидаемый результат")
+        set_text("Название требования", title)
+        set_text("Критерий выполнения",
+                 "Saved after IWXA Setup Core selected a new data directory")
+        click_button("Применить к черновику")
+        assert head() == initial, "Source folder changed before explicit Save"
+        click_button("Сохранить")
+        deadline = time.monotonic() + 45
+        while time.monotonic() < deadline:
+            saved = head()
+            if saved["generation"] != initial["generation"]:
+                break
+            time.sleep(0.25)
+        else:
+            screenshot("setup-core-selected-data-save-timeout")
+            raise AssertionError("Atlas did not write to the Setup Core data directory")
+        after = project(saved)
+        assert len(after.get("targets", [])) == len(before.get("targets", [])) + 1
+        assert any(t["title"] == title for t in after.get("targets", []))
+        stop()
+        launch()
+        assert head() == saved, "Selected Setup Core data directory lost after restart"
+        screenshot("setup-core-selected-data-reopened")
+        print("ATLAS05_SETUP_CORE_SELECTED_DATA_GUI_WRITE_RESTART_PASS", flush=True)
+    except Exception as exc:
+        print("ATLAS05_SETUP_CORE_SELECTED_DATA_HOLD " + repr(exc), flush=True)
+        screenshot("setup-core-selected-data-failure")
+        raise
+    finally:
+        stop()
+    sys.exit(0)
 
 initial = head()
 assert len(initial["projects"]) == 120, "First qualify installed 120-project portfolio"

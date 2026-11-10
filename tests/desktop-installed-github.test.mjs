@@ -16,6 +16,8 @@ test("installed GitHub acceptance uses real native GUI, remote public receipt an
  assert.match(script,/ATLAS05_GITHUB_REQUIREMENT_MANUAL_FACT_NATIVE_PASS/);
  assert.match(script,/ATLAS05_GITHUB_REQUIREMENT_SOURCE_LINK_RESTART_PASS/);
  assert.match(script,/ATLAS05_PLAN_FACT_FRESHNESS_TARGET_JUMP_NATIVE_PASS/);
+ assert.match(script,/ATLAS05_SETUP_CORE_SELECTED_DATA_GUI_WRITE_RESTART_PASS/);
+ assert.match(script,/ATLAS_SETUP_MIGRATED_DATA_ROOT/);
  assert.match(script,/Редакция совпадает; факт остаётся заявлением/);
  assert.match(script,/Viewing source freshness wrote data without user consent/);
  assert.match(script,/Navigating to the source-linked requirement changed saved data/);
