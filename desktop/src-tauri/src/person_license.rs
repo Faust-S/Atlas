@@ -132,12 +132,81 @@ pub async fn atlas_person_license_read(app:AppHandle)->Result<Value,String>{
     }
     Ok(value)
 }
+#[cfg(windows)]
+fn install_original_owner_public_trust(app:&AppHandle)->Result<(),String>{
+    use std::fs::{self,OpenOptions};
+    use std::io::Write;
+    // Public T3 verifier policy is a Setup Core resource, never supplied
+    // by an incoming license .iwxa. It is installed once before enrollment.
+    let original=app.path().resource_dir()
+        .map_err(|_|"ATLAS_PERSON_RESOURCE_DIR_UNAVAILABLE".to_string())?
+        .join("t3").join("publisher-person-trust.json");
+    let local=root(app)?.join("publisher-person-trust.json");
+    if local.exists(){
+        let info=fs::symlink_metadata(&local)
+            .map_err(|_|"ATLAS_PERSON_LOCAL_TRUST_READ_FAILED".to_string())?;
+        if !info.is_file()||info.file_type().is_symlink(){
+            return Err("ATLAS_PERSON_LOCAL_TRUST_NOT_REGULAR".into());
+        }
+        if original.exists(){
+            let recorded=fs::read(&local)
+                .map_err(|_|"ATLAS_PERSON_LOCAL_TRUST_READ_FAILED".to_string())?;
+            let installed=fs::read(&original)
+                .map_err(|_|"ATLAS_PERSON_SETUP_TRUST_READ_FAILED".to_string())?;
+            if recorded!=installed{
+                return Err("ATLAS_PERSON_SETUP_TRUST_CHANGED_REQUIRES_REVIEW".into());
+            }
+        }
+        return Ok(());
+    }
+    let meta=fs::symlink_metadata(&original)
+        .map_err(|_|"ATLAS_PERSON_PREINSTALLED_TRUST_MISSING".to_string())?;
+    if !meta.is_file()||meta.file_type().is_symlink()||
+       meta.len()<10||meta.len()>1024*1024{
+        return Err("ATLAS_PERSON_SETUP_TRUST_FILE_INVALID".into());
+    }
+    let bytes=fs::read(&original)
+        .map_err(|_|"ATLAS_PERSON_SETUP_TRUST_READ_FAILED".to_string())?;
+    if bytes.windows(11).any(|x|x==b"PRIVATE KEY"){
+        return Err("ATLAS_PERSON_SETUP_TRUST_PRIVATE_MATERIAL_DENIED".into());
+    }
+    let trust:Value=serde_json::from_slice(&bytes)
+        .map_err(|_|"ATLAS_PERSON_SETUP_TRUST_JSON_INVALID".to_string())?;
+    if trust.pointer("/policy/environment").and_then(Value::as_str)!=Some("PRODUCTION")||
+       trust.pointer("/policy/keys").and_then(Value::as_object).is_none()||
+       !trust.pointer("/productLicenseIssuers")
+         .and_then(Value::as_object).is_some_and(|issuers|
+            issuers.values().any(|v|v.get("productIds")
+              .and_then(Value::as_array).is_some_and(|ids|
+                ids.iter().any(|p|p.as_str()==Some(PRODUCT))))) {
+        return Err("ATLAS_PERSON_SETUP_TRUST_SCOPE_INVALID".into());
+    }
+    let dest=root(app)?;
+    fs::create_dir_all(&dest)
+        .map_err(|_|"ATLAS_PERSON_LOCAL_TRUST_DIRECTORY_FAILED".to_string())?;
+    let mut output=OpenOptions::new().write(true).create_new(true).open(&local)
+        .map_err(|_|"ATLAS_PERSON_LOCAL_TRUST_INSTALL_FAILED".to_string())?;
+    output.write_all(&bytes)
+        .map_err(|_|"ATLAS_PERSON_LOCAL_TRUST_INSTALL_FAILED".to_string())?;
+    output.sync_all()
+        .map_err(|_|"ATLAS_PERSON_LOCAL_TRUST_SYNC_FAILED".to_string())?;
+    let readback=fs::read(&local)
+        .map_err(|_|"ATLAS_PERSON_LOCAL_TRUST_READBACK_FAILED".to_string())?;
+    if readback!=bytes{return Err("ATLAS_PERSON_LOCAL_TRUST_READBACK_FAILED".into());}
+    Ok(())
+}
+#[cfg(not(windows))]
+fn install_original_owner_public_trust(_app:&AppHandle)->Result<(),String>{
+    Err("ATLAS_PERSON_WINDOWS_REQUIRED".into())
+}
+
 #[tauri::command]
 pub async fn atlas_person_license_enroll(app:AppHandle,person_id:String)
     ->Result<Value,String>{
     if !identifier(&person_id)||person_id.starts_with("holder:"){
         return Err("ATLAS_PERSON_ID_INVALID".into());
     }
+    install_original_owner_public_trust(&app)?;
     receipt(execute(app,"person-local-enroll",vec![person_id]).await?,
         "PERSON_ENROLLED")
 }
