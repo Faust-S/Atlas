@@ -67,3 +67,18 @@ test("The user can switch development branches without silently accepting stale 
  assert.match(ui,/Изучите выбранную ветку перед подключением/);
  assert.match(ui,/branchChoice\.trim\(\)!==\(preview\.branch\|\|""\)/);
 });
+
+test("Atlas 0.6 visual stress uses real installed .iwxa import and checks source, stage and dependency navigation",()=>{
+ const script=read("../desktop/tests/installed-atlas06-visual-scale.py");
+ assert.match(workflow,/atlas06-visual-portfolio\.mjs/);
+ assert.match(workflow,/installed-atlas06-visual-scale\.py/);
+ assert.match(script,/choose_archive\(\)/);
+ assert.match(script,/Заменить портфель в черновике/);
+ assert.match(script,/ATLAS06_VISUAL_IWXA_NATIVE_SAVE_PASS/);
+ assert.match(script,/ATLAS06_VISUAL_LINKED_SOURCE_FIRST_PASS/);
+ assert.match(script,/ATLAS06_VISUAL_LONG_TITLES_NARROW_PASS/);
+ assert.match(script,/ATLAS06_VISUAL_RECORDED_DEPENDENCY_NAVIGATION_PASS/);
+ assert.match(script,/assert d\.head\(\)==saved/);
+ assert.match(installed,/if __name__=="__main__":/);
+ assert.doesNotMatch(script,/invoke\(|execute_script\(|setItem\(|write_bytes\(STORE/);
+});

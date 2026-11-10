@@ -453,11 +453,12 @@ def qualify():
     print("ATLAS06_CONNECT_BRANCH_TREE_RESTART_PASS",flush=True)
     verify_refresh(second,project)
 
-try:
-    qualify()
-except Exception as exc:
-    print("ATLAS06_CONNECT_WINDOWS_HOLD "+repr(exc),flush=True)
-    screenshot("failure")
-    raise
-finally:
-    stop()
+if __name__=="__main__":
+    try:
+        qualify()
+    except Exception as exc:
+        print("ATLAS06_CONNECT_WINDOWS_HOLD "+repr(exc),flush=True)
+        screenshot("failure")
+        raise
+    finally:
+        stop()
