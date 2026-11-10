@@ -24,6 +24,10 @@ const isSha=x=>typeof x==="string"&&/^[a-f0-9]{40}$/i.test(x);
 // A single bounded read for a repository; an inaccessible tree does not erase
 // a successfully observed repository. Every proposed component is a real root
 // entry, never a fabricated work item, requirement, or readiness assertion.
+/** @param {string} input
+ * @param {any} [fetcher]
+ * @param {{signal?:AbortSignal,branch?:string|null}} [options]
+ */
 export async function inspectPublicProject(input,fetcher=globalThis.fetch,{signal,branch=null}={}){
  const entry=projectConnectionAddress(input);
  if(entry.kind==="owner"){
