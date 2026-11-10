@@ -9,6 +9,11 @@ rust-version = "1.90"
 name = "iwxa_atlas"
 crate-type = ["lib", "cdylib", "staticlib"]
 
+[features]
+# Only privately packaged Atlas with the original compiled T3 consumer is
+# allowed to enforce PERSON licensing. Public Atlas remains unmodified/free.
+person-license-enforced = []
+
 [build-dependencies]
 tauri-build = "=2.7.2"
 

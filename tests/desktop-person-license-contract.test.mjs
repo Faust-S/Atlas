@@ -61,3 +61,21 @@ test('Setup Core includes original private T3 only by explicit verified local op
  assert.match(bridge,/super::setup_core_data_root\(\)/);
  assert.doesNotMatch(config.identifier,/publisher|admin-center/);
 });
+
+
+test('licensed Atlas native writes require original live T3 feature admission when explicitly compiled',()=>{
+ const cargo=read('desktop/src-tauri/Cargo.toml');
+ assert.match(cargo,/person-license-enforced = \[\]/);
+ assert.match(bridge,/person-local-authorize/);
+ assert.match(bridge,/PERSON_AUTHORIZE/);
+ assert.match(bridge,/fn verified_workspace_admission\(/);
+ assert.match(bridge,/signatureVerified/);
+ assert.match(bridge,/statusVerified/);
+ assert.match(bridge,/#\[cfg\(feature="person-license-enforced"\)\]/);
+ assert.match(bridge,/ATLAS_PERSON_WORKSPACE_LICENSE_REQUIRED/);
+ assert.match(native,/fn atlas_commit\([\s\S]*?person_license::require_atlas_workspace\(&app\)/);
+ assert.match(native,/fn atlas_restore_history\([\s\S]*?person_license::require_atlas_workspace\(&app\)/);
+ assert.match(native,/fn atlas_restore_previous\([\s\S]*?person_license::require_atlas_workspace\(&app\)/);
+ assert.match(native,/person_license::atlas_person_license_workspace_access/);
+ assert.doesNotMatch(bridge,/verify\(|ed25519_dalek|create_keypair/);
+});

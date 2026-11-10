@@ -429,6 +429,7 @@ fn commit_root(root:&Path,expected_generation:&str,snapshot:Value)->Result<Write
 }
 #[tauri::command]
 fn atlas_commit(app:AppHandle,expected_generation:String,snapshot:Value)->Result<WriteResult,String>{
+    person_license::require_atlas_workspace(&app)?;
     commit_root(&path_for(&app)?,&expected_generation,snapshot)
 }
 // Recheck the native generation AFTER the file dialog returns; the user may
@@ -639,11 +640,13 @@ fn restore_history_root(
 fn atlas_restore_history(
     app: AppHandle, expected_generation: String, history_generation: String,
 ) -> Result<OpenResult, String> {
+    person_license::require_atlas_workspace(&app)?;
     restore_history_root(&path_for(&app)?, &expected_generation, &history_generation)
 }
 
 #[tauri::command]
 fn atlas_restore_previous(app:AppHandle)->Result<OpenResult,String>{
+    person_license::require_atlas_workspace(&app)?;
     restore_root(&path_for(&app)?)
 }
 
@@ -900,7 +903,8 @@ pub fn run(){
             person_license::atlas_person_license_capabilities,
             person_license::atlas_person_license_read,
             person_license::atlas_person_license_enroll,
-            person_license::atlas_person_license_import
+            person_license::atlas_person_license_import,
+            person_license::atlas_person_license_workspace_access
         ])
         .run(tauri::generate_context!())
         .expect("IWXA Atlas desktop window could not be started");

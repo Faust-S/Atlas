@@ -61,7 +61,8 @@ fn run(app:&AppHandle,action:&str,extra:&[String])->Result<Value,String>{
     let file=binary(app)?;
     let root=root(app)?;
     if !["person-local-capabilities","person-local-read",
-         "person-local-receive","person-local-enroll"].contains(&action)
+         "person-local-receive","person-local-enroll",
+         "person-local-authorize"].contains(&action)
        ||extra.len()>1 || extra.iter().any(|x|x.len()>4096||x.chars().any(char::is_control)){
         return Err("ATLAS_PERSON_T3_ARGUMENTS_INVALID".into());
     }
@@ -167,6 +168,45 @@ pub async fn atlas_person_license_import(app:AppHandle)
     }
     Ok(Some(result))
 }
+fn verified_workspace_admission(value:Value)->Result<Value,String>{
+    let value=receipt(value,"PERSON_AUTHORIZE")?;
+    if value.get("productId").and_then(Value::as_str)!=Some(PRODUCT)||
+       value.get("featureId").and_then(Value::as_str)!=Some("WORKSPACE")||
+       value.get("permitted").and_then(Value::as_bool).is_none() {
+        return Err("ATLAS_PERSON_WORKSPACE_ADMISSION_INVALID".into());
+    }
+    if value.get("permitted")==Some(&Value::Bool(true))&&
+       (value.get("signatureVerified")!=Some(&Value::Bool(true))||
+        value.get("statusVerified")!=Some(&Value::Bool(true))||
+        !value.get("licenseId").and_then(Value::as_str).is_some_and(identifier)) {
+        return Err("ATLAS_PERSON_WORKSPACE_PROOF_REQUIRED".into());
+    }
+    Ok(value)
+}
+#[tauri::command]
+pub async fn atlas_person_license_workspace_access(app:AppHandle)
+    ->Result<Value,String>{
+    verified_workspace_admission(
+        execute(app,"person-local-authorize",vec!["WORKSPACE".into()]).await?
+    )
+}
+// This does not alter normal public Atlas. The PRIVATE Windows package
+// explicitly compiles the native program with person-license-enforced, then
+// bundles the ORIGINAL T3 Consumer. The check executes at the storage write
+// boundary, not in React where it could be bypassed by direct IPC.
+#[cfg(feature="person-license-enforced")]
+pub fn require_atlas_workspace(app:&AppHandle)->Result<(),String>{
+    let value=verified_workspace_admission(
+        run(app,"person-local-authorize",&["WORKSPACE".into()])?
+    )?;
+    if value.get("permitted")!=Some(&Value::Bool(true)){
+        return Err("ATLAS_PERSON_WORKSPACE_LICENSE_REQUIRED".into());
+    }
+    Ok(())
+}
+#[cfg(not(feature="person-license-enforced"))]
+pub fn require_atlas_workspace(_app:&AppHandle)->Result<(),String>{Ok(())}
+
 #[cfg(test)]
 mod tests {
     use super::*;
