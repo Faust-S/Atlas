@@ -41,6 +41,29 @@ def snapshot_from_archive():
     assert len(project["dependencies"])==2
     return project
 
+def open_editor_by_visible_control(label):
+    # Physical click is first, and the native window title is the oracle.
+    # If Windows/WebView2 changed focus during scrolling, use ordinary
+    # keyboard activation of the same real visible control. Never invoke
+    # an internal API, mutate a Store, or claim PASS from UIA alone.
+    control=v.find_control(label,types={"Button"})
+    rect=control.rectangle()
+    print("ATLAS06_UNIVERSAL_EDITOR_CLICK "+label+" "+repr((rect.left,rect.top,rect.right,rect.bottom)),flush=True)
+    d.activate()
+    control.click_input()
+    until=time.monotonic()+6
+    while time.monotonic()<until:
+        if "Форма:" in win32gui.GetWindowText(d.handle):
+            return
+        time.sleep(0.2)
+    v.capture("universal-editor-first-click-no-form")
+    control=v.find_control(label,types={"Button"})
+    d.activate()
+    control.set_focus()
+    keyboard.send_keys("{ENTER}")
+    d.window_title_contains("Форма:",18)
+    print("ATLAS06_UNIVERSAL_EDITOR_KEYBOARD_RETRY_USED "+label,flush=True)
+
 def qualify():
     expected=snapshot_from_archive()
     baseline=d.head()
@@ -87,15 +110,11 @@ def qualify():
     print("ATLAS06_UNIVERSAL_DEPENDENCY_DETAILS_PASS",flush=True)
 
     # Open the actual work and stage editors; no form is submitted.
-    work=v.find_control("Открыть площадку",types={"Button"})
-    work.click_input()
-    d.window_title_contains("Форма:",25)
+    open_editor_by_visible_control("Открыть площадку")
     assert d.head()==saved
     keyboard.send_keys("{ESC}")
     v.await_no_form()
-    stage=v.find_control("Проведение",types={"Button"})
-    stage.click_input()
-    d.window_title_contains("Форма:",25)
+    open_editor_by_visible_control("Проведение")
     assert d.head()==saved
     keyboard.send_keys("{ESC}")
     v.await_no_form()

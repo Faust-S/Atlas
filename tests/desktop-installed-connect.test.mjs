@@ -107,3 +107,16 @@ test("Installed universal Atlas keeps internal project type codes out of navigat
  assert.match(driver,/d\.wait_text\("Другое",35\)/);
  assert.match(main,/PROJECT_TYPE_LABELS\[project\.type\]/);
 });
+
+
+test("Installed universal editor uses physical input and explicit native title readback",()=>{
+ const script=read("../desktop/tests/installed-atlas06-universal.py");
+ const visual=read("../desktop/tests/installed-atlas06-visual-scale.py");
+ assert.match(script,/def open_editor_by_visible_control\(label\):/);
+ assert.match(script,/control\.click_input\(\)/);
+ assert.match(script,/control\.set_focus\(\)/);
+ assert.match(script,/keyboard\.send_keys\("\{ENTER\}"\)/);
+ assert.match(script,/d\.window_title_contains\("Форма:",18\)/);
+ assert.match(visual,/A control already on screen must be used in place/);
+ assert.doesNotMatch(script,/execute_script\(|invoke\(|write_bytes\(STORE/);
+});

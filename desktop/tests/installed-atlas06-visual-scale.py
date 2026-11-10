@@ -49,9 +49,19 @@ def find_control(name,types=None,scroll=True):
         mouse.scroll(coords=(bounds[0]+min(505,bounds[2]-bounds[0]-110),
                              bounds[1]+min(505,bounds[3]-bounds[1]-85)),
                      wheel_dist=distance)
+    # A control already on screen must be used in place. Scrolling the page
+    # to the beginning before every click can invalidate WebView2 UIA layout
+    # coordinates between focus and physical input.
     if scroll:
+        current=win32gui.GetWindowRect(d.handle)
+        for e in d.window().descendants():
+            shown=str(e.window_text() or "")
+            if (named(shown) and e.is_visible() and e.is_enabled()
+                and (types is None or e.element_info.control_type in types)
+                and rectangle_in_workspace(e.rectangle(),current)):
+                return e
         d.activate()
-        scroll_at(win32gui.GetWindowRect(d.handle),30)
+        scroll_at(current,30)
         time.sleep(0.2)
     end=time.monotonic()+35
     attempts=0
