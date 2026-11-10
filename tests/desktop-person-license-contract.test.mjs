@@ -38,7 +38,9 @@ test('PERSON consent and public trust remain distinct from archive import',()=>{
  assert.match(ui,/atlas_person_license_enroll/);
  assert.match(ui,/atlas_person_license_import/);
  assert.match(ui,/Подпись и статус проверены T3/);
- assert.match(ui,/не включает[\s\S]*?дополнительные функции автоматически/);
+ assert.match(ui,/Право WORKSPACE/);
+ assert.match(ui,/не подтверждено; лицензируемая сборка не разрешит изменения портфеля/);
+ assert.match(ui,/atlas_person_license_workspace_access/);
  assert.match(main,/!embedded&&<AtlasPersonLicense enabled=\{native\}/);
  assert.doesNotMatch(ui,/localStorage|sessionStorage|privateKey|createSigner/);
 });
