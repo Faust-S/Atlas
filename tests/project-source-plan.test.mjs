@@ -116,7 +116,7 @@ test("Atlas uses its existing editors, schedule, and dependency graph from a nav
  assert.match(visual,/onOpenGraph/);
  assert.match(visual,/onAddDependency/);
  assert.match(visual,/source\.status==="current"/);
- assert.match(guide,/projectSourcePlanProjection\(snapshot,projectId\)/);
+ assert.match(guide,/projectSourcePlanProjection\(snapshot,projectId,moreLinks\?/);
  assert.match(guide,/open=\{projection\.mappedTotal>0\|\|linkedFolderWorks\|\|undefined\}/);
  assert.match(guide,/onOpenWork=\{id=>onEdit\("work:"\+id\)\}/);
  assert.match(guide,/onEditStage=\{id=>onEdit\("stage-edit:"\+id\)\}/);
