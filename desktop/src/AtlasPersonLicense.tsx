@@ -1,7 +1,7 @@
 import React,{useEffect,useRef,useState} from "react";
 import {invoke} from "@tauri-apps/api/core";
 
-type License={licenseId:string;status:"ACTIVE"|"SUSPENDED"|"REVOKED";
+type License={licenseId:string;status:"ACTIVE"|"SUSPENDED"|"REVOKED"|"EXPIRED"|"STATUS_STALE";
   sequence:number;signatureVerified:true;statusVerified:true;
   productionActivation:false};
 type PersonView={schema:string;revision:number;productId:string;
@@ -9,6 +9,9 @@ type PersonView={schema:string;revision:number;productId:string;
 type HostResult={operation:string;productionActivation:false;activeSeats:0;
   view?:PersonView;signatureVerified?:boolean;statusVerified?:boolean;
   outcome?:string;status?:string};
+type WorkspaceAccess={operation:"PERSON_AUTHORIZE";productId:string;featureId:string;
+  permitted:boolean;signatureVerified:boolean;statusVerified:boolean;
+  productionActivation:false;activeSeats:0};
 
 const code=(error:unknown)=>error instanceof Error?error.message:String(error);
 function describe(raw:string){
@@ -21,6 +24,7 @@ function describe(raw:string){
   PERSON_STATUS_ROLLBACK_DENIED:"Этот пакет содержит более старый статус лицензии. Сохранённые права не изменены.",
   PERSON_STATUS_STALE:"Срок подтверждения лицензии истёк. Попросите у издателя обновлённый пакет.",
   PERSON_LICENSE_NOT_CURRENT:"Срок лицензии истёк. Необходимо продление.",
+  ATLAS_PERSON_WORKSPACE_LICENSE_REQUIRED:"Для изменения портфеля необходима действующая подписанная лицензия с правом WORKSPACE.",
   PERSON_RECIPIENT_SUBJECT_MISMATCH:"Лицензия предназначена другому получателю.",
   PERSON_LICENSE_PERSON_MISMATCH:"Лицензия предназначена другому получателю.",
   PERSON_LICENSE_PRODUCT_MISMATCH:"Лицензия выдана для другой программы.",
@@ -32,6 +36,8 @@ function describe(raw:string){
 const status=(value:License["status"])=>{
  if(value==="REVOKED")return "Отозвана";
  if(value==="SUSPENDED")return "Приостановлена";
+ if(value==="STATUS_STALE")return "Истёк подписанный срок подтверждения статуса";
+ if(value==="EXPIRED")return "Срок лицензии истёк";
  return "Подписанный статус действителен";
 };
 export function AtlasPersonLicense({enabled}:{enabled:boolean}){
@@ -40,6 +46,7 @@ export function AtlasPersonLicense({enabled}:{enabled:boolean}){
  const [needsIdentity,setNeedsIdentity]=useState(false);
  const [personId,setPersonId]=useState("");
  const [view,setView]=useState<PersonView|null>(null);
+ const [workspaceAllowed,setWorkspaceAllowed]=useState(false);
  const [notice,setNotice]=useState("");
  const [failure,setFailure]=useState("");
  const closeRef=useRef<HTMLButtonElement|null>(null);
@@ -60,11 +67,19 @@ export function AtlasPersonLicense({enabled}:{enabled:boolean}){
       throw Error("ATLAS_PERSON_LICENSE_VIEW_INVALID");
     if(result.view.licenses.some(l=>!l.signatureVerified||!l.statusVerified||
        l.productionActivation!==false||
-       !["ACTIVE","SUSPENDED","REVOKED"].includes(l.status)))
+       !["ACTIVE","SUSPENDED","REVOKED","EXPIRED","STATUS_STALE"].includes(l.status)))
       throw Error("ATLAS_PERSON_LICENSE_ENTRY_INVALID");
+    const access=await invoke<WorkspaceAccess>("atlas_person_license_workspace_access");
+    if(access?.operation!=="PERSON_AUTHORIZE"||access.productId!=="IWXA_ATLAS"||
+       access.featureId!=="WORKSPACE"||typeof access.permitted!=="boolean"||
+       access.productionActivation!==false||access.activeSeats!==0||
+       (access.permitted&&(!access.signatureVerified||!access.statusVerified)))
+      throw Error("ATLAS_PERSON_WORKSPACE_ADMISSION_INVALID");
+    setWorkspaceAllowed(access.permitted);
     setView(result.view);
   }catch(e){
     setView(null);
+    setWorkspaceAllowed(false);
     const raw=code(e);
     setNeedsIdentity(raw.includes("PERSON_RECIPIENT_NOT_ENROLLED"));
     setFailure(describe(raw));
@@ -160,9 +175,11 @@ export function AtlasPersonLicense({enabled}:{enabled:boolean}){
              <span>{status(l.status)}</span>
              <small>Подпись и статус проверены. Версия статуса: {l.sequence}.</small>
            </article>)}
-         <p className="minor">Сохранение подписанного документа не включает
-           дополнительные функции автоматически. Доступ определяется программой
-           после отдельной проверки условий лицензии.</p>
+         <p className="minor" data-testid="atlas-person-workspace-access">
+          Право WORKSPACE: {workspaceAllowed?"подтверждено подписанной лицензией и статусом":
+            "не подтверждено; лицензируемая сборка не разрешит изменения портфеля"}.
+          Это локальная проверка, а не подтверждение коммерческого издателя
+          или права на облачные ресурсы.</p>
        </div>}
        <footer className="atlas-person-license-footer">
          <button type="button" className="action-button"
