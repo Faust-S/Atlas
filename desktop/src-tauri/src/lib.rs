@@ -77,9 +77,54 @@ fn check_file_size(size: usize, label: &str) -> Result<(), String> {
     }
     Ok(())
 }
+// The pinned IWXA Setup Core owns the user's selected data folder. Previous
+// NSIS installations have no Setup Core registry key and keep their own store.
+#[cfg(windows)]
+fn setup_core_data_root() -> Result<Option<PathBuf>, String> {
+    use std::{ffi::OsString, os::windows::ffi::OsStringExt};
+    use windows_sys::Win32::Foundation::{ERROR_FILE_NOT_FOUND, ERROR_PATH_NOT_FOUND};
+    use windows_sys::Win32::System::Registry::{RegGetValueW, HKEY_CURRENT_USER, RRF_RT_REG_SZ};
+    let key: Vec<u16> = "Software\\IWXA\\SetupCore\\Products\\iwxa.atlas\0".encode_utf16().collect();
+    let value: Vec<u16> = "DataLocation\0".encode_utf16().collect();
+    let mut bytes = 0u32;
+    let status = unsafe {
+        RegGetValueW(HKEY_CURRENT_USER, key.as_ptr(), value.as_ptr(), RRF_RT_REG_SZ,
+            std::ptr::null_mut(), std::ptr::null_mut(), &mut bytes)
+    };
+    if status == ERROR_FILE_NOT_FOUND || status == ERROR_PATH_NOT_FOUND { return Ok(None); }
+    if status != 0 || bytes < 4 || bytes > 32768 || bytes % 2 != 0 {
+        return Err("Недоступна зарегистрированная папка данных IWXA Setup Core".into());
+    }
+    let mut wide = vec![0u16; bytes as usize / 2];
+    let status = unsafe {
+        RegGetValueW(HKEY_CURRENT_USER, key.as_ptr(), value.as_ptr(), RRF_RT_REG_SZ,
+            std::ptr::null_mut(), wide.as_mut_ptr().cast(), &mut bytes)
+    };
+    if status != 0 || bytes % 2 != 0 || bytes < 4 {
+        return Err("Не удалось прочитать расположение данных IWXA Setup Core".into());
+    }
+    let len = bytes as usize / 2;
+    let text = &wide[..len];
+    let terminator = text.iter().position(|&c| c == 0)
+        .ok_or("Путь к данным IWXA Setup Core не завершён")?;
+    if terminator != len - 1 || terminator == 0 {
+        return Err("Некорректная папка данных IWXA Setup Core".into());
+    }
+    let root = PathBuf::from(OsString::from_wide(&text[..terminator]));
+    if !root.is_absolute() || root.parent().is_none() {
+        return Err("Некорректный абсолютный путь данных IWXA Setup Core".into());
+    }
+    Ok(Some(root))
+}
+
 fn path_for(app: &AppHandle) -> Result<PathBuf, String> {
-    app.path().app_local_data_dir().map(|p| p.join("atlas-store-v1"))
-        .map_err(|e| err("Недоступен каталог данных Atlas", e))
+    let original = app.path().app_local_data_dir()
+        .map_err(|e| err("Недоступен каталог данных Atlas", e))?;
+    #[cfg(windows)]
+    let root = setup_core_data_root()?.unwrap_or(original);
+    #[cfg(not(windows))]
+    let root = original;
+    Ok(root.join("atlas-store-v1"))
 }
 fn ensure_dirs(root: &Path) -> Result<(), String> {
     for dir in [root.to_path_buf(), root.join("blocks"), root.join("history")] {

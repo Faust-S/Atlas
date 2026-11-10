@@ -52,16 +52,16 @@ test("Windows ICO is exact Agent icon with only background RGB recolored",()=>{
  assert.equal(gitBlobSha(restored),"31fc05cae8a4cc69ccadcbc3dba31c85a3f9b709");
 });
 
-test("0.5.0-dev.1 release metadata is distinct from published 0.2.0",()=>{
+test("0.5.0 release metadata is consistent with IWXA Setup Core",()=>{
  const pkg=JSON.parse(read("../desktop/package.json"));
  const lock=JSON.parse(read("../desktop/package-lock.json"));
  const conf=JSON.parse(read("../desktop/src-tauri/tauri.conf.json"));
  const cargo=read("../desktop/src-tauri/Cargo.toml").toString("utf8");
  const cargoLock=read("../desktop/src-tauri/Cargo.lock").toString("utf8");
- assert.equal(pkg.version,"0.5.0-dev.1");
- assert.equal(lock.version,"0.5.0-dev.1");
- assert.equal(lock.packages[""].version,"0.5.0-dev.1");
- assert.equal(conf.version,"0.5.0-dev.1");
- assert.match(cargo,/name = "iwxa-atlas-desktop"\nversion = "0.5.0-dev.1"/);
- assert.match(cargoLock,/name = "iwxa-atlas-desktop"\nversion = "0.5.0-dev.1"/);
+ assert.equal(pkg.version,"0.5.0");
+ assert.equal(lock.version,"0.5.0");
+ assert.equal(lock.packages[""].version,"0.5.0");
+ assert.equal(conf.version,"0.5.0");
+ assert.match(cargo,/name = "iwxa-atlas-desktop"\nversion = "0.5.0"/);
+ assert.match(cargoLock,/name = "iwxa-atlas-desktop"\nversion = "0.5.0"/);
 });
