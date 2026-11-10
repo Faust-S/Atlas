@@ -14,7 +14,7 @@ test("Atlas opens a single progressively disclosed connection wizard, also on fi
  assert.match(ui,/data\.projects\.length===0&&<section className="surface atlas-first-start"/);
  assert.match(ui,/onClick=\{startConnection\}>Подключить проект/);
  assert.match(ui,/connectOpen&&<ProjectConnect snapshot=\{data\} onApply=\{completeConnection\}/);
- assert.match(ui,/Сохраните портфель на диск/);
+ assert.match(ui,/Сохраните изменения/);
  assert.match(connect,/1\. Источник/);
  assert.match(connect,/2\. Предпросмотр и выбор/);
  assert.match(connect,/3\. Сохранение в Atlas/);
@@ -27,7 +27,7 @@ test("Wizard never guesses work or edits GitHub while previewing a repository",(
  assert.match(connect,/Каталоги/);
  assert.match(connect,/Файлы/);
  assert.match(connect,/Показана только часть структуры/);
- assert.match(connect,/не становятся задачами автоматически/);
+ assert.match(connect,/Просмотрите найденные каталоги/);
  assert.match(connect,/Не удалось получить|Структуру файлов не удалось получить/);
  assert.match(connect,/Открыть существующий проект/);
  assert.match(connect,/onApply\(preview,\{name:name\.trim\(\),selectedRepositories:selected\}\)/);

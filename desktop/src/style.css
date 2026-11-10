@@ -609,3 +609,33 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .atlas-connect-confirm-actions{
  border-top:1px solid #e1eaf3;padding-top:12px;margin:12px 0 8px;
 }
+
+
+/* Proposed project parts use the existing saved observations and editor. */
+.atlas-project-organization .section-heading p{max-width:670px}
+.atlas-organization-source{border-top:1px solid #e0e8f1;padding:14px 0}
+.atlas-organization-source-heading{display:flex;align-items:center;flex-wrap:wrap;gap:10px}
+.atlas-organization-source-heading strong{font-size:14px;overflow-wrap:anywhere}
+.atlas-organization-source-heading button{margin-left:auto}
+.atlas-organization-source .minor{margin:7px 0}
+.atlas-organization-folders{margin-top:8px}
+.atlas-organization-folders>summary{cursor:pointer;color:#28598d;font-size:13px;font-weight:600;padding:6px 0}
+.atlas-organization-list{border:1px solid #dce7f3;border-radius:9px;overflow:hidden;margin:6px 0}
+.atlas-organization-row{display:flex;justify-content:space-between;align-items:center;gap:16px;
+ padding:11px 13px;border-bottom:1px solid #e5ebf3}
+.atlas-organization-row:last-child{border-bottom:none}
+.atlas-organization-item{min-width:0}
+.atlas-organization-item strong{display:block;font-size:13px;overflow-wrap:anywhere}
+.atlas-organization-item small{display:block;font-size:11px;color:#66809b;margin-top:3px}
+.atlas-organization-row .button-row{flex-shrink:0;display:flex;align-items:center}
+.atlas-organization-related{border-top:1px solid #e0e8f1;padding-top:12px}
+.atlas-organization-related h3{font-size:14px}
+.atlas-organization-related-list{display:grid;gap:6px;margin:8px 0}
+.atlas-organization-related-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.atlas-organization-related-row small{color:#718396}
+.atlas-organization-next{border-top:1px solid #e0e8f1;display:flex;
+ flex-wrap:wrap;align-items:center;gap:10px;padding-top:12px}
+@media(max-width:780px){
+ .atlas-organization-row{align-items:flex-start;flex-direction:column;gap:8px}
+ .atlas-organization-row .button-row{flex-wrap:wrap}
+}

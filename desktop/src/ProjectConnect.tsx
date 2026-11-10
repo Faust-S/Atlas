@@ -107,7 +107,7 @@ export function ProjectConnect({snapshot,onApply,onCancel,disabled=false}:{
  return <section className="surface atlas-project-connect" aria-label="Подключение существующего проекта">
   <div className="section-heading"><div>
    <h2>Подключить существующий проект</h2>
-   <p>Укажите адрес — Atlas сначала покажет, что удалось обнаружить. Решение о включении остаётся за вами.</p>
+   <p>Укажите адрес проекта. Atlas покажет найденные сведения и предложит, что подключить.</p>
   </div><button type="button" className="action-button" onClick={close}>Закрыть</button></div>
   <div className="atlas-connect-steps" aria-label="Этапы подключения">
    <span className={!preview?"active":""}>1. Источник</span>
@@ -126,8 +126,7 @@ export function ProjectConnect({snapshot,onApply,onCancel,disabled=false}:{
     {loading?"Изучаем источник…":"Посмотреть структуру"}
    </button>
   </form>
-  <p className="minor">Первый маршрут поддерживает публичные GitHub-репозитории и страницы их владельцев.
-   Приватные источники требуют отдельного разрешённого подключения. Файлы проекта не загружаются на сторонний сервер Atlas.</p>
+  <p className="minor">Сейчас доступны открытые репозитории GitHub. Для закрытого проекта потребуется отдельное подключение с разрешением доступа.</p>
   {error&&<p role="alert" className="alert error">{error}</p>}
   {loading&&<p role="status" className="minor">Читаем доступные сведения GitHub, ветку и структуру проекта. Ничего не изменяем.</p>}
   {preview&&<div className="atlas-connect-preview" aria-label="Предпросмотр перед подключением">
@@ -180,8 +179,7 @@ export function ProjectConnect({snapshot,onApply,onCancel,disabled=false}:{
     </details>:<p className="minor">Структуру файлов не удалось получить:
      {structure?.reason||"основная ветка не определена"}.
      Репозиторий можно подключить без файлового предпросмотра.</p>}
-    <p className="minor">Найденные каталоги не становятся задачами автоматически.
-     План и критерии результата задаются отдельно.</p>
+    <p className="minor">Просмотрите найденные каталоги. Позже вы сможете выбрать, с какими частями проекта работать.</p>
    </>:<>
     <p className="minor">{preview.summary.complete?
      "Доступные публичные репозитории обнаружены.":
@@ -209,11 +207,10 @@ export function ProjectConnect({snapshot,onApply,onCancel,disabled=false}:{
     {list.length>limit&&<button type="button" className="action-button"
       onClick={()=>setLimit(n=>Math.min(list.length,n+45))}>Показать ещё ({list.length-limit})</button>}
     <p className="minor">Выбрано {selected.length} из {list.length} показанных по фильтру.
-     За одно подключение — до 20 репозиториев.</p>
+     За один раз можно выбрать до 20 репозиториев.</p>
    </>}
    {preview.kind==="owner"&&confirmActions}
-   <p className="minor">Добавление изменяет только локальный черновик Atlas. Запишите его кнопкой «Сохранить».
-    Во внешнем GitHub никакие действия не выполняются.</p>
+   <p className="minor">После добавления проекта нажмите «Сохранить». Atlas не изменяет ваш репозиторий GitHub.</p>
   </div>}
  </section>;
 }

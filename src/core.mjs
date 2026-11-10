@@ -192,6 +192,12 @@ export function editItem(s,pid,id,patch){return change(s,x=>{const item=project(
  if("assignee" in patch)item.assignee=String(patch.assignee);
  if("dueDate" in patch)item.dueDate=patch.dueDate||null;
  if("resourceId" in patch)item.resourceId=patch.resourceId||null;
+ if("sourceId" in patch){
+  const sourceId=patch.sourceId||null;
+  if(sourceId&&!project(x,pid).sources.some(source=>source.id===sourceId))
+   throw Error("Unknown source for work");
+  item.sourceId=sourceId;
+ }
  if("allocationPct" in patch)item.allocationPct=patch.allocationPct;
  if("estimateDays" in patch){if(!Number.isSafeInteger(patch.estimateDays)||patch.estimateDays<0||patch.estimateDays>36500)throw Error("Invalid work estimateDays");item.estimateDays=patch.estimateDays;}
  if("targetIds" in patch){if(!Array.isArray(patch.targetIds))throw Error("Invalid work targetIds");item.targetIds=[...patch.targetIds];}

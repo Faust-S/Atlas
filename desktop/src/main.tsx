@@ -21,6 +21,7 @@ import {githubPortfolioCatalog,createProjectFromGitHubCatalog,githubPortfolioOve
  filterGithubPortfolioOverview} from "../../src/ecosystem.mjs";
 import {ProjectGantt,ProjectDependencyDiagram,PortfolioNetworkMap} from "./ProjectVisuals";
 import {ProjectConnect} from "./ProjectConnect";
+import {ProjectOrganizationGuide} from "./ProjectOrganizationGuide";
 import {applyPublicProjectPreview} from "../../src/project-onboarding.mjs";
 import {prepareImportedSnapshot} from "./import-snapshot.mjs";
 import {buildIwxaPortfolio,readIwxaPortfolio,toBase64,fromBase64} from "./iwxa-portfolio.mjs";
@@ -751,8 +752,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   if(connected.state!==before){
    const count=connected.createdIds.length;
    mutate(connected.state,count?
-    "Подключено проектов: "+count+". Структура и источники добавлены в черновик. Сохраните портфель на диск.":
-    "Источники обновлены в черновике. Сохраните портфель на диск.");
+    "Добавлено проектов: "+count+". Сохраните изменения.":
+    "Источники обновлены. Сохраните изменения.");
   }else{setMessage("Проект уже подключён. Открыта его существующая карточка.");setError("");}
   selectProject(connected.primaryId,true);
  };
@@ -761,7 +762,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   try{
    const result=createProjectFromGitHubCatalog(latestSnapshot.current,ownerProjectId,ownerSourceId,repository);
    if(result.created)
-    mutate(result.state,"Проект добавлен в черновик вместе с GitHub-источником. Сохраните портфель на диск.");
+    mutate(result.state,"Проект добавлен. Сохраните изменения.");
    selectProject(result.projectId,true);
   }catch(e){issue(e)}
  };
@@ -1143,6 +1144,15 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       <p className="minor">Переход только открывает представление или редактор. Факты и решения автоматически не изменяются.</p>
      </section>}
 
+     {(project.type==="engineering"||project.sources.some((source:any)=>source.kind==="github"))&&
+     <ProjectOrganizationGuide snapshot={data} projectId={project.id}
+      onEdit={openEditor}
+      onRefresh={sourceId=>void syncPublic({projectId:project.id,sourceId})}
+      onOpenSources={()=>view("sources")}
+      onOpenWorks={()=>view("work")}
+      onOpenProject={id=>selectProject(id)}
+      onAddRelation={()=>openEditor("portfolio-link")}
+      busy={busy}/>}
      <section className="surface atlas-reality-overview" aria-label="Сопоставление цели, фактов и решений">
       <div className="section-heading"><div><h2>План, факты и решения</h2>
        <p>Atlas сопоставляет требования с записанными фактами, показывает расхождения и связанные решения. Источники можно проверить отдельно.</p></div>

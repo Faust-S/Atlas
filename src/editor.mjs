@@ -9,6 +9,7 @@ import {parsePlanReviewAction,parsePlanProposalAction,planReviewContext,decidePl
 import {setPlanDates,setPlanWork,addPlanWork,checkPlanAmendment} from "./plan-amendment.mjs";
 import {addPlanningResource,editPlanningResource,resourceChoiceOptions} from "./resource-planning.mjs";
 import {repoName,ownerName,branchName} from "./github-public.mjs";
+import {selectedSourceFolder} from "./project-organization.mjs";
 
 const option=(value,label)=>({value:String(value),label});
 const choice=(name,label,items,value="",required=true)=>({name,label,type:"select",options:items,value,required});
@@ -166,12 +167,19 @@ export function editorSpec(project,action,snapshot=null){
    field("dueDate","Срок этапа","date",stage.dueDate||"",false)]};
  }
  if(action==="stage")return {title:"Новый этап",fields:[field("name","Название этапа")]};
- if(action==="item"||action.startsWith("item-target:")){
+ if(action==="item"||action.startsWith("item-target:")||action.startsWith("folder-work:")){
   const targetId=action.startsWith("item-target:")?action.slice("item-target:".length):"";
   const target=(project.targets||[]).find(t=>t.id===targetId);
+  const folder=action.startsWith("folder-work:")?
+   selectedSourceFolder(snapshot,project.id,action):null;
   if(targetId&&!target)throw Error("Связанное требование не найдено");
-  return {title:target?"Работа по требованию: "+target.title:"Новая работа",fields:[
-   field("title","Что нужно сделать?", "text",target?"Проверить: "+target.title:""),
+  return {title:folder?"Работа по каталогу: "+folder.folder:
+    target?"Работа по требованию: "+target.title:"Новая работа",
+   ...(folder?{hint:"Каталог «"+folder.folder+"» найден в "+folder.repository+
+    ". Уточните задачу. Работа сохранит ссылку на источник, а её выполнение потребуется проверить отдельно."}:{}),
+   fields:[
+   field("title","Что нужно сделать?", "text",folder?"Уточнить назначение каталога "+folder.folder:
+    target?"Проверить: "+target.title:""),
    choice("targetId","Связать с ожидаемым результатом",optionalTargets(project),targetId,false),
    choice("stageId","Этап",stageOptions(project),"",false),
    field("assignee","Ответственный (имя или роль)","text","",false),
@@ -356,7 +364,16 @@ export function applyEditor(snapshot,projectId,action,input){
  if(action.startsWith("risk-edit:"))return {state:editRisk(snapshot,projectId,action.slice(10),{
   title:get("title"),status:get("status")
  })};
- if(action==="item"||action.startsWith("item-target:")){const r=createItem(snapshot,projectId,{title:get("title"),stageId:get("stageId"),assignee:get("assignee"),targetIds:get("targetId")?[get("targetId")]:[],resourceId:get("resourceId"),allocationPct:percentage("allocationPct")});return {state:editItem(r.state,projectId,r.id,{estimateDays:integer("estimateDays")})}};
+ if(action==="item"||action.startsWith("item-target:")||action.startsWith("folder-work:")){
+  const origin=action.startsWith("folder-work:")?
+   selectedSourceFolder(snapshot,projectId,action):null;
+  const r=createItem(snapshot,projectId,{title:get("title"),stageId:get("stageId"),
+   assignee:get("assignee"),targetIds:get("targetId")?[get("targetId")]:[],
+   resourceId:get("resourceId"),allocationPct:percentage("allocationPct")});
+  return {state:editItem(r.state,projectId,r.id,{
+   estimateDays:integer("estimateDays"),...(origin?{sourceId:origin.sourceId}:{})
+  })};
+ }
  if(action==="dep")return {state:connect(snapshot,projectId,get("from"),get("to"))};
  if(action==="target")return {state:addTarget(snapshot,projectId,{title:get("title"),desired:get("desired"),intent:get("intent")}).state};
  if(action.startsWith("recheck:")){

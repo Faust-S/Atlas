@@ -17,7 +17,7 @@ test("Observed GitHub owner catalog creates editable projects without a second s
  assert.match(ui,/Каталог владельца/);
  assert.match(ui,/Создать проект/);
  assert.match(ui,/Приватные репозитории не перечисляются/);
- assert.match(ui,/Сохраните портфель на диск/);
+ assert.match(ui,/Сохраните изменения/);
  assert.match(ui,/includeDiscoveredProject\(project\.id,s\.id,repo\.name\)/);
 });
 
