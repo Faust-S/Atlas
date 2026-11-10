@@ -37,6 +37,7 @@ export function ProjectOrganizationGuide({snapshot,projectId,onEdit,onRefresh,on
        key={source.sourceId+"/"+folder.name}>
        <div className="atlas-organization-item">
         <strong>{folder.name}</strong><small>{folder.role}</small>
+        {folder.workCount>0&&<small>Связанных работ: {folder.workCount}</small>}
        </div>
        <div className="button-row">
         <a className="text-link" href={folder.url} target="_blank" rel="noopener noreferrer">

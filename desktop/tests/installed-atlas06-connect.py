@@ -323,6 +323,8 @@ def verify_organization_work(previous,original_project):
     task=project["items"][0]
     assert task["title"]=="Проверить исходники сайта"
     assert task["sourceId"]==original_project["sources"][0]["id"]
+    assert task["sourcePath"]=="src"
+    assert task["sourceRevision"]==original_project["sources"][0]["summary"]["structure"]["commitSha"]
     assert task["state"]=="todo" and task["targetIds"]==[]
     assert project["sources"]==original_project["sources"]
     for field in ("stages","dependencies","decisions","targets","findings"):

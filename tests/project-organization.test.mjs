@@ -68,12 +68,22 @@ test("A user-submitted editor creates one standard work linked to its real sourc
  assert.equal(project.items.length,1);
  assert.equal(project.items[0].title,"Проверить интерфейс сайта");
  assert.equal(project.items[0].sourceId,sourceId);
+ assert.equal(project.items[0].sourcePath,"src");
+ assert.equal(project.items[0].sourceRevision,SHA);
  assert.equal(project.items[0].estimateDays,2);
  assert.deepEqual(project.stages,[]);
  assert.deepEqual(project.dependencies,[]);
  assert.deepEqual(project.decisions,[]);
  assert.deepEqual(deserialize(serialize(result.state)),result.state);
+ const past=structuredClone(result.state);
+ past.projects[0].sources[0].summary.branchHeads["work/dev"]=NEXT;
+ assert.doesNotThrow(()=>deserialize(serialize(past)));
+ assert.equal(past.projects[0].items[0].sourceRevision,SHA);
+ const invalid=structuredClone(result.state);
+ invalid.projects[0].items[0].sourcePath="../outside";
+ assert.throws(()=>deserialize(JSON.stringify(invalid)),/Invalid work source location/);
  assert.equal(projectStructureGuide(result.state,projectId).sources[0].linkedWorkCount,1);
+ assert.equal(projectStructureGuide(result.state,projectId).sources[0].folders[0].workCount,1);
  assert.equal(projectStructureGuide(result.state,projectId).nextAction.action,"project-edit");
 });
 test("Work suggestion only accepts an exact existing folder, revision, and connected source",()=>{

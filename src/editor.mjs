@@ -176,7 +176,7 @@ export function editorSpec(project,action,snapshot=null){
   return {title:folder?"Работа по каталогу: "+folder.folder:
     target?"Работа по требованию: "+target.title:"Новая работа",
    ...(folder?{hint:"Каталог «"+folder.folder+"» найден в "+folder.repository+
-    ". Уточните задачу. Работа сохранит ссылку на источник, а её выполнение потребуется проверить отдельно."}:{}),
+    ". Уточните задачу. Atlas сохранит каталог и редакцию исходников вместе с работой."}:{}),
    fields:[
    field("title","Что нужно сделать?", "text",folder?"Уточнить назначение каталога "+folder.folder:
     target?"Проверить: "+target.title:""),
@@ -371,7 +371,9 @@ export function applyEditor(snapshot,projectId,action,input){
    assignee:get("assignee"),targetIds:get("targetId")?[get("targetId")]:[],
    resourceId:get("resourceId"),allocationPct:percentage("allocationPct")});
   return {state:editItem(r.state,projectId,r.id,{
-   estimateDays:integer("estimateDays"),...(origin?{sourceId:origin.sourceId}:{})
+   estimateDays:integer("estimateDays"),...(origin?{
+    sourceId:origin.sourceId,sourcePath:origin.folder,sourceRevision:origin.commitSha
+   }:{})
   })};
  }
  if(action==="dep")return {state:connect(snapshot,projectId,get("from"),get("to"))};

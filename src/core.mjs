@@ -10,6 +10,10 @@ const priorities=new Set(["low","normal","high","critical"]);
 const kinds=new Set(["github","github_owner","gitlab","forgejo","gitea","obsidian","anytype","jira","file","other"]);
 const uid=()=>crypto.randomUUID();
 const nonempty=(x,label)=>{if(typeof x!=="string"||!x.trim())throw Error(label+" required");return x.trim()};
+const validSourcePath=value=>typeof value==="string"&&value.length>0&&value.length<=320&&
+ !value.startsWith("/")&&!value.endsWith("/")&&!value.includes("\\")&&
+ value.split("/").every(part=>part.length>0&&part!=="."&&part!==".."&&
+  !/[\u0000-\u001f]/.test(part));
 const validDate=value=>{if(value==null||value==="")return true;if(typeof value!=="string"||!/^\d{4}-\d{2}-\d{2}$/.test(value))return false;const d=new Date(value+"T00:00:00Z");return Number.isFinite(d.valueOf())&&d.toISOString().slice(0,10)===value};
 export const empty=()=>({schema:SCHEMA,revision:0,projects:[]});
 export function validate(s){
@@ -48,7 +52,13 @@ export function validate(s){
   const itemIds=new Set(p.items.map(x=>x.id)),stageIds=new Set(p.stages.map(x=>x.id)),sourceIds=new Set(p.sources.map(x=>x.id)),targetIds=new Set((p.targets||[]).map(x=>x.id)),changeIds=new Set((p.changes||[]).map(x=>x.id));
   if(itemIds.size!==p.items.length||stageIds.size!==p.stages.length||sourceIds.size!==p.sources.length)throw Error("Duplicate ID");
   for(const x of p.items){if(!x||typeof x.id!=="string"||!x.id||typeof x.title!=="string"||!x.title.trim()||
-    !workStates.has(x.state)||!priorities.has(x.priority)||x.stageId&&!stageIds.has(x.stageId)||x.sourceId&&!sourceIds.has(x.sourceId))throw Error("Invalid work item");if(x.estimateDays!==undefined&&(!Number.isSafeInteger(x.estimateDays)||x.estimateDays<0||x.estimateDays>36500))throw Error("Invalid work estimateDays");if(!validDate(x.dueDate))throw Error("Invalid work dueDate");if(!validResource(x.resourceId)||!validAllocation(x.allocationPct))throw Error("Invalid work resource commitment");if(x.targetIds!==undefined&&(!Array.isArray(x.targetIds)||new Set(x.targetIds).size!==x.targetIds.length||x.targetIds.some(id=>!targetIds.has(id))))throw Error("Invalid work targetIds");if(x.changeId!=null&&!changeIds.has(x.changeId))throw Error("Invalid work changeId");}
+    !workStates.has(x.state)||!priorities.has(x.priority)||x.stageId&&!stageIds.has(x.stageId)||x.sourceId&&!sourceIds.has(x.sourceId))throw Error("Invalid work item");if(x.estimateDays!==undefined&&(!Number.isSafeInteger(x.estimateDays)||x.estimateDays<0||x.estimateDays>36500))throw Error("Invalid work estimateDays");if(!validDate(x.dueDate))throw Error("Invalid work dueDate");if(!validResource(x.resourceId)||!validAllocation(x.allocationPct))throw Error("Invalid work resource commitment");if(x.targetIds!==undefined&&(!Array.isArray(x.targetIds)||new Set(x.targetIds).size!==x.targetIds.length||x.targetIds.some(id=>!targetIds.has(id))))throw Error("Invalid work targetIds");if(x.changeId!=null&&!changeIds.has(x.changeId))throw Error("Invalid work changeId");
+   if(x.sourcePath!==undefined||x.sourceRevision!==undefined){
+    if(!x.sourceId||!validSourcePath(x.sourcePath)||
+      typeof x.sourceRevision!=="string"||!/^[a-f0-9]{40}$/i.test(x.sourceRevision))
+     throw Error("Invalid work source location");
+   }
+  }
   for(const x of p.sources)if(!kinds.has(x.kind)||!x.locator||
    (x.branch!==undefined&&(x.kind!=="github"||typeof x.branch!=="string"||
     !x.branch.trim()||x.branch.length>200)))throw Error("Invalid source");
@@ -197,6 +207,14 @@ export function editItem(s,pid,id,patch){return change(s,x=>{const item=project(
   if(sourceId&&!project(x,pid).sources.some(source=>source.id===sourceId))
    throw Error("Unknown source for work");
   item.sourceId=sourceId;
+ }
+ if("sourcePath" in patch||"sourceRevision" in patch){
+  if(!("sourcePath" in patch&&"sourceRevision" in patch)||
+     !item.sourceId||!validSourcePath(patch.sourcePath)||
+     typeof patch.sourceRevision!=="string"||!/^[a-f0-9]{40}$/i.test(patch.sourceRevision))
+   throw Error("Invalid work source location");
+  item.sourcePath=patch.sourcePath;
+  item.sourceRevision=patch.sourceRevision.toLowerCase();
  }
  if("allocationPct" in patch)item.allocationPct=patch.allocationPct;
  if("estimateDays" in patch){if(!Number.isSafeInteger(patch.estimateDays)||patch.estimateDays<0||patch.estimateDays>36500)throw Error("Invalid work estimateDays");item.estimateDays=patch.estimateDays;}

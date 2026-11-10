@@ -51,6 +51,8 @@ export function projectStructureGuide(snapshot,projectId,{maxFolders=24,maxSourc
   const folders=tree&&Array.isArray(tree.folders)?tree.folders.filter(rootName)
    .slice(0,maxFolders).map(name=>({
     name,role:roleFor(name),sourceId:source.id,commitSha:tree.commitSha,
+    workCount:project.items.filter(item=>
+     item.sourceId===source.id&&item.sourcePath===name).length,
     url:"https://github.com/"+repo+"/tree/"+tree.commitSha+"/"+encodeURIComponent(name)
    })):[];
   const knownFiles=tree&&Array.isArray(tree.detected)?
