@@ -362,6 +362,20 @@ def verify_organization_work(previous,original_project):
     print("ATLAS06_WORK_FOLDER_LINK_VISIBLE_PASS",flush=True)
     screenshot("source-linked-work-reopened")
     print("ATLAS06_USER_APPROVED_SOURCE_WORK_RESTART_PASS",flush=True)
+    # Navigate the new read-only diagram through ordinary visible controls.
+    click_button("Обзор")
+    window_title_contains("Atlas — Обзор")
+    wait_text("Схема проекта: каталоги, работы и этапы",35)
+    wait_text("Как связаны части проекта",35)
+    wait_text("Проверить исходники сайта",35)
+    screenshot("source-work-stage-map")
+    assert head()==current,"Viewing source plan map changed native storage"
+    click_scrolled_button("План-график",main=True)
+    window_title_contains("Atlas — График",35)
+    wait_text("План-график CPM",35)
+    assert head()==current,"Opening existing Gantt changed native storage"
+    screenshot("source-plan-to-gantt")
+    print("ATLAS06_SOURCE_PLAN_MAP_TO_GANTT_PASS",flush=True)
 
 def qualify():
     if (STORE/"head.json").exists():

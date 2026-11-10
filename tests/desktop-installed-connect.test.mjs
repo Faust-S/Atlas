@@ -38,6 +38,10 @@ test("Native GUI test requires a read-only public discovery and explicit native 
  assert.match(installed,/ATLAS06_USER_APPROVED_SOURCE_WORK_NATIVE_SAVE_PASS/);
  assert.match(installed,/ATLAS06_USER_APPROVED_SOURCE_WORK_RESTART_PASS/);
  assert.match(installed,/ATLAS06_WORK_FOLDER_LINK_VISIBLE_PASS/);
+ assert.match(installed,/ATLAS06_SOURCE_PLAN_MAP_TO_GANTT_PASS/);
+ assert.match(installed,/wait_text\("Схема проекта: каталоги, работы и этапы",35\)/);
+ assert.match(installed,/click_scrolled_button\("План-график",main=True\)/);
+ assert.match(installed,/assert head\(\)==current,"Opening existing Gantt changed native storage"/);
  assert.match(installed,/def click_editor_submit\(\):/);
  assert.match(installed,/button\.click_input\(\)/);
  assert.match(installed,/Work submission action is not visible within the native window/);
