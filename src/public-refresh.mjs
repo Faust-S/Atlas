@@ -2,7 +2,7 @@
 // snapshot revision; no extra store, credentials, grants or readiness authority.
 import {validate} from "./core.mjs";
 import {sourceChanges} from "./source-observation.mjs";
-import {observePublicRepo,observePublicOwner,repoName,ownerName} from "./github-public.mjs";
+import {observePublicRepo,observePublicOwner,observePublicRootTree,repoName,ownerName} from "./github-public.mjs";
 
 const MAX_BINDINGS=30,MAX_REQUESTS=4,DEFAULT_AGE=15*60*1000;
 const supported=new Set(["github","github_owner"]);
@@ -57,8 +57,31 @@ export function planPublicRefresh(snapshot,{
 }
 
 const isRateLimited=e=>/\b(?:403|429)\b|rate.limit|rate-limit/i.test(String(e?.message||e));
+const shaOk=sha=>typeof sha==="string"&&/^[a-f0-9]{40}$/i.test(sha);
+// The existing bounded GitHub observation now includes a bounded root view.
+// Repo/CI evidence remains usable when GitHub refuses a tree read. A tree
+// failure is not a failed build, nor an assertion that folders are missing.
+export async function observePublicRepoWithTree(name,branch,fetcher=globalThis.fetch){
+ const observed=await observePublicRepo(name,fetcher,{includeActions:true,actionsBranch:branch});
+ const selected=branch??observed.defaultBranch;
+ const sha=typeof selected==="string"?observed.branchHeads?.[selected]:null;
+ if(!selected||!shaOk(sha))return {
+  ...observed,structure:{status:"unavailable",branch:selected??null,
+   reason:"Не удалось подтвердить выбранную ветку и её редакцию"}
+ };
+ try{
+  const structure=await observePublicRootTree(name,selected,fetcher,{commitSha:sha});
+  // Root metadata must describe the same revision the branch observer saw.
+  if(structure.commitSha!==sha.toLowerCase())throw Error("Редакции дерева и ветки не совпадают");
+  return {...observed,structure};
+ }catch(error){
+  return {...observed,structure:{status:"unavailable",branch:selected,
+   reason:String(error?.message||"GitHub не вернул структуру").slice(0,180)}};
+ }
+}
+
 export async function reconcilePublicSources(snapshot,{
- plan=planPublicRefresh(snapshot),repoObserver=(name,branch)=>observePublicRepo(name,globalThis.fetch,{includeActions:true,actionsBranch:branch}),ownerObserver=observePublicOwner
+ plan=planPublicRefresh(snapshot),repoObserver=observePublicRepoWithTree,ownerObserver=observePublicOwner
 }={}){
  validate(snapshot);
  const state=structuredClone(snapshot),projects=new Map(state.projects.map(x=>[x.id,x]));
@@ -85,11 +108,13 @@ export async function reconcilePublicSources(snapshot,{
     const previousTree=source.summary?.structure;
     const currentSha=previousTree?.branch&&observation.branchHeads?.[previousTree.branch];
     const keepTree=source.kind==="github"&&previousTree?.status==="observed"&&
-     typeof previousTree.commitSha==="string"&&
-     /^[a-f0-9]{40}$/i.test(previousTree.commitSha)&&
-     typeof currentSha==="string"&&
+     shaOk(previousTree.commitSha)&&shaOk(currentSha)&&
      currentSha.toLowerCase()===previousTree.commitSha.toLowerCase();
-    const nextObservation=keepTree?{...observation,structure:previousTree}:observation;
+    // On a failed tree fetch keep already-seen data only for the SAME SHA.
+    // A newly observed tree always takes precedence; changed revisions
+    // never inherit the old folders or suggest they are still current.
+    const nextObservation=observation.structure?.status==="observed"?
+     observation:keepTree?{...observation,structure:previousTree}:observation;
     const changes=sourceChanges(source.summary,nextObservation);
     source.summary={...nextObservation,changes};
     source.status="ok";source.error=null;
@@ -131,13 +156,10 @@ export function publicSourceQueue(snapshot,{now=Date.now(),maxAgeMs=DEFAULT_AGE}
   if(changes?.comparable)
    row.changed+=(changes.added?.length||0)+(changes.removed?.length||0)+
     (changes.changed?.length||0)+(changes.renamed?.length||0);
-  // A complete root comparison remains useful when the branch listing was
-  // incomplete: avoid hiding observed folder/file changes in the queue.
-  if(changes?.structureDelta){
-   const d=changes.structureDelta;
-   row.changed+=(d.addedFolders?.length||0)+(d.removedFolders?.length||0)+
-    (d.addedFiles?.length||0)+(d.removedFiles?.length||0);
-  }
+  // Complete root evidence can be compared even with incomplete pagination.
+  const root=changes?.structureDelta;
+  if(root)row.changed+=(root.addedFolders?.length||0)+(root.removedFolders?.length||0)+
+   (root.addedFiles?.length||0)+(root.removedFiles?.length||0);
   if(source.observedAt&&(!row.lastObserved||Date.parse(source.observedAt)>Date.parse(row.lastObserved)))
    row.lastObserved=source.observedAt;
  }
