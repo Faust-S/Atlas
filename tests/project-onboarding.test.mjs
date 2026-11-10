@@ -91,7 +91,7 @@ test("Public root inspection remains bounded and reports incomplete trees",async
  assert.equal(tree.totalFiles,3);
  assert.equal(tree.folders.length,1);
  assert.equal(tree.files.length,1);
- assert.throws(()=>observePublicRootTree("demo/widget","main",mock.fetcher,{maxEntries:121}));
+ await assert.rejects(observePublicRootTree("demo/widget","main",mock.fetcher,{maxEntries:121}));
 });
 test("Private GitHub repositories are not silently described as public projects",async()=>{
  const mock=github({privateRepo:true});

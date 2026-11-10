@@ -105,6 +105,9 @@ export function applyPublicProjectPreview(snapshot,preview,{name="",selectedRepo
   const link=attach(created.state,created.id,"github",locator,{branch:selectedBranch});
   const observation={
    ...preview.summary,
+   // GitHub's null-prototype branch lookup must have the same JSON shape
+   // as the subsequently saved and reopened Atlas source observation.
+   branchHeads:{...preview.summary.branchHeads},
    ...(preview.structure?.status==="observed"?{structure:preview.structure}:{})
   };
   const observed=applySourceObservation(link.state,created.id,link.id,observation);
