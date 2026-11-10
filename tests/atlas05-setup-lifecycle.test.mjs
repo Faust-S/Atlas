@@ -15,3 +15,16 @@ test("native Setup Core witness verifies selected data, GUI readback and preserv
  assert.match(script,/ATLAS05_SETUP_CORE_CUSTOM_DATA_AND_UNINSTALL_PASS/);
  assert.match(workflow,/qualify-setup-core-lifecycle\.ps1/);
 });
+
+test("stable 0.5 release is guarded by the same Windows job and checked package hash",()=>{
+ const workflow=read("../.github/workflows/atlas-0-2-1-branding.yml");
+ const lifecycle=workflow.indexOf("qualify-setup-core-lifecycle.ps1");
+ const release=workflow.indexOf("Publish Atlas 0.5.0 after installed Windows acceptance");
+ assert.ok(lifecycle>=0&&release>lifecycle,"Release cannot precede installed product acceptance");
+ assert.match(workflow,/\[publish-release-0\.5\]/);
+ assert.match(workflow,/ATLAS05_RELEASE_CHECKSUM_MISMATCH/);
+ assert.match(workflow,/gh release create v0\.5\.0/);
+ assert.match(workflow,/--target \$env:GITHUB_SHA/);
+ assert.match(workflow,/ATLAS05_STABLE_RELEASE_PUBLISHED/);
+ assert.match(workflow,/Authenticode publisher signature is not included/);
+});

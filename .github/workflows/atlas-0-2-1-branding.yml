@@ -289,3 +289,22 @@ jobs:
           gh release create v0.4.0 "$($installer.FullName)" "$sumfile" --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title 'IWXA Atlas 0.4.0' --notes 'Windows x64 stable release based on the accepted Atlas 0.4 candidate. Installed Tauri/NSIS, native persistence, 120 projects / 1200 works, and strict installed GUI routes are qualified. New UX copy, unified .iwxa exchange and expanded GitHub connectivity belong to Atlas 0.5.'
           if ($LASTEXITCODE -ne 0) { throw 'Release publication failed' }
           Write-Output "ATLAS04_STABLE_RELEASE_PUBLISHED sha=$env:GITHUB_SHA checksum=$checksum"
+
+      - name: Publish Atlas 0.5.0 after installed Windows acceptance
+        if: github.ref == 'refs/heads/work/2026-11-09-atlas-0-5' && github.event_name == 'push' && contains(github.event.head_commit.message, '[publish-release-0.5]')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installer = Get-Item -LiteralPath 'artifacts/IWXA-Atlas-0.5.0-Setup.exe' -ErrorAction Stop
+          $sumfile = Get-Item -LiteralPath 'artifacts/IWXA-Atlas-0.5.0-Setup.exe.sha256' -ErrorAction Stop
+          $actual = (Get-FileHash -LiteralPath $installer.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          $expected = ((Get-Content -LiteralPath $sumfile.FullName -Raw).Trim().Split(' ')[0]).ToLowerInvariant()
+          if ($actual -ne $expected) { throw 'ATLAS05_RELEASE_CHECKSUM_MISMATCH' }
+          gh release view v0.5.0 --repo $env:GITHUB_REPOSITORY 2>$null
+          if ($LASTEXITCODE -eq 0) { throw 'ATLAS05_RELEASE_ALREADY_EXISTS' }
+          $notes = 'IWXA Atlas 0.5.0: Windows x64. Installation via IWXA Setup Core, selected data folders, safe uninstall, .iwxa exchange, GitHub/Actions observations and Plan / fact. Existing NSIS installations remain intact until an explicit legacy transition. Authenticode publisher signature is not included.'
+          gh release create v0.5.0 "$($installer.FullName)" "$($sumfile.FullName)" --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title 'IWXA Atlas 0.5.0' --notes $notes
+          if ($LASTEXITCODE -ne 0) { throw 'ATLAS05_RELEASE_PUBLICATION_FAILED' }
+          Write-Output "ATLAS05_STABLE_RELEASE_PUBLISHED sha=$env:GITHUB_SHA checksum=$actual"
