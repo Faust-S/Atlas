@@ -51,7 +51,7 @@ def launch():
         win32gui.EnumWindows(visit,None)
         if found:
             handle=found[0]
-            win32gui.MoveWindow(handle,0,0,1120,760,True)
+            win32gui.MoveWindow(handle,0,0,1024,710,True)
             activate()
             return
         time.sleep(0.3)
@@ -91,14 +91,21 @@ def click_button(name,timeout=35):
     time.sleep(0.3)
 
 def set_text(name,value):
-    control=window().child_window(title=name,control_type="Edit")
-    if not control.exists(timeout=10) or not control.is_visible():
+    # HTML input[list] is represented by Windows UIA as ComboBox, while
+    # an ordinary text field is Edit. Both must support native typing.
+    controls = []
+    for role in ("Edit","ComboBox"):
+        candidate=window().child_window(title=name,control_type=role)
+        if candidate.exists(timeout=2) and candidate.is_visible() and candidate.is_enabled():
+            controls.append(candidate)
+    if len(controls)!=1:
         screenshot("input-not-found")
-        raise AssertionError("Native editor missing: "+name)
-    control.click_input()
+        raise AssertionError("Native input not uniquely accessible: "+name+
+                             " (Edit/ComboBox found="+str(len(controls))+")")
+    controls[0].click_input()
     keyboard.send_keys("^a")
     keyboard.send_keys(value,with_spaces=True)
-    time.sleep(0.25)
+    time.sleep(0.3)
 
 def wait_text(value,timeout=90):
     until=time.monotonic()+timeout
