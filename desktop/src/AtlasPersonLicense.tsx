@@ -1,0 +1,179 @@
+import React,{useEffect,useRef,useState} from "react";
+import {invoke} from "@tauri-apps/api/core";
+
+type License={licenseId:string;status:"ACTIVE"|"SUSPENDED"|"REVOKED";
+  sequence:number;signatureVerified:true;statusVerified:true;
+  productionActivation:false};
+type PersonView={schema:string;revision:number;productId:string;
+  licenses:License[];productionActivation:false;activeSeats:0};
+type HostResult={operation:string;productionActivation:false;activeSeats:0;
+  view?:PersonView;signatureVerified?:boolean;statusVerified?:boolean;
+  outcome?:string;status?:string};
+
+const code=(error:unknown)=>error instanceof Error?error.message:String(error);
+function describe(raw:string){
+ const matches:Record<string,string>={
+  ATLAS_PERSON_T3_COMPONENT_NOT_BUNDLED:"В эту установку Atlas ещё не включён проверяющий компонент T3.",
+  ATLAS_PERSON_WINDOWS_REQUIRED:"Проверка персональных лицензий доступна в установленной версии для Windows.",
+  PERSON_RECIPIENT_NOT_ENROLLED:"Этот компьютер ещё не привязан к получателю лицензии.",
+  PERSON_CONSUMER_PREINSTALLED_TRUST_REQUIRED:"Доверие издателя ещё не установлено. Получите файл установки доверия из официального источника IWXA.",
+  PERSON_CONSUMER_PREINSTALLED_TRUST_AND_KEY_REQUIRED:"Доверие издателя или локальная защита ещё не настроены.",
+  PERSON_STATUS_ROLLBACK_DENIED:"Этот пакет содержит более старый статус лицензии. Сохранённые права не изменены.",
+  PERSON_STATUS_STALE:"Срок подтверждения лицензии истёк. Попросите у издателя обновлённый пакет.",
+  PERSON_LICENSE_NOT_CURRENT:"Срок лицензии истёк. Необходимо продление.",
+  PERSON_RECIPIENT_SUBJECT_MISMATCH:"Лицензия предназначена другому получателю.",
+  PERSON_LICENSE_PERSON_MISMATCH:"Лицензия предназначена другому получателю.",
+  PERSON_LICENSE_PRODUCT_MISMATCH:"Лицензия выдана для другой программы.",
+  PERSON_RECIPIENT_ALREADY_ENROLLED:"Получатель уже привязан к текущему профилю Windows.",
+  PERSON_RECIPIENT_WINDOWS_BINDING_INVALID:"Не удалось подтвердить привязку к текущему компьютеру."
+ };
+ return matches[raw]??"Не удалось выполнить проверку: "+raw;
+}
+const status=(value:License["status"])=>{
+ if(value==="REVOKED")return "Отозвана";
+ if(value==="SUSPENDED")return "Приостановлена";
+ return "Подписанный статус действителен";
+};
+export function AtlasPersonLicense({enabled}:{enabled:boolean}){
+ const [opened,setOpened]=useState(false);
+ const [busy,setBusy]=useState(false);
+ const [needsIdentity,setNeedsIdentity]=useState(false);
+ const [personId,setPersonId]=useState("");
+ const [view,setView]=useState<PersonView|null>(null);
+ const [notice,setNotice]=useState("");
+ const [failure,setFailure]=useState("");
+ const closeRef=useRef<HTMLButtonElement|null>(null);
+ const openRef=useRef<HTMLButtonElement|null>(null);
+ async function refresh(){
+  setBusy(true);setFailure("");setNeedsIdentity(false);
+  try{
+    const capabilities=await invoke<HostResult>("atlas_person_license_capabilities");
+    if(capabilities?.operation!=="PERSON_CAPABILITIES"||
+       capabilities.productionActivation!==false||capabilities.activeSeats!==0)
+      throw Error("ATLAS_PERSON_CAPABILITIES_INVALID");
+    const result=await invoke<HostResult>("atlas_person_license_read");
+    if(result?.operation!=="PERSON_READ"||!result.view||
+       result.productionActivation!==false||result.activeSeats!==0||
+       result.view.productId!=="IWXA_ATLAS"||
+       result.view.productionActivation!==false||
+       result.view.activeSeats!==0||!Array.isArray(result.view.licenses))
+      throw Error("ATLAS_PERSON_LICENSE_VIEW_INVALID");
+    if(result.view.licenses.some(l=>!l.signatureVerified||!l.statusVerified||
+       l.productionActivation!==false||
+       !["ACTIVE","SUSPENDED","REVOKED"].includes(l.status)))
+      throw Error("ATLAS_PERSON_LICENSE_ENTRY_INVALID");
+    setView(result.view);
+  }catch(e){
+    setView(null);
+    const raw=code(e);
+    setNeedsIdentity(raw.includes("PERSON_RECIPIENT_NOT_ENROLLED"));
+    setFailure(describe(raw));
+  }finally{setBusy(false);}
+ }
+ useEffect(()=>{
+   if(!opened)return;
+   closeRef.current?.focus();
+   void refresh();
+ },[opened]);
+ useEffect(()=>{
+   if(!opened)return;
+   const esc=(event:KeyboardEvent)=>{if(event.key==="Escape"&&!busy){
+     setOpened(false);openRef.current?.focus();
+   }};
+   window.addEventListener("keydown",esc);
+   return()=>window.removeEventListener("keydown",esc);
+ },[opened,busy]);
+ async function enroll(){
+   if(busy||!personId||personId.startsWith("holder:")||
+      !/^[A-Za-z0-9][A-Za-z0-9._:/@-]{0,159}$/.test(personId))return;
+   setBusy(true);setFailure("");setNotice("");
+   try{
+     const result=await invoke<HostResult>("atlas_person_license_enroll",{personId});
+     if(result?.operation!=="PERSON_ENROLLED"||
+        result.productionActivation!==false||result.activeSeats!==0)
+       throw Error("ATLAS_PERSON_ENROLLMENT_RECEIPT_INVALID");
+     setNeedsIdentity(false);
+     setNotice("Получатель привязан к текущему профилю Windows. Теперь можно открыть подписанный пакет.");
+     await refresh();
+   }catch(e){setFailure(describe(code(e)));}
+   finally{setBusy(false);}
+ }
+ async function receive(){
+   if(busy)return;
+   setBusy(true);setFailure("");setNotice("");
+   try{
+     const receipt=await invoke<HostResult|null>("atlas_person_license_import");
+     if(receipt===null)return;
+     if(receipt?.operation!=="PERSON_RECEIVE"||
+       receipt.productionActivation!==false||receipt.activeSeats!==0||
+       receipt.signatureVerified!==true||receipt.statusVerified!==true)
+       throw Error("ATLAS_PERSON_IMPORT_RECEIPT_INVALID");
+     setNotice("Подпись и статус проверены T3. Лицензия сохранена на этом компьютере.");
+     await refresh();
+   }catch(e){setFailure(describe(code(e)));}
+   finally{setBusy(false);}
+ }
+ if(!enabled)return null;
+ return <>
+   <button ref={openRef} type="button" className="action-button"
+     data-testid="atlas-person-license-open" onClick={()=>setOpened(true)}>
+     Моя лицензия
+   </button>
+   {opened&&<div className="atlas-person-license-backdrop">
+     <section className="atlas-person-license-dialog" role="dialog"
+       aria-modal="true" aria-label="Моя лицензия">
+       <header className="atlas-person-license-header">
+         <div><small>Atlas</small><h2>Моя лицензия</h2></div>
+         <button ref={closeRef} type="button" className="icon-button"
+           aria-label="Закрыть окно лицензии" disabled={busy}
+           onClick={()=>{setOpened(false);openRef.current?.focus();}}>×</button>
+       </header>
+       <p>Лицензия передаётся офлайн. Atlas проверяет подпись и статус через T3,
+         используя ранее установленное доверие издателя.</p>
+       {busy&&<p role="status">Проверяем данные лицензии…</p>}
+       {failure&&<p className="alert error" role="alert">{failure}</p>}
+       {notice&&<p className="alert notice" role="status">{notice}</p>}
+       {needsIdentity&&<form className="atlas-person-license-enroll" onSubmit={e=>{
+         e.preventDefault();void enroll();
+       }}>
+         <h3>Привязать получателя</h3>
+         <p>Введите идентификатор получателя, указанный издателем. Он будет
+           привязан к текущему профилю Windows и не изменяется при импорте пакета.</p>
+         <label>Идентификатор получателя
+           <input type="text" autoComplete="off" required
+             minLength={1} maxLength={160}
+             value={personId} onChange={e=>setPersonId(e.target.value)}
+             placeholder="person:…" disabled={busy}/>
+         </label>
+         <button type="submit" className="action-button primary" disabled={busy||
+           !/^[A-Za-z0-9][A-Za-z0-9._:/@-]{0,159}$/.test(personId)||
+           personId.startsWith("holder:")}>
+           Привязать к этому компьютеру
+         </button>
+       </form>}
+       {view&&<div data-testid="atlas-person-license-records">
+         <h3>Сохранённые лицензии</h3>
+         {view.licenses.length===0?<p>Подписанных лицензий пока нет.</p>:
+           view.licenses.map((l,i)=><article key={l.licenseId}
+             className="atlas-person-license-entry">
+             <strong>Лицензия {i+1}</strong>
+             <span>{status(l.status)}</span>
+             <small>Подпись и статус проверены. Версия статуса: {l.sequence}.</small>
+           </article>)}
+         <p className="minor">Сохранение подписанного документа не включает
+           дополнительные функции автоматически. Доступ определяется программой
+           после отдельной проверки условий лицензии.</p>
+       </div>}
+       <footer className="atlas-person-license-footer">
+         <button type="button" className="action-button"
+           onClick={()=>void refresh()} disabled={busy}>Обновить</button>
+         <button type="button" className="action-button primary"
+           data-testid="atlas-person-license-import" onClick={()=>void receive()}
+           disabled={busy||needsIdentity||!view}>
+           Открыть лицензию .iwxa
+         </button>
+       </footer>
+     </section>
+   </div>}
+ </>;
+}
