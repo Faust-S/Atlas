@@ -147,7 +147,8 @@ test("public workflow receipt survives saved Atlas snapshot without accepting wo
  assert.equal(serialize(fixture.state),before);
  assert.equal(restored.projects[0].sources[0].summary.readiness,"not_assessed");
  const ui=readFileSync(new URL("../src/public-refresh.mjs",import.meta.url),"utf8");
- assert.match(ui,/repoObserver=\(name,branch\)=>observePublicRepo\(name,globalThis\.fetch,\{includeActions:true,actionsBranch:branch\}\)/);
+ assert.match(ui,/repoObserver=observePublicRepoWithTree/);
+ assert.match(ui,/observePublicRootTree\(name,selected,fetcher,\{commitSha:sha\}\)/);
 });
 
 test("same GitHub repository with distinct selected branches is refreshed separately",async()=>{

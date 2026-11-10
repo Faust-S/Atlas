@@ -21,13 +21,48 @@ function selectedBranchDelta(previous,next){
  return before&&after&&before.branch===after.branch&&before.sha!==after.sha
   ?{branch:before.branch,previousSha:before.sha,currentSha:after.sha}:null;
 }
+// Root tree comparison does not depend on complete branch pagination. It
+// needs two exact, fully enumerated root trees for the SAME named branch.
+// Missing/limited trees never prove that a directory has been deleted.
+function rootStructureDelta(previous,next){
+ if(previous?.scope!=="repository"||next?.scope!=="repository"||
+    typeof previous.repository!=="string"||typeof next.repository!=="string"||
+    previous.repository.toLowerCase()!==next.repository.toLowerCase())return null;
+ const before=previous.structure,after=next.structure;
+ if(before?.status!=="observed"||after?.status!=="observed"||
+    before.branch!==after.branch||!before.branch||
+    before.truncated||after.truncated||before.limited||after.limited||
+    !/^[a-f0-9]{40}$/i.test(before.commitSha||"")||
+    !/^[a-f0-9]{40}$/i.test(after.commitSha||""))return null;
+ const values=(tree,key)=>{
+  const rows=tree[key];
+  if(!Array.isArray(rows)||rows.length>120||
+     rows.some(x=>typeof x!=="string"||!x||x.includes("/")||x==="."||x===".."))
+   return null;
+  return [...new Set(rows)];
+ };
+ const foldersBefore=values(before,"folders"),foldersAfter=values(after,"folders");
+ const filesBefore=values(before,"files"),filesAfter=values(after,"files");
+ if(!foldersBefore||!foldersAfter||!filesBefore||!filesAfter)return null;
+ if(before.commitSha.toLowerCase()===after.commitSha.toLowerCase()&&
+    before.treeSha!==after.treeSha)return null;
+ const added=(was,now)=>now.filter(x=>!new Set(was).has(x));
+ return {branch:before.branch,previousSha:before.commitSha.toLowerCase(),
+  currentSha:after.commitSha.toLowerCase(),
+  addedFolders:added(foldersBefore,foldersAfter),
+  removedFolders:added(foldersAfter,foldersBefore),
+  addedFiles:added(filesBefore,filesAfter),
+  removedFiles:added(filesAfter,filesBefore)};
+}
 export function sourceChanges(previous,next){
  if(!next||!["owner","repository"].includes(next.scope))throw Error("Invalid source observation scope");
  if(!previous||previous.scope!==next.scope||previous.complete!==true||next.complete!==true){
   const selectedRevision=selectedBranchDelta(previous,next);
+  const structureDelta=rootStructureDelta(previous,next);
   return {baseline:!previous,comparable:false,added:[],removed:[],renamed:[],changed:[],
    reason:"Comparison requires two complete source snapshots",
-   ...(selectedRevision?{selectedRevision}:{})};
+   ...(selectedRevision?{selectedRevision}:{}),
+   ...(structureDelta?{structureDelta}:{})};
  }
  if(next.scope==="owner"){
   const old=new Map(previous.repositories.map(x=>[identity(x),x]));
@@ -43,6 +78,7 @@ export function sourceChanges(previous,next){
   for(const [id,r] of old)if(!fresh.has(id))removed.push(label(r));
   return {baseline:false,comparable:true,added,removed,renamed,changed};
  }
+ const structureDelta=rootStructureDelta(previous,next);
  const prior=previous.branchHeads||{},current=next.branchHeads||{};
  const old=new Set(previous.branches||Object.keys(prior)),fresh=new Set(next.branches||Object.keys(current));
  return {baseline:false,comparable:true,added:[...fresh].filter(x=>!old.has(x)),
@@ -51,7 +87,8 @@ export function sourceChanges(previous,next){
   // Retain the actual before/after commit IDs inside the existing source summary.
   // Older snapshots without this optional field remain readable.
   revisions:[...fresh].filter(x=>old.has(x)&&typeof prior[x]==="string"&&typeof current[x]==="string"&&prior[x]!==current[x])
-   .map(ref=>({ref,previousSha:prior[ref],currentSha:current[ref]}))};
+   .map(ref=>({ref,previousSha:prior[ref],currentSha:current[ref]})),
+  ...(structureDelta?{structureDelta}:{})};
 }
 export function applySourceObservation(snapshot,projectId,sourceId,observation){
  const p=snapshot.projects.find(x=>x.id===projectId),source=p?.sources.find(x=>x.id===sourceId);

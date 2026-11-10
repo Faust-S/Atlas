@@ -92,6 +92,15 @@ export function sourceReview(source,{limit=12}={}){
  const change=source.summary?.changes;
  const comparable=change?.comparable===true;
  const branchDelta=change?.selectedRevision;
+ const rootDelta=change?.structureDelta;
+ // The root comparison is independent of incomplete branch pagination.
+ // Never report folder/file removals based on a truncated root listing.
+ const structureDelta=source.kind==="github"&&source.status==="ok"&&
+  rootDelta&&Array.isArray(rootDelta.addedFolders)&&
+  Array.isArray(rootDelta.removedFolders)&&Array.isArray(rootDelta.addedFiles)&&
+  Array.isArray(rootDelta.removedFiles)?
+  {...rootDelta,total:rootDelta.addedFolders.length+rootDelta.removedFolders.length+
+   rootDelta.addedFiles.length+rootDelta.removedFiles.length}:null;
  let selectedRevision=null;
  if(source.kind==="github"&&source.status==="ok"&&!comparable&&
     source.summary?.scope==="repository"&&isString(branchDelta?.branch)&&
@@ -134,7 +143,7 @@ export function sourceReview(source,{limit=12}={}){
  return Object.freeze({
   supported,status,lastAttempt,lastSuccess,
   sourceUrl:supported?sourceWebUrl(source):null,
-  selectedRevision,
+  selectedRevision,structureDelta,
   observedCommit:supported?observedCommit(source):null,
   error:hasError?String(source.error||"Источник недоступен"):null,
   comparison:comparable?"COMPARABLE":change?.baseline?"BASELINE":"NOT_COMPARABLE",

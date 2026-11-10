@@ -131,6 +131,13 @@ export function publicSourceQueue(snapshot,{now=Date.now(),maxAgeMs=DEFAULT_AGE}
   if(changes?.comparable)
    row.changed+=(changes.added?.length||0)+(changes.removed?.length||0)+
     (changes.changed?.length||0)+(changes.renamed?.length||0);
+  // A complete root comparison remains useful when the branch listing was
+  // incomplete: avoid hiding observed folder/file changes in the queue.
+  if(changes?.structureDelta){
+   const d=changes.structureDelta;
+   row.changed+=(d.addedFolders?.length||0)+(d.removedFolders?.length||0)+
+    (d.addedFiles?.length||0)+(d.removedFiles?.length||0);
+  }
   if(source.observedAt&&(!row.lastObserved||Date.parse(source.observedAt)>Date.parse(row.lastObserved)))
    row.lastObserved=source.observedAt;
  }

@@ -1596,6 +1596,16 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
          <button type="button" className="text-link" onClick={()=>view("reality")}>Проверить связанные требования</button>
         </p>}
         {review.previousObservation&&<p className="minor">Предыдущее наблюдение сохранено, но последняя сверка завершилась ошибкой.</p>}
+        {(review.structureDelta?.total||0)>0&&<p className="minor" aria-label="Изменения в составе проекта">
+         В структуре источника появились изменения: добавлено каталогов {review.structureDelta.addedFolders.length},
+         файлов {review.structureDelta.addedFiles.length}; удалено каталогов {review.structureDelta.removedFolders.length},
+         файлов {review.structureDelta.removedFiles.length}. Это не подтверждает выполнение работ.
+        </p>}
+        {s.kind==="github"&&s.summary?.structure?.status==="unavailable"&&
+         <p className="minor" aria-label="Структура источника недоступна">
+          Ветка наблюдалась, но состав её файлов сейчас недоступен. При следующей сверке Atlas
+          попробует получить структуру снова. Отсутствие сведений не означает удаление файлов.
+         </p>}
         {review.rows.length>0&&<div className="table-scroll"><table className="atlas-source-table"><thead><tr>
          <th>Изменение</th><th>Объект</th><th>Данные проверки</th>
         </tr></thead><tbody>{review.rows.map((row:any,i:number)=><tr key={i}>
@@ -1607,8 +1617,27 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
         {s.kind==="github"&&s.summary?.structure?.status==="observed"&&
          <details className="atlas-connected-structure">
           <summary>Структура репозитория · {s.summary.structure.totalFolders} каталогов · {s.summary.structure.totalFiles} файлов</summary>
-          <p className="minor">Это корневые каталоги и файлы на момент изучения выбранной ветки.
-           Они не считаются работами или готовыми модулями без вашего решения.</p>
+          <p className="minor">Структура получена из GitHub для редакции{" "}
+           {s.summary.structure.commitSha?.slice(0,12)||"не установлена"}.
+           Показан только верхний уровень. Каталоги и файлы не становятся работами
+           или готовыми модулями без вашего решения.</p>
+          {review.structureDelta&&<div className="atlas-structure-changes" aria-label="Изменения корневой структуры">
+           <strong>{review.structureDelta.total>0?"Что изменилось с предыдущей сверки":
+            "На верхнем уровне изменений нет"}</strong>
+           {[
+            ...review.structureDelta.addedFolders.map((name:string)=>"Каталог добавлен: "+name),
+            ...review.structureDelta.removedFolders.map((name:string)=>"Каталог отсутствует в новой редакции: "+name),
+            ...review.structureDelta.addedFiles.map((name:string)=>"Файл добавлен: "+name),
+            ...review.structureDelta.removedFiles.map((name:string)=>"Файл отсутствует в новой редакции: "+name)
+           ].length>0&&<ul>{[
+            ...review.structureDelta.addedFolders.map((name:string)=>"Каталог добавлен: "+name),
+            ...review.structureDelta.removedFolders.map((name:string)=>"Каталог отсутствует в новой редакции: "+name),
+            ...review.structureDelta.addedFiles.map((name:string)=>"Файл добавлен: "+name),
+            ...review.structureDelta.removedFiles.map((name:string)=>"Файл отсутствует в новой редакции: "+name)
+           ].slice(0,18).map((line:string,i:number)=><li key={i}>{line}</li>)}</ul>}
+           {review.structureDelta.total>18&&<p className="minor">
+            Показано 18 из {review.structureDelta.total} изменений.</p>}
+          </div>}
           <div className="atlas-connect-root">
            <div><strong>Каталоги</strong><ul>{s.summary.structure.folders.map((name:string)=>
             <li key={name}>{name}</li>)}</ul></div>
