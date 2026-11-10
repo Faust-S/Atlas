@@ -174,6 +174,24 @@ def wait_text(value,timeout=90):
     screenshot("view-timeout")
     raise AssertionError("Installed UI never rendered: "+value)
 
+def assert_map_in_initial_view():
+    # A valid map must be readable before the user scrolls the workspace.
+    # UIA IsVisible alone is insufficient: off-screen WebView elements may
+    # still report visible. Check the physical Windows coordinates.
+    bounds=win32gui.GetWindowRect(handle)
+    for text in ("Как связаны части проекта","Проверить исходники сайта"):
+        matches=[element for element in window().descendants()
+                 if element.window_text()==text and element.is_visible()]
+        within=[element for element in matches
+                if element.rectangle().top>=bounds[1]+105
+                and element.rectangle().bottom<=bounds[3]-38
+                and element.rectangle().left>=bounds[0]+235
+                and element.rectangle().right<=bounds[2]-8]
+        if not within:
+            screenshot("source-map-below-fold")
+            raise AssertionError("Map content is below the initial Windows viewport: "+text)
+    print("ATLAS06_SOURCE_PLAN_ABOVE_FOLD_PASS",flush=True)
+
 def stop():
     global process,handle
     if process is None:return
@@ -369,6 +387,7 @@ def verify_organization_work(previous,original_project):
     wait_text("Как связаны части проекта",35)
     wait_text("Проверить исходники сайта",35)
     screenshot("source-work-stage-map")
+    assert_map_in_initial_view()
     assert head()==current,"Viewing source plan map changed native storage"
     click_scrolled_button("План-график",main=True)
     window_title_contains("Atlas — График",35)

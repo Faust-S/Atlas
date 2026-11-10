@@ -1144,16 +1144,6 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      </details>
     </nav>
     {tab==="overview"&&<>
-     <div className="metric-grid"><Metric value={project.targets?.length||0} label="Ожидаемых результатов"/><Metric value={impact?.attention??0} label="Требуют внимания"/>
-      <Metric value={project.items.length} label="Работ"/><Metric value={projected?.deadlineSlipDays??"?"} label="Дней риска срока"/></div>
-     {nextStep&&<section className="surface atlas-next-step" aria-label="Следующий шаг проекта">
-      <div className="section-heading"><div><small>Подсказка по текущему плану</small>
-       <h2>{nextStep.title}</h2><p>{nextStep.note}</p></div>
-       <Action primary onClick={()=>nextStep.action?openEditor(nextStep.action):view(nextStep.tab as Tab)}>{nextStep.button}</Action>
-      </div>
-      <p className="minor">Переход только открывает представление или редактор. Факты и решения автоматически не изменяются.</p>
-     </section>}
-
      {(project.type==="engineering"||project.sources.some((source:any)=>source.kind==="github"))&&
      <ProjectOrganizationGuide snapshot={data} projectId={project.id}
       onEdit={openEditor}
@@ -1165,6 +1155,17 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       onOpenProject={id=>selectProject(id)}
       onAddRelation={()=>openEditor("portfolio-link")}
       busy={busy}/>}
+     <div className="metric-grid"><Metric value={project.targets?.length||0} label="Ожидаемых результатов"/><Metric value={impact?.attention??0} label="Требуют внимания"/>
+      <Metric value={project.items.length} label="Работ"/><Metric value={projected?.deadlineSlipDays??"?"} label="Дней риска срока"/></div>
+     {nextStep&&<section className="surface atlas-next-step" aria-label="Следующий шаг проекта">
+      <div className="section-heading"><div><small>Подсказка по текущему плану</small>
+       <h2>{nextStep.title}</h2><p>{nextStep.note}</p></div>
+       <Action primary onClick={()=>nextStep.action?openEditor(nextStep.action):view(nextStep.tab as Tab)}>{nextStep.button}</Action>
+      </div>
+      <p className="minor">Переход только открывает представление или редактор. Факты и решения автоматически не изменяются.</p>
+     </section>}
+
+
      <section className="surface atlas-reality-overview" aria-label="Сопоставление цели, фактов и решений">
       <div className="section-heading"><div><h2>План, факты и решения</h2>
        <p>Atlas сопоставляет требования с записанными фактами, показывает расхождения и связанные решения. Источники можно проверить отдельно.</p></div>

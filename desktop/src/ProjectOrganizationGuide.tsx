@@ -1,4 +1,4 @@
-import React from "react";
+import React,{useEffect,useState} from "react";
 import {projectStructureGuide,projectSourcePlanProjection,folderWorkAction} from "../../src/project-organization.mjs";
 import {ProjectSourcePlanMap} from "./ProjectVisuals";
 
@@ -11,10 +11,19 @@ export function ProjectOrganizationGuide({snapshot,projectId,onEdit,onRefresh,on
  onOpenSources:()=>void;onOpenWorks:()=>void;onAddRelation:()=>void;
  onOpenTimeline:()=>void;onOpenGraph:()=>void;busy?:boolean;
 }){
+ const [moreLinks,setMoreLinks]=useState(false);
+ useEffect(()=>setMoreLinks(false),[projectId]);
  const guide=projectStructureGuide(snapshot,projectId);
- const projection=projectSourcePlanProjection(snapshot,projectId);
+ const projection=projectSourcePlanProjection(snapshot,projectId,moreLinks?
+  {maxSources:8,maxFoldersPerSource:16,maxWorksPerFolder:8,maxOtherWorks:20}:
+  {maxSources:2,maxFoldersPerSource:4,maxWorksPerFolder:3,maxOtherWorks:6});
  const suggested=guide.nextAction;
  const hasSources=guide.sources.length>0;
+ const linkedFolderWorks=snapshot.projects.find((p:any)=>p.id===projectId)?.items
+  .some((work:any)=>work.sourceId&&work.sourcePath)??false;
+ const hasMoreLinks=projection.hiddenSources>0||projection.hiddenOtherWorks>0||
+  projection.sources.some((source:any)=>source.incomplete||
+   source.folders.some((folder:any)=>folder.hiddenWorks>0));
  return <section className="surface atlas-project-organization" aria-label="Состав проекта и возможные следующие действия">
   <div className="section-heading"><div>
    <h2>Состав проекта</h2>
@@ -24,7 +33,7 @@ export function ProjectOrganizationGuide({snapshot,projectId,onEdit,onRefresh,on
   {!hasSources&&<p className="minor">Подключите исходники, чтобы увидеть их каталоги и связанные проекты.
    План проекта можно составлять и без GitHub.</p>}
   {hasSources&&<details className="atlas-source-plan-disclosure"
-   open={projection.mappedTotal>0||undefined}>
+   open={projection.mappedTotal>0||linkedFolderWorks||undefined}>
    <summary>Схема проекта: каталоги, работы и этапы</summary>
    <ProjectSourcePlanMap projection={projection}
     onOpenWork={id=>onEdit("work:"+id)}
@@ -32,9 +41,17 @@ export function ProjectOrganizationGuide({snapshot,projectId,onEdit,onRefresh,on
     onSuggestFolder={(sourceId,commitSha,folder)=>
      onEdit(folderWorkAction(sourceId,commitSha,folder))}
     onOpenTimeline={onOpenTimeline} onOpenGraph={onOpenGraph}
+    onOpenWorks={onOpenWorks} onOpenSources={onOpenSources}
     onCreateStage={()=>onEdit("stage")}
     onAddDependency={()=>onEdit("dep")}/>
+   {!moreLinks&&hasMoreLinks&&<div className="atlas-source-plan-preview-actions">
+    <button type="button" className="action-button"
+     onClick={()=>setMoreLinks(true)}>Показать больше связей</button>
+   </div>}
   </details>}
+  {hasSources&&<details className="atlas-organization-details"
+   open={!linkedFolderWorks||undefined}>
+   <summary>Каталоги и сведения об источниках</summary>
   {guide.sources.map((source:any)=><div key={source.sourceId} className="atlas-organization-source">
    <div className="atlas-organization-source-heading">
     <strong>{source.repository}</strong><span className="minor">Ветка: {source.branch||"не выбрана"}</span>
@@ -77,6 +94,7 @@ export function ProjectOrganizationGuide({snapshot,projectId,onEdit,onRefresh,on
   </div>)}
   {guide.hiddenSources>0&&<p className="minor">Остальные источники ({guide.hiddenSources})
    доступны в разделе «Источники».</p>}
+  </details>}
   {guide.related.length>0&&<div className="atlas-organization-related">
    <h3>Проекты, которые стоит сопоставить</h3>
    <p className="minor">Общий репозиторий или владелец GitHub ещё не означает зависимость.

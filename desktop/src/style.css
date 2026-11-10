@@ -643,6 +643,10 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 }
 
 
+.atlas-organization-details{border-top:1px solid #e0e8f1;padding-top:10px;margin-top:12px}
+.atlas-organization-details>summary{cursor:pointer;color:#28598d;font-size:13px;
+ font-weight:650;padding:8px 0;outline-offset:3px}
+
 /* Atlas 0.6 - the existing source, work and stage model shown together. */
 .atlas-source-plan-disclosure{border:1px solid #cfdef0;border-radius:10px;
  background:#fbfdff;margin:12px 0;padding:11px 13px}
@@ -651,6 +655,8 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .atlas-source-plan-disclosure[open]>summary{margin-bottom:14px}
 .atlas-source-plan-map .section-heading h3{margin:0;font-size:15px}
 .atlas-source-plan-map .section-heading p{margin:5px 0;color:#60758d;font-size:12px}
+.atlas-source-plan-preview-actions{display:flex;justify-content:flex-start;
+ padding:8px 0 2px}
 .atlas-source-plan-source{border-top:1px solid #dee8f3;padding:13px 0}
 .atlas-source-plan-source-title{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;
  margin-bottom:10px}
@@ -678,6 +684,13 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .atlas-source-plan-stage{display:flex;align-items:center;min-width:0;overflow-wrap:anywhere}
 .atlas-source-plan-stage>.text-link{text-align:left}
 .atlas-source-plan-stage>.action-button{min-width:0}
+.atlas-source-plan-map .text-link,.atlas-source-plan-map .action-button{
+ min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere;word-break:break-word}
+.atlas-source-plan-work>.text-link,.atlas-source-plan-stage>.text-link{
+ display:block;text-align:left}
+.atlas-source-plan-dependencies{font-size:11px;color:#657b95;min-width:0}
+.atlas-source-plan-dependencies>summary{cursor:pointer;outline-offset:2px;padding:2px 0}
+.atlas-source-plan-dependencies>.text-link{display:block;margin:4px 0;max-width:100%}
 .atlas-source-plan-unassigned{border:1px dashed #cedaec;border-radius:8px;
  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;
  gap:9px;padding:8px 10px;background:#fcfdff}

@@ -242,10 +242,11 @@ export function PortfolioNetworkMap({snapshot,onOpenProject}:{
 // The connectors illustrate only confirmed user-created work/stage assignments.
 // No component or dependency is created by opening the diagram.
 export function ProjectSourcePlanMap({projection,onOpenWork,onEditStage,onSuggestFolder,
- onOpenTimeline,onOpenGraph,onCreateStage,onAddDependency}:{
+ onOpenTimeline,onOpenGraph,onOpenWorks,onOpenSources,onCreateStage,onAddDependency}:{
  projection:any;onOpenWork:(id:string)=>void;onEditStage:(id:string)=>void;
  onSuggestFolder:(sourceId:string,commitSha:string,folder:string)=>void;
  onOpenTimeline:()=>void;onOpenGraph:()=>void;
+ onOpenWorks:()=>void;onOpenSources:()=>void;
  onCreateStage:()=>void;onAddDependency:()=>void;
 }){
  return <div className="atlas-source-plan-map" aria-label="Схема каталогов, работ и этапов">
@@ -283,8 +284,13 @@ export function ProjectSourcePlanMap({projection,onOpenWork,onEditStage,onSugges
         <button type="button" className="text-link" onClick={()=>onOpenWork(work.id)}>
          {work.title}</button>
         {!work.sameRevision&&<small>Работа связана с прежней редакцией исходников</small>}
-        {work.predecessorTotal>0&&<small>
-         Зависит от других работ: {work.predecessorTotal}</small>}
+        {work.predecessorTotal>0&&<details className="atlas-source-plan-dependencies">
+         <summary>Ожидает {work.predecessorTotal} работ</summary>
+         {work.predecessors.map((previous:any)=><button key={previous.id} type="button"
+          className="text-link" onClick={()=>onOpenWork(previous.id)}>{previous.title}</button>)}
+         {work.predecessorTotal>work.predecessors.length&&<button type="button"
+          className="text-link" onClick={onOpenGraph}>Открыть остальные зависимости</button>}
+        </details>
        </div>
        <span className="atlas-source-plan-arrow" aria-hidden="true">→</span>
        <div className="atlas-source-plan-stage">
@@ -302,12 +308,14 @@ export function ProjectSourcePlanMap({projection,onOpenWork,onEditStage,onSugges
         Добавить работу</button>
       </div>}
       {folder.hiddenWorks>0&&<p className="minor">Ещё {folder.hiddenWorks} работ.
-       Полный список доступен во вкладке «Работы».</p>}
+       {" "}<button type="button" className="text-link"
+        onClick={onOpenWorks}>Открыть все работы</button></p>
      </div>
     </div>)}
     {!source.folders.length&&<p className="minor">На верхнем уровне этой ветки каталоги не найдены.</p>}
-    {source.incomplete&&<p className="minor">Показана часть каталогов.
-     Это не означает, что остальных нет.</p>}
+    {source.incomplete&&<p className="minor">Показаны каталоги: {source.folders.length}
+     {Number.isInteger(source.folderCount)?" из "+source.folderCount+" известных":""}.
+     Другие каталоги могут быть не получены.</p>
    </>:<p className="minor">Сведения о каталогах этой ветки сейчас недоступны.
     Работы остаются в плане. Обновите источник, чтобы сравнить их со структурой.</p>}
   </div>)}
@@ -319,14 +327,18 @@ export function ProjectSourcePlanMap({projection,onOpenWork,onEditStage,onSugges
     {projection.otherWorks.map((work:any)=><div key={work.id}>
      <button type="button" className="text-link"
       onClick={()=>onOpenWork(work.id)}>{work.title}</button>
-     <small>{work.reason}. {work.stageName}</small>
+     <small>{work.reason}.</small>
+     {work.stageId?<button type="button" className="text-link"
+      onClick={()=>onEditStage(work.stageId)}>{work.stageName}</button>:
+      <small>Без этапа</small>}
     </div>)}
    </div>
    {projection.hiddenOtherWorks>0&&<p className="minor">
     Ещё {projection.hiddenOtherWorks} работ доступны во вкладке «Работы».</p>}
   </div>}
-  {projection.hiddenSources>0&&<p className="minor">Не показано источников: {projection.hiddenSources}.
-   Полный список доступен во вкладке «Источники».</p>}
+  {projection.hiddenSources>0&&<p className="minor">Ещё {projection.hiddenSources} источников.
+   {" "}<button type="button" className="text-link" onClick={onOpenSources}>
+    Открыть все источники</button></p>
   <div className="atlas-source-plan-actions">
    <button type="button" className="action-button"
     onClick={onCreateStage}>Добавить этап</button>

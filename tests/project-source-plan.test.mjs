@@ -117,7 +117,7 @@ test("Atlas uses its existing editors, schedule, and dependency graph from a nav
  assert.match(visual,/onAddDependency/);
  assert.match(visual,/source\.status==="current"/);
  assert.match(guide,/projectSourcePlanProjection\(snapshot,projectId\)/);
- assert.match(guide,/open=\{projection\.mappedTotal>0\|\|undefined\}/);
+ assert.match(guide,/open=\{projection\.mappedTotal>0\|\|linkedFolderWorks\|\|undefined\}/);
  assert.match(guide,/onOpenWork=\{id=>onEdit\("work:"\+id\)\}/);
  assert.match(guide,/onEditStage=\{id=>onEdit\("stage-edit:"\+id\)\}/);
  assert.match(guide,/onCreateStage=\{\(\)=>onEdit\("stage"\)\}/);
@@ -127,4 +127,64 @@ test("Atlas uses its existing editors, schedule, and dependency graph from a nav
  assert.match(css,/\.atlas-source-plan-assignment\{display:grid/);
  assert.doesNotMatch(visual.slice(visual.indexOf("export function ProjectSourcePlanMap")),/fetch\(|localStorage|mutate\(|createItem\(/);
  assert.doesNotMatch(visual.slice(visual.indexOf("export function ProjectSourcePlanMap")) ,/[—–]/);
+});
+
+
+test("Linked folders are shown first in a bounded map without changing source order",()=>{
+ const f=fixture(),updated=structuredClone(f.state);
+ const tree=updated.projects[0].sources[0].summary.structure;
+ tree.folders=["unrelated-first","unrelated-second","src","docs"];
+ tree.totalFolders=tree.folders.length;
+ const original=serialize(updated);
+ const map=projectSourcePlanProjection(updated,f.projectId,{
+  maxSources:1,maxFoldersPerSource:1,maxWorksPerFolder:1,maxOtherWorks:2
+ });
+ assert.equal(map.sources[0].folders[0].name,"src");
+ assert.equal(map.sources[0].folders[0].works[0].id,f.firstId);
+ assert.equal(map.sources[0].displayed,1);
+ assert.equal(map.sources[0].folderCount,4);
+ assert.equal(map.sources[0].incomplete,true);
+ assert.equal(map.otherWorks.some(work=>work.id===f.secondId),true);
+ assert.deepEqual(tree.folders,["unrelated-first","unrelated-second","src","docs"]);
+ assert.equal(serialize(updated),original);
+});
+test("Large linked folders stay bounded; long work and stage titles remain intact",()=>{
+ const f=fixture(),veryLong="Разобрать структуру "+("длинного названия каталога ".repeat(4));
+ let state=f.state;
+ for(let i=0;i<55;i++){
+  const added=createItem(state,f.projectId,{title:veryLong+" №"+i});
+  state=editItem(added.state,f.projectId,added.id,{
+   sourceId:f.sourceId,sourcePath:"src",sourceRevision:SHA});
+ }
+ const before=serialize(state);
+ const map=projectSourcePlanProjection(state,f.projectId,{
+  maxSources:1,maxFoldersPerSource:1,maxWorksPerFolder:3,maxOtherWorks:1
+ });
+ const folder=map.sources[0].folders[0];
+ assert.equal(folder.name,"src");
+ assert.equal(folder.totalWorks,56);
+ assert.equal(folder.works.length,3);
+ assert.equal(folder.hiddenWorks,53);
+ assert.equal(folder.works[1].title,veryLong+" №0");
+ assert.equal(map.workTotal,58);
+ assert.equal(map.dependencyTotal,1);
+ assert.equal(serialize(state),before);
+});
+test("The first screen prioritizes real project links and permits controlled expansion",()=>{
+ const ui=read("../desktop/src/main.tsx");
+ const guide=read("../desktop/src/ProjectOrganizationGuide.tsx");
+ const visual=read("../desktop/src/ProjectVisuals.tsx");
+ const css=read("../desktop/src/style.css");
+ const mapIndex=ui.indexOf('<ProjectOrganizationGuide snapshot={data}');
+ const metricsIndex=ui.indexOf('<div className="metric-grid">',mapIndex);
+ const tipIndex=ui.indexOf('<section className="surface atlas-next-step"',mapIndex);
+ assert.ok(mapIndex>0&&metricsIndex>mapIndex&&tipIndex>mapIndex);
+ assert.match(guide,/maxSources:2,maxFoldersPerSource:4,maxWorksPerFolder:3,maxOtherWorks:6/);
+ assert.match(guide,/Показать больше связей/);
+ assert.match(guide,/Каталоги и сведения об источниках/);
+ assert.match(visual,/Ожидает \{work\.predecessorTotal\} работ/);
+ assert.match(visual,/onOpenWork\(previous\.id\)/);
+ assert.match(visual,/Открыть все источники/);
+ assert.match(css,/\.atlas-source-plan-map \.text-link,\.atlas-source-plan-map \.action-button\{[^}]*overflow-wrap:anywhere/);
+ assert.match(css,/\.atlas-source-plan-dependencies>summary\{/);
 });

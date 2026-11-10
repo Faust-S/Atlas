@@ -38,7 +38,7 @@ const treeStatus=source=>{
  return "current";
 };
 const textOfSource=s=>({sourceId:s.id,repository:entryRepo(s),branch:selectedBranch(s)});
-export function projectStructureGuide(snapshot,projectId,{maxFolders=24,maxSources=12}={}){
+export function projectStructureGuide(snapshot,projectId,{maxFolders=24,maxSources=12,linkedFirst=false}={}){
  validate(snapshot);
  if(!Number.isInteger(maxFolders)||maxFolders<1||maxFolders>120||
     !Number.isInteger(maxSources)||maxSources<1||maxSources>40)
@@ -48,8 +48,13 @@ export function projectStructureGuide(snapshot,projectId,{maxFolders=24,maxSourc
  const sources=project.sources.filter(s=>entryRepo(s)).slice(0,maxSources).map(source=>{
   const status=treeStatus(source),repo=entryRepo(source);
   const tree=status==="current"?source.summary.structure:null;
-  const folders=tree&&Array.isArray(tree.folders)?tree.folders.filter(rootName)
-   .slice(0,maxFolders).map(name=>({
+  const names=tree&&Array.isArray(tree.folders)?tree.folders.filter(rootName):[];
+  if(linkedFirst){
+   const linked=new Set(project.items.filter(item=>item.sourceId===source.id)
+    .map(item=>item.sourcePath));
+   names.sort((a,b)=>Number(linked.has(b))-Number(linked.has(a)));
+  }
+  const folders=names.slice(0,maxFolders).map(name=>({
     name,role:roleFor(name),sourceId:source.id,commitSha:tree.commitSha,
     workCount:project.items.filter(item=>
      item.sourceId===source.id&&item.sourcePath===name).length,
@@ -126,7 +131,7 @@ export function projectSourcePlanProjection(snapshot,projectId,{
  const project=snapshot.projects.find(p=>p.id===projectId);
  if(!project)throw Error("Проект не найден");
  const overview=projectStructureGuide(snapshot,projectId,{
-  maxSources,maxFolders:maxFoldersPerSource
+  maxSources,maxFolders:maxFoldersPerSource,linkedFirst:true
  });
  const stageById=new Map(project.stages.map(s=>[s.id,s]));
  const workById=new Map(project.items.map(w=>[w.id,w]));
