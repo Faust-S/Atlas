@@ -44,7 +44,8 @@ $tree = $tree.Trim()
 if ($head -notmatch '^[0-9a-f]{40}$' -or $tree -notmatch '^[0-9a-f]{40}$') {
     throw 'ATLAS_SETUP_SOURCE_REVISION_MISSING'
 }
-$temporary = Join-Path $env:RUNNER_TEMP ('atlas-setup-' + [Guid]::NewGuid().ToString('N'))
+$scratch = if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { [IO.Path]::GetTempPath() }
+$temporary = Join-Path $scratch ('atlas-setup-' + [Guid]::NewGuid().ToString('N'))
 $payload = Join-Path $temporary 'payload'
 New-Item -ItemType Directory -Path $payload -Force | Out-Null
 try {
@@ -158,8 +159,10 @@ try {
                 }
             } finally { $bmp.Dispose() }
         } finally { $nativeIcon.Dispose() }
-        "ATLAS_INSTALLED_EXE=$installedExe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-        "ATLAS_SETUP_CORE_PACKAGE=$outputPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+        if ($env:GITHUB_ENV) {
+            "ATLAS_INSTALLED_EXE=$installedExe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            "ATLAS_SETUP_CORE_PACKAGE=$outputPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+        }
         Write-Host "ATLAS05_SETUP_CORE_NATIVE_INSTALL_PASS data=$($locations.dataRoot) program=$($locations.programRoot)"
     }
 } finally {
