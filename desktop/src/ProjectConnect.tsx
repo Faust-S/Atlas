@@ -93,6 +93,17 @@ export function ProjectConnect({snapshot,onApply,onCancel,disabled=false}:{
    ci?.state==="none"?"Запусков GitHub Actions пока нет":
    ci?.state==="unavailable"?"Результат проверки недоступен":
    "Состояние проверок не определено";
+ const confirmActions=preview?<div className="button-row atlas-connect-confirm-actions">
+  <button type="button" className="action-button primary" onClick={apply}
+   disabled={disabled||loading||preview.kind==="owner"&&!selected.length||
+    preview.kind==="repository"&&branchChoice.trim()!==(preview.branch||"")}>
+   {existing?"Открыть существующий проект":
+    preview.kind==="owner"?"Включить выбранные проекты":"Добавить в Atlas"}
+  </button>
+  <button type="button" className="action-button" onClick={()=>{setPreview(null);setError("")}}>
+   Изменить источник
+  </button>
+ </div>:null;
  return <section className="surface atlas-project-connect" aria-label="Подключение существующего проекта">
   <div className="section-heading"><div>
    <h2>Подключить существующий проект</h2>
@@ -142,14 +153,16 @@ export function ProjectConnect({snapshot,onApply,onCancel,disabled=false}:{
     </div>
     {branchChoice!==preview.branch&&<p className="minor">Выбрана другая ветка. Нажмите «Изучить выбранную ветку», чтобы обновить предпросмотр.</p>}
     <div className="summary-line">
-     <span>Ветка: {preview.summary.defaultBranch||"не определена"}</span>
+     <span>Исходники: {preview.branch||"не определена"}</span>
+     {preview.summary.defaultBranch!==preview.branch&&<span>Основная ветка: {preview.summary.defaultBranch||"не определена"}</span>}
      <span>{ciLabel}</span>
      <span>{preview.summary.complete?"Перечень веток получен":"Перечень веток неполный"}</span>
     </div>
     {existing&&<p className="minor">Уже включён в проект «{existing.name}».
      Повторного проекта не будет: откроется существующий.</p>}
-    {structure?.status==="observed"?<>
-     <h3>Корневая структура</h3>
+    {confirmActions}
+    {structure?.status==="observed"?<details className="atlas-connect-root-preview">
+     <summary>Корневая структура · {structure.totalFolders} каталогов · {structure.totalFiles} файлов</summary>
      <div className="atlas-connect-root">
       <div><strong>Каталоги · {structure.totalFolders}</strong>
        {structure.folders.slice(0,16).length?<ul>{structure.folders.slice(0,16).map((folder:string)=>
@@ -164,7 +177,7 @@ export function ProjectConnect({snapshot,onApply,onCancel,disabled=false}:{
       {" "}{structure.detected.join(", ")}</p>}
      {(structure.truncated||structure.limited||structure.totalFolders>16||structure.totalFiles>16)&&
       <p className="minor">Показана только часть структуры. Вложенные каталоги не исследованы.</p>}
-    </>:<p className="minor">Структуру файлов не удалось получить:
+    </details>:<p className="minor">Структуру файлов не удалось получить:
      {structure?.reason||"основная ветка не определена"}.
      Репозиторий можно подключить без файлового предпросмотра.</p>}
     <p className="minor">Найденные каталоги не становятся задачами автоматически.
@@ -198,17 +211,7 @@ export function ProjectConnect({snapshot,onApply,onCancel,disabled=false}:{
     <p className="minor">Выбрано {selected.length} из {list.length} показанных по фильтру.
      За одно подключение — до 20 репозиториев.</p>
    </>}
-   <div className="button-row">
-    <button type="button" className="action-button primary" onClick={apply}
-     disabled={disabled||loading||preview.kind==="owner"&&!selected.length||
-      preview.kind==="repository"&&branchChoice.trim()!==(preview.branch||"")}>
-     {existing?"Открыть существующий проект":
-      preview.kind==="owner"?"Включить выбранные проекты":"Добавить в Atlas"}
-    </button>
-    <button type="button" className="action-button" onClick={()=>{setPreview(null);setError("")}}>
-     Изменить источник
-    </button>
-   </div>
+   {preview.kind==="owner"&&confirmActions}
    <p className="minor">Добавление изменяет только локальный черновик Atlas. Запишите его кнопкой «Сохранить».
     Во внешнем GitHub никакие действия не выполняются.</p>
   </div>}

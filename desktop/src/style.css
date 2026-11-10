@@ -585,3 +585,27 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
  .atlas-connect-form label{min-width:0}
  .atlas-connect-form .action-button{width:100%}
 }
+
+
+/* One focused user flow instead of a project dashboard underneath a wizard.
+ * Keep the native command bar, save indicators and alerts visible. */
+.atlas-connect-focused .workspace > .page-heading,
+.atlas-connect-focused .workspace > .metric-grid,
+.atlas-connect-focused .workspace > .surface:not(.atlas-project-connect){
+ display:none;
+}
+.atlas-connect-focused .atlas-project-connect{margin-top:8px}
+.atlas-connect-root-preview{
+ border:1px solid #d8e5f3;border-radius:9px;padding:10px 12px;margin:12px 0;
+ background:#f8fbff;
+}
+.atlas-connect-root-preview summary{
+ color:#285788;cursor:pointer;font-size:13px;font-weight:650;
+}
+.atlas-connect-root-preview summary:focus-visible{
+ outline:2px solid #4287d4;outline-offset:3px;
+}
+.atlas-connect-root-preview .atlas-connect-root{margin-top:12px}
+.atlas-connect-confirm-actions{
+ border-top:1px solid #e1eaf3;padding-top:12px;margin:12px 0 8px;
+}

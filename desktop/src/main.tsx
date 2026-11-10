@@ -858,7 +858,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    {native&&!recovery&&!error&&<p className="minor">Открытие нативного хранилища…</p>}
   </div>
  </main>;
- return <div ref={rootRef} className={"app-shell"+(inspector?"":" no-inspector")+(editor?" editor-active":"")+(embedded?" atlas-embedded":"")}>
+ return <div ref={rootRef} className={"app-shell"+(inspector?"":" no-inspector")+(editor?" editor-active":"")+(embedded?" atlas-embedded":"")+(connectOpen?" atlas-connect-focused":"")}>
   <aside className="sidebar">
    <div className="brand"><img className="logo-symbol" src={logoUrl} alt="" aria-hidden="true" /><div><strong>Atlas</strong><small>IWXA · 0.6.0-dev.1</small></div></div>
    <nav className="main-nav" aria-label="Основная навигация">

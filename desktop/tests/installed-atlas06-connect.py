@@ -194,13 +194,23 @@ def open_source_view():
     # The project is also present in the portfolio list; use the actual
     # sidebar control rather than a potentially ambiguous project button.
     activate()
-    options=[item for item in window().descendants(control_type="Button")
-             if item.window_text()=="Atlas" and item.is_visible() and item.is_enabled()]
-    left=win32gui.GetWindowRect(handle)[0]
-    sidebar=[item for item in options if item.rectangle().left-left<260]
+    # A native HWND can exist before WebView2 has hydrated its React content.
+    # Require the real saved project to become navigable after restart.
+    deadline=time.monotonic()+40
+    sidebar=[]
+    while time.monotonic()<deadline:
+        options=[item for item in window().descendants(control_type="Button")
+                 if item.window_text()=="Atlas" and item.is_visible() and item.is_enabled()]
+        left=win32gui.GetWindowRect(handle)[0]
+        sidebar=[item for item in options if item.rectangle().left-left<260]
+        if len(sidebar)==1:break
+        if len(sidebar)>1:
+            screenshot("ambiguous-project-navigation")
+            raise AssertionError("Multiple Atlas projects in installed sidebar")
+        time.sleep(0.3)
     if len(sidebar)!=1:
         screenshot("project-navigation-missing")
-        raise AssertionError("Expected one Atlas project in installed sidebar")
+        raise AssertionError("Saved Atlas project did not appear in installed sidebar")
     sidebar[0].click_input()
     window_title_contains("Atlas — Обзор")
     # The detailed views are in the existing collapsible tab group.
@@ -272,6 +282,7 @@ def verify_refresh(previous,original_project):
     print("ATLAS06_CONNECT_LIVE_ROOT_REFRESH_SAVE_PASS",flush=True)
     stop()
     launch()
+    wait_text("Портфель проектов",45)
     assert head()==current,"Refreshed native project changed after restart"
     assert saved_project(head())==project,"Refreshed project block changed after restart"
     screenshot("refreshed-source-reopened")
@@ -325,6 +336,7 @@ def qualify():
     print("ATLAS06_CONNECT_NATIVE_SAVE_PASS",flush=True)
     stop()
     launch()
+    wait_text("Портфель проектов",45)
     second=head()
     assert second==first,"Saved structure or source changed after native restart"
     assert saved_project(second)==project,"Project block changed after restart"

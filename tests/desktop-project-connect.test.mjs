@@ -64,3 +64,17 @@ test("Structure is retained only when an independent GitHub refresh sees the exa
  assert.equal(after.structure,undefined);
  assert.equal(serialize(state),original);
 });
+
+test("Atlas connection wizard stays focused: no duplicate portfolio dashboards, compact root preview, early confirmation",()=>{
+ assert.match(ui,/connectOpen\?" atlas-connect-focused":""/);
+ assert.match(css,/\.atlas-connect-focused \.workspace > \.page-heading/);
+ assert.match(css,/\.atlas-connect-focused \.workspace > \.metric-grid/);
+ assert.match(css,/\.atlas-connect-focused \.workspace > \.surface:not\(\.atlas-project-connect\)/);
+ assert.match(connect,/<details className="atlas-connect-root-preview">/);
+ assert.match(connect,/<summary>Корневая структура/);
+ assert.match(connect,/const confirmActions=preview\?/);
+ assert.match(connect,/\{existing&&<p[\s\S]*\{confirmActions\}[\s\S]*\{structure\?\.status==="observed"/);
+ assert.match(connect,/\{preview\.kind==="owner"&&confirmActions\}/);
+ assert.match(connect,/Исходники: \{preview\.branch\|\|"не определена"\}/);
+ assert.match(connect,/Основная ветка: \{preview\.summary\.defaultBranch/);
+});
