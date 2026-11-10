@@ -830,7 +830,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   window.addEventListener("keydown",key);return ()=>window.removeEventListener("keydown",key);
  });
  if(!ready)return <main className="entry">
-  <div className="entry-card"><img className="logo-symbol" src={logoUrl} alt="" aria-hidden="true" /><h1>IWXA Atlas <em>0.5.0-dev.1</em></h1>
+  <div className="entry-card"><img className="logo-symbol" src={logoUrl} alt="" aria-hidden="true" /><h1>IWXA Atlas <em>0.6.0-dev.1</em></h1>
    <p>{recovery?"Найдена предыдущая исправная версия портфеля. Восстановление выполняется только по вашему решению.":"Самостоятельное локальное приложение для Windows. Данные принадлежат пользователю."}</p>
    {error&&<p role="alert" className="error">{error}</p>}
    {recovery&&<Action onClick={()=>void restore()} primary disabled={busy}>Восстановить сохранённую версию</Action>}
@@ -840,7 +840,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  </main>;
  return <div ref={rootRef} className={"app-shell"+(inspector?"":" no-inspector")+(editor?" editor-active":"")+(embedded?" atlas-embedded":"")}>
   <aside className="sidebar">
-   <div className="brand"><img className="logo-symbol" src={logoUrl} alt="" aria-hidden="true" /><div><strong>Atlas</strong><small>IWXA · 0.5.0-dev.1</small></div></div>
+   <div className="brand"><img className="logo-symbol" src={logoUrl} alt="" aria-hidden="true" /><div><strong>Atlas</strong><small>IWXA · 0.6.0-dev.1</small></div></div>
    <nav className="main-nav" aria-label="Основная навигация">
     <button aria-label="Открыть портфель проектов" className={!active?"nav-current":""}
       onClick={()=>selectProject(null)}>▦ <span>Портфель проектов</span><b>{data.projects.length}</b></button>
@@ -1027,7 +1027,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       </select></label>
       <label>Найти продукт <input aria-label="Поиск на карте разработки" type="search"
        placeholder="Проект или репозиторий" value={ecosystemQuery}
-       onChange={event=>{setEcosystemQuery(event.target.value);setEcosystemLimit(36)}}/></label>
+       onChange={event=>{setEcosystemQuery(event.target.value.slice(0,240));setEcosystemLimit(36)}}/></label>
       <small>Показано {Math.min(ecosystemRows.length,ecosystemLimit)} из {ecosystemRows.length}</small>
      </div>
      {ecosystemRows.length?<div className="table-scroll"><table aria-label="Продукты и связанные репозитории">
@@ -1607,7 +1607,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
           {" "}Приватные репозитории не перечисляются без отдельного разрешения.</p>
          <label>Найти репозиторий <input type="search" aria-label={"Поиск репозиториев "+ownerCatalog.owner}
           placeholder="Название репозитория" value={ownerCatalogQuery[s.id]||""}
-          onChange={event=>{setOwnerCatalogQuery(prev=>({...prev,[s.id]:event.target.value}));
+          onChange={event=>{setOwnerCatalogQuery(prev=>({...prev,[s.id]:event.target.value.slice(0,240)}));
            setOwnerCatalogLimit(prev=>({...prev,[s.id]:24}))}}/></label>
          {ownerCatalog.rows.length>0?<div className="table-scroll"><table aria-label={"Репозитории "+ownerCatalog.owner}>
           <thead><tr><th>Репозиторий</th><th>В Atlas</th><th>Действие</th></tr></thead>
@@ -1730,7 +1730,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      </div>
     </section>
    </div>}
-   <footer className="workspace-footer"><span>IWXA Atlas 0.5 · проекты хранятся на этом компьютере</span>
+   <footer className="workspace-footer"><span>IWXA Atlas 0.6 · проекты хранятся на этом компьютере</span>
     <span>Вы сами решаете, какие изменения сохранить и принять.</span></footer>
   </main>
   {inspector&&<aside className="inspector">

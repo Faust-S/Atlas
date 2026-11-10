@@ -7,13 +7,13 @@ const tauri=JSON.parse(read("../desktop/src-tauri/tauri.conf.json"));
 const workflow=read("../.github/workflows/atlas-0-2-1-branding.yml");
 const setup=read("../desktop/installer/build-setup-core.ps1");
 const native=read("../desktop/src-tauri/src/lib.rs");
-test("Atlas 0.5 defines the Setup Core product and does not package a second NSIS",()=>{
+test("Current Atlas development product uses the Setup Core profile and does not package a second NSIS",()=>{
  assert.equal(product.schema,"IWXA_SETUP_PRODUCT/1");
  assert.equal(product.id,"iwxa.atlas");
  assert.equal(product.display_name,"IWXA Atlas");
  assert.equal(product.architecture,"windows-x64");
  assert.equal(product.data_namespace,tauri.identifier);
- assert.equal(product.version,"0.5.0");
+ assert.equal(product.version,"0.6.0-dev.1");
  assert.equal(product.version,tauri.version);
  assert.equal(product.entrypoint,"iwxa-atlas-desktop.exe");
  assert.deepEqual(product.requirements,["webview2-evergreen"]);
@@ -34,6 +34,7 @@ test("Setup Core is pinned and compiled from original Center, not copied or fork
  assert.match(setup,/--verify-installed-file/);
  assert.match(setup,/--locations-file/);
  assert.match(setup,/ATLAS05_SETUP_CORE_NATIVE_INSTALL_PASS/);
+ assert.match(setup,/IWXA-Atlas-0\.6\.0-dev\.1-Setup\.exe/);
  assert.match(workflow,/ref: 0ef7544e2a6fd5fab5994f7f25abbb960063908c/);
  assert.match(workflow,/repository: Faust-S\/Center/);
  assert.match(workflow,/desktop\/installer\/build-setup-core\.ps1/);
