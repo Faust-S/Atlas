@@ -37,23 +37,46 @@ def rectangle_in_workspace(rect,window_bounds,require_vertical=True):
        and rect.bottom<=window_bounds[3]-35)
 
 def find_control(name,types=None,scroll=True):
+    # WebView2 UIA may collapse whitespace or shorten names of very long
+    # buttons. A long unique prefix is sufficient for locating that test
+    # fixture's single control; a physical click still must open its editor.
+    wanted="".join(name.split())
+    def named(text):
+        shown="".join(str(text).split())
+        return shown==wanted or (len(wanted)>100 and
+            shown.startswith(wanted[:64]))
+    def scroll_at(bounds,distance):
+        mouse.scroll(coords=(bounds[0]+min(505,bounds[2]-bounds[0]-110),
+                             bounds[1]+min(505,bounds[3]-bounds[1]-85)),
+                     wheel_dist=distance)
+    if scroll:
+        d.activate()
+        scroll_at(win32gui.GetWindowRect(d.handle),30)
+        time.sleep(0.2)
     end=time.monotonic()+35
+    attempts=0
+    candidates=[]
     while time.monotonic()<end:
         bounds=win32gui.GetWindowRect(d.handle)
-        matches=[e for e in d.window().descendants()
-                 if e.window_text()==name and e.is_visible()
-                 and e.is_enabled()
-                 and (types is None or e.element_info.control_type in types)]
-        for element in matches:
-            if rectangle_in_workspace(element.rectangle(),bounds):
+        relevant=[]
+        for e in d.window().descendants():
+            text=str(e.window_text() or "")
+            if (named(text) and e.is_visible() and e.is_enabled()
+                and (types is None or e.element_info.control_type in types)):
+                relevant.append(e)
+        for element in relevant:
+            rect=element.rectangle()
+            candidates.append((element.element_info.control_type,
+                               rect.left,rect.top,rect.right,rect.bottom))
+            if rectangle_in_workspace(rect,bounds):
                 return element
         if not scroll:
             break
+        attempts+=1
         d.activate()
-        mouse.scroll(coords=(bounds[0]+min(505,bounds[2]-bounds[0]-110),
-                             bounds[1]+min(505,bounds[3]-bounds[1]-85)),
-                     wheel_dist=-4)
-        time.sleep(0.25)
+        scroll_at(bounds,-2)
+        time.sleep(0.2)
+    print("ATLAS06_VISUAL_UIA_CANDIDATES "+name[:45]+" "+repr(candidates[:8]),flush=True)
     capture("control-not-visible")
     raise AssertionError("Synthetic visual control not physically reachable: "+name[:90])
 
@@ -182,7 +205,8 @@ def qualify_visual():
     win32gui.MoveWindow(d.handle,0,0,820,650,True)
     time.sleep(0.6)
     d.wait_text("atlas-visual-fixture/project-5",25)
-    long_work=find_control(LONG_WORK,types={"Button"})
+    capture("large-project-820-before-scroll")
+    long_work=find_control(LONG_WORK,types={"Button","Hyperlink","Text"})
     bounds=win32gui.GetWindowRect(d.handle)
     assert rectangle_in_workspace(long_work.rectangle(),bounds),"Long work clipped in narrow window"
     capture("long-work-820")
@@ -198,7 +222,7 @@ def qualify_visual():
     print("ATLAS06_VISUAL_LONG_WORK_NAVIGATION_PASS",flush=True)
 
     # Existing stage is navigable from the map, not synthesized by the view.
-    stage=find_control(LONG_STAGE,types={"Button"})
+    stage=find_control(LONG_STAGE,types={"Button","Hyperlink","Text"})
     stage.click_input()
     d.window_title_contains("Форма:",25)
     assert d.head()==saved
