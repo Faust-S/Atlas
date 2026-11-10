@@ -148,14 +148,16 @@ fn install_original_owner_public_trust(app:&AppHandle)->Result<(),String>{
         if !info.is_file()||info.file_type().is_symlink(){
             return Err("ATLAS_PERSON_LOCAL_TRUST_NOT_REGULAR".into());
         }
-        if original.exists(){
-            let recorded=fs::read(&local)
-                .map_err(|_|"ATLAS_PERSON_LOCAL_TRUST_READ_FAILED".to_string())?;
-            let installed=fs::read(&original)
-                .map_err(|_|"ATLAS_PERSON_SETUP_TRUST_READ_FAILED".to_string())?;
-            if recorded!=installed{
-                return Err("ATLAS_PERSON_SETUP_TRUST_CHANGED_REQUIRES_REVIEW".into());
-            }
+        // Existing local bytes are not an independent trust root. The
+        // official Setup Core resource must still be present and identical
+        // before FIRST recipient enrollment; never bootstrap from a file
+        // planted in the user data folder.
+        let recorded=fs::read(&local)
+            .map_err(|_|"ATLAS_PERSON_LOCAL_TRUST_READ_FAILED".to_string())?;
+        let installed=fs::read(&original)
+            .map_err(|_|"ATLAS_PERSON_PREINSTALLED_TRUST_MISSING".to_string())?;
+        if recorded!=installed{
+            return Err("ATLAS_PERSON_SETUP_TRUST_CHANGED_REQUIRES_REVIEW".into());
         }
         return Ok(());
     }
