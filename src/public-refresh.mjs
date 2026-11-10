@@ -62,7 +62,10 @@ const shaOk=sha=>typeof sha==="string"&&/^[a-f0-9]{40}$/i.test(sha);
 // Repo/CI evidence remains usable when GitHub refuses a tree read. A tree
 // failure is not a failed build, nor an assertion that folders are missing.
 export async function observePublicRepoWithTree(name,branch,fetcher=globalThis.fetch){
- const observed=await observePublicRepo(name,fetcher,{includeActions:true,actionsBranch:branch});
+ const fetched=await observePublicRepo(name,fetcher,{includeActions:true,actionsBranch:branch});
+ // Public GitHub observer uses a null-prototype lookup for branch names.
+ // Persist the regular JSON shape so Save/Import/Restart retain equality.
+ const observed={...fetched,branchHeads:{...fetched.branchHeads}};
  const selected=branch??observed.defaultBranch;
  const sha=typeof selected==="string"?observed.branchHeads?.[selected]:null;
  if(!selected||!shaOk(sha))return {
