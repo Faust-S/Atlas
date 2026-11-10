@@ -24,7 +24,7 @@ const isSha=x=>typeof x==="string"&&/^[a-f0-9]{40}$/i.test(x);
 // A single bounded read for a repository; an inaccessible tree does not erase
 // a successfully observed repository. Every proposed component is a real root
 // entry, never a fabricated work item, requirement, or readiness assertion.
-export async function inspectPublicProject(input,fetcher=globalThis.fetch,{signal}={}){
+export async function inspectPublicProject(input,fetcher=globalThis.fetch,{signal,branch=null}={}){
  const entry=projectConnectionAddress(input);
  if(entry.kind==="owner"){
   const summary=await observePublicOwner(entry.locator,fetcher,{maxPages:2,signal});
@@ -33,26 +33,29 @@ export async function inspectPublicProject(input,fetcher=globalThis.fetch,{signa
   return {kind:"owner",locator:entry.locator,url:entry.url,name:entry.locator,
    summary,structure:null,observedAt:summary.observedAt};
  }
+ const requested=branch===null?null:branchName(branch);
  const summary=await observePublicRepo(entry.locator,fetcher,
-  {maxPages:2,signal,includeActions:true});
+  {maxPages:2,signal,includeActions:true,actionsBranch:requested});
  if(summary.scope!=="repository"||
     summary.repository.toLowerCase()!==entry.locator.toLowerCase())
   throw Error("GitHub вернул данные другого репозитория");
- const branch=summary.defaultBranch;
- let structure={status:"unavailable",reason:"Основная ветка не определена"};
- if(typeof branch==="string"&&branch){
+ const selected=requested||summary.defaultBranch;
+ if(requested&&!isSha(summary.branchHeads?.[requested]))
+  throw Error("Указанная ветка GitHub не подтверждена. Проверьте название и доступность.");
+ let structure={status:"unavailable",reason:"Ветка исходников не определена"};
+ if(typeof selected==="string"&&selected){
   try{
-   const tree=await observePublicRootTree(entry.locator,branch,fetcher,{signal});
-   const commit=summary.branchHeads?.[branch];
-   structure={...tree,commitSha:isSha(commit)?commit.toLowerCase():null};
+   structure=await observePublicRootTree(entry.locator,selected,fetcher,{
+    signal,commitSha:summary.branchHeads?.[selected]??null});
   }catch(error){
    if(signal?.aborted)throw error;
-   structure={status:"unavailable",branch,
+   structure={status:"unavailable",branch:selected,
     reason:String(error?.message||"Не удалось прочитать дерево файлов GitHub").slice(0,260)};
   }
  }
  return {kind:"repository",locator:entry.locator,url:entry.url,
-  name:entry.locator.split("/")[1],summary,structure,observedAt:summary.observedAt};
+  name:entry.locator.split("/")[1],branch:selected,summary,structure,
+  observedAt:summary.observedAt};
 }
 
 const sourceRepository=source=>{
@@ -104,8 +107,13 @@ export function applyPublicProjectPreview(snapshot,preview,{name="",selectedRepo
     ownerId:null,connected:false};
   const created=createProject(snapshot,{name:name.trim()||locator.split("/")[1],
    type:"engineering",goal:""});
-  const selectedBranch=typeof preview.summary.defaultBranch==="string"&&preview.summary.defaultBranch
-   ?branchName(preview.summary.defaultBranch):null;
+  const selectedBranch=typeof preview.branch==="string"&&preview.branch?
+   branchName(preview.branch):
+   typeof preview.summary.defaultBranch==="string"&&preview.summary.defaultBranch?
+   branchName(preview.summary.defaultBranch):null;
+  if(selectedBranch&&selectedBranch!==preview.summary.defaultBranch&&
+     !isSha(preview.summary.branchHeads?.[selectedBranch]))
+   throw Error("Выбранная рабочая ветка не подтверждена GitHub");
   const link=attach(created.state,created.id,"github",locator,{branch:selectedBranch});
   const observation={
    ...preview.summary,

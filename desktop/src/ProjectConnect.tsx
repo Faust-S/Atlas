@@ -18,6 +18,7 @@ export function ProjectConnect({snapshot,onApply,onCancel,disabled=false}:{
  const [selected,setSelected]=useState<string[]>([]);
  const [filter,setFilter]=useState("");
  const [limit,setLimit]=useState(45);
+ const [branchChoice,setBranchChoice]=useState("");
  const ongoing=useRef<AbortController|null>(null);
  useEffect(()=>()=>{ongoing.current?.abort()},[]);
  const connected=useMemo(()=>{
@@ -40,18 +41,21 @@ export function ProjectConnect({snapshot,onApply,onCancel,disabled=false}:{
  },[preview,filter]);
  const updateAddress=(value:string)=>{
   ongoing.current?.abort();setAddress(value.slice(0,250));setPreview(null);
-  setError("");setSelected([]);setName("");
+  setError("");setSelected([]);setName("");setBranchChoice("");
  };
- const inspect=async(event:React.FormEvent)=>{
-  event.preventDefault();
+ const inspect=async(event:React.FormEvent|null=null,requestedBranch:string|null=null)=>{
+  event?.preventDefault();
   if(disabled||loading||!address.trim())return;
   ongoing.current?.abort();
   const controller=new AbortController();ongoing.current=controller;
+  const previousName=name;
   setError("");setPreview(null);setLoading(true);setSelected([]);setFilter("");setLimit(45);
   try{
-   const found=await inspectPublicProject(address,globalThis.fetch,{signal:controller.signal});
+   const found=await inspectPublicProject(address,globalThis.fetch,{
+    signal:controller.signal,branch:requestedBranch?.trim()||null});
    if(controller.signal.aborted)return;
-   setPreview(found);setName(found.kind==="owner"?found.locator+" · проекты":found.name);
+   setPreview(found);setName(previousName|| (found.kind==="owner"?found.locator+" · проекты":found.name));
+   setBranchChoice(found.kind==="repository"?found.branch||"":"");
   }catch(e){
    if(!controller.signal.aborted)setError(String((e as Error)?.message||e));
   }finally{
@@ -68,6 +72,9 @@ export function ProjectConnect({snapshot,onApply,onCancel,disabled=false}:{
  };
  const apply=()=>{
   if(!preview||disabled||loading)return;
+  if(preview.kind==="repository"&&branchChoice.trim()!==(preview.branch||"")){
+   setError("Изучите выбранную ветку перед подключением.");return;
+  }
   if(preview.kind==="owner"&&!selected.length){
    setError("Отметьте хотя бы один репозиторий для подключения.");return;
   }
@@ -122,6 +129,18 @@ export function ProjectConnect({snapshot,onApply,onCancel,disabled=false}:{
      onChange={e=>{setName(e.target.value);setError("")}} disabled={disabled}/>
    </label>
    {preview.kind==="repository"?<>
+    <div className="atlas-connect-branch button-row">
+     <label>Ветка исходников
+      <input type="text" list="atlas-connect-branches" maxLength={200}
+       aria-label="Ветка исходников для подключения"
+       value={branchChoice} onChange={e=>{setBranchChoice(e.target.value);setError("")}}/>
+      <datalist id="atlas-connect-branches">{preview.summary.branches.slice(0,100).map((value:string)=>
+       <option value={value} key={value}/>)}</datalist>
+     </label>
+     <button className="action-button" type="button" disabled={loading||disabled||!branchChoice.trim()}
+      onClick={()=>void inspect(null,branchChoice)}>Изучить выбранную ветку</button>
+    </div>
+    {branchChoice!==preview.branch&&<p className="minor">Выбрана другая ветка. Нажмите «Изучить выбранную ветку», чтобы обновить предпросмотр.</p>}
     <div className="summary-line">
      <span>Ветка: {preview.summary.defaultBranch||"не определена"}</span>
      <span>{ciLabel}</span>
@@ -181,7 +200,8 @@ export function ProjectConnect({snapshot,onApply,onCancel,disabled=false}:{
    </>}
    <div className="button-row">
     <button type="button" className="action-button primary" onClick={apply}
-     disabled={disabled||loading||preview.kind==="owner"&&!selected.length}>
+     disabled={disabled||loading||preview.kind==="owner"&&!selected.length||
+      preview.kind==="repository"&&branchChoice.trim()!==(preview.branch||"")}>
      {existing?"Открыть существующий проект":
       preview.kind==="owner"?"Включить выбранные проекты":"Добавить в Atlas"}
     </button>

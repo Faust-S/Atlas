@@ -5,7 +5,7 @@ import {observePublicRootTree} from "../src/github-public.mjs";
 import {projectConnectionAddress,inspectPublicProject,applyPublicProjectPreview,
  findConnectedRepository,findConnectedOwner} from "../src/project-onboarding.mjs";
 
-const a="a".repeat(40),b="b".repeat(40);
+const a="a".repeat(40),b="b".repeat(40),c="c".repeat(40),d="d".repeat(40);
 const ok=data=>({ok:true,status:200,headers:{get:()=>null},json:async()=>data});
 const missing=status=>({ok:false,status,headers:{get:()=>null},json:async()=>({})});
 function github({kind="repository",privateRepo=false,treeError=false,partial=false}={}){
@@ -16,11 +16,14 @@ function github({kind="repository",privateRepo=false,treeError=false,partial=fal
    if(url.endsWith("/repos/demo/widget"))
     return ok({id:11,private:privateRepo,default_branch:"main",pushed_at:"2026-11-10T12:00:00Z"});
    if(url.includes("/branches?"))
-    return ok([{name:"main",commit:{sha:a}}]);
+    return ok([{name:"main",commit:{sha:a}},{name:"work/dev",commit:{sha:c}}]);
+   if(url.endsWith("/branches/main"))return ok({name:"main",commit:{sha:a}});
    if(url.includes("/actions/runs?"))
     return ok({workflow_runs:[]});
-   if(url.endsWith("/git/trees/main"))
-    return treeError?missing(403):ok({sha:b,truncated:partial,tree:[
+   if(url.endsWith("/git/commits/"+a))return ok({sha:a,tree:{sha:b}});
+   if(url.endsWith("/git/commits/"+c))return ok({sha:c,tree:{sha:d}});
+   if(url.endsWith("/git/trees/"+b)||url.endsWith("/git/trees/"+d))
+    return treeError?missing(403):ok({sha:url.endsWith("/"+d)?d:b,truncated:partial,tree:[
      {path:"src",type:"tree"},{path:"docs",type:"tree"},
      {path:"README.md",type:"blob"},{path:"package.json",type:"blob"},
      {path:"Cargo.toml",type:"blob"},{path:"src/index.js",type:"blob"},
@@ -62,7 +65,7 @@ test("Public repository preview reads real root entries and never infers fake ta
  assert.deepEqual(preview.structure.folders,["docs","src"]);
  assert.deepEqual(preview.structure.files,["Cargo.toml","package.json","README.md"]);
  assert.deepEqual(preview.structure.detected,["Cargo.toml","package.json","README.md"]);
- assert.equal(mock.calls.length,4);
+ assert.equal(mock.calls.length,5);
  assert.ok(mock.calls.every(url=>url.startsWith("https://api.github.com/repos/demo/widget")));
  const before=empty(),value=serialize(before);
  const imported=applyPublicProjectPreview(before,preview);
@@ -142,4 +145,21 @@ test("Mismatched or fabricated preview input never changes a portfolio",async()=
  assert.throws(()=>applyPublicProjectPreview(s,{...p,summary:{...p.summary,complete:undefined}}),/предпросмотр/);
  assert.throws(()=>applyPublicProjectPreview(s,p,{name:"x".repeat(161)}),/Некорректный/);
  assert.equal(serialize(s),old);
+});
+
+test("Explicit development branch inspects that branch and stores it as the source of truth",async()=>{
+ const mock=github();
+ const preview=await inspectPublicProject("demo/widget",mock.fetcher,{branch:"work/dev"});
+ assert.equal(preview.branch,"work/dev");
+ assert.equal(preview.structure.status,"observed");
+ assert.equal(preview.structure.commitSha,c);
+ assert.equal(preview.structure.treeSha,d);
+ assert.equal(preview.summary.ci.branch,"work/dev");
+ assert.ok(mock.calls.includes("https://api.github.com/repos/demo/widget/git/commits/"+c));
+ assert.ok(mock.calls.includes("https://api.github.com/repos/demo/widget/git/trees/"+d));
+ const imported=applyPublicProjectPreview(empty(),preview);
+ assert.equal(imported.state.projects[0].sources[0].branch,"work/dev");
+ assert.equal(imported.state.projects[0].sources[0].summary.structure.branch,"work/dev");
+ await assert.rejects(inspectPublicProject("demo/widget",github().fetcher,{branch:"not-present"}),
+  /не подтверждена/);
 });

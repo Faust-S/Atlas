@@ -171,11 +171,25 @@ export async function observePublicOwner(value,fetcher=globalThis.fetch,{maxPage
 // Directory names and manifest filenames are evidence of structure, not tasks,
 // phases, product boundaries, or a verified build. No filesystem checkout.
 export async function observePublicRootTree(value,branch,fetcher=globalThis.fetch,
- {maxEntries=48,signal}={}){
- const name=repoName(value),selected=branchName(branch);
+ {maxEntries=48,signal,commitSha=null}={}){
+ const name=repoName(value),selected=branchName(branch),base=API+"/repos/"+name;
  if(!Number.isInteger(maxEntries)||maxEntries<1||maxEntries>120)
   throw Error("Invalid GitHub tree preview limit");
- const payload=await request(API+"/repos/"+name+"/git/trees/"+encodeURIComponent(selected),fetcher,signal);
+ let commit=typeof commitSha==="string"&&/^[a-f\d]{40}$/i.test(commitSha)?
+  commitSha.toLowerCase():null;
+ if(!commit){
+  const exact=await request(base+"/branches/"+selected.split("/").map(encodeURIComponent).join("/"),fetcher,signal);
+  if(exact?.name!==selected||typeof exact.commit?.sha!=="string"||
+     !/^[a-f\d]{40}$/i.test(exact.commit.sha))throw Error("Ветка GitHub не подтверждена");
+  commit=exact.commit.sha.toLowerCase();
+ }
+ // The Git tree endpoint needs a tree SHA. A commit SHA or a branch name is
+ // not always a valid tree identifier (e.g. empty default branches).
+ const gitCommit=await request(base+"/git/commits/"+commit,fetcher,signal);
+ if(gitCommit?.sha?.toLowerCase()!==commit||
+    typeof gitCommit.tree?.sha!=="string"||!/^[a-f\d]{40}$/i.test(gitCommit.tree.sha))
+  throw Error("Не удалось подтвердить дерево файлов выбранного коммита");
+ const payload=await request(base+"/git/trees/"+gitCommit.tree.sha,fetcher,signal);
  if(!payload||!Array.isArray(payload.tree)||typeof payload.sha!=="string"||
     !/^[a-f\d]{40}$/i.test(payload.sha))
   throw Error("GitHub не вернул структуру выбранной ветки");
@@ -194,7 +208,7 @@ export async function observePublicRootTree(value,branch,fetcher=globalThis.fetc
    "go.mod","pom.xml","build.gradle","build.gradle.kts","composer.json",
    "Gemfile","CMakeLists.txt","*.sln","README.md","AGENTS.md","Dockerfile"]);
  const detected=files.filter(file=>manifests.has(file)||file.endsWith(".sln")).slice(0,15);
- return {status:"observed",branch:selected,treeSha:payload.sha.toLowerCase(),
+ return {status:"observed",branch:selected,commitSha:commit,treeSha:payload.sha.toLowerCase(),
   truncated:payload.truncated===true,folders:folders.slice(0,maxEntries),
   files:files.slice(0,maxEntries),detected,
   totalFolders:folders.length,totalFiles:files.length,
