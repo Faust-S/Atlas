@@ -900,6 +900,7 @@ pub fn run(){
             atlas_open,atlas_commit,atlas_export_json,atlas_select_import,
             atlas_export_iwxa,atlas_select_iwxa,atlas_restore_previous,
             atlas_list_history,atlas_restore_history,
+            person_license::atlas_person_license_edition,
             person_license::atlas_person_license_capabilities,
             person_license::atlas_person_license_read,
             person_license::atlas_person_license_enroll,
