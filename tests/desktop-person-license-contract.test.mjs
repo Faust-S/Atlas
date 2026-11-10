@@ -8,6 +8,7 @@ const native=read('desktop/src-tauri/src/lib.rs');
 const ui=read('desktop/src/AtlasPersonLicense.tsx');
 const main=read('desktop/src/main.tsx');
 const config=JSON.parse(read('desktop/src-tauri/tauri.conf.json'));
+const setup=read('desktop/installer/build-setup-core.ps1');
 
 test('Atlas keeps original T3 consumer as the only signed PERSON verifier',()=>{
  assert.match(bridge,/iwxa-t3-product-consumer\.exe/);
@@ -48,4 +49,15 @@ test('public Atlas stores no new T3 keys or pinned production issuer trust',()=>
  assert.match(bridge,/app_local_data_dir/);
  assert.match(bridge,/t3-consumer-person/);
  assert.match(bridge,/ATLAS_PERSON_T3_COMPONENT_NOT_BUNDLED/);
+});
+
+test('Setup Core includes original private T3 only by explicit verified local option',()=>{
+ assert.match(setup,/\[switch\]\$IncludePersonConsumer/);
+ assert.match(setup,/if \(\$IncludePersonConsumer\)/);
+ assert.match(setup,/Get-FileHash -LiteralPath \$consumer -Algorithm SHA256/);
+ assert.match(setup,/Get-FileHash -LiteralPath \$copy -Algorithm SHA256/);
+ assert.match(setup,/ATLAS_PERSON_PRIVATE_CONSUMER_NOT_STAGED/);
+ assert.match(setup,/ATLAS_PERSON_ORIGINAL_T3_COMPONENT_STAGED_SHA256_PASS/);
+ assert.match(bridge,/super::setup_core_data_root\(\)/);
+ assert.doesNotMatch(config.identifier,/publisher|admin-center/);
 });
