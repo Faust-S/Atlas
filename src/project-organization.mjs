@@ -183,10 +183,14 @@ export function projectSourcePlanProjection(snapshot,projectId,{
   });
   return {...source,folders};
  });
- const other=project.items.filter(w=>!represented.has(w.id));
+ const outside=project.items.filter(w=>!represented.has(w.id));
+ // Keep genuine unassigned work ahead of links merely hidden by preview limits.
+ const other=[...outside.filter(w=>!w.sourceId||!w.sourcePath),
+  ...outside.filter(w=>w.sourceId&&w.sourcePath)];
  const otherRows=other.slice(0,maxOtherWorks).map(w=>({
-  ...toWork(w),reason:w.sourceId?
-   "Привязка к каталогу пока не показана":"Каталог не указан"
+  ...toWork(w),reason:!w.sourceId?"Каталог не указан":
+   !w.sourcePath?"Привязка к каталогу пока не показана":
+   "Связанный каталог вне показанной части схемы"
  }));
  const renderedWorkIds=new Set([...sources.flatMap(s=>s.folders.flatMap(f=>f.works.map(w=>w.id))),
   ...otherRows.map(w=>w.id)]);
