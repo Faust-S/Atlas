@@ -5,7 +5,8 @@ param(
     [string]$SetupCoreRoot = "setup-core-source",
     [string]$Output = "artifacts/IWXA-Atlas-0.6.0-dev.1-Setup.exe",
     [switch]$InstallForQualification,
-    [switch]$IncludePersonConsumer
+    [switch]$IncludePersonConsumer,
+    [string]$PersonTrustFile = ""
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -70,6 +71,40 @@ try {
         $b = (Get-FileHash -LiteralPath $copy -Algorithm SHA256).Hash
         if ($a -ne $b) { throw 'ATLAS_PERSON_PRIVATE_CONSUMER_COPY_MISMATCH' }
         Write-Host 'ATLAS_PERSON_ORIGINAL_T3_COMPONENT_STAGED_SHA256_PASS'
+        if ([string]::IsNullOrWhiteSpace($PersonTrustFile)) {
+            throw 'ATLAS_PERSON_OWNER_PUBLIC_TRUST_REQUIRED'
+        }
+        $trustPath = (Resolve-Path -LiteralPath $PersonTrustFile -ErrorAction Stop).Path
+        $trustInfo = Get-Item -LiteralPath $trustPath -Force
+        if ($trustInfo.LinkType -or $trustInfo.Length -lt 10 -or
+            $trustInfo.Length -gt 1048576) {
+            throw 'ATLAS_PERSON_PUBLIC_TRUST_FILE_INVALID'
+        }
+        $trustRaw = Get-Content -LiteralPath $trustPath -Raw -Encoding utf8
+        if ($trustRaw.Contains('PRIVATE KEY')) {
+            throw 'ATLAS_PERSON_PUBLIC_TRUST_CONTAINS_PRIVATE_MATERIAL'
+        }
+        $trust = $trustRaw | ConvertFrom-Json -Depth 100
+        if ($trust.policy.environment -ne 'PRODUCTION' -or
+            -not $trust.policy.keys -or -not $trust.policy.authorities -or
+            -not $trust.productLicenseIssuers) {
+            throw 'ATLAS_PERSON_OWNER_TRUST_FIELDS_INVALID'
+        }
+        $atlasIssuer = @($trust.productLicenseIssuers.PSObject.Properties |
+            Where-Object { $_.Value.environment -eq 'PRODUCTION' -and
+                $_.Value.productIds -contains 'IWXA_ATLAS' })
+        if ($atlasIssuer.Count -lt 1) {
+            throw 'ATLAS_PERSON_OWNER_TRUST_ATLAS_NOT_AUTHORIZED'
+        }
+        $trustCopy = Join-Path $recipient 'publisher-person-trust.json'
+        Copy-Item -LiteralPath $trustPath -Destination $trustCopy
+        $trustHash = (Get-FileHash -LiteralPath $trustPath -Algorithm SHA256).Hash
+        if ((Get-FileHash -LiteralPath $trustCopy -Algorithm SHA256).Hash -ne $trustHash) {
+            throw 'ATLAS_PERSON_OWNER_PUBLIC_TRUST_SHA_MISMATCH'
+        }
+        Write-Host 'ATLAS_PERSON_PUBLIC_TRUST_STAGED_SHA256_PASS'
+    } elseif (-not [string]::IsNullOrWhiteSpace($PersonTrustFile)) {
+        throw 'ATLAS_PERSON_TRUST_REQUIRES_ORIGINAL_CONSUMER'
     }
 
     $stub = Join-Path $temporary 'iwxa-setup-core-stub.exe'
