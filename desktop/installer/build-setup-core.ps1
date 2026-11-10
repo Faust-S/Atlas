@@ -4,7 +4,8 @@
 param(
     [string]$SetupCoreRoot = "setup-core-source",
     [string]$Output = "artifacts/IWXA-Atlas-0.6.0-dev.1-Setup.exe",
-    [switch]$InstallForQualification
+    [switch]$InstallForQualification,
+    [switch]$IncludePersonConsumer
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -48,6 +49,28 @@ $payload = Join-Path $temporary 'payload'
 New-Item -ItemType Directory -Path $payload -Force | Out-Null
 try {
     Copy-Item -LiteralPath $exe -Destination (Join-Path $payload $product.entrypoint) -Force
+    if ($IncludePersonConsumer) {
+        # The privately compiled ORIGINAL T3 receiver is staged only by a
+        # local closed qualification. Never retrieve it from a public repo,
+        # accept it from an incoming .iwxa or create a second verifier.
+        $consumer = Join-Path $atlas 'desktop/src-tauri/target/release/t3/iwxa-t3-product-consumer.exe'
+        if (!(Test-Path -LiteralPath $consumer -PathType Leaf)) {
+            throw 'ATLAS_PERSON_PRIVATE_CONSUMER_NOT_STAGED'
+        }
+        $info = Get-Item -LiteralPath $consumer -Force
+        if ($info.LinkType -or $info.Length -lt 1024) {
+            throw 'ATLAS_PERSON_PRIVATE_CONSUMER_FILE_INVALID'
+        }
+        $recipient = Join-Path $payload 't3'
+        New-Item -ItemType Directory -Path $recipient -Force | Out-Null
+        $copy = Join-Path $recipient 'iwxa-t3-product-consumer.exe'
+        Copy-Item -LiteralPath $consumer -Destination $copy
+        $a = (Get-FileHash -LiteralPath $consumer -Algorithm SHA256).Hash
+        $b = (Get-FileHash -LiteralPath $copy -Algorithm SHA256).Hash
+        if ($a -ne $b) { throw 'ATLAS_PERSON_PRIVATE_CONSUMER_COPY_MISMATCH' }
+        Write-Host 'ATLAS_PERSON_ORIGINAL_T3_COMPONENT_STAGED_SHA256_PASS'
+    }
+
     $stub = Join-Path $temporary 'iwxa-setup-core-stub.exe'
     & $stubBuilder -Output $stub -Icon $icon
     if ($LASTEXITCODE -ne 0 -or !(Test-Path -LiteralPath $stub -PathType Leaf)) {
