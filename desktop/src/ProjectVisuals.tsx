@@ -309,13 +309,13 @@ export function ProjectSourcePlanMap({projection,onOpenWork,onEditStage,onSugges
       </div>}
       {folder.hiddenWorks>0&&<p className="minor">Ещё {folder.hiddenWorks} работ.
        {" "}<button type="button" className="text-link"
-        onClick={onOpenWorks}>Открыть все работы</button></p>
+        onClick={onOpenWorks}>Открыть все работы</button></p>}
      </div>
     </div>)}
     {!source.folders.length&&<p className="minor">На верхнем уровне этой ветки каталоги не найдены.</p>}
     {source.incomplete&&<p className="minor">Показаны каталоги: {source.folders.length}
      {Number.isInteger(source.folderCount)?" из "+source.folderCount+" известных":""}.
-     Другие каталоги могут быть не получены.</p>
+     Другие каталоги могут быть не получены.</p>}
    </>:<p className="minor">Сведения о каталогах этой ветки сейчас недоступны.
     Работы остаются в плане. Обновите источник, чтобы сравнить их со структурой.</p>}
   </div>)}
@@ -338,7 +338,7 @@ export function ProjectSourcePlanMap({projection,onOpenWork,onEditStage,onSugges
   </div>}
   {projection.hiddenSources>0&&<p className="minor">Ещё {projection.hiddenSources} источников.
    {" "}<button type="button" className="text-link" onClick={onOpenSources}>
-    Открыть все источники</button></p>
+    Открыть все источники</button></p>}
   <div className="atlas-source-plan-actions">
    <button type="button" className="action-button"
     onClick={onCreateStage}>Добавить этап</button>
