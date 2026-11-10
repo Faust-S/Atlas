@@ -33,8 +33,8 @@ test("Wizard never guesses work or edits GitHub while previewing a repository",(
  assert.match(connect,/onApply\(preview,\{name:name\.trim\(\),selectedRepositories:selected\}\)/);
  assert.match(connect,/disabled=\{disabled\|\|loading\|\|preview\.kind==="owner"&&!selected\.length\|\|/);
  assert.match(connect,/Отметьте хотя бы один репозиторий/);
- assert.match(connect,/Приватные источники требуют отдельного разрешённого подключения/);
- assert.match(connect,/Во внешнем GitHub никакие действия не выполняются/);
+ assert.match(connect,/Для закрытого проекта потребуется отдельное подключение с разрешением доступа/);
+ assert.match(connect,/Atlas не изменяет ваш репозиторий GitHub/);
  assert.match(ui,/atlas-connected-structure/);
  assert.match(css,/\.atlas-connect-selection/);
 });
