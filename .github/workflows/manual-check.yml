@@ -86,12 +86,8 @@ jobs:
           npm ci --no-audit --no-fund
           npm run build
           if ($LASTEXITCODE -ne 0) { throw 'ATLAS_PERSON_FRONTEND_BUILD_FAILED' }
-          cargo test --manifest-path src-tauri/Cargo.toml --lib person_license::tests::bridge_never_accepts_unbounded_identity_or_unsigned_receipts -- --exact
+          cargo test --locked --manifest-path src-tauri/Cargo.toml --lib person_license::tests::bridge_never_accepts_unbounded_identity_or_unsigned_receipts -- --exact
           if ($LASTEXITCODE -ne 0) { throw 'ATLAS_PERSON_NATIVE_BRIDGE_FAILED' }
-      - name: Inspect Cargo.lock changes required for reproducible Atlas Windows builds
-        shell: pwsh
-        run: |
-          git diff -- desktop/src-tauri/Cargo.lock
       - name: Original private T3 consumer is never embedded in public CI
         shell: pwsh
         run: |
