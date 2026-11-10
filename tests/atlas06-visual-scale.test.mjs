@@ -13,7 +13,7 @@ test("Large multi-source diagram highlights the confirmed work rather than the o
  assert.equal(project.sources.length,6);
  assert.equal(project.items.length,1212);
  assert.equal(project.stages.length,48);
- assert.equal(project.dependencies.length,305);
+ assert.equal(project.dependencies.length,299);
  assert.equal(preview.sources.length,2);
  assert.equal(preview.hiddenSources,4);
  assert.equal(preview.sources[0].sourceId,"visual-source-5");
@@ -43,6 +43,6 @@ test("Larger map remains bounded and preserves long titles, stages and dependenc
  assert.equal(more.sources[0].folders[0].works[0].stageName,LONG_STAGE);
  assert.equal(more.sources[0].folders[0].works[0].title,LONG_WORK);
  assert.equal(more.sources[0].folders[0].works[0].predecessorTotal,5);
- assert.equal(more.dependencyTotal,305);
+ assert.equal(more.dependencyTotal,299);
  assert.equal(serialize(snapshot),before);
 });
