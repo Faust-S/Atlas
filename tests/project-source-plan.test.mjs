@@ -188,3 +188,32 @@ test("The first screen prioritizes real project links and permits controlled exp
  assert.match(css,/\.atlas-source-plan-map \.text-link,\.atlas-source-plan-map \.action-button\{[^}]*overflow-wrap:anywhere/);
  assert.match(css,/\.atlas-source-plan-dependencies>summary\{/);
 });
+
+
+test("Source plan prioritizes sources with confirmed work links beyond first two",()=>{
+ const f=fixture(),snapshot=structuredClone(f.state);
+ const p=snapshot.projects[0],selected=p.sources[0];
+ const extra=Array.from({length:5},(_,i)=>({
+  ...structuredClone(selected),id:"unrelated-"+i,locator:"example/unrelated-"+i
+ }));
+ p.sources=[...extra,selected];
+ const before=serialize(snapshot);
+ const map=projectSourcePlanProjection(snapshot,f.projectId,{
+  maxSources:2,maxFoldersPerSource:1,maxWorksPerFolder:1,maxOtherWorks:1
+ });
+ assert.equal(map.sources[0].sourceId,f.sourceId);
+ assert.equal(map.sources[0].folders[0].works[0].id,f.firstId);
+ assert.equal(map.hiddenSources,4);
+ assert.deepEqual(p.sources.map(s=>s.id),[...extra.map(s=>s.id),f.sourceId]);
+ assert.equal(serialize(snapshot),before);
+});
+test("Map expansion has a reversible visible control, without new plan state",()=>{
+ const guide=read("../desktop/src/ProjectOrganizationGuide.tsx");
+ const visual=read("../desktop/src/ProjectVisuals.tsx");
+ assert.match(guide,/onToggleExpansion=\{\(\)=>setMoreLinks\(value=>!value\)\}/);
+ assert.match(visual,/aria-expanded=\{expanded\}/);
+ assert.match(visual,/\{expanded\?"Свернуть схему":"Показать больше связей"\}/);
+ const projection=read("../src/project-organization.mjs");
+ assert.match(projection,/sourceList\.sort\(/);
+ assert.match(projection,/workByFolder=new Map\(\)/);
+});

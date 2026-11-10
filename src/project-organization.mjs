@@ -45,31 +45,42 @@ export function projectStructureGuide(snapshot,projectId,{maxFolders=24,maxSourc
   throw Error("Invalid project source preview bounds");
  const project=snapshot.projects.find(p=>p.id===projectId);
  if(!project)throw Error("Проект не найден");
- const sources=project.sources.filter(s=>entryRepo(s)).slice(0,maxSources).map(source=>{
+ const sourceList=project.sources.filter(s=>entryRepo(s));
+ const linkCounts=new Map(),folderCounts=new Map();
+ for(const item of project.items){
+  if(!item.sourceId)continue;
+  linkCounts.set(item.sourceId,(linkCounts.get(item.sourceId)||0)+1);
+  if(item.sourcePath){
+   let paths=folderCounts.get(item.sourceId);
+   if(!paths){paths=new Map();folderCounts.set(item.sourceId,paths)}
+   paths.set(item.sourcePath,(paths.get(item.sourcePath)||0)+1);
+  }
+ }
+ if(linkedFirst){
+  sourceList.sort((a,b)=>(linkCounts.get(b.id)||0)-(linkCounts.get(a.id)||0));
+ }
+ const sources=sourceList.slice(0,maxSources).map(source=>{
   const status=treeStatus(source),repo=entryRepo(source);
   const tree=status==="current"?source.summary.structure:null;
   const names=tree&&Array.isArray(tree.folders)?tree.folders.filter(rootName):[];
   if(linkedFirst){
-   const linked=new Set(project.items.filter(item=>item.sourceId===source.id)
-    .map(item=>item.sourcePath));
+   const linked=new Set(folderCounts.get(source.id)?.keys()||[]);
    names.sort((a,b)=>Number(linked.has(b))-Number(linked.has(a)));
   }
   const folders=names.slice(0,maxFolders).map(name=>({
     name,role:roleFor(name),sourceId:source.id,commitSha:tree.commitSha,
-    workCount:project.items.filter(item=>
-     item.sourceId===source.id&&item.sourcePath===name).length,
+    workCount:folderCounts.get(source.id)?.get(name)||0,
     url:"https://github.com/"+repo+"/tree/"+tree.commitSha+"/"+encodeURIComponent(name)
    }));
   const knownFiles=tree&&Array.isArray(tree.detected)?
    tree.detected.filter(rootName).slice(0,8):[];
-  const linkedWorks=project.items.filter(item=>item.sourceId===source.id);
   return {...textOfSource(source),status,
    commitSha:tree?.commitSha??null,
    folderCount:tree?.totalFolders??null,
    displayed:folders.length,folders,knownFiles,
    incomplete:Boolean(tree&&(tree.truncated||tree.limited||
     Number(tree.totalFolders)>folders.length)),
-   linkedWorkCount:linkedWorks.length};
+   linkedWorkCount:linkCounts.get(source.id)||0};
  });
  const allRepos=new Set(sources.map(s=>s.repository.toLowerCase()));
  const ownerSet=new Set(sources.map(s=>s.repository.split("/")[0].toLowerCase()));
@@ -86,7 +97,7 @@ export function projectStructureGuide(snapshot,projectId,{maxFolders=24,maxSourc
   !(project.targets||[]).length?{title:"Опишите ожидаемый результат",action:"target"}:
   !project.items.length?{title:"Добавьте первую работу",action:"item"}:null;
  return {projectId,projectName:project.name,sources,
-  hiddenSources:Math.max(0,project.sources.filter(s=>entryRepo(s)).length-sources.length),
+  hiddenSources:Math.max(0,sourceList.length-sources.length),
   related,nextAction};
 }
 export function folderWorkAction(sourceId,commitSha,folder){
@@ -149,12 +160,19 @@ export function projectSourcePlanProjection(snapshot,projectId,{
    .map(id=>({id,title:workById.get(id).title})),
   predecessorTotal:(incoming.get(work.id)||[]).length
  });
+ const workByFolder=new Map();
+ for(const item of project.items){
+  if(!item.sourceId||!item.sourcePath)continue;
+  let folders=workByFolder.get(item.sourceId);
+  if(!folders){folders=new Map();workByFolder.set(item.sourceId,folders)}
+  const rows=folders.get(item.sourcePath)||[];
+  rows.push(item);folders.set(item.sourcePath,rows);
+ }
  const represented=new Set();
  let mappedTotal=0;
  const sources=overview.sources.map(source=>{
   const folders=source.folders.map(folder=>{
-   const matching=project.items.filter(w=>w.sourceId===source.sourceId&&
-    w.sourcePath===folder.name);
+   const matching=workByFolder.get(source.sourceId)?.get(folder.name)||[];
    mappedTotal+=matching.length;
    for(const w of matching)represented.add(w.id);
    const rows=matching.slice(0,maxWorksPerFolder).map(w=>({

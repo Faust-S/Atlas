@@ -36,6 +36,8 @@ export function ProjectOrganizationGuide({snapshot,projectId,onEdit,onRefresh,on
    open={projection.mappedTotal>0||linkedFolderWorks||undefined}>
    <summary>Схема проекта: каталоги, работы и этапы</summary>
    <ProjectSourcePlanMap projection={projection}
+    expanded={moreLinks} hasMoreLinks={hasMoreLinks}
+    onToggleExpansion={()=>setMoreLinks(value=>!value)}
     onOpenWork={id=>onEdit("work:"+id)}
     onEditStage={id=>onEdit("stage-edit:"+id)}
     onSuggestFolder={(sourceId,commitSha,folder)=>
@@ -44,10 +46,6 @@ export function ProjectOrganizationGuide({snapshot,projectId,onEdit,onRefresh,on
     onOpenWorks={onOpenWorks} onOpenSources={onOpenSources}
     onCreateStage={()=>onEdit("stage")}
     onAddDependency={()=>onEdit("dep")}/>
-   {!moreLinks&&hasMoreLinks&&<div className="atlas-source-plan-preview-actions">
-    <button type="button" className="action-button"
-     onClick={()=>setMoreLinks(true)}>Показать больше связей</button>
-   </div>}
   </details>}
   {hasSources&&<details className="atlas-organization-details"
    open={!linkedFolderWorks||undefined}>

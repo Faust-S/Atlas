@@ -242,12 +242,14 @@ export function PortfolioNetworkMap({snapshot,onOpenProject}:{
 // The connectors illustrate only confirmed user-created work/stage assignments.
 // No component or dependency is created by opening the diagram.
 export function ProjectSourcePlanMap({projection,onOpenWork,onEditStage,onSuggestFolder,
- onOpenTimeline,onOpenGraph,onOpenWorks,onOpenSources,onCreateStage,onAddDependency}:{
+ onOpenTimeline,onOpenGraph,onOpenWorks,onOpenSources,onCreateStage,onAddDependency,
+ expanded,hasMoreLinks,onToggleExpansion}:{
  projection:any;onOpenWork:(id:string)=>void;onEditStage:(id:string)=>void;
  onSuggestFolder:(sourceId:string,commitSha:string,folder:string)=>void;
  onOpenTimeline:()=>void;onOpenGraph:()=>void;
  onOpenWorks:()=>void;onOpenSources:()=>void;
  onCreateStage:()=>void;onAddDependency:()=>void;
+ expanded:boolean;hasMoreLinks:boolean;onToggleExpansion:()=>void;
 }){
  return <div className="atlas-source-plan-map" aria-label="Схема каталогов, работ и этапов">
   <div className="section-heading"><div><h3>Как связаны части проекта</h3>
@@ -257,6 +259,9 @@ export function ProjectSourcePlanMap({projection,onOpenWork,onEditStage,onSugges
      onClick={onOpenTimeline}>План-график</button>
     <button type="button" className="action-button" disabled={!projection.workTotal}
      onClick={onOpenGraph}>Зависимости работ</button>
+    {(hasMoreLinks||expanded)&&<button type="button" className="action-button"
+     aria-expanded={expanded} onClick={onToggleExpansion}>
+     {expanded?"Свернуть схему":"Показать больше связей"}</button>}
    </div>
   </div>
   {projection.sources.map((source:any)=><div className="atlas-source-plan-source" key={source.sourceId}>
