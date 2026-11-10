@@ -92,6 +92,26 @@ def click_button(name,timeout=35):
     wait_button(name,timeout).click_input()
     time.sleep(0.3)
 
+def click_editor_submit():
+    # UIA may advertise a Button as visible even while it is below the
+    # physical scroll viewport. A real user must be able to press it.
+    activate()
+    button=wait_button("Добавить работу",20)
+    rect=button.rectangle()
+    bounds=win32gui.GetWindowRect(handle)
+    if not (rect.top>=bounds[1]+42 and rect.bottom<=bounds[3]-28 and
+            rect.left>=bounds[0]+230 and rect.right<=bounds[2]-8):
+        screenshot("source-work-submit-not-visible")
+        raise AssertionError("Work submission action is not visible within the native window")
+    button.click_input()
+    deadline=time.monotonic()+20
+    while time.monotonic()<deadline:
+        if "Форма:" not in win32gui.GetWindowText(handle):
+            return
+        time.sleep(0.25)
+    screenshot("source-work-submit-not-applied")
+    raise AssertionError("Source-linked work editor stayed open after submission")
+
 def click_scrolled_button(name,main=False):
     # The selection controls are intentionally after the discovered tree.
     # Wheel scrolling in the main workspace is ordinary real user input;
@@ -306,7 +326,7 @@ def verify_organization_work(previous,original_project):
     assert head()==previous,"Opening a work editor wrote a task before confirmation"
     set_text("Что нужно сделать?","Проверить исходники сайта")
     screenshot("source-work-editor")
-    click_button("Применить к черновику")
+    click_editor_submit()
     assert head()==previous,"Applying the form silently saved the project"
     wait_button("Сохранить")
     click_button("Сохранить")
@@ -338,6 +358,8 @@ def verify_organization_work(previous,original_project):
     open_source_view()
     click_button("Таблица")
     wait_text("Проверить исходники сайта",35)
+    wait_text("Каталог:",35)
+    print("ATLAS06_WORK_FOLDER_LINK_VISIBLE_PASS",flush=True)
     screenshot("source-linked-work-reopened")
     print("ATLAS06_USER_APPROVED_SOURCE_WORK_RESTART_PASS",flush=True)
 

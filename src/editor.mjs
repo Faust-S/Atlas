@@ -173,13 +173,20 @@ export function editorSpec(project,action,snapshot=null){
   const folder=action.startsWith("folder-work:")?
    selectedSourceFolder(snapshot,project.id,action):null;
   if(targetId&&!target)throw Error("Связанное требование не найдено");
-  return {title:folder?"Работа по каталогу: "+folder.folder:
-    target?"Работа по требованию: "+target.title:"Новая работа",
-   ...(folder?{hint:"Каталог «"+folder.folder+"» найден в "+folder.repository+
-    ". Уточните задачу. Atlas сохранит каталог и редакцию исходников вместе с работой."}:{}),
+  if(folder)return {
+   title:"Работа по каталогу: "+folder.folder,
+   hint:"Каталог «"+folder.folder+"» найден в "+folder.repository+
+    ". Уточните задачу. Этап и ответственного можно выбрать после добавления работы.",
    fields:[
-   field("title","Что нужно сделать?", "text",folder?"Уточнить назначение каталога "+folder.folder:
-    target?"Проверить: "+target.title:""),
+    field("title","Что нужно сделать?","text","Уточнить назначение каталога "+folder.folder),
+    ...((project.targets||[]).length?[
+     choice("targetId","Связать с ожидаемым результатом",optionalTargets(project),"",false)
+    ]:[]),
+    field("estimateDays","Оценка длительности, календарных дней","number","1")
+   ]
+  };
+  return {title:target?"Работа по требованию: "+target.title:"Новая работа",fields:[
+   field("title","Что нужно сделать?", "text",target?"Проверить: "+target.title:""),
    choice("targetId","Связать с ожидаемым результатом",optionalTargets(project),targetId,false),
    choice("stageId","Этап",stageOptions(project),"",false),
    field("assignee","Ответственный (имя или роль)","text","",false),

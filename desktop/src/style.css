@@ -133,7 +133,9 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .editor-panel h2{font-size:16px;margin:0;color:#203b61}
 .editor-panel .field{display:block;font-size:13px;color:#34516e;font-weight:600;margin:13px 0}
 .editor-panel .field select,.editor-panel .field input,.editor-panel .field textarea{display:block;width:100%;min-height:38px;margin-top:6px;font-weight:400;background:#fff}
-.editor-panel .form-footer{justify-content:flex-end;margin-top:20px}
+.editor-panel .form-footer{justify-content:flex-end;margin-top:16px;padding:11px 2px 9px;
+ position:sticky;bottom:0;z-index:4;background:#edf4fc;border-top:1px solid #d2e1f1}
+.editor-panel .form-footer .action-button{min-height:38px}
 .alert{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:11px 13px;border:1px solid transparent;
  border-radius:10px;margin:-12px 0 16px;font-size:12px}
 .alert button{background:transparent;border:0;font-size:17px;color:inherit}

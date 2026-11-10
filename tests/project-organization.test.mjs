@@ -56,6 +56,7 @@ test("A user-submitted editor creates one standard work linked to its real sourc
   {sourceId,folder:"src",repository:"example/site",branch:"work/dev",commitSha:SHA});
  const spec=editorSpec(state.projects[0],action,state);
  assert.equal(spec.title,"Работа по каталогу: src");
+ assert.deepEqual(spec.fields.map(field=>field.name),["title","estimateDays"]);
  assert.ok(spec.hint.includes("Уточните задачу"));
  assert.equal(spec.fields.find(x=>x.name==="title").value,"Уточнить назначение каталога src");
  const form=new FormData();
@@ -136,6 +137,9 @@ test("Author voice: everyday UI text, with clear boundaries and no technical use
  assert.match(ui,/Открыть связанные работы/);
  assert.match(ui,/Версия исходников/);
  assert.match(main,/ProjectOrganizationGuide snapshot=\{data\} projectId=\{project.id\}/);
+ assert.match(main,/function workFolderUrl\(project:any,work:any\)/);
+ assert.match(main,/Каталог: <a className="text-link"/);
+ assert.match(main,/work.sourcePath.split\("\/"\).map\(encodeURIComponent\).join\("\/"\)/);
  assert.doesNotMatch(ui,/[—–]/);
  assert.doesNotMatch(ui,/\b(?:runtime|kernel|authority|object_type|schema)\b/i);
 });

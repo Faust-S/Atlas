@@ -5,6 +5,8 @@ const read=p=>readFileSync(new URL(p,import.meta.url),"utf8");
 const workflow=read("../.github/workflows/atlas-0-2-1-branding.yml");
 const installed=read("../desktop/tests/installed-atlas06-connect.py");
 const ui=read("../desktop/src/ProjectConnect.tsx");
+const desktop=read("../desktop/src/main.tsx");
+const style=read("../desktop/src/style.css");
 test("Atlas 0.6 installed Windows gate uses original pinned Setup Core and the dev build",()=>{
  assert.match(workflow,/work\/2026-11-10-atlas-0-6/);
  assert.match(workflow,/npm run desktop:build -- --no-bundle/);
@@ -35,6 +37,13 @@ test("Native GUI test requires a read-only public discovery and explicit native 
  assert.match(installed,/ATLAS06_CONNECT_LIVE_ROOT_REFRESH_RESTART_PASS/);
  assert.match(installed,/ATLAS06_USER_APPROVED_SOURCE_WORK_NATIVE_SAVE_PASS/);
  assert.match(installed,/ATLAS06_USER_APPROVED_SOURCE_WORK_RESTART_PASS/);
+ assert.match(installed,/ATLAS06_WORK_FOLDER_LINK_VISIBLE_PASS/);
+ assert.match(installed,/def click_editor_submit\(\):/);
+ assert.match(installed,/button\.click_input\(\)/);
+ assert.match(installed,/Work submission action is not visible within the native window/);
+ assert.match(installed,/Source-linked work editor stayed open after submission/);
+ assert.match(desktop,/editor\.action\.startsWith\("folder-work:"\)\?"Добавить работу"/);
+ assert.match(style,/\.editor-panel \.form-footer\{[^}]*position:sticky;bottom:0;/);
  assert.match(installed,/click_scrolled_button\("Предложить работу по каталогу src",main=True\)/);
  assert.match(installed,/assert task\["sourceId"\]==original_project\["sources"\]\[0\]\["id"\]/);
  assert.match(installed,/wait_text\("Портфель проектов",45\)/);

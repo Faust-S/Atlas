@@ -22,6 +22,7 @@ import {githubPortfolioCatalog,createProjectFromGitHubCatalog,githubPortfolioOve
 import {ProjectGantt,ProjectDependencyDiagram,PortfolioNetworkMap} from "./ProjectVisuals";
 import {ProjectConnect} from "./ProjectConnect";
 import {ProjectOrganizationGuide} from "./ProjectOrganizationGuide";
+import {repoName} from "../../src/github-public.mjs";
 import {applyPublicProjectPreview} from "../../src/project-onboarding.mjs";
 import {prepareImportedSnapshot} from "./import-snapshot.mjs";
 import {buildIwxaPortfolio,readIwxaPortfolio,toBase64,fromBase64} from "./iwxa-portfolio.mjs";
@@ -61,6 +62,15 @@ const planReviewStatus:Record<string,string>={
  proposal_open:"Предложение на рассмотрении",plan_pending:"План утверждён, требуется применение"
 };
 function readable(date?:string|null){return date?date.slice(0,10):"Не задано"}
+function workFolderUrl(project:any,work:any){
+ if(!work.sourcePath||!/^[a-f0-9]{40}$/i.test(work.sourceRevision||""))return null;
+ const source=project.sources?.find((entry:any)=>entry.id===work.sourceId&&entry.kind==="github");
+ if(!source)return null;
+ try{
+  return "https://github.com/"+repoName(source.locator)+"/tree/"+work.sourceRevision+"/"+
+   work.sourcePath.split("/").map(encodeURIComponent).join("/");
+ }catch{return null}
+}
 const confirmAction=(question:string)=>window.confirm(question);
 // Rust serde_json normalizes object key order; compare structural content on readback.
 const stable=(value:any):any=>Array.isArray(value)?value.map(stable):
@@ -136,7 +146,7 @@ function EditorPanel({editor,onSubmit,onCancel,onDirtyChange,busy}:{
        value={fields[f.name]??""} onChange={event=>updateFields({...fields,[f.name]:event.target.value})}/>
     }
    </label>)}
-   <div className="form-footer"><Action onClick={onCancel}>Отмена</Action><button className="action-button primary" disabled={busy} type="submit" title="Ctrl+Enter">Применить к черновику</button></div>
+   <div className="form-footer"><Action onClick={onCancel}>Отмена</Action><button className="action-button primary" disabled={busy} type="submit" title="Ctrl+Enter">{editor.action.startsWith("folder-work:")?"Добавить работу":"Применить к черновику"}</button></div>
   </form>
  </section>
 }
@@ -1356,6 +1366,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      <div className="table-scroll atlas-work-table-scroll"><table className="atlas-work-table" aria-label="Работы проекта"><thead><tr><th>Работа</th><th>Состояние</th><th>Длительность</th><th>Ответственный</th><th>Срок</th><th>Изменить</th></tr></thead>
       <tbody>{filteredWork.slice(0,workLimit).map((w:any)=><tr key={w.id}>
        <td data-label="Работа"><strong>{w.title}</strong><small>{project.stages.find((s:any)=>s.id===w.stageId)?.name||"Без этапа"}</small>
+        {workFolderUrl(project,w)&&<small>Каталог: <a className="text-link"
+         href={workFolderUrl(project,w)!} target="_blank" rel="noopener noreferrer">
+         {w.sourcePath}</a></small>}
         {findingsByWork.has(w.id)&&<details className="atlas-work-observation-history">
          <summary aria-label={"История наблюдений по работе: "+w.title}>
           Заявленных наблюдений: {findingsByWork.get(w.id)?.length} · Не независимая приёмка

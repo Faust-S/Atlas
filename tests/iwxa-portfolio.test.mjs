@@ -9,7 +9,7 @@ import {createHash} from "node:crypto";
 import {desktopLoadPortfolio} from "./fixtures/desktop-portfolio-120.mjs";
 import {createRequire} from "node:module";
 const {zipSync,unzipSync,strToU8,strFromU8}=createRequire(new URL("../desktop/package.json",import.meta.url))("fflate");
-import {empty,createProject,createItem,createDecision,serialize} from "../src/core.mjs";
+import {empty,createProject,createItem,createDecision,attach,editItem,serialize} from "../src/core.mjs";
 import {buildIwxaPortfolio,readIwxaPortfolio,IWXA_PROFILE,IWXA_ADOPTION,
  IWXA_MAX_BYTES,toBase64,fromBase64} from "../desktop/src/iwxa-portfolio.mjs";
 const fixture=()=>{
@@ -37,6 +37,20 @@ test("IWXA 1.0 ZIP carrier roundtrip preserves Atlas work, Unicode and project I
  assert.equal(result.manifest.options.include_schemas,true);
  assert.equal(result.manifest.options.include_assets,false);
  assert.equal(toBase64(fromBase64(toBase64(archive))),toBase64(archive));
+});
+
+test("A user-confirmed source folder and exact revision survive the existing .iwxa archive",async()=>{
+ const a=createProject(empty(),{name:"Site",type:"engineering"});
+ const source=attach(a.state,a.id,"github","example/site",{branch:"work/dev"});
+ const work=createItem(source.state,a.id,{title:"Проверить интерфейс"});
+ const saved=editItem(work.state,a.id,work.id,{sourceId:source.id,sourcePath:"src",
+  sourceRevision:"a".repeat(40)});
+ const archive=await buildIwxaPortfolio(saved,{now:"2026-11-10T17:00:00.000Z"});
+ const opened=await readIwxaPortfolio(archive);
+ assert.equal(serialize(opened.snapshot),serialize(saved));
+ assert.equal(opened.snapshot.projects[0].items[0].sourcePath,"src");
+ assert.equal(opened.snapshot.projects[0].items[0].sourceRevision,"a".repeat(40));
+ assert.equal(opened.snapshot.projects[0].items[0].sourceId,source.id);
 });
 test("IWXA 1.0 object archive is inspectable by external ZIP readers, not a renamed JSON file",async()=>{
  const archive=await make(),files=unzipSync(archive);
