@@ -547,3 +547,41 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .atlas-source-ci>.minor{font-size:11px;color:#607896}
 .atlas-source-ci>.text-link{font-size:12px;display:inline-block;margin-top:3px}
 .atlas-source-ci>.text-link:focus-visible{outline:2px solid #4c8afc;outline-offset:3px;border-radius:4px}
+
+
+/* Atlas 0.6: a single progressive project-connection surface, not a second workspace. */
+.atlas-project-connect{border-color:#a9c8ed;background:#fcfdff}
+.atlas-connect-steps{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+.atlas-connect-steps span{padding:5px 10px;border:1px solid #d7e2ef;border-radius:8px;
+ font-size:12px;color:#61758b;background:#f3f6fa}
+.atlas-connect-steps span.active{border-color:#80ade8;background:#e3efff;color:#214e87;font-weight:700}
+.atlas-connect-form{display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin-bottom:10px}
+.atlas-connect-form label{min-width:220px;flex:1;font-size:12px;color:#405b77;font-weight:600}
+.atlas-connect-form input,.atlas-connect-preview input[type="text"],.atlas-connect-preview input[type="search"]{
+ display:block;width:100%;min-width:0;min-height:39px;padding:8px 11px;margin-top:5px;
+ border:1px solid #bbcde3;border-radius:8px;background:#fff;color:#1c3552}
+.atlas-connect-preview{margin-top:14px;padding:15px;border:1px solid #d2e0f1;border-radius:10px;background:#fff}
+.atlas-connect-preview .section-heading{margin-bottom:9px}
+.atlas-connect-preview label{display:block;color:#405b77;font-size:12px;font-weight:600;margin-bottom:10px}
+.atlas-connect-root{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:9px 0}
+.atlas-connect-root>div{border:1px solid #e2e9f2;border-radius:9px;padding:11px;min-width:0;max-height:250px;overflow:auto}
+.atlas-connect-root strong{color:#304c6e;font-size:12px}
+.atlas-connect-root ul{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:5px}
+.atlas-connect-root li{font-size:12px;color:#37516c;overflow-wrap:anywhere}
+.atlas-connect-selection{display:grid;gap:6px;max-height:300px;overflow-y:auto;
+ border:1px solid #d9e3f1;border-radius:9px;padding:8px;margin-bottom:10px}
+.atlas-connect-option{display:flex!important;align-items:center;gap:9px;padding:7px 9px;margin:0!important;
+ border-radius:7px;background:#f7faff;cursor:pointer}
+.atlas-connect-option:hover{background:#eaf2ff}
+.atlas-connect-option input{width:17px;height:17px;flex:none}
+.atlas-connect-option span{display:block;min-width:0;overflow-wrap:anywhere}
+.atlas-connect-option strong{display:block;font-size:12px}
+.atlas-connect-option small{display:block;color:#6b7c91;font-size:11px}
+.atlas-connected-structure{margin:10px 0 14px;border-top:1px solid #e4ecf6;padding-top:10px}
+.atlas-connected-structure>summary{font-size:12px;font-weight:650;color:#295f9b;cursor:pointer}
+@media(max-width:780px){
+ .atlas-connect-root{grid-template-columns:1fr}
+ .atlas-connect-form{display:grid}
+ .atlas-connect-form label{min-width:0}
+ .atlas-connect-form .action-button{width:100%}
+}

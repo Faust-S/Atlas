@@ -20,6 +20,8 @@ import {sourceReview,sourceFreshnessLabel} from "../../src/source-review.mjs";
 import {githubPortfolioCatalog,createProjectFromGitHubCatalog,githubPortfolioOverview,
  filterGithubPortfolioOverview} from "../../src/ecosystem.mjs";
 import {ProjectGantt,ProjectDependencyDiagram,PortfolioNetworkMap} from "./ProjectVisuals";
+import {ProjectConnect} from "./ProjectConnect";
+import {applyPublicProjectPreview} from "../../src/project-onboarding.mjs";
 import {prepareImportedSnapshot} from "./import-snapshot.mjs";
 import {buildIwxaPortfolio,readIwxaPortfolio,toBase64,fromBase64} from "./iwxa-portfolio.mjs";
 import {commitWithReadback,readSavedSnapshotForReference} from "./native-save.mjs";
@@ -155,6 +157,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const [active,setActive]=useState<string|null>(null),[tab,setTab]=useState<Tab>("overview");
  const [search,setSearch]=useState(""),[editor,setEditor]=useState<Editor|null>(null);
  const [portfolioStatus,setPortfolioStatus]=useState("all");
+ const [connectOpen,setConnectOpen]=useState(false);
  const [ecosystemOwner,setEcosystemOwner]=useState("all");
  const [ecosystemQuery,setEcosystemQuery]=useState("");
  const [ecosystemLimit,setEcosystemLimit]=useState(36);
@@ -426,7 +429,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   if(!afterSubmit&&!requireClosedForm())return;
   resetWorkspaceScroll();
   host?.onSelection?.({projectId:id,workId:null,revision:String(latestSnapshot.current.revision)});
-  setActive(id);setTab("overview");setEditor(null);setForecastId(null);
+  setActive(id);setTab("overview");setEditor(null);setForecastId(null);setConnectOpen(false);
   setShowProjectRelations(false);setRelationLimit(12);setRequirementJump(null);setChangeJump(null);
   if(!afterSubmit)setMessage("");
   setWorkFilter("all");setWorkTargetFilter("all");setWorkObservationFilter("all");setWorkHistoryLimits({});setWorkQuery("");setWorkSort("title");setWorkLimit(200);setRealityLimit(8);
@@ -736,6 +739,23 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   if(!confirmAction("Удалить межпроектную зависимость? План будет пересчитан."))return;
   try{mutate(removePortfolioLink(data,id),"Связь проектов удалена. Сохраните изменение.");}catch(e){issue(e)}
  };
+ const startConnection=()=>{
+  if(busyRef.current||!requireClosedForm())return;
+  selectProject(null,true);setConnectOpen(true);resetWorkspaceScroll();
+ };
+ const completeConnection=(preview:any,options:{name:string;selectedRepositories:string[]})=>{
+  if(busyRef.current)throw Error("Дождитесь завершения текущего действия.");
+  if(!requireClosedForm())throw Error("Сначала закройте открытую форму.");
+  const before=latestSnapshot.current;
+  const connected=applyPublicProjectPreview(before,preview,options);
+  if(connected.state!==before){
+   const count=connected.createdIds.length;
+   mutate(connected.state,count?
+    "Подключено проектов: "+count+". Структура и источники добавлены в черновик. Сохраните портфель на диск.":
+    "Источники обновлены в черновике. Сохраните портфель на диск.");
+  }else{setMessage("Проект уже подключён. Открыта его существующая карточка.");setError("");}
+  selectProject(connected.primaryId,true);
+ };
  const includeDiscoveredProject=(ownerProjectId:string,ownerSourceId:string,repository:string)=>{
   if(busyRef.current||!requireClosedForm())return;
   try{
@@ -845,6 +865,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     <button aria-label="Открыть портфель проектов" className={!active?"nav-current":""}
       onClick={()=>selectProject(null)}>▦ <span>Портфель проектов</span><b>{data.projects.length}</b></button>
     <button aria-label="Создать проект" onClick={()=>{selectProject(null);openEditor("new")}}>＋ <span>Создать проект</span></button>
+    <button aria-label="Подключить существующий проект" onClick={startConnection}>↗ <span>Подключить проект</span></button>
    </nav>
    <div className="sidebar-label">Мои проекты</div>
    <div className="project-nav" aria-label="Проекты">
@@ -899,7 +920,21 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    {!project?<>
     <div className="page-heading"><div><small>Ваше рабочее пространство</small><h1>Портфель проектов</h1>
       <p>Что должно быть, что известно и какие решения влияют на планы.</p></div>
-      <Action onClick={()=>openEditor("new")} primary title="Ctrl+N">＋ Новый проект</Action></div>
+      <div className="button-row">
+       <Action onClick={startConnection}>Подключить проект</Action>
+       <Action onClick={()=>openEditor("new")} primary title="Ctrl+N">＋ Новый проект</Action>
+      </div></div>
+    {connectOpen&&<ProjectConnect snapshot={data} onApply={completeConnection}
+     onCancel={()=>setConnectOpen(false)} disabled={busy||!!editor}/>}
+    {!connectOpen&&data.projects.length===0&&<section className="surface atlas-first-start">
+     <h2>Начать работу с Atlas</h2>
+     <p>Создайте собственный проект или подключите действующую разработку. Перед подключением Atlas покажет найденные сведения.</p>
+     <div className="button-row">
+      <Action primary onClick={startConnection}>Подключить существующий проект</Action>
+      <Action onClick={()=>openEditor("new")}>Создать новый проект</Action>
+      {!embedded&&<Action onClick={()=>void importIwxa()}>Открыть архив .iwxa</Action>}
+     </div>
+    </section>}
     <div className="metric-grid">
      <Metric value={data.projects.length} label="Проектов"/>
      <Metric value={data.projects.filter((p:any)=>p.status==="active").length} label="В работе"/>
@@ -1569,6 +1604,20 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
         {review.remaining>0&&<Action onClick={()=>setSourceRowLimits(prev=>({...prev,[s.id]:Math.min(review.total,(prev[s.id]||12)+24)}))}>
          Показать ещё изменения ({review.remaining})
         </Action>}
+        {s.kind==="github"&&s.summary?.structure?.status==="observed"&&
+         <details className="atlas-connected-structure">
+          <summary>Структура репозитория · {s.summary.structure.totalFolders} каталогов · {s.summary.structure.totalFiles} файлов</summary>
+          <p className="minor">Это корневые каталоги и файлы на момент изучения выбранной ветки.
+           Они не считаются работами или готовыми модулями без вашего решения.</p>
+          <div className="atlas-connect-root">
+           <div><strong>Каталоги</strong><ul>{s.summary.structure.folders.map((name:string)=>
+            <li key={name}>{name}</li>)}</ul></div>
+           <div><strong>Файлы</strong><ul>{s.summary.structure.files.map((name:string)=>
+            <li key={name}>{name}</li>)}</ul></div>
+          </div>
+          {(s.summary.structure.truncated||s.summary.structure.limited)&&
+           <p className="minor">Показана только часть корневой структуры.</p>}
+         </details>}
         {s.kind==="github"&&<div className="atlas-source-related-requirements"
           aria-label="Требования со сведениями из этого GitHub-источника">
          <strong>Требования, связанные с этим источником: {linkedRequirements.length}</strong>

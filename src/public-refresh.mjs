@@ -80,8 +80,18 @@ export async function reconcilePublicSources(snapshot,{
     if((source.kind==="github"&&observation?.scope!=="repository")||
        (source.kind==="github_owner"&&observation?.scope!=="owner")||
        typeof observation.complete!=="boolean")throw Error("Invalid public observation");
-    const changes=sourceChanges(source.summary,observation);
-    source.summary={...observation,changes};
+    // A root tree is valid only for the exact branch commit originally read.
+    // Keep it across routine refreshes when SHA is unchanged; drop it on drift.
+    const previousTree=source.summary?.structure;
+    const currentSha=previousTree?.branch&&observation.branchHeads?.[previousTree.branch];
+    const keepTree=source.kind==="github"&&previousTree?.status==="observed"&&
+     typeof previousTree.commitSha==="string"&&
+     /^[a-f0-9]{40}$/i.test(previousTree.commitSha)&&
+     typeof currentSha==="string"&&
+     currentSha.toLowerCase()===previousTree.commitSha.toLowerCase();
+    const nextObservation=keepTree?{...observation,structure:previousTree}:observation;
+    const changes=sourceChanges(source.summary,nextObservation);
+    source.summary={...nextObservation,changes};
     source.status="ok";source.error=null;
     report.updated++;
    }catch(e){
