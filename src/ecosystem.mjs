@@ -110,7 +110,7 @@ export function githubPortfolioOverview(snapshot){
    const key=canonicalRepo(source);
    const review=sourceReview(source);
    repositories.push({id:source.id,kind:source.kind,locator:source.locator,
-    owner,repository:key,branch:source.branch||source.summary?.defaultBranch||null,
+    owner,repository:key,url:review.sourceUrl,branch:source.branch||source.summary?.defaultBranch||null,
     status:source.status,observation:review.status,
     ci:review.ci?.label||null});
   }

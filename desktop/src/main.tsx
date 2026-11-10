@@ -17,6 +17,8 @@ import {revisionReview,recheckAction} from "../../src/revision-review.mjs";
 import {previewPlanAmendment,applyPlanAmendment,removePlanAmendment} from "../../src/plan-amendment.mjs";
 import {planPublicRefresh,reconcilePublicSources,publicSourceQueue} from "../../src/public-refresh.mjs";
 import {sourceReview,sourceFreshnessLabel} from "../../src/source-review.mjs";
+import {githubPortfolioCatalog,createProjectFromGitHubCatalog,githubPortfolioOverview,
+ filterGithubPortfolioOverview} from "../../src/ecosystem.mjs";
 import {ProjectGantt,ProjectDependencyDiagram} from "./ProjectVisuals";
 import {prepareImportedSnapshot} from "./import-snapshot.mjs";
 import {buildIwxaPortfolio,readIwxaPortfolio,toBase64,fromBase64} from "./iwxa-portfolio.mjs";
@@ -153,6 +155,11 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const [active,setActive]=useState<string|null>(null),[tab,setTab]=useState<Tab>("overview");
  const [search,setSearch]=useState(""),[editor,setEditor]=useState<Editor|null>(null);
  const [portfolioStatus,setPortfolioStatus]=useState("all");
+ const [ecosystemOwner,setEcosystemOwner]=useState("all");
+ const [ecosystemQuery,setEcosystemQuery]=useState("");
+ const [ecosystemLimit,setEcosystemLimit]=useState(36);
+ const [ownerCatalogQuery,setOwnerCatalogQuery]=useState<Record<string,string>>({});
+ const [ownerCatalogLimit,setOwnerCatalogLimit]=useState<Record<string,number>>({});
  const [attentionFilter,setAttentionFilter]=useState("all");
  const [attentionQuery,setAttentionQuery]=useState("");
  const [attentionLimit,setAttentionLimit]=useState(8);
@@ -214,6 +221,10 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const resources=useMemo(()=>portfolioResources(data,{schedule:dates} as any),[data,dates]);
  const reviews=useMemo(()=>planReviewQueue(data),[data]);
  const sourceQueue=useMemo(()=>publicSourceQueue(data),[data]);
+ const ecosystem=useMemo(()=>githubPortfolioOverview(data),[data]);
+ const ecosystemRows=useMemo(()=>filterGithubPortfolioOverview(ecosystem,{
+  owner:ecosystem.owners.includes(ecosystemOwner)?ecosystemOwner:"all",query:ecosystemQuery
+ }),[ecosystem,ecosystemOwner,ecosystemQuery]);
  const rechecks=useMemo(()=>revisionReview(data),[data]);
  // The full review queue remains available in large portfolios. Rendering
  // is paged; records never disappear silently after an arbitrary first page.
@@ -725,6 +736,15 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   if(!confirmAction("Удалить межпроектную зависимость? План будет пересчитан."))return;
   try{mutate(removePortfolioLink(data,id),"Связь проектов удалена. Сохраните изменение.");}catch(e){issue(e)}
  };
+ const includeDiscoveredProject=(ownerProjectId:string,ownerSourceId:string,repository:string)=>{
+  if(busyRef.current||!requireClosedForm())return;
+  try{
+   const result=createProjectFromGitHubCatalog(latestSnapshot.current,ownerProjectId,ownerSourceId,repository);
+   if(result.created)
+    mutate(result.state,"Проект добавлен в черновик вместе с GitHub-источником. Сохраните портфель на диск.");
+   selectProject(result.projectId,true);
+  }catch(e){issue(e)}
+ };
  const removeProject=(id:string)=>{
   if(!requireClosedForm()||busyRef.current)return;
   const subject=data.projects.find((p:any)=>p.id===id);if(!subject)return;
@@ -987,6 +1007,53 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       <Fallback message="Плановые ресурсы пока не добавлены. Назначения ответственных в текстовых полях не считаются подтверждёнными ресурсами."/>}
      {resources.people.length>0&&<p className="minor">Показано {Math.min(resourceLimit,resources.people.length)} из {resources.people.length} ресурсов.</p>}
      {resources.people.length>resourceLimit&&<Action onClick={()=>setResourceLimit(n=>Math.min(resources.people.length,n+40))}>Показать ещё ресурсы</Action>}
+    </section>
+    <section className="surface atlas-ecosystem-overview" aria-label="Карта разработки по проектам и GitHub">
+     <div className="section-heading"><div><h2>Карта разработки</h2>
+      <p>Продукты, источники и открытые вопросы в одном портфеле. Зелёная сборка не означает принятую поставку.</p></div></div>
+     <div className="summary-line">
+      <span>Проектов: {ecosystem.totals.projects}</span>
+      <span>С источниками GitHub: {ecosystem.totals.connected}</span>
+      <span>Заблокировано работ: {ecosystem.totals.blocked}</span>
+      <span>Обязательных требований: {ecosystem.totals.requirements}</span>
+      <span>Зависимостей: {ecosystem.totals.dependencies}</span>
+     </div>
+     <div className="filter-row">
+      <label>Владелец GitHub <select aria-label="Владелец источников на карте разработки"
+       value={ecosystem.owners.includes(ecosystemOwner)?ecosystemOwner:"all"}
+       onChange={event=>{setEcosystemOwner(event.target.value);setEcosystemLimit(36)}}>
+       <option value="all">Все проекты</option>
+       {ecosystem.owners.map(owner=><option value={owner} key={owner}>{owner}</option>)}
+      </select></label>
+      <label>Найти продукт <input aria-label="Поиск на карте разработки" type="search"
+       placeholder="Проект или репозиторий" value={ecosystemQuery}
+       onChange={event=>{setEcosystemQuery(event.target.value);setEcosystemLimit(36)}}/></label>
+      <small>Показано {Math.min(ecosystemRows.length,ecosystemLimit)} из {ecosystemRows.length}</small>
+     </div>
+     {ecosystemRows.length?<div className="table-scroll"><table aria-label="Продукты и связанные репозитории">
+      <thead><tr><th>Продукт или проект</th><th>Исходники</th><th>Работы</th>
+       <th>Результаты и решения</th><th>Связи</th><th>Действие</th></tr></thead>
+      <tbody>{ecosystemRows.slice(0,ecosystemLimit).map((r:any)=><tr key={r.id}>
+       <td><button type="button" className="text-link" onClick={()=>selectProject(r.id)}>{r.name}</button>
+        <small>{statuses[r.status]||r.status}</small></td>
+       <td>{r.repositories.length?r.repositories.slice(0,2).map((source:any)=>
+        <div key={source.id}>{source.url?
+         <a className="text-link" href={source.url} target="_blank" rel="noopener noreferrer">
+          {source.locator}</a>:<span>{source.locator}</span>}
+         <small>{source.kind==="github_owner"?"Каталог владельца":"Репозиторий"} · {source.observation}</small>
+        </div>):<small>Источник ещё не подключён</small>}
+        {r.repositories.length>2&&<small>И ещё {r.repositories.length-2} источников</small>}</td>
+       <td>{r.works} работ · {r.blocked} заблокированы
+        <small>{r.doneClaims} отмечены выполненными, без автоматической приёмки</small></td>
+       <td>{r.requirements} требований · {r.findings} фактов
+        <small>{r.proposals} предложений к решению · {r.decisions} решений</small></td>
+       <td>{r.predecessors} входящих · {r.downstream} исходящих</td>
+       <td><Action onClick={()=>openProjectTab(r.id,r.sourcesMissing?"sources":"overview")}>Открыть</Action></td>
+      </tr>)}</tbody></table></div>:
+      <Fallback message="По выбранному фильтру проектов нет. Добавьте проект и подключите его источники."/>}
+     {ecosystemRows.length>ecosystemLimit&&<Action onClick={()=>setEcosystemLimit(n=>Math.min(ecosystemRows.length,n+36))}>
+      Показать ещё ({ecosystemRows.length-ecosystemLimit})</Action>}
+     <p className="minor">Для портфеля IWXA создайте проект «IWXA», добавьте в его источниках публичного владельца GitHub и обновите список. Затем включайте нужные репозитории как отдельные проекты; приватные продукты добавляются вручную или через разрешённый host.</p>
     </section>
     <section className="surface">
      <div className="section-heading"><div><h2>Источники проектов</h2><p>Atlas проверяет открытые репозитории GitHub по вашему запросу. Ничего в них не меняет.</p></div>
@@ -1439,6 +1506,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       const review=sourceReview(s,{limit:sourceRowLimits[s.id]||12});
       const sourceIssue=sourceResponseById.get(s.id);
       const linkedRequirements=sourceRequirementLinks.get(s.id)||[];
+      const ownerCatalog=s.kind==="github_owner"?githubPortfolioCatalog(data,project.id,s.id,{
+       query:ownerCatalogQuery[s.id]||"",limit:ownerCatalogLimit[s.id]||24
+      }):null;
       return <div className="atlas-source-review" key={s.id}>
        <div className="attention-row"><div><strong>{sourceNames[s.kind]||"Источник"}: {s.locator}</strong>
         {s.kind==="github"&&<small>Ветка проверок: {s.branch||s.summary?.defaultBranch||"основная ветка репозитория"}</small>}
@@ -1528,6 +1598,37 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
             Открыть связанное изменение</Action>}
          <p className="minor">Сначала предложение, затем отдельное решение. Работа и приёмка автоматически не создаются.</p>
         </div>}
+        {ownerCatalog&&<details className="atlas-owner-catalog">
+         <summary>Репозитории GitHub · {ownerCatalog.total} обнаружено · {ownerCatalog.connected} уже в портфеле</summary>
+         <p className="minor">{ownerCatalog.observed?
+          ownerCatalog.complete?"Список публичных репозиториев наблюдался полностью.":
+           "Получена часть публичных репозиториев. Не найденные здесь репозитории могут существовать.":
+          "Последнее наблюдение недоступно. Обновите список перед созданием проекта."}
+          {" "}Приватные репозитории не перечисляются без отдельного разрешения.</p>
+         <label>Найти репозиторий <input type="search" aria-label={"Поиск репозиториев "+ownerCatalog.owner}
+          placeholder="Название репозитория" value={ownerCatalogQuery[s.id]||""}
+          onChange={event=>{setOwnerCatalogQuery(prev=>({...prev,[s.id]:event.target.value}));
+           setOwnerCatalogLimit(prev=>({...prev,[s.id]:24}))}}/></label>
+         {ownerCatalog.rows.length>0?<div className="table-scroll"><table aria-label={"Репозитории "+ownerCatalog.owner}>
+          <thead><tr><th>Репозиторий</th><th>В Atlas</th><th>Действие</th></tr></thead>
+          <tbody>{ownerCatalog.rows.map((repo:any)=><tr key={repo.name}>
+           <td><a className="text-link" href={"https://github.com/"+repo.name}
+            target="_blank" rel="noopener noreferrer">{repo.repository}</a>
+            <small>{repo.defaultBranch||"Основная ветка не определена"}{repo.archived?" · Архивный репозиторий":""}</small></td>
+           <td>{repo.projects.length?repo.projects.map((p:any)=><div key={p.id}>
+            <button type="button" className="text-link" onClick={()=>selectProject(p.id)}>{p.name}</button></div>):
+            <small>Отдельного проекта ещё нет</small>}</td>
+           <td>{repo.canCreate?<Action onClick={()=>includeDiscoveredProject(project.id,s.id,repo.name)}
+             disabled={busy}>Создать проект</Action>:repo.projects.length?
+             <Action onClick={()=>selectProject(repo.projects[0].id)}>Открыть проект</Action>:
+             <small>Сначала обновите список</small>}</td>
+          </tr>)}</tbody></table></div>:<p className="minor">По вашему запросу репозитории не найдены.</p>}
+         <p className="minor">Показано {ownerCatalog.rows.length} из {ownerCatalog.matched} по фильтру.</p>
+         {ownerCatalog.remaining>0&&<Action onClick={()=>setOwnerCatalogLimit(prev=>({...prev,
+          [s.id]:Math.min(ownerCatalog.matched,(prev[s.id]||24)+24)}))}>
+          Показать ещё ({ownerCatalog.remaining})</Action>}
+         <p className="minor">Создание проекта добавляет GitHub-источник и плановый проект только в черновик Atlas; данные GitHub не меняются.</p>
+        </details>}
         <p className="minor">Наблюдение источника не подтверждает готовность проекта, выполнение работы или приёмку результата.</p>
        </div>}
       </div>
