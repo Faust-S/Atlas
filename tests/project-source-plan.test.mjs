@@ -270,7 +270,7 @@ test("The overview offers its existing plan diagram in non-engineering projects"
 });
 
 
-test("Project type names in navigation match the existing human-readable editor choices",()=>{
+test("Project type names in navigation match the existing human-readable editor choices",async()=>{
  const {PROJECT_TYPE_LABELS,editorSpec}=await import("../src/editor.mjs");
  const labels=["Личный","Команда","Бизнес","Разработка","Исследование",
   "Здоровье (без медицинских записей)","Другое"];
