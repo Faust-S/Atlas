@@ -194,3 +194,14 @@ test("User chooses an existing stage or creates one with a source-linked work",(
  assert.throws(()=>applyEditor(stale,projectId,action,newStage),/изменилась/);
  assert.equal(serialize(stale),staleBefore);
 });
+
+test("An ordinary non-GitHub project also returns the new work ID without extra state",()=>{
+ const p=createProject(empty(),{name:"Обычный план",type:"other"});
+ const before=serialize(p.state),form=new FormData();
+ form.set("title","Первая работа");form.set("estimateDays","1");
+ const result=applyEditor(p.state,p.id,"item",form);
+ assert.equal(result.state.projects[0].items.length,1);
+ assert.equal(result.workId,result.state.projects[0].items[0].id);
+ assert.equal(serialize(p.state),before);
+ assert.deepEqual(deserialize(serialize(result.state)),result.state);
+});

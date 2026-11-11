@@ -362,6 +362,26 @@ def verify_organization_work(previous,original_project):
     set_text("Новый этап (необязательно)","Проверка исходников")
     screenshot("source-work-editor")
     click_editor_submit()
+    window_title_contains("Atlas — Таблица",35)
+    wait_text("Работы проекта",35)
+    # The just-created work must be physically on screen, not only present in UIA.
+    title_button=wait_button("Открыть работу Проверить исходники сайта",25)
+    bounds=win32gui.GetWindowRect(handle)
+    target=title_button.rectangle()
+    if not (target.top>=bounds[1]+105 and target.bottom<=bounds[3]-35
+            and target.left>=bounds[0]+230 and target.right<=bounds[2]-8):
+        screenshot("created-work-not-visible")
+        raise AssertionError("Created work was not focused in installed Windows table")
+    screenshot("new-work-focused-in-table")
+    print("ATLAS06_CREATED_WORK_TABLE_FOCUS_PASS",flush=True)
+    stage_button=wait_button(
+        "Открыть этап Проверка исходников для работы Проверить исходники сайта",20)
+    stage_button.click_input()
+    window_title_contains("Форма: Этап: Проверка исходников",20)
+    assert head()==previous,"Opening the newly created stage changed native storage"
+    keyboard.send_keys("{ESC}")
+    assert head()==previous,"Stage navigation bypassed explicit native Save"
+    print("ATLAS06_CREATED_WORK_STAGE_NAVIGATION_PASS",flush=True)
     assert head()==previous,"Applying the form silently saved the project"
     wait_button("Сохранить")
     click_button("Сохранить")

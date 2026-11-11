@@ -3,6 +3,7 @@
 A real user-path .iwxa file picker, preview and Save imports the fixture.
 Checks the native readback, real WebView2 UIA coordinates, scroll, resizing,
 expansion, work/stage/dependency navigation and preservation after restart.
+Finally creates and saves a new work in a 1212-work plan through real controls.
 No test IPC, direct native store injection, DOM debugger, or network mocks.
 """
 import importlib.util
@@ -367,6 +368,58 @@ def qualify_visual():
     time.sleep(0.2)
     assert d.head()==saved
     print("ATLAS06_VISUAL_INSTALLED_NO_UNREQUESTED_WRITE_PASS",flush=True)
+
+    # New user work is alphabetically beyond the initial 200 rows.
+    # The existing ID-based return must expand the real list and focus its row.
+    new_title="Якорная работа большого проекта, созданная вручную"
+    d.click_button("Таблица")
+    d.window_title_contains(PROJECT+" — Таблица",35)
+    d.click_button("＋ Работа")
+    d.window_title_contains("Форма: Новая работа",25)
+    d.set_text("Что нужно сделать?",new_title)
+    assert d.head()==saved,"Opening the new-work form wrote to native storage"
+    # Ctrl+Enter is the existing user keyboard shortcut for applying the form.
+    keyboard.send_keys("^{ENTER}")
+    await_no_form()
+    d.window_title_contains(PROJECT+" — Таблица",25)
+    d.wait_text("Работа внесена в черновик.",35)
+    deadline=time.monotonic()+45
+    visible=False
+    while time.monotonic()<deadline:
+        try:
+            target=d.window().child_window(
+                title="Открыть работу "+new_title,control_type="Button")
+            if target.exists(timeout=1) and target.is_visible() and (
+                    rectangle_in_workspace(target.rectangle(),
+                                           win32gui.GetWindowRect(d.handle))):
+                visible=True
+                break
+        except Exception:
+            pass
+        time.sleep(0.3)
+    if not visible:
+        capture("new-work-large-focus-missing")
+        raise AssertionError("Created work was not physically focused among 1212 items")
+    assert d.head()==saved,"Applying the new-work form silently saved native data"
+    capture("created-work-large-focused")
+    print("ATLAS06_VISUAL_CREATED_WORK_LARGE_FOCUS_PASS",flush=True)
+
+    d.click_button("Сохранить")
+    changed=await_saved(saved)
+    after=d.saved_project(changed)
+    assert len(after["items"])==1213
+    added=[item for item in after["items"] if item["title"]==new_title]
+    assert len(added)==1,"Created work must be uniquely stored"
+    assert added[0]["id"] not in {item["id"] for item in expected["items"]}
+    for field in ("id","name","type","goal","stages","sources","dependencies",
+                  "targets","findings","changes","decisions","risks"):
+        assert after.get(field)==expected.get(field),"New work changed "+field
+    d.stop()
+    d.launch()
+    d.wait_text("Портфель проектов",45)
+    assert d.head()==changed,"Saved work changed after cold restart"
+    assert d.saved_project(changed)==after,"Native work readback changed after restart"
+    print("ATLAS06_VISUAL_CREATED_WORK_LARGE_SAVE_RESTART_PASS",flush=True)
 
 if __name__=="__main__":
     try:

@@ -367,3 +367,19 @@ test("Installed Atlas shows observed root catalogs immediately after adding a re
  assert.match(installed,/ATLAS06_CONNECT_SOURCE_MAP_FIRST_VIEW_PASS/);
  assert.match(installed,/Viewing project parts changed native storage/);
 });
+
+test("Installed Windows witnesses immediate work and stage access and the 1212-work jump",()=>{
+ const source=read("../desktop/tests/installed-atlas06-connect.py");
+ const stress=read("../desktop/tests/installed-atlas06-visual-scale.py");
+ assert.match(source,/ATLAS06_CREATED_WORK_TABLE_FOCUS_PASS/);
+ assert.match(source,/ATLAS06_CREATED_WORK_STAGE_NAVIGATION_PASS/);
+ assert.match(source,/window_title_contains\("Atlas — Таблица",35\)/);
+ assert.match(source,/title_button=wait_button\("Открыть работу Проверить исходники сайта",25\)/);
+ assert.match(source,/target\.bottom<=bounds\[3\]-35/);
+ assert.match(stress,/ATLAS06_VISUAL_CREATED_WORK_LARGE_FOCUS_PASS/);
+ assert.match(stress,/ATLAS06_VISUAL_CREATED_WORK_LARGE_SAVE_RESTART_PASS/);
+ assert.match(stress,/len\(after\["items"\]\)==1213/);
+ assert.match(stress,/d\.head\(\)==saved,"Applying the new-work form silently saved native data"/);
+ assert.match(stress,/d\.saved_project\(changed\)==after/);
+ assert.doesNotMatch(stress,/execute_script\(|invoke\(|write_bytes\(d\.STORE|localStorage/);
+});
