@@ -449,6 +449,42 @@ def qualify_visual():
     assert d.saved_project(changed)==after,"Native work readback changed after restart"
     print("ATLAS06_VISUAL_CREATED_WORK_LARGE_SAVE_RESTART_PASS",flush=True)
 
+    # A previously created work can receive another predecessor directly from
+    # its own row. The dependent work is fixed by that row, never reselected.
+    select_project()
+    d.click_button("Таблица")
+    d.window_title_contains(PROJECT+" — Таблица",35)
+    d.set_text("Найти работу",new_title)
+    action=find_control("Добавить предшественника для работы "+new_title,
+                        types={"Button"})
+    action.click_input()
+    d.window_title_contains("Форма: Предшествующая работа для: "+new_title,25)
+    assert d.head()==changed,"Opening dependency editor changed native storage"
+    choice=d.window().child_window(
+        title="Что должно быть выполнено раньше?",control_type="ComboBox")
+    assert choice.exists(timeout=10) and choice.is_enabled()
+    # First available work is visual-work-0-1. visual-work-0-0 was
+    # already connected during the initial creation and must be excluded.
+    submit=find_control("Применить к черновику",types={"Button"})
+    submit.click_input()
+    await_no_form()
+    assert d.head()==changed,"Choosing a predecessor silently saved native storage"
+    print("ATLAS06_VISUAL_EXISTING_WORK_PREDECESSOR_FORM_PASS",flush=True)
+    d.click_button("Сохранить")
+    linked_head=await_saved(changed)
+    linked=d.saved_project(linked_head)
+    assert len(linked["items"])==1213
+    added_links=[edge for edge in linked["dependencies"]
+                 if edge not in after["dependencies"]]
+    assert added_links==[{"from":"visual-work-0-1","to":added[0]["id"]}],added_links
+    assert linked["stages"]==after["stages"] and linked["sources"]==after["sources"]
+    d.stop()
+    d.launch()
+    d.wait_text("Портфель проектов",45)
+    assert d.head()==linked_head
+    assert d.saved_project(linked_head)==linked
+    print("ATLAS06_VISUAL_EXISTING_WORK_PREDECESSOR_RESTART_PASS",flush=True)
+
 if __name__=="__main__":
     try:
         qualify_visual()
