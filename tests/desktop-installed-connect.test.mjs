@@ -412,3 +412,14 @@ test("Native predecessor form uses a visible confirmation after selecting an exi
  assert.ok(regular.indexOf('field("estimateDays"')<regular.indexOf('field("assignee"'));
  assert.ok(regular.indexOf('choice("predecessorId"')<regular.indexOf('choice("resourceId"'));
 });
+
+test("Installed large-project qualification confirms a second predecessor for the existing work",()=>{
+ const stress=read("../desktop/tests/installed-atlas06-visual-scale.py");
+ assert.match(stress,/ATLAS06_VISUAL_EXISTING_WORK_PREDECESSOR_FORM_PASS/);
+ assert.match(stress,/ATLAS06_VISUAL_EXISTING_WORK_PREDECESSOR_RESTART_PASS/);
+ assert.match(stress,/Добавить предшественника для работы/);
+ assert.match(stress,/title="Что должно быть выполнено раньше\?",control_type="ComboBox"/);
+ assert.match(stress,/added_links==\[\{"from":"visual-work-0-1","to":added\[0\]\["id"\]\}\]/);
+ assert.match(stress,/d\.head\(\)==changed,"Choosing a predecessor silently saved native storage"/);
+ assert.match(stress,/d\.saved_project\(linked_head\)==linked/);
+});
