@@ -1511,20 +1511,24 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
         {recentWorkKind==="dependency"&&recentScheduleEffect&&
          <div className="atlas-work-plan-effect" aria-label="Последствия изменения зависимости">
           <p>{recentScheduleEffect.movedTotal>0?
-           "Сдвинулся расчётный срок у "+recentScheduleEffect.movedTotal+" работ. "+
+           "Изменились расчётные сроки. Затронуто работ: "+recentScheduleEffect.movedTotal+". "+
            (recentScheduleEffect.delayedTotal?"Позже: "+recentScheduleEffect.delayedTotal+". ":"")+
            (recentScheduleEffect.earlierTotal?"Раньше: "+recentScheduleEffect.earlierTotal+".":""):
            "Расчётные сроки существующих работ не сдвинулись."}
            {recentScheduleEffect.criticalChangedTotal>0?
-            " Изменилось положение на критическом пути у "+recentScheduleEffect.criticalChangedTotal+" работ.":""}
+            " Критический путь изменился. Затронуто работ: "+recentScheduleEffect.criticalChangedTotal+".":""}
           </p>
           {recentScheduleEffect.examples.length>0&&<ul className="atlas-work-effect-list">
            {recentScheduleEffect.examples.map(item=><li key={item.id}>
             <button type="button" className="text-link"
-             aria-label={"Перейти к затронутой работе "+item.title}
-             onClick={()=>revealWorkInTable(item.id)}>{item.title}</button>
-            <small>Изменение расчётного окончания: {item.shiftDays>0?"+":""}{item.shiftDays} дн.
-             {item.finishDate?" · "+item.finishDate:" · от начала проекта"}</small>
+             aria-label={"Изменить затронутую работу "+item.title}
+             onClick={()=>openEditor("work:"+item.id)}>{item.title}</button>
+            <small>Расчётное окончание: {item.previousFinishDate&&item.finishDate?
+             "было "+item.previousFinishDate+", стало "+item.finishDate:
+             "было через "+item.previousFinishOffset+" дн., стало через "+
+             item.finishOffset+" дн. от начала проекта"}.
+             {" "}Сдвиг {item.shiftDays>0?"+":""}{item.shiftDays} дн.
+             {item.critical?" На критическом пути.":""}</small>
            </li>)}
           </ul>}
           {recentScheduleEffect.movedTotal>recentScheduleEffect.examples.length&&

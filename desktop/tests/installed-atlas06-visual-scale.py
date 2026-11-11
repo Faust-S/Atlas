@@ -489,6 +489,44 @@ def qualify_visual():
     assert d.saved_project(linked_head)==linked
     print("ATLAS06_VISUAL_EXISTING_WORK_PREDECESSOR_RESTART_PASS",flush=True)
 
+    # Changing a real existing dependency must explain the resulting delay
+    # and let a user open an affected work directly in its original editor.
+    select_project()
+    d.click_button("Таблица")
+    d.window_title_contains(PROJECT+" — Таблица",35)
+    d.set_text("Найти работу","Работа 0 / 2")
+    direct=find_control("Добавить предшественника для работы Работа 0 / 2",
+                        types={"Button"})
+    direct.click_input()
+    d.window_title_contains("Форма: Предшествующая работа для:",25)
+    confirm=find_control("Применить к черновику",types={"Button"})
+    confirm.click_input()
+    await_no_form()
+    assert d.head()==linked_head,"Dependency was saved without user approval"
+    d.wait_text("Изменились расчётные сроки. Затронуто работ: 2.",35)
+    d.wait_text("Расчётное окончание: было",35)
+    print("ATLAS06_VISUAL_EXISTING_WORK_SHIFT_EXPLAINED_PASS",flush=True)
+    edit=find_control("Изменить затронутую работу Работа 0 / 2",
+                      types={"Button"})
+    edit.click_input()
+    d.window_title_contains("Форма: Работа: Работа 0 / 2",25)
+    assert d.head()==linked_head,"Opening affected work editor modified storage"
+    d.click_button("Закрыть редактор")
+    print("ATLAS06_VISUAL_AFFECTED_WORK_DIRECT_EDITOR_PASS",flush=True)
+    d.click_button("Сохранить")
+    final_head=await_saved(linked_head)
+    final=d.saved_project(final_head)
+    new_edges=[edge for edge in final["dependencies"]
+               if edge not in linked["dependencies"]]
+    assert new_edges==[{"from":"visual-work-0-0","to":"visual-work-0-1"}],new_edges
+    assert final["items"]==linked["items"] and final["stages"]==linked["stages"]
+    d.stop()
+    d.launch()
+    d.wait_text("Портфель проектов",45)
+    assert d.head()==final_head
+    assert d.saved_project(final_head)==final
+    print("ATLAS06_VISUAL_AFFECTED_WORK_LINK_RESTART_PASS",flush=True)
+
 if __name__=="__main__":
     try:
         qualify_visual()

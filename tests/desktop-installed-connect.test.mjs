@@ -430,3 +430,15 @@ test("Native Windows expects truthful unchanged schedule feedback after a neutra
  assert.match(script,/d\.wait_text\("Расчётные сроки существующих работ не сдвинулись\.",35\)/);
  assert.match(script,/d\.wait_text\("Продолжительность плана: было",35\)/);
 });
+
+test("Installed Windows verifies a delayed existing work and opens its editor directly",()=>{
+ const stress=read("../desktop/tests/installed-atlas06-visual-scale.py");
+ assert.match(stress,/ATLAS06_VISUAL_EXISTING_WORK_SHIFT_EXPLAINED_PASS/);
+ assert.match(stress,/ATLAS06_VISUAL_AFFECTED_WORK_DIRECT_EDITOR_PASS/);
+ assert.match(stress,/ATLAS06_VISUAL_AFFECTED_WORK_LINK_RESTART_PASS/);
+ assert.match(stress,/find_control\("Изменить затронутую работу Работа 0 \/ 2"/);
+ assert.match(stress,/d\.wait_text\("Изменились расчётные сроки\. Затронуто работ: 2\.",35\)/);
+ assert.match(stress,/d\.head\(\)==linked_head,"Opening affected work editor modified storage"/);
+ assert.match(stress,/new_edges==\[\{"from":"visual-work-0-0","to":"visual-work-0-1"\}\]/);
+ assert.match(stress,/d\.saved_project\(final_head\)==final/);
+});

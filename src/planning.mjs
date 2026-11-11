@@ -88,7 +88,7 @@ export function scheduleChangeSummary(before,after,{limit=4}={}){
   throw new Error("Invalid schedule comparison limit");
  const previous=new Map(before.rows.map(row=>[row.id,row]));
  let movedTotal=0,delayedTotal=0,earlierTotal=0,criticalChangedTotal=0;
- const examples=[];
+ const affected=[];
  for(const row of after.rows){
   const old=previous.get(row.id);
   if(!old)continue;
@@ -97,12 +97,18 @@ export function scheduleChangeSummary(before,after,{limit=4}={}){
   if(!shiftDays)continue;
   movedTotal++;
   if(shiftDays>0)delayedTotal++;else earlierTotal++;
-  if(examples.length<limit)examples.push({
-   id:row.id,title:row.title,shiftDays,finishDate:row.finishDate??null
+  affected.push({
+   id:row.id,title:row.title,shiftDays,
+   previousFinishOffset:old.earlyFinish,finishOffset:row.earlyFinish,
+   previousFinishDate:old.finishDate??null,finishDate:row.finishDate??null,
+   critical:Boolean(row.critical)
   });
  }
+ // Most affected works first; stable ties preserve their source schedule order.
+ affected.sort((a,b)=>Number(b.shiftDays>0)-Number(a.shiftDays>0)||
+  Math.abs(b.shiftDays)-Math.abs(a.shiftDays)||Number(b.critical)-Number(a.critical));
  return {durationBefore:before.durationDays,durationAfter:after.durationDays,
-  movedTotal,delayedTotal,earlierTotal,criticalChangedTotal,examples};
+  movedTotal,delayedTotal,earlierTotal,criticalChangedTotal,examples:affected.slice(0,limit)};
 }
 
 /**

@@ -59,3 +59,31 @@ test('comparison handles neutral dependencies and limits large previews',()=>{
  assert.throws(()=>scheduleChangeSummary(null,scheduleProject(linear)),/Invalid schedule comparison/);
  assert.throws(()=>scheduleChangeSummary(scheduleProject(base),scheduleProject(linear),{limit:0}),/Invalid schedule comparison limit/);
 });
+
+test('schedule impact lists largest delayed works first and retains before/after dates',()=>{
+ const before={durationDays:10,rows:[
+  {id:'small',title:'Небольшой сдвиг',earlyFinish:2,finishDate:'2026-11-03',critical:false},
+  {id:'earlier',title:'Раньше',earlyFinish:8,finishDate:'2026-11-09',critical:true},
+  {id:'big',title:'Большой сдвиг',earlyFinish:3,finishDate:'2026-11-04',critical:false}
+ ]};
+ const after={durationDays:12,rows:[
+  {id:'small',title:'Небольшой сдвиг',earlyFinish:3,finishDate:'2026-11-04',critical:false},
+  {id:'earlier',title:'Раньше',earlyFinish:6,finishDate:'2026-11-07',critical:false},
+  {id:'big',title:'Большой сдвиг',earlyFinish:7,finishDate:'2026-11-08',critical:true}
+ ]};
+ const oldText=JSON.stringify(before),newText=JSON.stringify(after);
+ const impact=scheduleChangeSummary(before,after,{limit:2});
+ assert.equal(impact.movedTotal,3);
+ assert.equal(impact.delayedTotal,2);
+ assert.equal(impact.earlierTotal,1);
+ assert.equal(impact.criticalChangedTotal,2);
+ assert.deepEqual(impact.examples.map(x=>x.id),['big','small']);
+ assert.deepEqual(impact.examples.map(x=>x.shiftDays),[4,1]);
+ assert.equal(impact.examples[0].previousFinishOffset,3);
+ assert.equal(impact.examples[0].finishOffset,7);
+ assert.equal(impact.examples[0].previousFinishDate,'2026-11-04');
+ assert.equal(impact.examples[0].finishDate,'2026-11-08');
+ assert.equal(impact.examples[0].critical,true);
+ assert.equal(JSON.stringify(before),oldText);
+ assert.equal(JSON.stringify(after),newText);
+});

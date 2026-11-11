@@ -734,8 +734,11 @@ test("An existing-work dependency explains CPM effects without writing data",()=
  assert.match(ui,/Связь внесена в черновик\. Сохраните изменения\./);
  assert.match(ui,/Расчётные сроки существующих работ не сдвинулись\./);
  assert.match(ui,/Последствия изменения зависимости/);
- assert.match(ui,/Перейти к затронутой работе/);
- assert.match(ui,/onClick=\{\(\)=>revealWorkInTable\(item\.id\)\}/);
+ assert.match(ui,/Изменить затронутую работу/);
+ assert.match(ui,/onClick=\{\(\)=>openEditor\("work:"\+item\.id\)\}/);
+ assert.match(ui,/item\.previousFinishDate&&item\.finishDate/);
+ assert.match(ui,/item\.previousFinishOffset/);
+ assert.match(ui,/item\.critical\?" На критическом пути\."/);
  assert.match(plan,/export function scheduleChangeSummary\(/);
  const from=plan.indexOf("export function scheduleChangeSummary(");
  const to=plan.indexOf("export function workDependencyOverview(");
