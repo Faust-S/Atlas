@@ -552,7 +552,7 @@ def qualify_visual():
     # read-only; no synthetic native state or implicit Save.
     select_project()
     d.click_button("График")
-    d.wait_text("Позже срока (1)",35)
+    d.wait_text("План-график CPM",35)
     deadline_filter=d.window().child_window(
         title="Только работы позже контрольного срока",control_type="CheckBox")
     assert deadline_filter.exists(timeout=15) and deadline_filter.is_enabled()
@@ -569,6 +569,23 @@ def qualify_visual():
     assert d.saved_project(final_head)==final
     capture("gantt-work-deadline-filter")
     print("ATLAS06_VISUAL_GANTT_WORK_DEADLINE_FILTER_PASS",flush=True)
+
+    # The same real CPM warning is visible and actionable in the work table,
+    # with one click to show all late works even beyond its 200-row preview.
+    d.click_button("Таблица")
+    show_late=find_control("Показать работы позже контрольного срока",
+                           types={"Button"})
+    show_late.click_input()
+    d.wait_text("Показано 1 из 1 работ по фильтру",35)
+    d.wait_text("Расчётное окончание: 2026-11-13",35)
+    d.wait_text("Позже указанного срока",35)
+    capture("table-work-deadline-filter")
+    assert d.head()==final_head,"Table deadline filter changed native Store"
+    show_all=find_control("Показать все работы проекта",types={"Button"})
+    show_all.click_input()
+    d.wait_text("Показано 200 из 1213 работ по фильтру",35)
+    assert d.saved_project(final_head)==final
+    print("ATLAS06_VISUAL_TABLE_WORK_DEADLINE_FILTER_PASS",flush=True)
 
 if __name__=="__main__":
     try:

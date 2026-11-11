@@ -809,3 +809,17 @@ test("Affected work deadlines are visible only when the calculated finish can be
  assert.match(ui,/Контрольный срок \{item\.dueDate\} не выдержан/);
  assert.match(css,/\.atlas-work-effect-list small\.atlas-work-effect-deadline/);
 });
+
+test("Works table finds calculated deadline overruns without searching a long project",()=>{
+ const ui=read("../desktop/src/main.tsx");
+ const css=read("../desktop/src/style.css");
+ assert.match(ui,/const overdueWorkFinishes=useMemo/);
+ assert.match(ui,/row\.dueDate&&row\.finishDate&&row\.finishDate>row\.dueDate/);
+ assert.match(ui,/workDeadlineFilter==="all"\|\|overdueWorkFinishes\.has\(item\.id\)/);
+ assert.match(ui,/Показать работы позже контрольного срока/);
+ assert.match(ui,/Показать все работы проекта/);
+ assert.match(ui,/setWorkDeadlineFilter\("all"\)/);
+ assert.match(ui,/overdueWorkFinishes\.get\(w\.id\)/);
+ assert.match(ui,/Расчётное окончание: \{overdueWorkFinishes\.get\(w\.id\)\}/);
+ assert.match(css,/\.atlas-work-overdue-label/);
+});

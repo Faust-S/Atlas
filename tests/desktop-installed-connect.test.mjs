@@ -482,3 +482,14 @@ test("Installed Windows numeric work-duration editor uses WebView2 Spinner input
  assert.match(driver,/for role in \("Edit","ComboBox","Spinner"\):/);
  assert.match(editor,/field\("estimateDays","Плановая длительность, дней","number"/);
 });
+
+test("Installed Atlas table reveals dated control-overrun work without saving or losing other works",()=>{
+ const driver=read("../desktop/tests/installed-atlas06-visual-scale.py");
+ const ui=read("../desktop/src/main.tsx");
+ assert.match(driver,/ATLAS06_VISUAL_TABLE_WORK_DEADLINE_FILTER_PASS/);
+ assert.match(driver,/Показать работы позже контрольного срока/);
+ assert.match(driver,/Показано 1 из 1 работ по фильтру/);
+ assert.match(driver,/Table deadline filter changed native Store/);
+ assert.match(driver,/Показано 200 из 1213 работ по фильтру/);
+ assert.match(ui,/overdueWorkFinishes\.size>0\|\|workDeadlineFilter==="overdue"/);
+});

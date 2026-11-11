@@ -143,3 +143,15 @@ test('a missed work deadline stays actionable in a limited schedule impact previ
  assert.equal(result.examples[0].missedDeadline,true);
  assert.equal(result.examples[0].dueDate,'2026-11-02');
 });
+
+test('work-table deadline risk is grounded in a real dated CPM finish only',()=>{
+ const dated=project([['step',2],['finish',2]],[['step','finish']],'2026-11-01');
+ dated.items.find(w=>w.id==='finish').dueDate='2026-11-04';
+ const before=JSON.stringify(dated);
+ const rows=scheduleProject(dated).rows;
+ assert.deepEqual(rows.filter(r=>r.dueDate&&r.finishDate&&r.finishDate>r.dueDate).map(r=>r.id),['finish']);
+ assert.equal(rows.find(r=>r.id==='finish').finishDate,'2026-11-05');
+ const withoutStart={...dated,startDate:null};
+ assert.deepEqual(scheduleProject(withoutStart).rows.filter(r=>r.dueDate&&r.finishDate&&r.finishDate>r.dueDate),[]);
+ assert.equal(JSON.stringify(dated),before);
+});
