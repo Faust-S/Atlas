@@ -776,3 +776,20 @@ test("Affected-work actions are placed before secondary schedule details",()=>{
  assert.match(witness,/ATLAS06_VISUAL_AFFECTED_WORK_ACTION_VISIBLE_PASS/);
  assert.match(witness,/scroll=False\)/);
 });
+
+test("Correcting a work named in the impact list recalculates the schedule before Save",()=>{
+ const ui=read("../desktop/src/main.tsx");
+ assert.match(ui,/recentWorkKind==="adjusted"/);
+ assert.match(ui,/editor\.action\.startsWith\("work:"\)&&recentScheduleEffect/);
+ assert.match(ui,/recentScheduleEffect\.examples\.some\(item=>item\.id===correctedId\)/);
+ assert.match(ui,/const correctedId=editor\.action\.slice\(5\)/);
+ assert.match(ui,/scheduleChangeSummary\(plan,scheduleProject\(updatedProject\)\)/);
+ assert.match(ui,/setRecentWorkKind\("adjusted"\)/);
+ assert.match(ui,/revealWorkInTable\(correctedId,false\)/);
+ assert.match(ui,/Последствия изменения работы/);
+ assert.match(ui,/Работа изменена в черновике\. Сохраните изменения\./);
+ const a=ui.indexOf('else if(editor.action.startsWith("work:")');
+ const b=ui.indexOf('editorDirtyRef.current=false;setEditor(null);',a);
+ assert.ok(a>0&&b>a);
+ assert.doesNotMatch(ui.slice(a,b),/commitWithReadback\(|nativeInvoke\(|localStorage/);
+});

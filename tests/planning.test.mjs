@@ -87,3 +87,15 @@ test('schedule impact lists largest delayed works first and retains before/after
  assert.equal(JSON.stringify(before),oldText);
  assert.equal(JSON.stringify(after),newText);
 });
+
+test('correcting an affected work duration recalculates its downstream chain',()=>{
+ const original=project([['a',1],['b',1],['c',1]],[['a','b'],['b','c']],null);
+ const corrected=project([['a',1],['b',2],['c',1]],[['a','b'],['b','c']],null);
+ const before=scheduleProject(original),after=scheduleProject(corrected);
+ const effect=scheduleChangeSummary(before,after);
+ assert.equal(effect.durationBefore,3);
+ assert.equal(effect.durationAfter,4);
+ assert.equal(effect.delayedTotal,2);
+ assert.deepEqual(effect.examples.map(x=>x.id),['b','c']);
+ assert.deepEqual(effect.examples.map(x=>x.shiftDays),[1,1]);
+});

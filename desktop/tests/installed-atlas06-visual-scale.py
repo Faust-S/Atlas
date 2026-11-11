@@ -515,15 +515,27 @@ def qualify_visual():
     edit.click_input()
     d.window_title_contains("Форма: Работа: Работа 0 / 2",25)
     assert d.head()==linked_head,"Opening affected work editor modified storage"
-    d.click_button("Закрыть редактор")
     print("ATLAS06_VISUAL_AFFECTED_WORK_DIRECT_EDITOR_PASS",flush=True)
+    d.set_text("Плановая длительность, дней","2")
+    apply=find_control("Применить к черновику",types={"Button"})
+    apply.click_input()
+    await_no_form()
+    assert d.head()==linked_head,"Correcting affected work saved without confirmation"
+    d.wait_text("Работа изменена в черновике.",35)
+    d.wait_text("Изменились расчётные сроки. Затронуто работ: 2.",35)
+    capture("affected-work-duration-updated-feedback")
+    print("ATLAS06_VISUAL_AFFECTED_WORK_REPLANNED_PASS",flush=True)
     d.click_button("Сохранить")
     final_head=await_saved(linked_head)
     final=d.saved_project(final_head)
     new_edges=[edge for edge in final["dependencies"]
                if edge not in linked["dependencies"]]
     assert new_edges==[{"from":"visual-work-0-0","to":"visual-work-0-1"}],new_edges
-    assert final["items"]==linked["items"] and final["stages"]==linked["stages"]
+    changes=[item for item in final["items"] if item!=next(
+        old for old in linked["items"] if old["id"]==item["id"])]
+    assert len(changes)==1 and changes[0]["id"]=="visual-work-0-1",changes
+    assert changes[0]["estimateDays"]==2
+    assert final["stages"]==linked["stages"] and final["sources"]==linked["sources"]
     d.stop()
     d.launch()
     d.wait_text("Портфель проектов",45)

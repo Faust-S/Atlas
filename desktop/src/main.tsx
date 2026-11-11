@@ -246,7 +246,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const [graphJump,setGraphJump]=useState<{projectId:string;workId:string;query:string;origin:"overview"|"work"|"board"}|null>(null);
  const [workReturnId,setWorkReturnId]=useState<string|null>(null);
  const [recentWorkId,setRecentWorkId]=useState<string|null>(null);
- const [recentWorkKind,setRecentWorkKind]=useState<"created"|"dependency">("created");
+ const [recentWorkKind,setRecentWorkKind]=useState<"created"|"dependency"|"adjusted">("created");
  const [recentPlanBefore,setRecentPlanBefore]=useState<{
   workId:string;revision:number;days:number;change:ReturnType<typeof scheduleChangeSummary>|null
  }|null>(null);
@@ -617,6 +617,19 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     setRecentWorkKind(isDependencyChange?"dependency":"created");
     setRecentWorkId(result.workId);
     revealWorkInTable(result.workId,!isDependencyChange);
+   }else if(editor.action.startsWith("work:")&&recentScheduleEffect&&
+     (recentWorkKind==="dependency"||recentWorkKind==="adjusted")){
+    // Only a work from the displayed impact list keeps the recalculation route.
+    const correctedId=editor.action.slice(5);
+    if(recentScheduleEffect.examples.some(item=>item.id===correctedId)){
+     const updatedProject=result.state.projects.find((p:any)=>p.id===formProject);
+     const change=plan&&updatedProject?scheduleChangeSummary(plan,scheduleProject(updatedProject)):null;
+     setRecentPlanBefore({workId:correctedId,revision:result.state.revision,
+      days:plan?.durationDays??0,change});
+     setRecentWorkKind("adjusted");
+     setRecentWorkId(correctedId);
+     revealWorkInTable(correctedId,false);
+    }
    }
    editorDirtyRef.current=false;setEditor(null);
    if(embedded||window.innerWidth<=1220)setInspector(false);
@@ -1494,14 +1507,18 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      <div className="section-heading"><div><h2>Работы проекта</h2><p>Изменения отражаются в доске, графике и зависимостях.</p></div>
       <div className="button-row"><Action onClick={()=>openEditor("item")} primary title="Ctrl+Shift+N">＋ Работа</Action><Action onClick={()=>openEditor("stage")}>＋ Этап</Action><Action onClick={()=>openEditor("dep")} title="Ctrl+Shift+L">Связь работ</Action></div></div>
      {recentWork&&<div className="atlas-work-created"
-      aria-label={recentWorkKind==="dependency"?"Изменение зависимостей работы":"Только что добавленная работа"}>
+      aria-label={recentWorkKind==="dependency"?"Изменение зависимостей работы":
+       recentWorkKind==="adjusted"?"Изменение работы":"Только что добавленная работа"}>
        <div><strong>{recentWork.title}</strong>
         <p role="status">{recentWorkKind==="dependency"?
          dirty?"Связь внесена в черновик. Сохраните изменения.":"Связь сохранена.":
+         recentWorkKind==="adjusted"?
+         dirty?"Работа изменена в черновике. Сохраните изменения.":"Изменения работы сохранены.":
          dirty?"Работа внесена в черновик. Сохраните изменения.":"Работа сохранена."}
          {" "}{recentStage?"Этап: "+recentStage.name+".":"Этап пока не выбран."}</p>
-        {recentWorkKind==="dependency"&&recentScheduleEffect&&
-         <div className="atlas-work-plan-effect" aria-label="Последствия изменения зависимости">
+        {(recentWorkKind==="dependency"||recentWorkKind==="adjusted")&&recentScheduleEffect&&
+         <div className="atlas-work-plan-effect"
+          aria-label={recentWorkKind==="adjusted"?"Последствия изменения работы":"Последствия изменения зависимости"}>
           <p>{recentScheduleEffect.movedTotal>0?
            "Изменились расчётные сроки. Затронуто работ: "+recentScheduleEffect.movedTotal+". "+
            (recentScheduleEffect.delayedTotal?"Позже: "+recentScheduleEffect.delayedTotal+". ":"")+

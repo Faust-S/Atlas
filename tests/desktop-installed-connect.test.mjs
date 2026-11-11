@@ -444,3 +444,13 @@ test("Installed Windows verifies a delayed existing work and opens its editor di
  assert.match(stress,/new_edges==\[\{"from":"visual-work-0-0","to":"visual-work-0-1"\}\]/);
  assert.match(stress,/d\.saved_project\(final_head\)==final/);
 });
+
+test("Installed Windows corrects a shifted work and verifies the new plan after restart",()=>{
+ const stress=read("../desktop/tests/installed-atlas06-visual-scale.py");
+ assert.match(stress,/ATLAS06_VISUAL_AFFECTED_WORK_REPLANNED_PASS/);
+ assert.match(stress,/d\.set_text\("Плановая длительность, дней","2"\)/);
+ assert.match(stress,/d\.wait_text\("Работа изменена в черновике\.",35\)/);
+ assert.match(stress,/d\.wait_text\("Изменились расчётные сроки\. Затронуто работ: 2\.",35\)/);
+ assert.match(stress,/changes\[0\]\["estimateDays"\]==2/);
+ assert.match(stress,/d\.saved_project\(final_head\)==final/);
+});
