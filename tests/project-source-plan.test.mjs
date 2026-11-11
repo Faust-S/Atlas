@@ -537,6 +537,24 @@ test("Full dependency graph focuses the selected work and restores search on ret
  assert.match(main,/onOpenGraph=\{openWorkGraph\}/);
  assert.match(main,/focusWorkId=\{graphFocusWork\?\.id\|\|null\}/);
  assert.match(main,/К найденной работе/);
+ assert.match(main,/К работе в таблице/);
  assert.match(guide,/onOpenGraph:\(workId\?:string,query\?:string\)=>void/);
  assert.doesNotMatch(main.slice(main.indexOf("const view=(tabId:Tab)=>"),main.indexOf("useEffect(()=>{",main.indexOf("const view=(tabId:Tab)=>"))),/mutate\(|commitWithReadback/);
+});
+
+test("Any work in the ordinary table opens its exact dependency graph and returns to the filtered row",()=>{
+ const main=read("../desktop/src/main.tsx");
+ assert.match(main,/aria-label=\{"Связи работы "\+w\.title\}/);
+ assert.match(main,/onClick=\{\(\)=>openWorkGraph\(w\.id,workQuery,"work"\)\}/);
+ assert.match(main,/origin:"overview"\|"work"/);
+ assert.match(main,/graphJump\?\.origin==="work"/);
+ assert.match(main,/setWorkReturnId\(graphJump\.workId\)/);
+ assert.match(main,/view\("work"\)/);
+ assert.match(main,/filteredWork\.findIndex\(\(item:any\)=>item\.id===workReturnId\)/);
+ assert.match(main,/if\(index>=workLimit\)\{setWorkLimit\(index\+1\);return;\}/);
+ assert.match(main,/control\.scrollIntoView\(\{block:"center",behavior:"auto"\}\)/);
+ assert.match(main,/control\.focus\(\{preventScroll:true\}\)/);
+ assert.match(main,/setWorkReturnId\(null\)/);
+ assert.match(main,/tabId==="overview"&&tab==="graph"&&graphJump\?\.origin==="overview"/);
+ assert.doesNotMatch(main.slice(main.indexOf("const openWorkGraph="),main.indexOf("useEffect(()=>{",main.indexOf("const openWorkGraph="))),/mutate\(|commitWithReadback\(/);
 });

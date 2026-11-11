@@ -163,6 +163,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const requirementCardRef=useRef<HTMLElement|null>(null);
  const changeCardRef=useRef<HTMLDivElement|null>(null);
  const sourceJumpRef=useRef<HTMLDivElement|null>(null);
+ const workReturnRef=useRef<HTMLButtonElement|null>(null);
  const logoUrl=host?.assetUrl??"/atlas-mark.svg";
  const [data,setData]=useState<Atlas>(()=>empty());
  const [ready,setReady]=useState(false),[busy,setBusy]=useState(false);
@@ -220,7 +221,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const [sourceRowLimits,setSourceRowLimits]=useState<Record<string,number>>({});
  const [sourceJump,setSourceJump]=useState<{projectId:string;workId:string;query:string}|null>(null);
  const [mapSearchReturn,setMapSearchReturn]=useState<{workId:string;query:string}|null>(null);
- const [graphJump,setGraphJump]=useState<{projectId:string;workId:string;query:string}|null>(null);
+ const [graphJump,setGraphJump]=useState<{projectId:string;workId:string;query:string;origin:"overview"|"work"}|null>(null);
+ const [workReturnId,setWorkReturnId]=useState<string|null>(null);
  const [recheckLimit,setRecheckLimit]=useState(25);
  const project=data.projects.find((p:any)=>p.id===active)||null;
  const sourceJumpContext=useMemo(()=>sourceJump&&project&&
@@ -355,6 +357,17 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     String(item.assignee||"").toLocaleLowerCase("ru-RU").includes(query)));
   return sortWorkRows(filterWorkRowsByObservation(matching,findingsByWork,workObservationFilter),workSort);
  },[project,workFilter,workQuery,workSort,workTargetFilter,workObservationFilter,findingsByWork]);
+ useEffect(()=>{
+  if(tab!=="work"||!ready||!workReturnId||!project)return;
+  const index=filteredWork.findIndex((item:any)=>item.id===workReturnId);
+  if(index<0){setWorkReturnId(null);return;}
+  if(index>=workLimit){setWorkLimit(index+1);return;}
+  const control=workReturnRef.current;
+  if(!control)return;
+  control.scrollIntoView({block:"center",behavior:"auto"});
+  control.focus({preventScroll:true});
+  setWorkReturnId(null);
+ },[tab,ready,workReturnId,project,filteredWork,workLimit]);
  const mutate=(next:Atlas,notice:string)=>{setSavedRefPreview(null);latestSnapshot.current=next;setData(next);setMessage(notice);setError("");};
  const issue=(e:unknown)=>{setError(deepFreezeError(e));setMessage("");};
  const showSavedReference=async(projectId:string,workId?:string)=>{
@@ -459,7 +472,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   resetWorkspaceScroll();
   host?.onSelection?.({projectId:id,workId:null,revision:String(latestSnapshot.current.revision)});
   setActive(id);setTab("overview");setEditor(null);setForecastId(null);setConnectOpen(false);
-  setSourceJump(null);setMapSearchReturn(null);setGraphJump(null);
+  setSourceJump(null);setMapSearchReturn(null);setGraphJump(null);setWorkReturnId(null);
   setShowProjectRelations(false);setRelationLimit(12);setRequirementJump(null);setChangeJump(null);
   if(!afterSubmit)setMessage("");
   setWorkFilter("all");setWorkTargetFilter("all");setWorkObservationFilter("all");setWorkHistoryLimits({});setWorkQuery("");setWorkSort("title");setWorkLimit(200);setRealityLimit(8);
@@ -820,7 +833,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   setMapSearchReturn(tabId==="overview"&&tab==="sources"&&sourceJump!==null&&
    sourceJump.projectId===project?.id?
    {workId:sourceJump.workId,query:sourceJump.query}:
-   tabId==="overview"&&tab==="graph"&&graphJump!==null&&
+   tabId==="overview"&&tab==="graph"&&graphJump?.origin==="overview"&&
    graphJump.projectId===project?.id?
    {workId:graphJump.workId,query:graphJump.query}:null);
   setSourceJump(null);
@@ -832,11 +845,17 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   view("sources");
   setSourceJump({projectId:project.id,workId,query});
  };
- const openWorkGraph=(workId?:string,query?:string)=>{
+ const openWorkGraph=(workId?:string,query?:string,origin:"overview"|"work"="overview")=>{
   if(!project||!requireClosedForm())return;
   view("graph");
   const work=workId&&project.items.find((item:any)=>item.id===workId);
-  setGraphJump(work?{projectId:project.id,workId:work.id,query:query||""}:null);
+  setGraphJump(work?{projectId:project.id,workId:work.id,query:query||"",origin}:null);
+ };
+ const returnFromWorkGraph=()=>{
+  if(graphJump?.origin==="work"){
+   setWorkReturnId(graphJump.workId);
+   view("work");
+  }else view("overview");
  };
  useEffect(()=>{
   const key=(event:KeyboardEvent)=>{
@@ -1465,6 +1484,10 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
            ariaLabel={"Зафиксировать факт по работе: "+w.title+" — "+targetById.get(id).title}
            onClick={()=>openEditor("finding-work:"+encodeURIComponent(w.id)+":"+encodeURIComponent(id))}>{targetById.get(id).title}</Action>)}
          </div></details>}
+        <button type="button" className="action-button"
+         aria-label={"Связи работы "+w.title}
+         ref={workReturnId===w.id?workReturnRef:undefined}
+         onClick={()=>openWorkGraph(w.id,workQuery,"work")}>Связи</button>
         <Action disabled={busy||dirty||!persisted||!!editor} onClick={()=>showSavedReference(project.id,w.id)} title="Только сохранённая редакция">Ссылка</Action>
         <Action onClick={()=>removeWork(w.id)}>Удалить</Action></td></tr>)}</tbody></table></div>
      {project.items.length>0&&<p className="minor">Показано {Math.min(filteredWork.length,workLimit)} из {filteredWork.length} работ по фильтру; всего в проекте: {project.items.length}.</p>}
@@ -1493,11 +1516,11 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
        onEditDates={()=>openEditor("dates")} onOpenWork={id=>openEditor("work:"+id)}/>:
       <section className="surface"><Fallback message="План пока не рассчитан. Добавьте работы или проверьте зависимости."/></section>)}
     {tab==="graph"&&<section className="surface"><div className="section-heading">
-      <div><h2>Зависимости работ</h2><p>Интерактивный DAG существующего CPM; выделенный путь не означает подтверждение исполнения.</p></div>
+      <div><h2>Зависимости работ</h2><p>Посмотрите, какие работы должны завершиться раньше и какие зависят от них. Красные линии отмечают критический путь.</p></div>
       <Action onClick={()=>openEditor("dep")}>＋ Зависимость</Action></div>
       {graphFocusWork&&<div className="button-row">
        <p className="minor" style={{overflowWrap:"anywhere"}}>Связи работы: <strong>{graphFocusWork.title}</strong></p>
-       <Action onClick={()=>view("overview")}>К найденной работе</Action>
+       <Action onClick={returnFromWorkGraph}>{graphJump?.origin==="work"?"К работе в таблице":"К найденной работе"}</Action>
       </div>}
       {plan&&<ProjectDependencyDiagram key={project.id} schedule={plan}
        focusWorkId={graphFocusWork?.id||null} onOpenWork={id=>openEditor("work:"+id)}/>}

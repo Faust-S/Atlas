@@ -124,6 +124,28 @@ def qualify():
     keyboard.send_keys("{ESC}")
     print("ATLAS06_UNIVERSAL_SEARCH_DEPENDENCY_CONTEXT_PASS",flush=True)
 
+    # An ordinary project without GitHub must navigate from its work table to
+    # the exact dependency graph, then return to the same filtered work.
+    d.click_button("Таблица")
+    d.wait_text("Работы проекта",25)
+    d.set_text("Найти работу","Открыть площадку")
+    work_link=v.find_control("Связи работы Открыть площадку",types={"Button"})
+    work_link.click_input()
+    d.wait_text("Зависимости работ",25)
+    back=v.find_control("К работе в таблице",types={"Button"},scroll=False)
+    assert v.rectangle_in_workspace(back.rectangle(),win32gui.GetWindowRect(d.handle))
+    v.capture("universal-work-dependency-graph")
+    assert d.head()==saved,"Opening graph from ordinary work changed native Store"
+    back.click_input()
+    d.wait_text("Работы проекта",25)
+    selected=v.find_control("Связи работы Открыть площадку",types={"Button"},scroll=False)
+    assert v.rectangle_in_workspace(selected.rectangle(),win32gui.GetWindowRect(d.handle)), (
+        "The original work was not restored inside the Windows viewport")
+    v.capture("universal-work-dependency-return")
+    assert d.head()==saved,"Returning from ordinary work graph changed native Store"
+    print("ATLAS06_UNIVERSAL_TABLE_GRAPH_ROUNDTRIP_PASS",flush=True)
+    d.click_button("Обзор")
+
     # Two predecessors in the already saved plan, never inferred by the map.
     detail=v.find_control("Предшествующих работ: 2")
     detail.click_input()

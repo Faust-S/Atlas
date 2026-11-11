@@ -226,3 +226,17 @@ test("Installed Atlas focuses a selected work in its graph and returns without d
  assert.match(driver,/Return from focused graph changed native Store/);
  assert.match(ui,/focusWorkId=\{graphFocusWork\?\.id\|\|null\}/);
 });
+
+test("Installed ordinary project without GitHub returns from exact work graph to the selected table row",()=>{
+ const driver=read("../desktop/tests/installed-atlas06-universal.py");
+ const ui=read("../desktop/src/main.tsx");
+ assert.match(driver,/d\.click_button\("Таблица"\)/);
+ assert.match(driver,/d\.set_text\("Найти работу","Открыть площадку"\)/);
+ assert.match(driver,/v\.find_control\("Связи работы Открыть площадку",types=\{"Button"\}\)/);
+ assert.match(driver,/v\.find_control\("К работе в таблице",types=\{"Button"\},scroll=False\)/);
+ assert.match(driver,/The original work was not restored inside the Windows viewport/);
+ assert.match(driver,/ATLAS06_UNIVERSAL_TABLE_GRAPH_ROUNDTRIP_PASS/);
+ assert.match(driver,/Opening graph from ordinary work changed native Store/);
+ assert.match(driver,/Returning from ordinary work graph changed native Store/);
+ assert.match(ui,/ref=\{workReturnId===w\.id\?workReturnRef:undefined\}/);
+});
