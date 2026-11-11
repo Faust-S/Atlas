@@ -23,9 +23,11 @@ test("Known root directories suggest possible roles without changing the user's 
  assert.equal(guide.sources.length,1);
  assert.equal(guide.sources[0].status,"current");
  assert.equal(guide.sources[0].folderCount,5);
+ // A project-specific folder stays available before tests and setup folders.
  assert.deepEqual(guide.sources[0].folders.map(x=>x.role),[
-  "Возможно, исходный код","Возможно, документация","Возможно, проверки",
-  "Возможно, инструменты разработки","Назначение ещё не установлено"]);
+  "Возможно, исходный код","Назначение ещё не установлено",
+  "Возможно, документация","Возможно, проверки",
+  "Возможно, инструменты разработки"]);
  assert.equal(guide.sources[0].folders[0].url,
   "https://github.com/example/site/tree/"+SHA+"/src");
  assert.deepEqual(guide.sources[0].knownFiles,["package.json"]);
