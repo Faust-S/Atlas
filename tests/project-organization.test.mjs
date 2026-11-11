@@ -58,8 +58,8 @@ test("A user-submitted editor creates one standard work linked to its real sourc
   {sourceId,folder:"src",repository:"example/site",branch:"work/dev",commitSha:SHA});
  const spec=editorSpec(state.projects[0],action,state);
  assert.equal(spec.title,"Работа по каталогу: src");
- assert.deepEqual(spec.fields.map(field=>field.name),["title","estimateDays"]);
- assert.ok(spec.hint.includes("Уточните задачу"));
+ assert.deepEqual(spec.fields.map(field=>field.name),["title","newStageName","estimateDays"]);
+ assert.ok(spec.hint.includes("Назовите работу"));
  assert.equal(spec.fields.find(x=>x.name==="title").value,"Уточнить назначение каталога src");
  const form=new FormData();
  for(const [key,val] of Object.entries({title:"Проверить интерфейс сайта",
@@ -144,4 +144,52 @@ test("Author voice: everyday UI text, with clear boundaries and no technical use
  assert.match(main,/work.sourcePath.split\("\/"\).map\(encodeURIComponent\).join\("\/"\)/);
  assert.doesNotMatch(ui,/[—–]/);
  assert.doesNotMatch(ui,/\b(?:runtime|kernel|authority|object_type|schema)\b/i);
+});
+
+test("User chooses an existing stage or creates one with a source-linked work",()=>{
+ const {state,projectId,sourceId}=fixture();
+ const original=serialize(state),action=folderWorkAction(sourceId,SHA,"src");
+ const newStage=new FormData();
+ newStage.set("title","Разобрать интерфейс");
+ newStage.set("estimateDays","3");
+ newStage.set("newStageName","Подготовка");
+ const created=applyEditor(state,projectId,action,newStage).state;
+ assert.equal(serialize(state),original);
+ const p=created.projects.find(entry=>entry.id===projectId);
+ assert.equal(p.stages.length,1);
+ assert.equal(p.stages[0].name,"Подготовка");
+ assert.equal(p.items.length,1);
+ assert.equal(p.items[0].stageId,p.stages[0].id);
+ assert.equal(p.items[0].sourceId,sourceId);
+ assert.equal(p.items[0].sourcePath,"src");
+ assert.equal(p.items[0].sourceRevision,SHA);
+ assert.equal(p.items[0].estimateDays,3);
+ assert.deepEqual(deserialize(serialize(created)),created);
+ const spec=editorSpec(p,action,created);
+ assert.deepEqual(spec.fields.map(f=>f.name),
+  ["title","stageId","newStageName","estimateDays"]);
+ assert.equal(spec.fields.find(f=>f.name==="stageId").options[1].value,p.stages[0].id);
+ const existing=new FormData();
+ existing.set("title","Доработать интерфейс");
+ existing.set("estimateDays","2");
+ existing.set("stageId",p.stages[0].id);
+ const before=serialize(created);
+ const appended=applyEditor(created,projectId,action,existing).state;
+ assert.equal(appended.projects[0].stages.length,1);
+ assert.equal(appended.projects[0].items.length,2);
+ assert.equal(appended.projects[0].items[1].stageId,p.stages[0].id);
+ assert.equal(serialize(created),before);
+ const conflict=new FormData();
+ conflict.set("title","Недопустимый вариант");
+ conflict.set("estimateDays","1");
+ conflict.set("stageId",p.stages[0].id);
+ conflict.set("newStageName","Другой этап");
+ assert.throws(()=>applyEditor(created,projectId,action,conflict),
+  /существующий этап или укажите новый/);
+ assert.equal(serialize(created),before);
+ const stale=structuredClone(state);
+ stale.projects[0].sources[0].summary.branchHeads["work/dev"]=NEXT;
+ const staleBefore=serialize(stale);
+ assert.throws(()=>applyEditor(stale,projectId,action,newStage),/изменилась/);
+ assert.equal(serialize(stale),staleBefore);
 });
