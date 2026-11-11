@@ -242,3 +242,17 @@ test("Installed ordinary project without GitHub returns from exact work graph to
  assert.match(driver,/Returning from ordinary work graph changed native Store/);
  assert.match(ui,/ref=\{workReturnId===w\.id\?workReturnRef:undefined\}/);
 });
+
+test("Installed ordinary project opens board card dependencies and restores its exact card",()=>{
+ const driver=read("../desktop/tests/installed-atlas06-universal.py");
+ const main=read("../desktop/src/main.tsx");
+ assert.match(driver,/v\.find_control\("Другие разделы"\)\.click_input\(\)/);
+ assert.match(driver,/v\.find_control\("Доска",types=\{"Button"\}\)\.click_input\(\)/);
+ assert.match(driver,/board_work=v\.find_control\("Связи работы Открыть площадку",types=\{"Button"\}\)/);
+ assert.match(driver,/board_back=v\.find_control\("К работе на доске",types=\{"Button"\},scroll=False\)/);
+ assert.match(driver,/The selected board card was not restored in the Windows viewport/);
+ assert.match(driver,/ATLAS06_UNIVERSAL_BOARD_GRAPH_ROUNDTRIP_PASS/);
+ assert.match(driver,/Opening board work graph modified native Store/);
+ assert.match(driver,/Returning to board card modified native Store/);
+ assert.match(main,/onClick=\{\(\)=>openWorkGraph\(w\.id,"","board"\)\}/);
+});

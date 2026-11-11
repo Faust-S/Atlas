@@ -558,3 +558,20 @@ test("Any work in the ordinary table opens its exact dependency graph and return
  assert.match(main,/tabId==="overview"&&tab==="graph"&&graphJump\?\.origin==="overview"/);
  assert.doesNotMatch(main.slice(main.indexOf("const openWorkGraph="),main.indexOf("useEffect(()=>{",main.indexOf("const openWorkGraph="))),/mutate\(|commitWithReadback\(/);
 });
+
+test("Board cards navigate by work ID to the existing graph and restore the same card",()=>{
+ const main=read("../desktop/src/main.tsx");
+ assert.match(main,/origin:"overview"\|"work"\|"board"/);
+ assert.match(main,/onClick=\{\(\)=>openWorkGraph\(w\.id,"","board"\)\}/);
+ assert.match(main,/aria-label=\{"Связи работы "\+w\.title\}/);
+ assert.match(main,/graphJump\?\.origin==="board"/);
+ assert.match(main,/view\("board"\)/);
+ assert.match(main,/graphJump\?\.origin==="board"\?"К работе на доске"/);
+ assert.match(main,/project\.items\.filter\(\(item:any\)=>item\.state===selected\.state\)/);
+ assert.match(main,/if\(index>=\(boardLimits\[selected\.state\]\|\|60\)\)/);
+ assert.match(main,/setBoardLimits\(previous=>\(\{\.\.\.previous,\[selected\.state\]:index\+1\}\)\)/);
+ assert.match(main,/control\.scrollIntoView\(\{block:"center",inline:"nearest",behavior:"auto"\}\)/);
+ assert.match(main,/ref=\{workReturnId===w\.id\?workReturnRef:undefined\}/);
+ const nav=main.slice(main.indexOf("const openWorkGraph="),main.indexOf("useEffect(()=>{",main.indexOf("const openWorkGraph=")));
+ assert.doesNotMatch(nav,/mutate\(|commitWithReadback\(|localStorage|createItem\(/);
+});

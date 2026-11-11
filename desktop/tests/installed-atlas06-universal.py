@@ -144,6 +144,26 @@ def qualify():
     v.capture("universal-work-dependency-return")
     assert d.head()==saved,"Returning from ordinary work graph changed native Store"
     print("ATLAS06_UNIVERSAL_TABLE_GRAPH_ROUNDTRIP_PASS",flush=True)
+
+    # The same work must be reachable from the board without a source.
+    # Only actual Windows-visible controls are clicked.
+    v.find_control("Другие разделы").click_input()
+    v.find_control("Доска",types={"Button"}).click_input()
+    board_work=v.find_control("Связи работы Открыть площадку",types={"Button"})
+    board_work.click_input()
+    d.wait_text("Зависимости работ",25)
+    board_back=v.find_control("К работе на доске",types={"Button"},scroll=False)
+    assert v.rectangle_in_workspace(board_back.rectangle(),win32gui.GetWindowRect(d.handle))
+    v.capture("universal-board-work-graph")
+    assert d.head()==saved,"Opening board work graph modified native Store"
+    board_back.click_input()
+    restored=v.find_control("Связи работы Открыть площадку",types={"Button"},scroll=False)
+    assert v.rectangle_in_workspace(restored.rectangle(),win32gui.GetWindowRect(d.handle)), (
+        "The selected board card was not restored in the Windows viewport")
+    v.capture("universal-board-work-return")
+    assert d.head()==saved,"Returning to board card modified native Store"
+    print("ATLAS06_UNIVERSAL_BOARD_GRAPH_ROUNDTRIP_PASS",flush=True)
+
     # The tab strip can be above the Windows viewport after returning to a
     # filtered table row. Scroll it into the physical window before clicking.
     v.find_control("Обзор",types={"Button"}).click_input()

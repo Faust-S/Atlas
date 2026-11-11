@@ -221,7 +221,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const [sourceRowLimits,setSourceRowLimits]=useState<Record<string,number>>({});
  const [sourceJump,setSourceJump]=useState<{projectId:string;workId:string;query:string}|null>(null);
  const [mapSearchReturn,setMapSearchReturn]=useState<{workId:string;query:string}|null>(null);
- const [graphJump,setGraphJump]=useState<{projectId:string;workId:string;query:string;origin:"overview"|"work"}|null>(null);
+ const [graphJump,setGraphJump]=useState<{projectId:string;workId:string;query:string;origin:"overview"|"work"|"board"}|null>(null);
  const [workReturnId,setWorkReturnId]=useState<string|null>(null);
  const [recheckLimit,setRecheckLimit]=useState(25);
  const project=data.projects.find((p:any)=>p.id===active)||null;
@@ -368,6 +368,23 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   control.focus({preventScroll:true});
   setWorkReturnId(null);
  },[tab,ready,workReturnId,project,filteredWork,workLimit]);
+ useEffect(()=>{
+  if(tab!=="board"||!ready||!workReturnId||!project)return;
+  const selected=project.items.find((item:any)=>item.id===workReturnId);
+  if(!selected){setWorkReturnId(null);return;}
+  const index=project.items.filter((item:any)=>item.state===selected.state)
+   .findIndex((item:any)=>item.id===selected.id);
+  if(index<0){setWorkReturnId(null);return;}
+  if(index>=(boardLimits[selected.state]||60)){
+   setBoardLimits(previous=>({...previous,[selected.state]:index+1}));
+   return;
+  }
+  const control=workReturnRef.current;
+  if(!control)return;
+  control.scrollIntoView({block:"center",inline:"nearest",behavior:"auto"});
+  control.focus({preventScroll:true});
+  setWorkReturnId(null);
+ },[tab,ready,workReturnId,project,boardLimits]);
  const mutate=(next:Atlas,notice:string)=>{setSavedRefPreview(null);latestSnapshot.current=next;setData(next);setMessage(notice);setError("");};
  const issue=(e:unknown)=>{setError(deepFreezeError(e));setMessage("");};
  const showSavedReference=async(projectId:string,workId?:string)=>{
@@ -845,7 +862,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   view("sources");
   setSourceJump({projectId:project.id,workId,query});
  };
- const openWorkGraph=(workId?:string,query?:string,origin:"overview"|"work"="overview")=>{
+ const openWorkGraph=(workId?:string,query?:string,origin:"overview"|"work"|"board"="overview")=>{
   if(!project||!requireClosedForm())return;
   view("graph");
   const work=workId&&project.items.find((item:any)=>item.id===workId);
@@ -855,6 +872,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   if(graphJump?.origin==="work"){
    setWorkReturnId(graphJump.workId);
    view("work");
+  }else if(graphJump?.origin==="board"){
+   setWorkReturnId(graphJump.workId);
+   view("board");
   }else view("overview");
  };
  useEffect(()=>{
@@ -1500,7 +1520,10 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       {project.items.filter((w:any)=>w.state===key).slice(0,boardLimits[key]||60).map((w:any)=><div className="board-card" key={w.id}><strong>{w.title}</strong><small>{w.assignee||"Нет ответственного"} · {w.estimateDays??1} дн.</small>
        <div className="board-actions"><select aria-label={"Состояние "+w.title} value={w.state} onChange={e=>quickWork(w.id,e.target.value)}>
         {Object.entries(workStatuses).map(([v,title])=><option key={v} value={v}>{String(title)}</option>)}</select>
-        <button onClick={()=>openEditor("work:"+w.id)}>Детали</button></div></div>)}
+        <button onClick={()=>openEditor("work:"+w.id)}>Детали</button>
+        <button type="button" ref={workReturnId===w.id?workReturnRef:undefined}
+         aria-label={"Связи работы "+w.title}
+         onClick={()=>openWorkGraph(w.id,"","board")}>Связи</button></div></div>)}
        {project.items.filter((w:any)=>w.state===key).length>(boardLimits[key]||60)&&
         <Action onClick={()=>setBoardLimits(prev=>({...prev,[key]:(prev[key]||60)+60}))}>
          Показать ещё карточки ({project.items.filter((w:any)=>w.state===key).length-(boardLimits[key]||60)})
@@ -1520,7 +1543,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       <Action onClick={()=>openEditor("dep")}>＋ Зависимость</Action></div>
       {graphFocusWork&&<div className="button-row">
        <p className="minor" style={{overflowWrap:"anywhere"}}>Связи работы: <strong>{graphFocusWork.title}</strong></p>
-       <Action onClick={returnFromWorkGraph}>{graphJump?.origin==="work"?"К работе в таблице":"К найденной работе"}</Action>
+       <Action onClick={returnFromWorkGraph}>{graphJump?.origin==="work"?"К работе в таблице":graphJump?.origin==="board"?"К работе на доске":"К найденной работе"}</Action>
       </div>}
       {plan&&<ProjectDependencyDiagram key={project.id} schedule={plan}
        focusWorkId={graphFocusWork?.id||null} onOpenWork={id=>openEditor("work:"+id)}/>}
