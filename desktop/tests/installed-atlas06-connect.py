@@ -359,6 +359,7 @@ def verify_organization_work(previous,original_project):
     wait_text("Работа по каталогу: src",35)
     assert head()==previous,"Opening a work editor wrote a task before confirmation"
     set_text("Что нужно сделать?","Проверить исходники сайта")
+    set_text("Новый этап (необязательно)","Проверка исходников")
     screenshot("source-work-editor")
     click_editor_submit()
     assert head()==previous,"Applying the form silently saved the project"
@@ -380,9 +381,13 @@ def verify_organization_work(previous,original_project):
     assert task["sourcePath"]=="src"
     assert task["sourceRevision"]==original_project["sources"][0]["summary"]["structure"]["commitSha"]
     assert task["state"]=="todo" and task["targetIds"]==[]
+    assert len(project["stages"])==1,"User-defined stage was not created"
+    assert project["stages"][0]["name"]=="Проверка исходников"
+    assert task["stageId"]==project["stages"][0]["id"]
     assert project["sources"]==original_project["sources"]
-    for field in ("stages","dependencies","decisions","targets","findings"):
+    for field in ("dependencies","decisions","targets","findings"):
         assert project.get(field)==original_project.get(field), "Form modified "+field
+    print("ATLAS06_SOURCE_WORK_STAGE_ONE_FORM_PASS",flush=True)
     print("ATLAS06_USER_APPROVED_SOURCE_WORK_NATIVE_SAVE_PASS",flush=True)
     stop()
     launch()
