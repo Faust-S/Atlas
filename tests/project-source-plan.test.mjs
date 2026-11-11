@@ -122,7 +122,7 @@ test("Atlas uses its existing editors, schedule, and dependency graph from a nav
  assert.match(guide,/onEditStage=\{id=>onEdit\("stage-edit:"\+id\)\}/);
  assert.match(guide,/onCreateStage=\{\(\)=>onEdit\("stage"\)\}/);
  assert.match(main,/onOpenTimeline=\{\(\)=>view\("timeline"\)\}/);
- assert.match(main,/onOpenGraph=\{\(\)=>view\("graph"\)\}/);
+ assert.match(main,/onOpenGraph=\{openWorkGraph\}/);
  assert.match(css,/\.atlas-source-plan-flow\{display:grid/);
  assert.match(css,/\.atlas-source-plan-assignment\{display:grid/);
  assert.doesNotMatch(visual.slice(visual.indexOf("export function ProjectSourcePlanMap")),/fetch\(|localStorage|mutate\(|createItem\(/);
@@ -508,7 +508,7 @@ test("Source navigation retains the matching query and selected work only for a 
  const map=read("../desktop/src/ProjectVisuals.tsx");
  assert.match(main,/setMapSearchReturn\(tabId==="overview"&&tab==="sources"/);
  assert.match(main,/sourceJump!==null&&\s*sourceJump\.projectId===project\?\.id\?/);
- assert.match(main,/\{workId:sourceJump\.workId,query:sourceJump\.query\}:null/);
+ assert.match(main,/\{workId:sourceJump\.workId,query:sourceJump\.query\}:\s*tabId==="overview"&&tab==="graph"/);
  assert.match(main,/setSourceJump\(null\);setMapSearchReturn\(null\)/);
  assert.match(main,/onOpenLinkedSource=\{openLinkedSource\}/);
  assert.match(main,/restoreSearch=\{mapSearchReturn\}/);
