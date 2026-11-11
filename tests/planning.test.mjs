@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { scheduleProject } from '../src/planning.mjs';
+import { scheduleProject,scheduleChangeSummary } from '../src/planning.mjs';
 import toposort from '../src/vendor/toposort.mjs';
 const project=(items,dependencies=[],startDate='2026-11-01')=>({items:items.map(([id,estimateDays=1,state='todo'])=>({id,title:id,estimateDays,state})),dependencies:dependencies.map(([from,to])=>({from,to})),startDate});
 test('upstream topological core orders dependencies including isolated items',()=>{const order=toposort.array(['a','b','c','d'],[['a','b'],['b','c']]);assert(order.indexOf('a')<order.indexOf('b'));assert(order.indexOf('b')<order.indexOf('c'));assert(order.includes('d'));});
@@ -23,3 +23,39 @@ test('CPM year overflow never produces a malformed calendar date',()=>{
  assert.equal(result.estimatedFinish,null);
 });
 test('compatible dependency edge shapes',()=>{const p=project([['a',2],['b',3]]);p.dependencies=[{fromId:'a',toId:'b'}];assert.equal(scheduleProject(p).durationDays,5)});
+
+test('comparison reports shifted existing work but excludes newly created work',()=>{
+ const original=project([['a',3],['b',2],['c',2],['d',1]],[['b','c']]);
+ const addedLink=project([['a',3],['b',2],['c',2],['d',1]],[['a','b'],['b','c']]);
+ const before=scheduleProject(original),after=scheduleProject(addedLink);
+ const oldText=JSON.stringify(before),newText=JSON.stringify(after);
+ const changed=scheduleChangeSummary(before,after);
+ assert.equal(changed.durationBefore,4);
+ assert.equal(changed.durationAfter,7);
+ assert.equal(changed.movedTotal,2);
+ assert.equal(changed.delayedTotal,2);
+ assert.equal(changed.earlierTotal,0);
+ assert.deepEqual(new Set(changed.examples.map(x=>x.id)),new Set(['b','c']));
+ assert.deepEqual(changed.examples.map(x=>x.shiftDays),[3,3]);
+ assert.equal(JSON.stringify(before),oldText);
+ assert.equal(JSON.stringify(after),newText);
+ const newItem=project([['a',3],['b',2],['c',2],['d',1],['e',9]],[['b','c']]);
+ const adding=scheduleChangeSummary(before,scheduleProject(newItem));
+ assert.equal(adding.movedTotal,0);
+ assert.equal(adding.durationAfter,9);
+});
+test('comparison handles neutral dependencies and limits large previews',()=>{
+ const source=project([['a',1],['b',4],['c',1]],[['b','c']],null);
+ const extra=project([['a',1],['b',4],['c',1]],[['b','c'],['a','c']],null);
+ const neutral=scheduleChangeSummary(scheduleProject(source),scheduleProject(extra));
+ assert.equal(neutral.movedTotal,0);
+ assert.equal(neutral.durationAfter,5);
+ const base=project([['a',1],['b',1],['c',1],['d',1]],[],null);
+ const linear=project([['a',1],['b',1],['c',1],['d',1]],[['a','b'],['b','c'],['c','d']],null);
+ const limited=scheduleChangeSummary(scheduleProject(base),scheduleProject(linear),{limit:1});
+ assert.equal(limited.movedTotal,3);
+ assert.equal(limited.examples.length,1);
+ assert.equal(limited.examples[0].finishDate,null);
+ assert.throws(()=>scheduleChangeSummary(null,scheduleProject(linear)),/Invalid schedule comparison/);
+ assert.throws(()=>scheduleChangeSummary(scheduleProject(base),scheduleProject(linear),{limit:0}),/Invalid schedule comparison limit/);
+});

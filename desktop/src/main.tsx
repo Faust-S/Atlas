@@ -9,7 +9,7 @@ import {projectImpact,projectNextStep} from "../../src/impact.mjs";
 import {buildPortfolioCommand,filterPortfolioCommand} from "../../src/portfolio-command.mjs";
 import {realityOverview,workObservationIndex} from "../../src/reality-overview.mjs";
 import {responseState} from "../../src/response.mjs";
-import {scheduleProject,workDependencyOverview,filterWorkRowsByDependencies} from "../../src/planning.mjs";
+import {scheduleProject,scheduleChangeSummary,workDependencyOverview,filterWorkRowsByDependencies} from "../../src/planning.mjs";
 import {portfolioSchedule,projectedFinishLabel} from "../../src/portfolio-schedule.mjs";
 import {portfolioResources} from "../../src/portfolio-resources.mjs";
 import {planReviewQueue,planReviewAction,planProposalAction} from "../../src/plan-review.mjs";
@@ -246,7 +246,10 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const [graphJump,setGraphJump]=useState<{projectId:string;workId:string;query:string;origin:"overview"|"work"|"board"}|null>(null);
  const [workReturnId,setWorkReturnId]=useState<string|null>(null);
  const [recentWorkId,setRecentWorkId]=useState<string|null>(null);
- const [recentPlanBefore,setRecentPlanBefore]=useState<{workId:string;revision:number;days:number}|null>(null);
+ const [recentWorkKind,setRecentWorkKind]=useState<"created"|"dependency">("created");
+ const [recentPlanBefore,setRecentPlanBefore]=useState<{
+  workId:string;revision:number;days:number;change:ReturnType<typeof scheduleChangeSummary>|null
+ }|null>(null);
  const [recheckLimit,setRecheckLimit]=useState(25);
  const project=data.projects.find((p:any)=>p.id===active)||null;
  const recentWork=recentWorkId?project?.items.find((item:any)=>item.id===recentWorkId):null;
@@ -291,6 +294,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const planBeforeRecent=recentWork&&recentPlanBefore&&
   recentPlanBefore.workId===recentWork.id&&recentPlanBefore.revision===data.revision?
   recentPlanBefore.days:null;
+ const recentScheduleEffect=recentWork&&recentPlanBefore&&
+  recentPlanBefore.workId===recentWork.id&&recentPlanBefore.revision===data.revision?
+  recentPlanBefore.change:null;
  const workLinks=useMemo(()=>project&&plan?workDependencyOverview(project,plan):new Map(),[project,plan]);
  const pendingWorkCount=useMemo(()=>Array.from(workLinks.values())
   .filter((entry:any)=>entry.pendingTotal>0).length,[workLinks]);
@@ -601,8 +607,11 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    mutate(result.state,"Изменение внесено в черновик. Для записи на диск нажмите «Сохранить».");
    if(result.projectId)selectProject(result.projectId,true);
    if(result.workId){
+    const updatedProject=result.state.projects.find((p:any)=>p.id===formProject);
+    const change=plan&&updatedProject?scheduleChangeSummary(plan,scheduleProject(updatedProject)):null;
     setRecentPlanBefore({workId:result.workId,revision:result.state.revision,
-     days:plan?.durationDays??0});
+     days:plan?.durationDays??0,change});
+    setRecentWorkKind(editor.action.startsWith("dep-to:")?"dependency":"created");
     setRecentWorkId(result.workId);
     revealWorkInTable(result.workId);
    }
@@ -1481,9 +1490,12 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     {tab==="work"&&<section className="surface atlas-work-surface">
      <div className="section-heading"><div><h2>Работы проекта</h2><p>Изменения отражаются в доске, графике и зависимостях.</p></div>
       <div className="button-row"><Action onClick={()=>openEditor("item")} primary title="Ctrl+Shift+N">＋ Работа</Action><Action onClick={()=>openEditor("stage")}>＋ Этап</Action><Action onClick={()=>openEditor("dep")} title="Ctrl+Shift+L">Связь работ</Action></div></div>
-     {recentWork&&<div className="atlas-work-created" aria-label="Только что добавленная работа">
+     {recentWork&&<div className="atlas-work-created"
+      aria-label={recentWorkKind==="dependency"?"Изменение зависимостей работы":"Только что добавленная работа"}>
        <div><strong>{recentWork.title}</strong>
-        <p role="status">{dirty?"Работа внесена в черновик. Сохраните изменения.":"Работа сохранена."}
+        <p role="status">{recentWorkKind==="dependency"?
+         dirty?"Связь внесена в черновик. Сохраните изменения.":"Связь сохранена.":
+         dirty?"Работа внесена в черновик. Сохраните изменения.":"Работа сохранена."}
          {" "}{recentStage?"Этап: "+recentStage.name+".":"Этап пока не выбран."}</p>
         <p className="minor">Оценка: {recentWork.estimateDays??1} календарных дней.
          {recentWork.dueDate?" Контрольный срок: "+recentWork.dueDate+".":""}</p>
@@ -1496,6 +1508,29 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
         {planBeforeRecent!==null&&plan&&<p className="minor">
          Продолжительность плана: было {planBeforeRecent} дн., стало {plan.durationDays} дн.
          Расчёт по календарным дням без распределения ресурсов.</p>}
+        {recentWorkKind==="dependency"&&recentScheduleEffect&&
+         <div className="atlas-work-plan-effect" aria-label="Последствия изменения зависимости">
+          <p>{recentScheduleEffect.movedTotal>0?
+           "Сдвинулся расчётный срок у "+recentScheduleEffect.movedTotal+" работ. "+
+           (recentScheduleEffect.delayedTotal?"Позже: "+recentScheduleEffect.delayedTotal+". ":"")+
+           (recentScheduleEffect.earlierTotal?"Раньше: "+recentScheduleEffect.earlierTotal+".":""):
+           "Расчётные сроки существующих работ не сдвинулись."}
+           {recentScheduleEffect.criticalChangedTotal>0?
+            " Изменилось положение на критическом пути у "+recentScheduleEffect.criticalChangedTotal+" работ.":""}
+          </p>
+          {recentScheduleEffect.examples.length>0&&<ul className="atlas-work-effect-list">
+           {recentScheduleEffect.examples.map(item=><li key={item.id}>
+            <button type="button" className="text-link"
+             aria-label={"Перейти к затронутой работе "+item.title}
+             onClick={()=>revealWorkInTable(item.id)}>{item.title}</button>
+            <small>Изменение расчётного окончания: {item.shiftDays>0?"+":""}{item.shiftDays} дн.
+             {item.finishDate?" · "+item.finishDate:" · от начала проекта"}</small>
+           </li>)}
+          </ul>}
+          {recentScheduleEffect.movedTotal>recentScheduleEffect.examples.length&&
+           <p className="minor">Ещё {recentScheduleEffect.movedTotal-
+            recentScheduleEffect.examples.length} работ в полном графике.</p>}
+         </div>}
         {recentPlanRow?.finishDate&&recentWork.dueDate&&
          recentPlanRow.finishDate>recentWork.dueDate&&<p className="atlas-schedule-warning">
           Расчётный финиш позже указанного срока. Проверьте длительность и зависимости.</p>}

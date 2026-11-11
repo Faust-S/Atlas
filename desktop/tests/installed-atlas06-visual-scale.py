@@ -469,6 +469,10 @@ def qualify_visual():
     submit.click_input()
     await_no_form()
     assert d.head()==changed,"Choosing a predecessor silently saved native storage"
+    d.wait_text("Связь внесена в черновик.",35)
+    d.wait_text("Расчётные сроки существующих работ не сдвинулись.",35)
+    d.wait_text("Продолжительность плана: было",35)
+    print("ATLAS06_VISUAL_EXISTING_WORK_DEPENDENCY_EFFECT_PASS",flush=True)
     print("ATLAS06_VISUAL_EXISTING_WORK_PREDECESSOR_FORM_PASS",flush=True)
     d.click_button("Сохранить")
     linked_head=await_saved(changed)

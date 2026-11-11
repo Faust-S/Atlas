@@ -427,7 +427,7 @@ export function applyEditor(snapshot,projectId,action,input){
   if(!p.items.some(item=>item.id===id)||!p.items.some(item=>item.id===from&&item.id!==id)||
      p.dependencies.some(dep=>dep.from===from&&dep.to===id))
    throw Error("Связь работ больше недоступна. Откройте форму заново.");
-  return {state:connect(snapshot,projectId,from,id)};
+  return {state:connect(snapshot,projectId,from,id),workId:id};
  }
  if(action==="dep")return {state:connect(snapshot,projectId,get("from"),get("to"))};
  if(action==="target")return {state:addTarget(snapshot,projectId,{title:get("title"),desired:get("desired"),intent:get("intent")}).state};

@@ -722,3 +722,23 @@ test("Plan feedback is calculated from the existing schedule, without background
  const a=ui.indexOf("const recentPlanRow="),b=ui.indexOf("const workLinks=",a);
  assert.doesNotMatch(ui.slice(a,b),/commitWithReadback\(|nativeInvoke\(|fetch\(/);
 });
+
+test("An existing-work dependency explains CPM effects without writing data",()=>{
+ const ui=read("../desktop/src/main.tsx");
+ const editor=read("../src/editor.mjs");
+ const plan=read("../src/planning.mjs");
+ assert.match(editor,/return \{state:connect\(snapshot,projectId,from,id\),workId:id\}/);
+ assert.match(ui,/scheduleChangeSummary\(plan,scheduleProject\(updatedProject\)\)/);
+ assert.match(ui,/setRecentWorkKind\(editor\.action\.startsWith\("dep-to:"\)\?"dependency":"created"\)/);
+ assert.match(ui,/Изменение зависимостей работы/);
+ assert.match(ui,/Связь внесена в черновик\. Сохраните изменения\./);
+ assert.match(ui,/Расчётные сроки существующих работ не сдвинулись\./);
+ assert.match(ui,/Последствия изменения зависимости/);
+ assert.match(ui,/Перейти к затронутой работе/);
+ assert.match(ui,/onClick=\{\(\)=>revealWorkInTable\(item\.id\)\}/);
+ assert.match(plan,/export function scheduleChangeSummary\(/);
+ const from=plan.indexOf("export function scheduleChangeSummary(");
+ const to=plan.indexOf("export function workDependencyOverview(");
+ assert.ok(from>0&&to>from);
+ assert.doesNotMatch(plan.slice(from,to),/commitWithReadback\(|localStorage|connect\(snapshot/);
+});

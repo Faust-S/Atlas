@@ -77,6 +77,35 @@ export function scheduleProject(p) {
 
 
 /**
+ * Compare two existing CPM calculations. No project entities are written.
+ * New work is not counted as a shifted previously existing work.
+ */
+export function scheduleChangeSummary(before,after,{limit=4}={}){
+ if(!before||!after||!Array.isArray(before.rows)||!Array.isArray(after.rows)||
+    !Number.isSafeInteger(before.durationDays)||!Number.isSafeInteger(after.durationDays))
+  throw new Error("Invalid schedule comparison");
+ if(!Number.isInteger(limit)||limit<1||limit>20)
+  throw new Error("Invalid schedule comparison limit");
+ const previous=new Map(before.rows.map(row=>[row.id,row]));
+ let movedTotal=0,delayedTotal=0,earlierTotal=0,criticalChangedTotal=0;
+ const examples=[];
+ for(const row of after.rows){
+  const old=previous.get(row.id);
+  if(!old)continue;
+  if(Boolean(old.critical)!==Boolean(row.critical))criticalChangedTotal++;
+  const shiftDays=row.earlyFinish-old.earlyFinish;
+  if(!shiftDays)continue;
+  movedTotal++;
+  if(shiftDays>0)delayedTotal++;else earlierTotal++;
+  if(examples.length<limit)examples.push({
+   id:row.id,title:row.title,shiftDays,finishDate:row.finishDate??null
+  });
+ }
+ return {durationBefore:before.durationDays,durationAfter:after.durationDays,
+  movedTotal,delayedTotal,earlierTotal,criticalChangedTotal,examples};
+}
+
+/**
  * Read-only preview of recorded work dependencies.
  * Reuses the existing schedule's direct predecessors and blockedBy IDs,
  * without computing a second graph or inferring accepted results.

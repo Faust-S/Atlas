@@ -423,3 +423,10 @@ test("Installed large-project qualification confirms a second predecessor for th
  assert.match(stress,/d\.head\(\)==changed,"Choosing a predecessor silently saved native storage"/);
  assert.match(stress,/d\.saved_project\(linked_head\)==linked/);
 });
+
+test("Native Windows expects truthful unchanged schedule feedback after a neutral dependency",()=>{
+ const script=read("../desktop/tests/installed-atlas06-visual-scale.py");
+ assert.match(script,/ATLAS06_VISUAL_EXISTING_WORK_DEPENDENCY_EFFECT_PASS/);
+ assert.match(script,/d\.wait_text\("Расчётные сроки существующих работ не сдвинулись\.",35\)/);
+ assert.match(script,/d\.wait_text\("Продолжительность плана: было",35\)/);
+});
