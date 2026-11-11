@@ -520,6 +520,7 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .atlas-work-effect-list{margin:6px 0 0;padding-left:20px;font-size:12px}
 .atlas-work-effect-list li{margin:4px 0}
 .atlas-work-effect-list small{display:block;color:#566e88;line-height:1.4}
+.atlas-work-effect-list small.atlas-work-effect-deadline{color:#86521f;font-weight:600}
 .atlas-work-row-title{display:block;max-width:100%;font-size:13px;line-height:1.4;overflow-wrap:anywhere}
 .atlas-work-stage-link{display:block;margin-top:4px;font-size:12px;max-width:100%;overflow-wrap:anywhere}
 .atlas-work-table tbody tr.atlas-recent-work{background:#edf5ff}

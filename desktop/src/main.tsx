@@ -1526,6 +1526,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
            "Расчётные сроки существующих работ не сдвинулись."}
            {recentScheduleEffect.criticalChangedTotal>0?
             " Критический путь изменился. Затронуто работ: "+recentScheduleEffect.criticalChangedTotal+".":""}
+           {recentScheduleEffect.deadlineMissedTotal>0?
+            " Контрольный срок не выдержан у "+recentScheduleEffect.deadlineMissedTotal+
+            " затронутых работ.":""}
           </p>
           {recentScheduleEffect.examples.length>0&&<ul className="atlas-work-effect-list">
            {recentScheduleEffect.examples.map(item=><li key={item.id}>
@@ -1538,6 +1541,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
              item.finishOffset+" дн. от начала проекта"}.
              {" "}Сдвиг {item.shiftDays>0?"+":""}{item.shiftDays} дн.
              {item.critical?" На критическом пути.":""}</small>
+            {item.missedDeadline&&<small className="atlas-work-effect-deadline">
+             Контрольный срок {item.dueDate} не выдержан. Проверьте план этой работы.
+            </small>}
            </li>)}
           </ul>}
           {recentScheduleEffect.movedTotal>recentScheduleEffect.examples.length&&

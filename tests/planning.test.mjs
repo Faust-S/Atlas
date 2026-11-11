@@ -99,3 +99,30 @@ test('correcting an affected work duration recalculates its downstream chain',()
  assert.deepEqual(effect.examples.map(x=>x.id),['b','c']);
  assert.deepEqual(effect.examples.map(x=>x.shiftDays),[1,1]);
 });
+
+test('affected work exposes a missed control date without changing planned values',()=>{
+ const original=project([['a',2],['b',2],['c',1],['d',3]],[['b','c']],'2026-11-01');
+ original.items.find(w=>w.id==='b').dueDate='2026-11-04';
+ original.items.find(w=>w.id==='c').dueDate='2026-11-07';
+ original.items.find(w=>w.id==='d').dueDate='2026-11-01';
+ const changed={...original,dependencies:[...original.dependencies,{from:'a',to:'b'}]};
+ const before=scheduleProject(original),after=scheduleProject(changed);
+ const oldText=JSON.stringify(original),newText=JSON.stringify(changed);
+ const delta=scheduleChangeSummary(before,after);
+ assert.equal(delta.movedTotal,2);
+ assert.equal(delta.deadlineMissedTotal,1);
+ const missed=delta.examples.find(x=>x.id==='b');
+ assert.equal(missed.dueDate,'2026-11-04');
+ assert.equal(missed.finishDate,'2026-11-05');
+ assert.equal(missed.missedDeadline,true);
+ assert.equal(delta.examples.find(x=>x.id==='c').missedDeadline,false);
+ assert.equal(delta.examples.some(x=>x.id==='d'),false);
+ assert.equal(JSON.stringify(original),oldText);
+ assert.equal(JSON.stringify(changed),newText);
+ const undated=project([['a',2],['b',2],['c',1]],[['b','c']],null);
+ undated.items.find(x=>x.id==='b').dueDate='2026-11-04';
+ const undatedAfter={...undated,dependencies:[...undated.dependencies,{from:'a',to:'b'}]};
+ const withoutStart=scheduleChangeSummary(scheduleProject(undated),scheduleProject(undatedAfter));
+ assert.equal(withoutStart.deadlineMissedTotal,0);
+ assert.equal(withoutStart.examples.find(x=>x.id==='b').finishDate,null);
+});

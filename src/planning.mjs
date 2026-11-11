@@ -67,7 +67,8 @@ export function scheduleProject(p) {
   const start = optionalStartDate(p.startDate ?? null);
   const rows = order.map(id=>{
     const item = byId.get(id),row=times.get(id);
-    return {id,title:item.title,state:item.state,stageId:item.stageId??null,priority:item.priority||'normal',...row,
+    return {id,title:item.title,state:item.state,stageId:item.stageId??null,priority:item.priority||'normal',
+       dueDate:item.dueDate??null,...row,
       predecessors:[...incoming.get(id)],blockedBy:incoming.get(id).filter(pred=>byId.get(pred).state!=='done'),
       startDate:daysFrom(start,row.earlyStart),finishDate:daysFrom(start,row.earlyFinish)};
   });
@@ -87,7 +88,7 @@ export function scheduleChangeSummary(before,after,{limit=4}={}){
  if(!Number.isInteger(limit)||limit<1||limit>20)
   throw new Error("Invalid schedule comparison limit");
  const previous=new Map(before.rows.map(row=>[row.id,row]));
- let movedTotal=0,delayedTotal=0,earlierTotal=0,criticalChangedTotal=0;
+ let movedTotal=0,delayedTotal=0,earlierTotal=0,criticalChangedTotal=0,deadlineMissedTotal=0;
  const affected=[];
  for(const row of after.rows){
   const old=previous.get(row.id);
@@ -97,10 +98,15 @@ export function scheduleChangeSummary(before,after,{limit=4}={}){
   if(!shiftDays)continue;
   movedTotal++;
   if(shiftDays>0)delayedTotal++;else earlierTotal++;
+  // A due date is meaningful only when the project has a calendar start.
+  // Report an existing deadline violation without attributing its cause.
+  const missedDeadline=Boolean(row.dueDate&&row.finishDate&&row.finishDate>row.dueDate);
+  if(missedDeadline)deadlineMissedTotal++;
   affected.push({
    id:row.id,title:row.title,shiftDays,
    previousFinishOffset:old.earlyFinish,finishOffset:row.earlyFinish,
    previousFinishDate:old.finishDate??null,finishDate:row.finishDate??null,
+   dueDate:row.dueDate??null,missedDeadline,
    critical:Boolean(row.critical)
   });
  }
@@ -108,7 +114,7 @@ export function scheduleChangeSummary(before,after,{limit=4}={}){
  affected.sort((a,b)=>Number(b.shiftDays>0)-Number(a.shiftDays>0)||
   Math.abs(b.shiftDays)-Math.abs(a.shiftDays)||Number(b.critical)-Number(a.critical));
  return {durationBefore:before.durationDays,durationAfter:after.durationDays,
-  movedTotal,delayedTotal,earlierTotal,criticalChangedTotal,examples:affected.slice(0,limit)};
+  movedTotal,delayedTotal,earlierTotal,criticalChangedTotal,deadlineMissedTotal,examples:affected.slice(0,limit)};
 }
 
 /**

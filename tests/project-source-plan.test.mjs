@@ -793,3 +793,16 @@ test("Correcting a work named in the impact list recalculates the schedule befor
  assert.ok(a>0&&b>a);
  assert.doesNotMatch(ui.slice(a,b),/commitWithReadback\(|nativeInvoke\(|localStorage/);
 });
+
+test("Affected work deadlines are visible only when the calculated finish can be dated",()=>{
+ const source=read("../src/planning.mjs"),ui=read("../desktop/src/main.tsx");
+ const css=read("../desktop/src/style.css");
+ assert.match(source,/dueDate:item\.dueDate\?\?null/);
+ assert.match(source,/row\.dueDate&&row\.finishDate&&row\.finishDate>row\.dueDate/);
+ assert.match(source,/deadlineMissedTotal/);
+ assert.match(ui,/recentScheduleEffect\.deadlineMissedTotal>0/);
+ assert.match(ui,/Контрольный срок не выдержан у/);
+ assert.match(ui,/item\.missedDeadline&&<small className="atlas-work-effect-deadline">/);
+ assert.match(ui,/Контрольный срок \{item\.dueDate\} не выдержан/);
+ assert.match(css,/\.atlas-work-effect-list small\.atlas-work-effect-deadline/);
+});
