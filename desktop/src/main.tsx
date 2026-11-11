@@ -516,7 +516,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   setSourceJump(null);setMapSearchReturn(null);setGraphJump(null);setWorkReturnId(null);
   setShowProjectRelations(false);setRelationLimit(12);setRequirementJump(null);setChangeJump(null);
   if(!afterSubmit)setMessage("");
-  setWorkFilter("all");setWorkTargetFilter("all");setWorkObservationFilter("all");setWorkDependencyFilter("all");setWorkHistoryLimits({});setWorkQuery("");setWorkSort("title");setWorkLimit(200);setRealityLimit(8);
+  setWorkDependencyFilter("all");setWorkFilter("all");setWorkTargetFilter("all");setWorkObservationFilter("all");setWorkHistoryLimits({});setWorkQuery("");setWorkSort("title");setWorkLimit(200);setRealityLimit(8);
   setHistoryQuery("");setHistoryType("all");setHistoryLimit(120);setRecheckLimit(25);
  };
  const openProjectTab=(id:string,tabId:Tab,changeId:string|null=null)=>{
