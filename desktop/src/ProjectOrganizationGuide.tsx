@@ -6,10 +6,11 @@ import {ProjectSourcePlanMap} from "./ProjectVisuals";
 // stage and dependency links remain usable in any project without GitHub.
 // Suggested roles are explanations to review, never new project entities.
 export function ProjectOrganizationGuide({snapshot,projectId,onEdit,onRefresh,onOpenProject,
- onOpenSources,onOpenWorks,onOpenStages,onAddRelation,onOpenTimeline,onOpenGraph,busy=false}:{
+ onOpenSources,onOpenLinkedSource,onOpenWorks,onOpenStages,onAddRelation,onOpenTimeline,onOpenGraph,busy=false}:{
  snapshot:any;projectId:string;onEdit:(action:string)=>void;
  onRefresh:(sourceId:string)=>void;onOpenProject:(id:string)=>void;
- onOpenSources:()=>void;onOpenWorks:()=>void;onOpenStages:()=>void;onAddRelation:()=>void;
+ onOpenSources:()=>void;onOpenLinkedSource:(workId:string)=>void;
+ onOpenWorks:()=>void;onOpenStages:()=>void;onAddRelation:()=>void;
  onOpenTimeline:()=>void;onOpenGraph:()=>void;busy?:boolean;
 }){
  const [moreLinks,setMoreLinks]=useState(false);
@@ -55,6 +56,7 @@ export function ProjectOrganizationGuide({snapshot,projectId,onEdit,onRefresh,on
      onEdit(folderWorkAction(sourceId,commitSha,folder))}
     onOpenTimeline={onOpenTimeline} onOpenGraph={onOpenGraph}
     onOpenWorks={onOpenWorks} onOpenSources={onOpenSources}
+    onOpenLinkedSource={onOpenLinkedSource}
     onOpenStages={onOpenStages}
     onCreateStage={()=>onEdit("stage")}
     onAddDependency={()=>onEdit("dep")}/>

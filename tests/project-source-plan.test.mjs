@@ -415,7 +415,7 @@ test("Search context stays inside one dialog and uses existing editors and sourc
  assert.match(visual,/Открыть предшествующую работу/);
  assert.match(visual,/Открыть зависящую работу/);
  assert.match(visual,/Открыть каталог GitHub/);
- assert.match(visual,/onClick=\{\(\)=>\{closeSearch\(\);onOpenSources\(\)\}\}/);
+ assert.match(visual,/onClick=\{\(\)=>\{closeSearch\(\);onOpenLinkedSource\(detail\.id\)\}\}/);
  assert.match(visual,/onClick=\{\(\)=>\{closeSearch\(\);onOpenGraph\(\)\}\}/);
  assert.match(visual,/onClick=\{\(\)=>\{if\(detail\.stage\)openFound\(\{kind:"stage",id:detail\.stage\.id\}\)\}\}/);
  assert.match(css,/\.atlas-source-plan-find-context\{display:grid/);
@@ -437,4 +437,35 @@ test("Long search result labels are bounded and recorded dependencies appear bef
  const source=visual.indexOf("detail.source&&",from);
  assert.ok(deps>from&&stage>deps&&source>stage);
  assert.doesNotMatch(visual.slice(from),/[—–]/);
+});
+
+
+test("Searching a work opens the exact saved source and folder within Atlas",()=>{
+ const main=read("../desktop/src/main.tsx");
+ const guide=read("../desktop/src/ProjectOrganizationGuide.tsx");
+ const visual=read("../desktop/src/ProjectVisuals.tsx");
+ const css=read("../desktop/src/style.css");
+ assert.match(main,/const \[sourceJump,setSourceJump\]=useState/);
+ assert.match(main,/projectSourcePlanWorkContext\(project,sourceJump\.workId\)/);
+ assert.match(main,/onOpenLinkedSource=\{workId=>view\("sources",workId\)\}/);
+ assert.match(main,/setSourceJump\(tabId==="sources"&&sourceWorkId&&project\?/);
+ assert.match(main,/target\.scrollIntoView\(\{behavior:"auto",block:"start"\}\)/);
+ assert.match(main,/ref=\{selected\?sourceJumpRef:undefined\}/);
+ assert.match(main,/aria-label="Каталог связанной работы"/);
+ assert.match(main,/linkedSource\.url&&<a className="text-link"/);
+ assert.match(main,/setSourceJump\(null\)/);
+ assert.match(guide,/onOpenLinkedSource=\{onOpenLinkedSource\}/);
+ assert.match(visual,/Показать каталог в Atlas/);
+ assert.match(css,/\.atlas-source-review-focused\{/);
+ assert.doesNotMatch(main.slice(main.indexOf("const view=(tabId:Tab,"),main.indexOf("useEffect(()=>{",main.indexOf("const view=(tabId:Tab,"))),/mutate\(|commitWithReadback/);
+});
+test("Historical source and unavailable folder keep their provenance separate",()=>{
+ const main=read("../desktop/src/main.tsx");
+ assert.match(main,/linkedSource\.status==="stale"/);
+ assert.match(main,/linkedSource\.status==="unavailable"/);
+ assert.match(main,/linkedSource\.revisionCurrent/);
+ assert.match(main,/Работа связана с прежней редакцией исходников/);
+ assert.match(main,/Источник больше не подключён/);
+ assert.match(main,/Каталог найден при последней сверке редакции исходников/);
+ assert.doesNotMatch(main,/Каталог найден в текущем репозитории/);
 });

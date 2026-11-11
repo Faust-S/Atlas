@@ -22,6 +22,7 @@ import {githubPortfolioCatalog,createProjectFromGitHubCatalog,githubPortfolioOve
 import {ProjectGantt,ProjectDependencyDiagram,PortfolioNetworkMap} from "./ProjectVisuals";
 import {ProjectConnect} from "./ProjectConnect";
 import {ProjectOrganizationGuide} from "./ProjectOrganizationGuide";
+import {projectSourcePlanWorkContext} from "../../src/project-organization.mjs";
 import {repoName} from "../../src/github-public.mjs";
 import {applyPublicProjectPreview} from "../../src/project-onboarding.mjs";
 import {prepareImportedSnapshot} from "./import-snapshot.mjs";
@@ -161,6 +162,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const relationSectionRef=useRef<HTMLElement|null>(null);
  const requirementCardRef=useRef<HTMLElement|null>(null);
  const changeCardRef=useRef<HTMLDivElement|null>(null);
+ const sourceJumpRef=useRef<HTMLDivElement|null>(null);
  const logoUrl=host?.assetUrl??"/atlas-mark.svg";
  const [data,setData]=useState<Atlas>(()=>empty());
  const [ready,setReady]=useState(false),[busy,setBusy]=useState(false);
@@ -216,8 +218,12 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const [reviewLimit,setReviewLimit]=useState(20);
  const [sourceLimit,setSourceLimit]=useState(15);
  const [sourceRowLimits,setSourceRowLimits]=useState<Record<string,number>>({});
+ const [sourceJump,setSourceJump]=useState<{projectId:string;workId:string}|null>(null);
  const [recheckLimit,setRecheckLimit]=useState(25);
  const project=data.projects.find((p:any)=>p.id===active)||null;
+ const sourceJumpContext=useMemo(()=>sourceJump&&project&&
+  sourceJump.projectId===project.id?
+   projectSourcePlanWorkContext(project,sourceJump.workId):null,[project,sourceJump]);
  // Canonical snapshot text is expensive for large portfolios: compute only
  // when domain data change, not for typing, scrolling, or tab switches.
  const dataSignature=useMemo(()=>snapshotText(data),[data]);
@@ -276,6 +282,14 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const impact=project?impactByProject.get(project.id)||null:null;
  const nextStep=useMemo(()=>project&&impact?projectNextStep(project,impact):null,[project,impact]);
  const realityMap=useMemo(()=>project&&reality&&impact?realityOverview(project,reality,impact):null,[project,reality,impact]);
+ useEffect(()=>{
+  if(tab!=="sources"||!ready||!sourceJumpContext?.source||!project||
+     sourceJump?.projectId!==project.id)return;
+  const target=sourceJumpRef.current;
+  if(!target)return;
+  target.scrollIntoView({behavior:"auto",block:"start"});
+  target.focus({preventScroll:true});
+ },[tab,ready,project,sourceJump,sourceJumpContext]);
  const sourceResponseById=useMemo(()=>{
   const relevant=project&&impact?responseState(project,impact).rows:[];
   return new Map<string,any>(relevant.filter(r=>r.key.startsWith("source-issue:"))
@@ -441,6 +455,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   resetWorkspaceScroll();
   host?.onSelection?.({projectId:id,workId:null,revision:String(latestSnapshot.current.revision)});
   setActive(id);setTab("overview");setEditor(null);setForecastId(null);setConnectOpen(false);
+  setSourceJump(null);
   setShowProjectRelations(false);setRelationLimit(12);setRequirementJump(null);setChangeJump(null);
   if(!afterSubmit)setMessage("");
   setWorkFilter("all");setWorkTargetFilter("all");setWorkObservationFilter("all");setWorkHistoryLimits({});setWorkQuery("");setWorkSort("title");setWorkLimit(200);setRealityLimit(8);
@@ -793,9 +808,11 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   try{mutate(editItem(data,project.id,id,{state}),"Состояние работы изменено в черновике.")}
   catch(e){issue(e)}
  };
- const view=(tabId:Tab)=>{
+ const view=(tabId:Tab,sourceWorkId:string|null=null)=>{
   if(!requireClosedForm())return;
   resetWorkspaceScroll();
+  setSourceJump(tabId==="sources"&&sourceWorkId&&project?
+   {projectId:project.id,workId:sourceWorkId}:null);
   setTab(tabId);setEditor(null);setForecastId(null);
  };
  useEffect(()=>{
@@ -1150,6 +1167,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       onEdit={openEditor}
       onRefresh={sourceId=>void syncPublic({projectId:project.id,sourceId})}
       onOpenSources={()=>view("sources")}
+      onOpenLinkedSource={workId=>view("sources",workId)}
       onOpenWorks={()=>view("work")}
       onOpenStages={()=>document.getElementById("atlas-project-stages")?.scrollIntoView({behavior:"smooth",block:"start"})}
       onOpenTimeline={()=>view("timeline")}
@@ -1566,6 +1584,15 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     {tab==="sources"&&<section className="surface"><div className="section-heading"><div><h2>Источники проекта</h2>
      <p>Проверяйте изменения и сборки открытых репозиториев GitHub по своему запросу. Другие источники пока можно добавлять как ссылки.</p></div>
      <Action onClick={()=>openEditor("source")} primary>＋ Источник</Action></div>
+     {sourceJumpContext?.source?.status==="missing"&&<div className="atlas-source-jump-missing"
+      role="status">
+      <strong>Источник больше не подключён</strong>
+      <p>Работа «{sourceJumpContext.title}» хранит прежнюю привязку
+       {sourceJumpContext.source.folder?" к каталогу «"+sourceJumpContext.source.folder+"»":""}.
+       Посмотреть её в текущих источниках нельзя.</p>
+      <button type="button" className="text-link" onClick={()=>setSourceJump(null)}>
+       Закрыть сведения</button>
+     </div>}
      {(project.sources||[]).map((s:any)=>{
       const review=sourceReview(s,{limit:sourceRowLimits[s.id]||12});
       const sourceIssue=sourceResponseById.get(s.id);
@@ -1573,7 +1600,32 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       const ownerCatalog=s.kind==="github_owner"?githubPortfolioCatalog(data,project.id,s.id,{
        query:ownerCatalogQuery[s.id]||"",limit:ownerCatalogLimit[s.id]||24
       }):null;
-      return <div className="atlas-source-review" key={s.id}>
+      const selected=sourceJumpContext?.source?.id===s.id;
+      const linkedSource=selected?sourceJumpContext?.source:null;
+      return <div className={"atlas-source-review"+(selected?" atlas-source-review-focused":"")}
+       key={s.id} ref={selected?sourceJumpRef:undefined} tabIndex={selected?-1:undefined}>
+       {selected&&linkedSource&&<div className="atlas-source-jump-folder"
+        role="group" aria-label="Каталог связанной работы">
+        <strong>Связь работы с каталогом</strong>
+        <p>Работа: <span>{sourceJumpContext?.title}</span></p>
+        {linkedSource.folder?<p>Каталог: <span title={linkedSource.folder}>{linkedSource.folder}</span></p>:
+         <p>Каталог для этой работы не указан.</p>}
+        <small>{linkedSource.url?
+         "Каталог найден при последней сверке редакции исходников.":
+         linkedSource.status==="stale"?
+         "Сведения о ветке устарели. Обновите источник перед сравнением.":
+         linkedSource.status==="unavailable"?
+         "Сведения об исходниках сейчас недоступны.":
+         linkedSource.revisionCurrent?
+         "Редакция совпадает, но каталог не подтверждён в полученной структуре.":
+         "Работа связана с прежней редакцией исходников."}</small>
+        <div className="button-row">
+         {linkedSource.url&&<a className="text-link" href={linkedSource.url}
+          target="_blank" rel="noopener noreferrer">Открыть найденный каталог на GitHub</a>}
+         <button type="button" className="text-link" onClick={()=>setSourceJump(null)}>
+          Закрыть связь</button>
+        </div>
+       </div>}
        <div className="attention-row"><div><strong>{sourceNames[s.kind]||"Источник"}: {s.locator}</strong>
         {s.kind==="github"&&<small>Ветка проверок: {s.branch||s.summary?.defaultBranch||"основная ветка репозитория"}</small>}
         <small>{review.status} · Попытка: {review.lastAttempt||"не выполнялась"}</small>

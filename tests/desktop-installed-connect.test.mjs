@@ -175,3 +175,16 @@ test("Installed search requires a physical click on a predecessor of a long-name
  assert.match(driver,/Predecessor is outside Windows viewport/);
  assert.match(driver,/Opening a searched predecessor changed native Store/);
 });
+
+
+test("Installed Windows Atlas opens exact source folder inside source list",()=>{
+ const stress=read("../desktop/tests/installed-atlas06-visual-scale.py");
+ const main=read("../desktop/src/main.tsx");
+ assert.match(stress,/ATLAS06_VISUAL_EXACT_SOURCE_FOLDER_JUMP_PASS/);
+ assert.match(stress,/find_control\("Показать каталог в Atlas",types=\{"Button"\},scroll=False\)\.click_input\(\)/);
+ assert.match(stress,/d\.wait_text\("Связь работы с каталогом",25\)/);
+ assert.match(stress,/d\.wait_text\("directory-23",25\)/);
+ assert.match(stress,/rectangle_in_workspace\(close\.rectangle\(\),win32gui\.GetWindowRect\(d\.handle\)\)/);
+ assert.match(stress,/assert d\.head\(\)==saved,"Jump to exact source folder changed native Store"/);
+ assert.match(main,/ref=\{selected\?sourceJumpRef:undefined\}/);
+});

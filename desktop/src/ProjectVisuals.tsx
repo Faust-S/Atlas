@@ -243,12 +243,14 @@ export function PortfolioNetworkMap({snapshot,onOpenProject}:{
 // The connectors illustrate only confirmed user-created work/stage assignments.
 // No component or dependency is created by opening the diagram.
 export function ProjectSourcePlanMap({projection,project,onOpenWork,onEditStage,onSuggestFolder,
- onOpenTimeline,onOpenGraph,onOpenWorks,onOpenSources,onOpenStages,onCreateStage,onAddDependency,
+ onOpenTimeline,onOpenGraph,onOpenWorks,onOpenSources,onOpenLinkedSource,onOpenStages,
+ onCreateStage,onAddDependency,
  expanded,hasMoreLinks,onToggleExpansion}:{
  projection:any;project:any;onOpenWork:(id:string)=>void;onEditStage:(id:string)=>void;
  onSuggestFolder:(sourceId:string,commitSha:string,folder:string)=>void;
  onOpenTimeline:()=>void;onOpenGraph:()=>void;
  onOpenWorks:()=>void;onOpenSources:()=>void;onOpenStages:()=>void;
+ onOpenLinkedSource:(workId:string)=>void;
  onCreateStage:()=>void;onAddDependency:()=>void;
  expanded:boolean;hasMoreLinks:boolean;onToggleExpansion:()=>void;
 }){
@@ -356,7 +358,8 @@ export function ProjectSourcePlanMap({projection,project,onOpenWork,onEditStage,
             "Работа связана с прежней редакцией исходников"}</small>
            <div className="atlas-source-plan-find-links">
             <button type="button" className="text-link"
-             onClick={()=>{closeSearch();onOpenSources()}}>Посмотреть источники</button>
+             onClick={()=>{closeSearch();onOpenLinkedSource(detail.id)}}>
+             Показать каталог в Atlas</button>
             {detail.source.url&&<a className="text-link"
              href={detail.source.url} target="_blank" rel="noopener noreferrer">
              Открыть каталог GitHub</a>}

@@ -272,6 +272,20 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 
 /* Read-only version comparison, presented inside the existing Source tab. */
 .atlas-source-review{border-top:1px solid #dce6f1;padding:1px 0 7px}
+.atlas-source-review-focused{border-left:3px solid #517cad;
+ padding-left:10px;scroll-margin-top:100px;outline:none}
+.atlas-source-jump-folder,.atlas-source-jump-missing{
+ margin:8px 4px 12px 0;padding:10px 12px;border:1px solid #dce6f1;
+ border-radius:8px;background:#f7faff;min-width:0;overflow-wrap:anywhere}
+.atlas-source-jump-folder>strong,.atlas-source-jump-missing>strong{
+ color:#27486b;font-size:13px}
+.atlas-source-jump-folder>p,.atlas-source-jump-missing>p{
+ font-size:12px;margin:7px 0;line-height:1.5}
+.atlas-source-jump-folder>p>span{font-weight:600}
+.atlas-source-jump-folder>small{color:#506987;font-size:12px;display:block}
+.atlas-source-jump-folder .button-row{margin-top:8px;justify-content:flex-start}
+.atlas-source-jump-folder .text-link,.atlas-source-jump-missing .text-link{
+ font-size:12px}
 .atlas-source-review .attention-row{border-top:none}
 .atlas-source-details{padding:0 5px 9px;max-width:100%}
 .atlas-source-details .atlas-source-table{min-width:480px}

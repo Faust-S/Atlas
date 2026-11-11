@@ -152,3 +152,18 @@ test("Search context handles unlinked work, absent source and invalid limits rea
  assert.equal(missing.source.url,null);
  assert.equal(serialize(snapshot),before);
 });
+
+
+test("Exact source target from the last source and a hidden folder remains read-only",()=>{
+ const snapshot=atlas06VisualPortfolio(),project=snapshot.projects[0],before=serialize(snapshot);
+ const found=projectSourcePlanSearch(project,"Работа 5 / 1080");
+ assert.equal(found.total,1);
+ const linked=projectSourcePlanWorkContext(project,found.matches[0].id);
+ assert.equal(linked.source.id,"visual-source-5");
+ assert.equal(linked.source.folder,"directory-23");
+ assert.equal(linked.source.repository,"atlas-visual-fixture/project-5");
+ assert.equal(linked.source.status,"current");
+ assert.equal(linked.source.revisionCurrent,true);
+ assert.match(linked.source.url,/\/directory-23$/);
+ assert.equal(serialize(snapshot),before);
+});
