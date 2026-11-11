@@ -347,6 +347,11 @@ export function ProjectSourcePlanMap({projection,project,restoreSearch,onOpenWor
          </button>}
          {detailWorkId===hit.id&&detail&&<div className="atlas-source-plan-find-context"
           role="group" aria-label="Связи выбранной работы">
+          {(detail.predecessorTotal>detail.predecessors.length||
+            detail.successorTotal>detail.successors.length)&&
+           <button type="button" className="text-link"
+            onClick={()=>{closeSearch();onOpenGraph(detail.id,searchQuery)}}>
+            Все зависимости на схеме</button>}
           {detail.predecessorTotal>0&&<div className="atlas-source-plan-find-relation">
            <small>Предшествующих работ: {detail.predecessorTotal}</small>
            {detail.predecessors.map((related:any)=><button key={related.id}
@@ -390,11 +395,6 @@ export function ProjectSourcePlanMap({projection,project,restoreSearch,onOpenWor
              Открыть каталог GitHub</a>}
            </div>
           </div>}
-          {(detail.predecessorTotal>detail.predecessors.length||
-            detail.successorTotal>detail.successors.length)&&
-           <button type="button" className="text-link"
-            onClick={()=>{closeSearch();onOpenGraph(detail.id,searchQuery)}}>
-            Все зависимости на схеме</button>}
           {!detail.source&&!detail.stage&&!detail.predecessorTotal&&
            !detail.successorTotal&&<small>Связи пока не записаны.</small>}
          </div>}

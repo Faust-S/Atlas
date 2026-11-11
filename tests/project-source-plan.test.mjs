@@ -436,6 +436,9 @@ test("Long search result labels are bounded and recorded dependencies appear bef
  const stage=visual.indexOf("detail.stage&&",from);
  const source=visual.indexOf("detail.source&&",from);
  assert.ok(deps>from&&stage>deps&&source>stage);
+ const fullGraph=visual.indexOf("Все зависимости на схеме",from);
+ assert.ok(fullGraph>from&&fullGraph<deps,
+  "Full dependency navigation must be reachable before long work and stage labels");
  assert.doesNotMatch(visual.slice(from),/[—–]/);
 });
 
