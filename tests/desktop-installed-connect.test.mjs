@@ -327,7 +327,14 @@ test("Installed Atlas filters source-free project work by recorded predecessor s
  assert.match(ui,/option value="has_pending">Есть незавершённые/);
  assert.match(ui,/option value="no_pending">Нет незавершённых/);
  assert.match(ui,/filterWorkRowsByDependencies\(/);
- assert.match(ui,/workDependencyFilter,workLinks,findingsByWork/);
+ // Check the existing dependency filter's real call, independently of other
+ // filters that may be added to the same memoized work list.
+ const start=ui.indexOf("const filteredWork=useMemo(");
+ const end=ui.indexOf(" useEffect(()=>{",start);
+ assert.ok(start>0&&end>start);
+ const workList=ui.slice(start,end);
+ assert.match(workList,/workLinks,workDependencyFilter\)/);
+ assert.match(workList,/workDependencyFilter/);
  assert.match(ui,/setWorkDependencyFilter\("all"\)/);
  assert.match(model,/export function filterWorkRowsByDependencies/);
  assert.match(style,/\.atlas-work-surface \.filter-row\{flex-wrap:wrap\}/);

@@ -696,7 +696,17 @@ test("A newly created work is revealed by its saved identity, with its stage and
  assert.match(main,/const isDependencyChange=editor\.action\.startsWith\("dep-to:"\)/);
  assert.match(main,/setWorkReturnId\(focusRow\?id:null\)/);
  assert.match(main,/setWorkFilter\("all"\);setWorkTargetFilter\("all"\);setWorkObservationFilter\("all"\)/);
- assert.match(main,/setWorkDependencyFilter\("all"\);setWorkQuery\(""\);setWorkSort\("title"\);setWorkLimit\(200\)/);
+ // The return-to-work action must clear both independent filters, but need
+ // not keep unrelated state setters in a fragile exact source order.
+ const returnAt=main.indexOf("const revealWorkInTable=");
+ const submitAt=main.indexOf("const submit=",returnAt);
+ assert.ok(returnAt>0&&submitAt>returnAt);
+ const returnFlow=main.slice(returnAt,submitAt);
+ assert.match(returnFlow,/setWorkDependencyFilter\("all"\)/);
+ assert.match(returnFlow,/setWorkDeadlineFilter\("all"\)/);
+ assert.match(returnFlow,/setWorkQuery\(""\)/);
+ assert.match(returnFlow,/setWorkSort\("title"\)/);
+ assert.match(returnFlow,/setWorkLimit\(200\)/);
  assert.match(main,/filteredWork\.findIndex\(\(item:any\)=>item\.id===workReturnId\)/);
  assert.match(main,/if\(index>=workLimit\)\{setWorkLimit\(index\+1\);return;\}/);
  assert.match(main,/ref=\{workReturnId===w\.id\?workReturnRef:undefined\}/);
