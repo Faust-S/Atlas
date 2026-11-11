@@ -711,7 +711,8 @@ test("Plan feedback is calculated from the existing schedule, without background
  const ui=read("../desktop/src/main.tsx");
  assert.ok(ui.includes("const plan=useMemo(()=>project?scheduleProject(project):null,[project]);"));
  assert.ok(ui.includes("const recentPlanRow=recentWork&&plan?plan.rows.find"));
- assert.ok(ui.includes("recentPlanBefore.revision===data.revision?recentPlanBefore.days:null"));
+ assert.ok(ui.includes("recentPlanBefore.workId===recentWork.id&&recentPlanBefore.revision===data.revision?"));
+ assert.ok(ui.includes("recentPlanBefore.days:null"));
  assert.ok(ui.includes("days:plan?.durationDays??0"));
  assert.ok(ui.includes("revision:result.state.revision"));
  assert.ok(ui.includes("Продолжительность плана: было {planBeforeRecent} дн., стало {plan.durationDays} дн."));
