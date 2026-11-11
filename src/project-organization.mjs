@@ -226,7 +226,7 @@ export function projectSourcePlanProjection(snapshot,projectId,{
 // available to open through its ordinary editor. This never writes to a plan.
 const searchLabel=value=>String(value??"").normalize("NFKC")
  .toLocaleLowerCase("ru-RU").replace(/\s+/g," ").trim();
-export function projectSourcePlanSearch(project,query,{limit=8,priorityWorkId=null}={}){
+export function projectSourcePlanSearch(project,query,{limit=8,priorityWorkId=""}={}){
  if(!project||!Array.isArray(project.items)||!Array.isArray(project.stages))
   throw Error("Проект не найден");
  if(!Number.isInteger(limit)||limit<1||limit>40)

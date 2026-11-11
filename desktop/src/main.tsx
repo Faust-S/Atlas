@@ -814,8 +814,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   resetWorkspaceScroll();
   // Returning from a linked source restores the selected work's search
   // context. Ordinary tab changes leave no retained search.
-  setMapSearchReturn(tabId==="overview"&&tab==="sources"&&
-   sourceJump?.projectId===project?.id?
+  setMapSearchReturn(tabId==="overview"&&tab==="sources"&&sourceJump!==null&&
+   sourceJump.projectId===project?.id?
    {workId:sourceJump.workId,query:sourceJump.query}:null);
   setSourceJump(null);
   setTab(tabId);setEditor(null);setForecastId(null);

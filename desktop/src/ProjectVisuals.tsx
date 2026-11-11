@@ -278,7 +278,7 @@ export function ProjectSourcePlanMap({projection,project,restoreSearch,onOpenWor
  },[projection.projectId,restoreSearch?.workId,restoreSearch?.query]);
  useEffect(()=>{if(searchOpen)inputRef.current?.focus()},[searchOpen]);
  const found=useMemo(()=>projectSourcePlanSearch(project,searchQuery,{
-  limit:8,priorityWorkId:detailWorkId
+  limit:8,priorityWorkId:detailWorkId||""
  }),[project,searchQuery,detailWorkId]);
  const detail=useMemo(()=>detailWorkId?
   projectSourcePlanWorkContext(project,detailWorkId):null,[project,detailWorkId]);

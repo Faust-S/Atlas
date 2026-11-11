@@ -213,5 +213,5 @@ test("Installed Atlas restores the work search when returning from source",()=>{
  assert.match(driver,/d\.wait_text\("Показать каталог в Atlas",25\)/);
  assert.match(driver,/Restoring source search changed native Store/);
  assert.match(main,/setMapSearchReturn\(tabId==="overview"&&tab==="sources"/);
- assert.match(map,/priorityWorkId:detailWorkId/);
+ assert.match(map,/priorityWorkId:detailWorkId\|\|""/);
 });
