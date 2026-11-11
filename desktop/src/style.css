@@ -656,7 +656,9 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .atlas-source-plan-map .section-heading h3{margin:0;font-size:15px}
 .atlas-source-plan-map .section-heading p{margin:5px 0;color:#60758d;font-size:12px}
 .atlas-source-plan-find{position:relative;flex:0 0 auto}
-.atlas-source-plan-find-panel{position:absolute;right:0;top:calc(100% + 7px);
+/* The plan starts low in the normal Windows viewport; show results above
+   the search button so even the first result stays reachable without scrolling. */
+.atlas-source-plan-find-panel{position:absolute;right:0;bottom:calc(100% + 7px);
  width:min(350px,calc(100vw - 30px));box-sizing:border-box;z-index:30;
  max-height:min(450px,58vh);overflow-y:auto;background:#fff;
  border:1px solid #c7daf1;box-shadow:0 12px 26px #1637572b;

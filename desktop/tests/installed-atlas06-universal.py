@@ -149,6 +149,20 @@ def qualify():
     v.await_no_form()
     assert d.head()==saved
     print("ATLAS06_UNIVERSAL_UNUSED_STAGE_EDITOR_PASS",flush=True)
+    # Search results must remain physically clickable in a narrow window.
+    v.find_control("Найти",types={"Button"}).click_input()
+    d.set_text("Найти работу или этап","Согласовать программу")
+    d.wait_text("Найдено: 1",25)
+    found=v.find_control("Открыть работу Согласовать программу",types={"Button"},scroll=False)
+    assert v.rectangle_in_workspace(found.rectangle(),win32gui.GetWindowRect(d.handle))
+    v.capture("universal-search-narrow")
+    found.click_input()
+    d.window_title_contains("Форма:",25)
+    assert d.head()==saved,"Narrow search changed native Store"
+    keyboard.send_keys("{ESC}")
+    v.await_no_form()
+    assert d.head()==saved
+    print("ATLAS06_UNIVERSAL_SEARCH_NARROW_PASS",flush=True)
     print("ATLAS06_UNIVERSAL_NATIVE_NO_UNREQUESTED_WRITE_PASS",flush=True)
 
 if __name__=="__main__":

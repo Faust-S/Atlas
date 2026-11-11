@@ -143,3 +143,13 @@ test("Installed Windows Atlas searches hidden work and stages with native input"
  assert.match(universal,/Открыть этап Подвести итоги/);
  assert.match(universal,/assert d\.head\(\)==saved,"Opening a searched unused stage changed native Store"/);
 });
+
+
+test("Native Windows search remains clickable in a narrow viewport",()=>{
+ const script=read("../desktop/tests/installed-atlas06-universal.py");
+ const css=read("../desktop/src/style.css");
+ assert.match(script,/ATLAS06_UNIVERSAL_SEARCH_NARROW_PASS/);
+ assert.match(script,/Открыть работу Согласовать программу/);
+ assert.match(script,/rectangle_in_workspace\(found\.rectangle\(\),win32gui\.GetWindowRect\(d\.handle\)\)/);
+ assert.match(css,/\.atlas-source-plan-find-panel\{position:absolute;right:0;bottom:calc\(100% \+ 7px\);/);
+});

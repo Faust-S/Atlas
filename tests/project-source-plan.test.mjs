@@ -397,3 +397,10 @@ test("Diagram search uses existing work and stage editors without changing stora
  assert.doesNotMatch(visual.slice(visual.indexOf("export function ProjectSourcePlanMap")),
   /localStorage|createItem\(|mutate\(|fetch\(/);
 });
+
+
+test("Search results open above the trigger instead of below the Windows viewport",()=>{
+ const css=read("../desktop/src/style.css");
+ assert.match(css,/\.atlas-source-plan-find-panel\{position:absolute;right:0;bottom:calc\(100% \+ 7px\);/);
+ assert.doesNotMatch(css,/\.atlas-source-plan-find-panel\{position:absolute;right:0;top:calc\(100% \+ 7px\);/);
+});
