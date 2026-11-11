@@ -477,7 +477,10 @@ test("Installed Windows Gantt filters dated work deadline violations and opens t
  assert.match(script,/ATLAS06_VISUAL_GANTT_WORK_DEADLINE_FILTER_PASS/);
  assert.match(script,/d\.click_button\("График"\)/);
  assert.match(script,/Только работы позже контрольного срока/);
- assert.match(script,/Показано 1 из 1 работ на графике/);
+ assert.match(script,/deadline_filter\.get_toggle_state\(\)==1/);
+ assert.match(script,/visible_bars=\[element for element in d\.window\(\)\.descendants/);
+ assert.match(script,/Gantt did not filter to the single overdue work/);
+ assert.match(script,/Overdue Gantt work is outside the physical Windows viewport/);
  assert.match(script,/Filtering overdue Gantt work changed native Store/);
  assert.match(script,/Opening overdue work from Gantt changed native Store/);
  assert.match(component,/Позже срока \(\{missedDeadlineTotal\}\)/);

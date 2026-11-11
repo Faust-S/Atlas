@@ -557,17 +557,27 @@ def qualify_visual():
         title="Только работы позже контрольного срока",control_type="CheckBox")
     assert deadline_filter.exists(timeout=15) and deadline_filter.is_enabled()
     deadline_filter.click_input()
-    d.wait_text("Показано 1 из 1 работ на графике.",35)
-    d.wait_text("Расчётный финиш позже срока 2026-11-11",35)
+    # In installed WebView2, the long "Показано ..." summary is below the
+    # chart's scroll region, outside the physical Windows viewport. Verify
+    # the checkbox state and the *actual single filtered bar*, not offscreen
+    # text that a user cannot see.
+    assert deadline_filter.get_toggle_state()==1,"Deadline filter was not checked"
+    visible_bars=[element for element in d.window().descendants(control_type="Button")
+                  if str(element.window_text()).startswith("Открыть работу ")
+                  and element.is_visible()]
+    assert [bar.window_text() for bar in visible_bars]==["Открыть работу Работа 0 / 2"],(
+        "Gantt did not filter to the single overdue work")
+    overdue=visible_bars[0]
+    assert rectangle_in_workspace(overdue.rectangle(),win32gui.GetWindowRect(d.handle)),(
+        "Overdue Gantt work is outside the physical Windows viewport")
+    capture("gantt-work-deadline-filter")
     assert d.head()==final_head,"Filtering overdue Gantt work changed native Store"
-    overdue=find_control("Открыть работу Работа 0 / 2",types={"Button"})
     overdue.click_input()
     d.window_title_contains("Форма: Работа: Работа 0 / 2",25)
     assert d.head()==final_head,"Opening overdue work from Gantt changed native Store"
     keyboard.send_keys("{ESC}")
     await_no_form()
     assert d.saved_project(final_head)==final
-    capture("gantt-work-deadline-filter")
     print("ATLAS06_VISUAL_GANTT_WORK_DEADLINE_FILTER_PASS",flush=True)
 
     # The same real CPM warning is visible and actionable in the work table,
