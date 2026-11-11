@@ -129,3 +129,17 @@ test("Native Windows witness covers an existing unused stage in a source-free pr
  assert.match(universal,/open_editor_by_visible_control\("Подвести итоги"\)/);
  assert.match(universal,/assert d\.head\(\)==saved,"Opening an unassigned stage modified native Store"/);
 });
+
+
+test("Installed Windows Atlas searches hidden work and stages with native input",()=>{
+ const stress=read("../desktop/tests/installed-atlas06-visual-scale.py");
+ const universal=read("../desktop/tests/installed-atlas06-universal.py");
+ assert.match(stress,/d\.set_text\("Найти работу или этап","Работа 5 \/ 1080"\)/);
+ assert.match(stress,/ATLAS06_VISUAL_SEARCH_HIDDEN_WORK_PASS/);
+ assert.match(stress,/ATLAS06_VISUAL_SEARCH_STAGE_PASS/);
+ assert.match(stress,/ATLAS06_VISUAL_SEARCH_READONLY_PASS/);
+ assert.match(stress,/found\.click_input\(\)/);
+ assert.match(universal,/ATLAS06_UNIVERSAL_SEARCH_STAGE_PASS/);
+ assert.match(universal,/Открыть этап Подвести итоги/);
+ assert.match(universal,/assert d\.head\(\)==saved,"Opening a searched unused stage changed native Store"/);
+});

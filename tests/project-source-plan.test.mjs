@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {empty,createProject,createStage,createItem,editItem,attach,observe,connect,serialize,deserialize} from "../src/core.mjs";
-import {projectSourcePlanProjection} from "../src/project-organization.mjs";
+import {projectSourcePlanProjection,projectSourcePlanSearch} from "../src/project-organization.mjs";
 
 const SHA="a".repeat(40),OLD="b".repeat(40),TREE="c".repeat(40);
 const read=p=>readFileSync(new URL(p,import.meta.url),"utf8");
@@ -364,4 +364,36 @@ test("Atlas tells hidden known folders apart from incomplete source readings",()
  assert.match(guide,/source\.hiddenKnownFolders>0/);
  assert.match(guide,/source\.observationIncomplete/);
  assert.doesNotMatch(visual,/Другие каталоги могут быть не получены/);
+});
+
+
+test("Quick search finds an unassigned stage in a stage-only project",()=>{
+ const p=createProject(empty(),{name:"Универсальный план",type:"other"});
+ const a=createStage(p.state,p.id,"Подготовка");
+ const b=createStage(a.state,p.id,"Подвести итоги");
+ const before=serialize(b.state),project=b.state.projects[0];
+ const projection=projectSourcePlanProjection(b.state,p.id,{maxUnassignedStages:1});
+ assert.equal(projection.unassignedStages.length,1);
+ assert.equal(projection.hiddenUnassignedStages,1);
+ const found=projectSourcePlanSearch(project,"ПОДВЕСТИ ИТОГИ");
+ assert.equal(found.total,1);
+ assert.equal(found.matches[0].id,b.id);
+ assert.equal(found.matches[0].kind,"stage");
+ assert.equal(serialize(b.state),before);
+});
+test("Diagram search uses existing work and stage editors without changing storage",()=>{
+ const visual=read("../desktop/src/ProjectVisuals.tsx");
+ const guide=read("../desktop/src/ProjectOrganizationGuide.tsx");
+ const css=read("../desktop/src/style.css");
+ assert.match(guide,/ProjectSourcePlanMap projection=\{projection\} project=\{project\}/);
+ assert.match(visual,/projectSourcePlanSearch\(project,searchQuery,\{limit:8\}\)/);
+ assert.match(visual,/aria-label="Найти работу или этап"/);
+ assert.match(visual,/openFound\(hit\)/);
+ assert.match(visual,/if\(hit\.kind==="work"\)onOpenWork\(hit\.id\)/);
+ assert.match(visual,/else onEditStage\(hit\.id\)/);
+ assert.match(visual,/setSearchOpen\(false\);setSearchQuery\(""\)/);
+ assert.match(css,/\.atlas-source-plan-find-panel\{/);
+ assert.match(css,/max-height:min\(450px,58vh\)/);
+ assert.doesNotMatch(visual.slice(visual.indexOf("export function ProjectSourcePlanMap")),
+  /localStorage|createItem\(|mutate\(|fetch\(/);
 });

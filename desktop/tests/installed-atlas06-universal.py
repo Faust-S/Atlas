@@ -100,6 +100,20 @@ def qualify():
     v.capture("universal-project-1024")
     print("ATLAS06_UNIVERSAL_NO_GITHUB_MAP_PASS",flush=True)
 
+    # Search also works in an ordinary project with no GitHub source.
+    v.find_control("Найти",types={"Button"},scroll=False).click_input()
+    d.set_text("Найти работу или этап","Подвести итоги")
+    d.wait_text("Найдено: 1",25)
+    v.capture("universal-search-unused-stage")
+    result=v.find_control("Открыть этап Подвести итоги",types={"Button"},scroll=False)
+    result.click_input()
+    d.window_title_contains("Форма:",25)
+    assert d.head()==saved,"Opening a searched unused stage changed native Store"
+    keyboard.send_keys("{ESC}")
+    v.await_no_form()
+    assert d.head()==saved
+    print("ATLAS06_UNIVERSAL_SEARCH_STAGE_PASS",flush=True)
+
     # Two predecessors in the already saved plan, never inferred by the map.
     detail=v.find_control("Предшествующих работ: 2")
     detail.click_input()

@@ -1,6 +1,7 @@
-import React,{useEffect,useMemo,useState} from 'react';
+import React,{useEffect,useMemo,useRef,useState} from 'react';
 import {dependencyDiagram,ganttViewport,ganttFocusOffset} from './visual-layout.mjs';
 import {portfolioNetwork} from '../../src/portfolio.mjs';
+import {projectSourcePlanSearch} from '../../src/project-organization.mjs';
 
 type CPM={durationDays:number;rows:Array<{id:string;title:string;earlyStart:number;earlyFinish:number;durationDays:number;critical:boolean;state:string;predecessors:string[];blockedBy:string[];floatDays:number}>};
 type Mode='fit'|'30'|'90';
@@ -241,16 +242,30 @@ export function PortfolioNetworkMap({snapshot,onOpenProject}:{
 // A navigable projection of saved GitHub observations and existing Atlas work.
 // The connectors illustrate only confirmed user-created work/stage assignments.
 // No component or dependency is created by opening the diagram.
-export function ProjectSourcePlanMap({projection,onOpenWork,onEditStage,onSuggestFolder,
+export function ProjectSourcePlanMap({projection,project,onOpenWork,onEditStage,onSuggestFolder,
  onOpenTimeline,onOpenGraph,onOpenWorks,onOpenSources,onOpenStages,onCreateStage,onAddDependency,
  expanded,hasMoreLinks,onToggleExpansion}:{
- projection:any;onOpenWork:(id:string)=>void;onEditStage:(id:string)=>void;
+ projection:any;project:any;onOpenWork:(id:string)=>void;onEditStage:(id:string)=>void;
  onSuggestFolder:(sourceId:string,commitSha:string,folder:string)=>void;
  onOpenTimeline:()=>void;onOpenGraph:()=>void;
  onOpenWorks:()=>void;onOpenSources:()=>void;onOpenStages:()=>void;
  onCreateStage:()=>void;onAddDependency:()=>void;
  expanded:boolean;hasMoreLinks:boolean;onToggleExpansion:()=>void;
 }){
+ const [searchOpen,setSearchOpen]=useState(false);
+ const [searchQuery,setSearchQuery]=useState("");
+ const inputRef=useRef<HTMLInputElement|null>(null);
+ const triggerRef=useRef<HTMLButtonElement|null>(null);
+ useEffect(()=>{setSearchOpen(false);setSearchQuery("")},[projection.projectId]);
+ useEffect(()=>{if(searchOpen)inputRef.current?.focus()},[searchOpen]);
+ const found=useMemo(()=>projectSourcePlanSearch(project,searchQuery,{limit:8}),
+  [project,searchQuery]);
+ const closeSearch=()=>{setSearchOpen(false);setSearchQuery("")};
+ const openFound=(hit:any)=>{
+  closeSearch();
+  if(hit.kind==="work")onOpenWork(hit.id);
+  else onEditStage(hit.id);
+ };
  return <div className="atlas-source-plan-map"
   aria-label={projection.sources.length?"Схема каталогов, работ и этапов":
    "Схема работ, этапов и зависимостей"}>
@@ -259,6 +274,39 @@ export function ProjectSourcePlanMap({projection,onOpenWork,onEditStage,onSugges
     "Каталог, работа и этап показаны рядом, если связь уже есть в плане.":
     "Работы, этапы и зависимости показаны по сохранённому плану."}</p></div>
    <div className="button-row">
+    <div className="atlas-source-plan-find">
+     <button type="button" ref={triggerRef} className="action-button"
+      aria-expanded={searchOpen} onClick={()=>setSearchOpen(open=>!open)}>Найти</button>
+     {searchOpen&&<div className="atlas-source-plan-find-panel" role="search"
+      onKeyDown={event=>{
+       if(event.key==="Escape"){
+        event.preventDefault();event.stopPropagation();closeSearch();
+        triggerRef.current?.focus();
+       }
+      }}>
+      <label>Работа или этап
+       <input ref={inputRef} type="search" aria-label="Найти работу или этап"
+        placeholder="Название или фрагмент" value={searchQuery}
+        onChange={event=>setSearchQuery(event.target.value)}/>
+      </label>
+      {searchQuery.trim()?<>
+       <p className="minor" role="status">{found.total?
+        "Найдено: "+found.total:"Совпадений нет"}</p>
+       <div className="atlas-source-plan-find-results">
+        {found.matches.map((hit:any)=><button key={hit.kind+":"+hit.id}
+         type="button" className="atlas-source-plan-find-hit" title={hit.title}
+         aria-label={(hit.kind==="work"?"Открыть работу ":"Открыть этап ")+hit.title}
+         onClick={()=>openFound(hit)}>
+         <small>{hit.kind==="work"?"Работа":"Этап"}</small>
+         <strong>{hit.title}</strong>
+         {hit.kind==="work"&&<small>{hit.stageName}</small>}
+        </button>)}
+       </div>
+       {found.hidden>0&&<p className="minor">
+        Показаны первые {found.matches.length} результатов. Уточните название.</p>}
+      </>:<p className="minor">Поиск по всем работам и этапам проекта.</p>}
+     </div>}
+    </div>
     <button type="button" className="action-button" disabled={!projection.workTotal}
      onClick={onOpenTimeline}>План-график</button>
     <button type="button" className="action-button" disabled={!projection.workTotal}

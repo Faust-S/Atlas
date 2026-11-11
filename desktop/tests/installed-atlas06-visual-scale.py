@@ -201,6 +201,34 @@ def qualify_visual():
     capture("large-project-1024")
     print("ATLAS06_VISUAL_LINKED_SOURCE_FIRST_PASS",flush=True)
 
+    # Find entries in the real saved plan that do not exist in the bounded map.
+    find_control("Найти",types={"Button"},scroll=False).click_input()
+    d.set_text("Найти работу или этап","Работа 5 / 1080")
+    d.wait_text("Найдено: 1",25)
+    capture("search-hidden-work-1024")
+    assert d.head()==saved,"Searching a hidden work changed native Store"
+    found=find_control("Открыть работу Работа 5 / 1080",types={"Button"},scroll=False)
+    found.click_input()
+    d.window_title_contains("Форма:",25)
+    assert d.head()==saved,"Opening a searched work changed native Store"
+    keyboard.send_keys("{ESC}")
+    await_no_form()
+    print("ATLAS06_VISUAL_SEARCH_HIDDEN_WORK_PASS",flush=True)
+
+    find_control("Найти",types={"Button"}).click_input()
+    d.set_text("Найти работу или этап","Этап работ 48")
+    d.wait_text("Найдено: 1",25)
+    capture("search-stage-1024")
+    found=find_control("Открыть этап Этап работ 48",types={"Button"},scroll=False)
+    found.click_input()
+    d.window_title_contains("Форма:",25)
+    assert d.head()==saved,"Opening a searched stage changed native Store"
+    keyboard.send_keys("{ESC}")
+    await_no_form()
+    assert d.head()==saved
+    print("ATLAS06_VISUAL_SEARCH_STAGE_PASS",flush=True)
+    print("ATLAS06_VISUAL_SEARCH_READONLY_PASS",flush=True)
+
     # The expansion button must be near the diagram heading, not after 200 rows.
     find_control("Показать больше связей",types={"Button"},scroll=False).click_input()
     d.wait_text("Свернуть схему",35)

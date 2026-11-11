@@ -46,7 +46,7 @@ export function ProjectOrganizationGuide({snapshot,projectId,onEdit,onRefresh,on
    open={projection.workTotal>0||projection.stageTotal>0||linkedFolderWorks||undefined}>
    <summary>{hasSources?"Схема проекта: каталоги, работы и этапы":
     "Схема проекта: работы и этапы"}</summary>
-   <ProjectSourcePlanMap projection={projection}
+   <ProjectSourcePlanMap projection={projection} project={project}
     expanded={moreLinks} hasMoreLinks={hasMoreLinks}
     onToggleExpansion={()=>setMoreLinks(value=>!value)}
     onOpenWork={id=>onEdit("work:"+id)}

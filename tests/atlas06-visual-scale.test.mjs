@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {serialize} from "../src/core.mjs";
-import {projectSourcePlanProjection} from "../src/project-organization.mjs";
+import {projectSourcePlanProjection,projectSourcePlanSearch} from "../src/project-organization.mjs";
 import {atlas06VisualPortfolio,LONG_FOLDER,LONG_WORK,LONG_STAGE} from "./fixtures/atlas06-visual-portfolio.mjs";
 
 test("Large multi-source diagram highlights the confirmed work rather than the oldest source",()=>{
@@ -44,5 +44,48 @@ test("Larger map remains bounded and preserves long titles, stages and dependenc
  assert.equal(more.sources[0].folders[0].works[0].title,LONG_WORK);
  assert.equal(more.sources[0].folders[0].works[0].predecessorTotal,5);
  assert.equal(more.dependencyTotal,299);
+ assert.equal(serialize(snapshot),before);
+});
+
+
+test("Quick search finds a saved work hidden beyond bounded source folders",()=>{
+ const snapshot=atlas06VisualPortfolio(),project=snapshot.projects[0];
+ const before=serialize(snapshot);
+ const initial=projectSourcePlanProjection(snapshot,project.id,{
+  maxSources:2,maxFoldersPerSource:4,maxWorksPerFolder:3,maxOtherWorks:6
+ });
+ const target="visual-work-5-1079";
+ assert.equal(initial.sources.some(source=>source.folders.some(folder=>
+  folder.works.some(work=>work.id===target))),false);
+ assert.equal(initial.otherWorks.some(work=>work.id===target),false);
+ const found=projectSourcePlanSearch(project,"  РАБОТА   5 / 1080  ");
+ assert.deepEqual(found.matches.map(row=>row.id),[target]);
+ assert.equal(found.matches[0].kind,"work");
+ assert.equal(found.matches[0].stageName,"Этап работ 24");
+ assert.equal(found.total,1);
+ assert.equal(found.hidden,0);
+ assert.equal(serialize(snapshot),before);
+});
+test("Quick search locates a saved stage omitted from the compact map",()=>{
+ const snapshot=atlas06VisualPortfolio(),project=snapshot.projects[0],before=serialize(snapshot);
+ const found=projectSourcePlanSearch(project,"  ЭТАП РАБОТ 48 ");
+ assert.deepEqual(found.matches.map(row=>row.id),["visual-stage-47"]);
+ assert.equal(found.matches[0].kind,"stage");
+ assert.equal(found.total,1);
+ assert.equal(serialize(snapshot),before);
+});
+test("Search stays bounded for common queries and preserves the full long name",()=>{
+ const snapshot=atlas06VisualPortfolio(),project=snapshot.projects[0],before=serialize(snapshot);
+ const many=projectSourcePlanSearch(project,"работа",{limit:8});
+ assert.equal(many.total,1200);
+ assert.equal(many.matches.length,8);
+ assert.equal(many.hidden,1192);
+ const full=projectSourcePlanSearch(project,LONG_WORK);
+ assert.equal(full.total,1);
+ assert.equal(full.matches[0].title,LONG_WORK);
+ assert.deepEqual(projectSourcePlanSearch(project,"  "),{matches:[],total:0,hidden:0});
+ assert.deepEqual(projectSourcePlanSearch(project,"несуществующее название"),
+  {matches:[],total:0,hidden:0});
+ assert.throws(()=>projectSourcePlanSearch(project,"работа",{limit:0}),/предел/);
  assert.equal(serialize(snapshot),before);
 });
