@@ -503,3 +503,15 @@ test("Installed Atlas table reveals dated control-overrun work without saving or
  assert.match(driver,/Показано 200 из 1213 работ по фильтру/);
  assert.match(ui,/overdueWorkFinishes\.size>0\|\|workDeadlineFilter==="overdue"/);
 });
+
+test("Installed Windows opens and corrects an overdue Gantt work without impact-panel state",()=>{
+ const driver=read("../desktop/tests/installed-atlas06-visual-scale.py");
+ const ui=read("../desktop/src/main.tsx");
+ assert.match(driver,/ATLAS06_VISUAL_DIRECT_GANTT_EDIT_REPLANNED_PASS/);
+ assert.match(driver,/ATLAS06_VISUAL_DIRECT_GANTT_EDIT_SAVED_RESTART_PASS/);
+ assert.match(driver,/Recalculating an ordinary Gantt edit silently saved Store/);
+ assert.match(driver,/changed\[0\]\["estimateDays"\]==0/);
+ assert.match(driver,/corrected\["dependencies"\]==final\["dependencies"\]/);
+ assert.match(driver,/d\.saved_project\(corrected_head\)==corrected/);
+ assert.match(ui,/if\(scheduleFieldsChanged\|\|fromImpactList\)/);
+});

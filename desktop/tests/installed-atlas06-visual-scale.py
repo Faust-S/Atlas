@@ -597,6 +597,44 @@ def qualify_visual():
     assert d.saved_project(final_head)==final
     print("ATLAS06_VISUAL_TABLE_WORK_DEADLINE_FILTER_PASS",flush=True)
 
+    # A user can open the overdue work from a regular Gantt view, correct
+    # its duration, see the new schedule, and explicitly save that correction.
+    # This is not an impact-panel follow-up: a cold restart already cleared
+    # the recent-work state before we opened Gantt above.
+    d.click_button("График")
+    late_checkbox=d.window().child_window(
+        title="Только работы позже контрольного срока",control_type="CheckBox")
+    assert late_checkbox.exists(timeout=15) and late_checkbox.is_enabled()
+    late_checkbox.click_input()
+    assert late_checkbox.get_toggle_state()==1
+    late=find_control("Открыть работу Работа 0 / 2",types={"Button"},scroll=False)
+    assert rectangle_in_workspace(late.rectangle(),win32gui.GetWindowRect(d.handle))
+    late.click_input()
+    d.window_title_contains("Форма: Работа: Работа 0 / 2",25)
+    assert d.head()==final_head,"Opening Gantt work for correction changed native Store"
+    d.set_text("Плановая длительность, дней","0")
+    find_control("Применить к черновику",types={"Button"}).click_input()
+    await_no_form()
+    d.wait_text("Работа изменена в черновике.",35)
+    d.wait_text("Изменились расчётные сроки. Затронуто работ: 2.",35)
+    assert d.head()==final_head,"Recalculating an ordinary Gantt edit silently saved Store"
+    print("ATLAS06_VISUAL_DIRECT_GANTT_EDIT_REPLANNED_PASS",flush=True)
+    d.click_button("Сохранить")
+    corrected_head=await_saved(final_head)
+    corrected=d.saved_project(corrected_head)
+    changed=[item for item in corrected["items"] if item!=next(
+        old for old in final["items"] if old["id"]==item["id"])]
+    assert len(changed)==1 and changed[0]["id"]=="visual-work-0-1",changed
+    assert changed[0]["estimateDays"]==0
+    assert corrected["dependencies"]==final["dependencies"]
+    assert corrected["stages"]==final["stages"] and corrected["sources"]==final["sources"]
+    d.stop()
+    d.launch()
+    d.wait_text("Портфель проектов",45)
+    assert d.head()==corrected_head
+    assert d.saved_project(corrected_head)==corrected
+    print("ATLAS06_VISUAL_DIRECT_GANTT_EDIT_SAVED_RESTART_PASS",flush=True)
+
 if __name__=="__main__":
     try:
         qualify_visual()
