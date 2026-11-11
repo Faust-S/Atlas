@@ -129,6 +129,10 @@ def qualify():
     d.click_button("Таблица")
     d.wait_text("Работы проекта",25)
     d.set_text("Найти работу","Открыть площадку")
+    d.wait_text("Не отмечены выполненными: Подготовить помещение, Согласовать программу",25)
+    v.capture("universal-table-work-conditions")
+    assert d.head()==saved,"Reading predecessor hints in table changed native Store"
+    print("ATLAS06_UNIVERSAL_TABLE_DEPENDENCY_HINT_PASS",flush=True)
     work_link=v.find_control("Связи работы Открыть площадку",types={"Button"})
     work_link.click_input()
     d.wait_text("Зависимости работ",25)
@@ -149,6 +153,10 @@ def qualify():
     # Only actual Windows-visible controls are clicked.
     v.find_control("Другие разделы").click_input()
     v.find_control("Доска",types={"Button"}).click_input()
+    d.wait_text("Не отмечены выполненными: Подготовить помещение, Согласовать программу",25)
+    v.capture("universal-board-work-conditions")
+    assert d.head()==saved,"Reading predecessor hints on board changed native Store"
+    print("ATLAS06_UNIVERSAL_BOARD_DEPENDENCY_HINT_PASS",flush=True)
     board_work=v.find_control("Связи работы Открыть площадку",types={"Button"})
     board_work.click_input()
     d.wait_text("Зависимости работ",25)

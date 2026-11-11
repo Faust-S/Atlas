@@ -272,3 +272,18 @@ test("Installed Atlas keeps offline Windows qualification independent of public 
  assert.match(style,/\.board-actions select\{flex:1 1 100%;width:100%;/);
  assert.match(style,/\.board-actions button\{flex:1 1 auto;/);
 });
+
+
+test("Installed source-free project shows recorded predecessor names before opening full graph",()=>{
+ const driver=read("../desktop/tests/installed-atlas06-universal.py");
+ const main=read("../desktop/src/main.tsx");
+ const css=read("../desktop/src/style.css");
+ assert.match(driver,/ATLAS06_UNIVERSAL_TABLE_DEPENDENCY_HINT_PASS/);
+ assert.match(driver,/ATLAS06_UNIVERSAL_BOARD_DEPENDENCY_HINT_PASS/);
+ assert.match(driver,/d\.wait_text\("Не отмечены выполненными: Подготовить помещение, Согласовать программу",25\)/);
+ assert.match(driver,/Reading predecessor hints in table changed native Store/);
+ assert.match(driver,/Reading predecessor hints on board changed native Store/);
+ assert.match(main,/workDependencyOverview\(project,plan\)/);
+ assert.match(main,/WorkDependencyHint info=\{workLinks\.get\(w\.id\)\}/);
+ assert.match(css,/\.atlas-work-dependency-hint\{display:grid/);
+});

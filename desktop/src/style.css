@@ -103,6 +103,11 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .board-card{background:#fff;border:1px solid #dbe6f3;border-radius:10px;padding:12px;margin:8px 0;box-shadow:0 3px 7px #7b91ab1b}
 .board-card strong{font-size:12px;display:block;line-height:1.5;color:#283c55}
 .board-card small{display:block;font-size:10px;color:#7086a2;margin-top:6px}
+.atlas-work-dependency-hint{display:grid;gap:3px;min-width:0;max-width:100%;margin-top:6px;
+ font-size:11px;line-height:1.4;color:#486581}
+.atlas-work-dependency-hint span{display:block;min-width:0;overflow-wrap:anywhere}
+.atlas-work-dependency-pending{color:#765325}
+.board-card .atlas-work-dependency-hint{margin:8px 0 0;font-size:11px}
 .board-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;min-width:0}
 .board-actions select{flex:1 1 100%;width:100%;min-width:0;max-width:100%;font-size:11px;padding:6px 4px}
 .board-actions button{flex:1 1 auto;min-width:0;border:0;background:#e9f2fc;color:#235b98;border-radius:6px;padding:7px 6px;font-size:11px}

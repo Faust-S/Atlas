@@ -9,7 +9,7 @@ import {projectImpact,projectNextStep} from "../../src/impact.mjs";
 import {buildPortfolioCommand,filterPortfolioCommand} from "../../src/portfolio-command.mjs";
 import {realityOverview,workObservationIndex} from "../../src/reality-overview.mjs";
 import {responseState} from "../../src/response.mjs";
-import {scheduleProject} from "../../src/planning.mjs";
+import {scheduleProject,workDependencyOverview} from "../../src/planning.mjs";
 import {portfolioSchedule,projectedFinishLabel} from "../../src/portfolio-schedule.mjs";
 import {portfolioResources} from "../../src/portfolio-resources.mjs";
 import {planReviewQueue,planReviewAction,planProposalAction} from "../../src/plan-review.mjs";
@@ -107,6 +107,19 @@ function Metric({value,label,note}:{value:number|string;label:string;note?:strin
  return <div className="metric"><small>{label}</small><strong>{value}</strong>{note&&<small>{note}</small>}</div>;
 }
 function Fallback({message}:{message:string}){return <div className="empty">{message}</div>}
+type WorkLinkPreview={predecessorTotal:number;pendingTotal:number;pendingTitles:string[];successorTotal:number};
+function WorkDependencyHint({info}:{info?:WorkLinkPreview|null}){
+ if(!info||(!info.predecessorTotal&&!info.successorTotal))return null;
+ const more=info.pendingTotal-info.pendingTitles.length;
+ return <div className="atlas-work-dependency-hint" role="note">
+  {info.pendingTotal>0?
+   <span className="atlas-work-dependency-pending">
+    Не отмечены выполненными: {info.pendingTitles.join(", ")}{more>0?" и ещё "+more:""}
+   </span>:
+   info.predecessorTotal>0?<span>Предшествующие отмечены выполненными: {info.predecessorTotal}</span>:null}
+  {info.successorTotal>0&&<span>От этой работы зависят: {info.successorTotal}</span>}
+ </div>;
+}
 function EditorPanel({editor,onSubmit,onCancel,onDirtyChange,busy}:{
  editor:Editor;onSubmit:(event:React.FormEvent<HTMLFormElement>)=>void;
  onCancel:()=>void;onDirtyChange:(changed:boolean)=>void;busy:boolean
@@ -260,6 +273,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const history=useMemo(()=>project?projectHistoryRows(project,{kind:historyType,query:historyQuery}):[],
   [project,historyType,historyQuery]);
  const plan=useMemo(()=>project?scheduleProject(project):null,[project]);
+ const workLinks=useMemo(()=>project&&plan?workDependencyOverview(project,plan):new Map(),[project,plan]);
  const reality=useMemo(()=>project?compareProject(project):null,[project]);
  // This lookup is invalidated by an actual domain snapshot change, not by
  // every typed character, search filter, inspector toggle or tab switch.
@@ -1452,6 +1466,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      <div className="table-scroll atlas-work-table-scroll"><table className="atlas-work-table" aria-label="Работы проекта"><thead><tr><th>Работа</th><th>Состояние</th><th>Длительность</th><th>Ответственный</th><th>Срок</th><th>Изменить</th></tr></thead>
       <tbody>{filteredWork.slice(0,workLimit).map((w:any)=><tr key={w.id}>
        <td data-label="Работа"><strong>{w.title}</strong><small>{project.stages.find((s:any)=>s.id===w.stageId)?.name||"Без этапа"}</small>
+        <WorkDependencyHint info={workLinks.get(w.id)}/>
         {workFolderUrl(project,w)&&<small>Каталог: <a className="text-link"
          href={workFolderUrl(project,w)!} target="_blank" rel="noopener noreferrer">
          {w.sourcePath}</a></small>}
@@ -1518,6 +1533,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     {tab==="board"&&<div className="board">
      {Object.entries(workStatuses).map(([key,title])=><section className="board-column" key={key}><h3>{String(title)} <small>{project.items.filter((w:any)=>w.state===key).length}</small></h3>
       {project.items.filter((w:any)=>w.state===key).slice(0,boardLimits[key]||60).map((w:any)=><div className="board-card" key={w.id}><strong>{w.title}</strong><small>{w.assignee||"Нет ответственного"} · {w.estimateDays??1} дн.</small>
+        <WorkDependencyHint info={workLinks.get(w.id)}/>
        <div className="board-actions"><select aria-label={"Состояние "+w.title} value={w.state} onChange={e=>quickWork(w.id,e.target.value)}>
         {Object.entries(workStatuses).map(([v,title])=><option key={v} value={v}>{String(title)}</option>)}</select>
         <button onClick={()=>openEditor("work:"+w.id)}>Детали</button>

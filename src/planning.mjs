@@ -74,3 +74,34 @@ export function scheduleProject(p) {
   return {durationDays,estimatedFinish:daysFrom(start,durationDays),rows,criticalIds:rows.filter(r=>r.critical).map(r=>r.id),
     workItems:rows.length,warning:'Calendar-day CPM estimate; not resource-leveled, not execution authority, not release acceptance'};
 }
+
+
+/**
+ * Read-only preview of recorded work dependencies.
+ * Reuses the existing schedule's direct predecessors and blockedBy IDs,
+ * without computing a second graph or inferring accepted results.
+ * A "done" state is a user claim, not independent verification.
+ */
+export function workDependencyOverview(project,plan,{maxNames=2}={}){
+ if(!project||!Array.isArray(project.items)||!Array.isArray(project.dependencies)||
+    !plan||!Array.isArray(plan.rows))throw Error("Invalid work dependency projection");
+ if(!Number.isInteger(maxNames)||maxNames<1||maxNames>5)
+  throw Error("Invalid work dependency preview limit");
+ const byId=new Map(project.items.map(work=>[work.id,work]));
+ const hints=new Map(project.items.map(work=>[work.id,{
+  predecessorTotal:0,pendingTotal:0,pendingTitles:[],successorTotal:0
+ }]));
+ for(const row of plan.rows){
+  const entry=hints.get(row.id);
+  if(!entry)continue;
+  entry.predecessorTotal=row.predecessors.length;
+  entry.pendingTotal=row.blockedBy.length;
+  entry.pendingTitles=row.blockedBy.slice(0,maxNames)
+   .map(id=>byId.get(id)?.title).filter(Boolean);
+ }
+ for(const edge of project.dependencies){
+  const entry=hints.get(edge.from);
+  if(entry&&hints.has(edge.to))entry.successorTotal++;
+ }
+ return hints;
+}
