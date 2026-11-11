@@ -39,6 +39,9 @@ test("Native GUI test requires a read-only public discovery and explicit native 
  assert.match(installed,/ATLAS06_CONNECT_LIVE_ROOT_REFRESH_SAVE_PASS/);
  assert.match(installed,/ATLAS06_CONNECT_LIVE_ROOT_REFRESH_RESTART_PASS/);
  assert.match(installed,/ATLAS06_USER_APPROVED_SOURCE_WORK_NATIVE_SAVE_PASS/);
+ assert.match(installed,/ATLAS06_SOURCE_WORK_STAGE_ONE_FORM_PASS/);
+ assert.match(installed,/set_text\("Новый этап \(необязательно\)","Проверка исходников"\)/);
+ assert.match(installed,/task\["stageId"\]==project\["stages"\]\[0\]\["id"\]/);
  assert.match(installed,/ATLAS06_USER_APPROVED_SOURCE_WORK_RESTART_PASS/);
  assert.match(installed,/ATLAS06_WORK_FOLDER_LINK_VISIBLE_PASS/);
  assert.match(installed,/ATLAS06_SOURCE_PLAN_MAP_TO_GANTT_PASS/);
