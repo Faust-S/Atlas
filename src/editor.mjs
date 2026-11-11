@@ -183,12 +183,14 @@ export function editorSpec(project,action,snapshot=null){
   if(folder)return {
    title:"Работа по каталогу: "+folder.folder,
    hint:"Каталог «"+folder.folder+"» найден в "+folder.repository+
-    ". Уточните задачу. Этап и ответственного можно выбрать после добавления работы.",
+    ". Назовите работу и при необходимости выберите существующий этап или создайте новый.",
    fields:[
     field("title","Что нужно сделать?","text","Уточнить назначение каталога "+folder.folder),
     ...((project.targets||[]).length?[
      choice("targetId","Связать с ожидаемым результатом",optionalTargets(project),"",false)
     ]:[]),
+    ...(project.stages.length?[choice("stageId","Этап",stageOptions(project),"",false)]:[]),
+    field("newStageName","Новый этап (необязательно)","text","",false),
     field("estimateDays","Оценка длительности, календарных дней","number","1")
    ]
   };
@@ -381,7 +383,15 @@ export function applyEditor(snapshot,projectId,action,input){
  if(action==="item"||action.startsWith("item-target:")||action.startsWith("folder-work:")){
   const origin=action.startsWith("folder-work:")?
    selectedSourceFolder(snapshot,projectId,action):null;
-  const r=createItem(snapshot,projectId,{title:get("title"),stageId:get("stageId"),
+  // Creating a stage and its first linked work is one confirmed draft edit.
+  let workState=snapshot,stageId=get("stageId");
+  const newStage=origin?get("newStageName"):"";
+  if(newStage){
+   if(stageId)throw Error("Выберите существующий этап или укажите новый.");
+   const created=createStage(snapshot,projectId,newStage);
+   workState=created.state;stageId=created.id;
+  }
+  const r=createItem(workState,projectId,{title:get("title"),stageId,
    assignee:get("assignee"),targetIds:get("targetId")?[get("targetId")]:[],
    resourceId:get("resourceId"),allocationPct:percentage("allocationPct")});
   return {state:editItem(r.state,projectId,r.id,{
