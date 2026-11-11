@@ -77,9 +77,10 @@ test("Quick search locates a saved stage omitted from the compact map",()=>{
 test("Search stays bounded for common queries and preserves the full long name",()=>{
  const snapshot=atlas06VisualPortfolio(),project=snapshot.projects[0],before=serialize(snapshot);
  const many=projectSourcePlanSearch(project,"работа",{limit:8});
- assert.equal(many.total,1200);
+ // One synthetic work has the distinct title LONG_WORK, not "Работа".
+ assert.equal(many.total,1199);
  assert.equal(many.matches.length,8);
- assert.equal(many.hidden,1192);
+ assert.equal(many.hidden,1191);
  const full=projectSourcePlanSearch(project,LONG_WORK);
  assert.equal(full.total,1);
  assert.equal(full.matches[0].title,LONG_WORK);
