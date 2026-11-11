@@ -435,6 +435,8 @@ test("Installed Windows verifies a delayed existing work and opens its editor di
  const stress=read("../desktop/tests/installed-atlas06-visual-scale.py");
  assert.match(stress,/ATLAS06_VISUAL_EXISTING_WORK_SHIFT_EXPLAINED_PASS/);
  assert.match(stress,/ATLAS06_VISUAL_AFFECTED_WORK_DIRECT_EDITOR_PASS/);
+ assert.match(stress,/ATLAS06_VISUAL_AFFECTED_WORK_ACTION_VISIBLE_PASS/);
+ assert.match(stress,/find_control\("Изменить затронутую работу Работа 0 \/ 2",[\s\S]*?scroll=False\)/);
  assert.match(stress,/ATLAS06_VISUAL_AFFECTED_WORK_LINK_RESTART_PASS/);
  assert.match(stress,/find_control\("Изменить затронутую работу Работа 0 \/ 2"/);
  assert.match(stress,/d\.wait_text\("Изменились расчётные сроки\. Затронуто работ: 2\.",35\)/);

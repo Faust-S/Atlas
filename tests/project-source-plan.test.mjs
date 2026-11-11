@@ -692,7 +692,8 @@ test("A newly created work is revealed by its saved identity, with its stage and
  assert.match(editor,/workId:r\.id/);
  assert.match(main,/if\(result\.workId\)\{/);
  assert.match(main,/setRecentWorkId\(result\.workId\)/);
- assert.match(main,/revealWorkInTable\(result\.workId\)/);
+ assert.match(main,/revealWorkInTable\(result\.workId,!isDependencyChange\)/);
+ assert.match(main,/const isDependencyChange=editor\.action\.startsWith\("dep-to:"\)/);
  assert.match(main,/setWorkReturnId\(id\)/);
  assert.match(main,/setWorkFilter\("all"\);setWorkTargetFilter\("all"\);setWorkObservationFilter\("all"\)/);
  assert.match(main,/setWorkDependencyFilter\("all"\);setWorkQuery\(""\);setWorkSort\("title"\);setWorkLimit\(200\)/);
@@ -744,4 +745,18 @@ test("An existing-work dependency explains CPM effects without writing data",()=
  const to=plan.indexOf("export function workDependencyOverview(");
  assert.ok(from>0&&to>from);
  assert.doesNotMatch(plan.slice(from,to),/commitWithReadback\(|localStorage|connect\(snapshot/);
+});
+
+test("Changing an existing dependency keeps its impact summary on screen",()=>{
+ const ui=read("../desktop/src/main.tsx");
+ const helper=ui.slice(ui.indexOf("const revealWorkInTable="),
+  ui.indexOf("const submit=",ui.indexOf("const revealWorkInTable=")));
+ assert.match(helper,/const revealWorkInTable=\(id:string,focusRow=true\)=>/);
+ assert.match(helper,/resetWorkspaceScroll\(\);setTab\("work"\)/);
+ assert.match(helper,/setWorkReturnId\(focusRow\?id:null\)/);
+ assert.match(ui,/const isDependencyChange=editor\.action\.startsWith\("dep-to:"\)/);
+ assert.match(ui,/revealWorkInTable\(result\.workId,!isDependencyChange\)/);
+ assert.match(ui,/onClick=\{\(\)=>openEditor\("work:"\+item\.id\)\}/);
+ assert.match(ui,/onClick=\{\(\)=>revealWorkInTable\(recentWork\.id\)\}/);
+ assert.doesNotMatch(helper,/mutate\(|commitWithReadback\(|nativeInvoke\(|localStorage/);
 });

@@ -587,13 +587,15 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   editorDirtyRef.current=false;setEditor(null);
   if(embedded||window.innerWidth<=1220)setInspector(false);
  };
- const revealWorkInTable=(id:string)=>{
-  // Keep the original ID-based jump: it can reveal rows beyond the preview limit.
+ const revealWorkInTable=(id:string,focusRow=true)=>{
+  // New work: reveal its exact row, including entries beyond the preview limit.
+  // Dependency change: keep the consequence summary at the top until the user
+  // chooses which affected work to open. No automatic scroll past the summary.
   resetWorkspaceScroll();setTab("work");setSourceJump(null);setGraphJump(null);
   setMapSearchReturn(null);
   setWorkFilter("all");setWorkTargetFilter("all");setWorkObservationFilter("all");
   setWorkDependencyFilter("all");setWorkQuery("");setWorkSort("title");setWorkLimit(200);
-  setWorkReturnId(id);
+  setWorkReturnId(focusRow?id:null);
  };
  const submit=(event:React.FormEvent<HTMLFormElement>)=>{
   event.preventDefault();
@@ -611,9 +613,10 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     const change=plan&&updatedProject?scheduleChangeSummary(plan,scheduleProject(updatedProject)):null;
     setRecentPlanBefore({workId:result.workId,revision:result.state.revision,
      days:plan?.durationDays??0,change});
-    setRecentWorkKind(editor.action.startsWith("dep-to:")?"dependency":"created");
+    const isDependencyChange=editor.action.startsWith("dep-to:");
+    setRecentWorkKind(isDependencyChange?"dependency":"created");
     setRecentWorkId(result.workId);
-    revealWorkInTable(result.workId);
+    revealWorkInTable(result.workId,!isDependencyChange);
    }
    editorDirtyRef.current=false;setEditor(null);
    if(embedded||window.innerWidth<=1220)setInspector(false);

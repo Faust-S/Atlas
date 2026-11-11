@@ -507,7 +507,11 @@ def qualify_visual():
     d.wait_text("Расчётное окончание: было",35)
     print("ATLAS06_VISUAL_EXISTING_WORK_SHIFT_EXPLAINED_PASS",flush=True)
     edit=find_control("Изменить затронутую работу Работа 0 / 2",
-                      types={"Button"})
+                      types={"Button"},scroll=False)
+    assert rectangle_in_workspace(edit.rectangle(),win32gui.GetWindowRect(d.handle)),(
+        "The affected-work action should be visible without scrolling")
+    capture("schedule-impact-direct-action-visible")
+    print("ATLAS06_VISUAL_AFFECTED_WORK_ACTION_VISIBLE_PASS",flush=True)
     edit.click_input()
     d.window_title_contains("Форма: Работа: Работа 0 / 2",25)
     assert d.head()==linked_head,"Opening affected work editor modified storage"
