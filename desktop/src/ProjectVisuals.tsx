@@ -323,7 +323,7 @@ export function ProjectSourcePlanMap({projection,project,onOpenWork,onEditStage,
            <small>Этап</small>
            <button type="button" className="text-link"
             aria-label={"Открыть этап работы "+detail.stage.title}
-            onClick={()=>openFound({kind:"stage",id:detail.stage.id})}>
+            onClick={()=>{if(detail.stage)openFound({kind:"stage",id:detail.stage.id})}}>
             {detail.stage.title}</button>
           </div>}
           {detail.source&&<div className="atlas-source-plan-find-relation">
