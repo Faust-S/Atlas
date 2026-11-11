@@ -215,7 +215,7 @@ def qualify_visual():
     find_control("Показать каталог в Atlas",types={"Button"},scroll=False).click_input()
     d.wait_text("Источники проекта",25)
     d.wait_text("Связь работы с каталогом",25)
-    d.wait_text("Каталог найден при последней сверке редакции исходников.",25)
+    d.wait_text("Каталог указан в сохранённой структуре исходников.",25)
     d.wait_text("directory-23",25)
     close=find_control("Закрыть связь",types={"Button"},scroll=False)
     assert rectangle_in_workspace(close.rectangle(),win32gui.GetWindowRect(d.handle))

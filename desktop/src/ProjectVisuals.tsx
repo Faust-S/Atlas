@@ -354,7 +354,7 @@ export function ProjectSourcePlanMap({projection,project,onOpenWork,onEditStage,
            <small>{detail.source.status==="missing"?
             "Источник больше не подключён":detail.source.status==="unavailable"?
             "Сведения об источнике сейчас недоступны":
-            detail.source.revisionCurrent?"Редакция исходников совпадает":
+            detail.source.revisionCurrent?"Сохранённые редакции совпадают":
             "Работа связана с прежней редакцией исходников"}</small>
            <div className="atlas-source-plan-find-links">
             <button type="button" className="text-link"

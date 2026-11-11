@@ -467,7 +467,7 @@ test("Historical source and unavailable folder keep their provenance separate",(
  assert.match(main,/linkedSource\.revisionCurrent/);
  assert.match(main,/Работа связана с прежней редакцией исходников/);
  assert.match(main,/Источник больше не подключён/);
- assert.match(main,/Каталог найден при последней сверке редакции исходников/);
+ assert.match(main,/Каталог указан в сохранённой структуре исходников/);
  assert.doesNotMatch(main,/Каталог найден в текущем репозитории/);
 });
 
@@ -485,4 +485,16 @@ test("Source folder inspection can open the same work and return to the map",()=
  assert.doesNotMatch(source,/mutate\(|commitWithReadback|createItem\(/);
  const lost=main.slice(main.indexOf('role="status">\n      <strong>Источник больше не подключён'));
  assert.match(lost,/onClick=\{\(\)=>openEditor\("work:"\+sourceJumpContext\.id\)\}/);
+});
+
+
+test("Source labels distinguish saved structure from a fresh GitHub check",()=>{
+ const main=read("../desktop/src/main.tsx");
+ const visual=read("../desktop/src/ProjectVisuals.tsx");
+ const driver=read("../desktop/tests/installed-atlas06-visual-scale.py");
+ assert.match(main,/Каталог указан в сохранённой структуре исходников/);
+ assert.match(visual,/Сохранённые редакции совпадают/);
+ assert.doesNotMatch(main,/Каталог найден при последней сверке редакции исходников/);
+ assert.doesNotMatch(visual,/Редакция исходников совпадает/);
+ assert.match(driver,/d\.wait_text\("Каталог указан в сохранённой структуре исходников\.",25\)/);
 });

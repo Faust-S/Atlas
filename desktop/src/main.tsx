@@ -1621,7 +1621,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
         {linkedSource.folder?<p>Каталог: <span title={linkedSource.folder}>{linkedSource.folder}</span></p>:
          <p>Каталог для этой работы не указан.</p>}
         <small>{linkedSource.url?
-         "Каталог найден при последней сверке редакции исходников.":
+         "Каталог указан в сохранённой структуре исходников.":
          linkedSource.status==="stale"?
          "Сведения о ветке устарели. Обновите источник перед сравнением.":
          linkedSource.status==="unavailable"?
