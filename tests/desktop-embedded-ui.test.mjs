@@ -244,3 +244,26 @@ test("filter shows the selected row count next to controls even when zero",()=>{
  assert.match(main,/Показано \{Math\.min\(filteredWork\.length,workLimit\)\} из \{filteredWork\.length\} работ по фильтру\./);
  assert.match(css,/\.atlas-work-filter-count\{display:inline;font-weight:700/);
 });
+
+
+test("Project overview opens pending recorded work without retaining hidden table filters",()=>{
+ assert.match(main,/const pendingWorkCount=useMemo\(\(\)=>Array\.from\(workLinks\.values\(\)\)/);
+ assert.match(main,/\.filter\(\(entry:any\)=>entry\.pendingTotal>0\)\.length,\[workLinks\]\)/);
+ assert.match(main,/pendingWorkCount>0&&<p className="minor atlas-pending-work-entry"/);
+ assert.match(main,/aria-label="Работы с незавершёнными предшественниками"/);
+ assert.match(main,/aria-label="Показать работы с незавершёнными предшественниками"/);
+ assert.match(main,/onClick=\{showPendingWorks\}>Показать работы/);
+ const from=main.indexOf("const showPendingWorks=()=>");
+ const to=main.indexOf("const openLinkedSource=",from);
+ assert.ok(from>0&&to>from);
+ const handler=main.slice(from,to);
+ assert.match(handler,/if\(!project\|\|!requireClosedForm\(\)\)return/);
+ assert.match(handler,/view\("work"\)/);
+ assert.match(handler,/setWorkFilter\("all"\)/);
+ assert.match(handler,/setWorkTargetFilter\("all"\)/);
+ assert.match(handler,/setWorkObservationFilter\("all"\)/);
+ assert.match(handler,/setWorkQuery\(""\)/);
+ assert.match(handler,/setWorkDependencyFilter\("has_pending"\)/);
+ assert.match(handler,/setWorkLimit\(200\)/);
+ assert.doesNotMatch(handler,/mutate\(|commitWithReadback\(|localStorage|createItem\(/);
+});

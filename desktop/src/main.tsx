@@ -283,6 +283,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   [project,historyType,historyQuery]);
  const plan=useMemo(()=>project?scheduleProject(project):null,[project]);
  const workLinks=useMemo(()=>project&&plan?workDependencyOverview(project,plan):new Map(),[project,plan]);
+ const pendingWorkCount=useMemo(()=>Array.from(workLinks.values())
+  .filter((entry:any)=>entry.pendingTotal>0).length,[workLinks]);
  const reality=useMemo(()=>project?compareProject(project):null,[project]);
  // This lookup is invalidated by an actual domain snapshot change, not by
  // every typed character, search filter, inspector toggle or tab switch.
@@ -881,6 +883,14 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   if(tabId!=="graph")setGraphJump(null);
   setTab(tabId);setEditor(null);setForecastId(null);
  };
+ const showPendingWorks=()=>{
+  if(!project||!requireClosedForm())return;
+  // Open all waiting work, not the user's last table search.
+  // Navigation remains read-only and reuses the established filter.
+  view("work");
+  setWorkFilter("all");setWorkTargetFilter("all");setWorkObservationFilter("all");
+  setWorkQuery("");setWorkDependencyFilter("has_pending");setWorkLimit(200);
+ };
  const openLinkedSource=(workId:string,query:string)=>{
   if(!project||!requireClosedForm())return;
   view("sources");
@@ -1264,6 +1274,13 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       busy={busy}/>}
      <div className="metric-grid"><Metric value={project.targets?.length||0} label="Ожидаемых результатов"/><Metric value={impact?.attention??0} label="Требуют внимания"/>
       <Metric value={project.items.length} label="Работ"/><Metric value={projected?.deadlineSlipDays??"?"} label="Дней риска срока"/></div>
+     {pendingWorkCount>0&&<p className="minor atlas-pending-work-entry" role="group"
+      aria-label="Работы с незавершёнными предшественниками">
+      Работ с незавершёнными предшественниками: {pendingWorkCount}.{" "}
+      <button type="button" className="text-link"
+       aria-label="Показать работы с незавершёнными предшественниками"
+       onClick={showPendingWorks}>Показать работы</button>
+     </p>}
      {nextStep&&<section className="surface atlas-next-step" aria-label="Следующий шаг проекта">
       <div className="section-heading"><div><small>Подсказка по текущему плану</small>
        <h2>{nextStep.title}</h2><p>{nextStep.note}</p></div>

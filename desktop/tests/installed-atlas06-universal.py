@@ -219,6 +219,26 @@ def qualify():
     v.find_control("Обзор",types={"Button"}).click_input()
     d.wait_text("Схема проекта: работы и этапы",25)
 
+    # The overview entry is a direct route to all work with unfinished
+    # predecessors. A previous table search must not silently hide them.
+    v.find_control("Таблица",types={"Button"}).click_input()
+    d.set_text("Найти работу","Подготовить помещение")
+    d.wait_text("Показано 1 из 1 работ по фильтру",25)
+    v.find_control("Обзор",types={"Button"}).click_input()
+    d.wait_text("Работ с незавершёнными предшественниками:",25)
+    jump=v.find_control("Показать работы с незавершёнными предшественниками",types={"Button"})
+    jump.click_input()
+    d.wait_text("Работы проекта",25)
+    d.wait_text("Показано 1 из 1 работ по фильтру",25)
+    target=v.find_control("Связи работы Открыть площадку",types={"Button"})
+    assert v.rectangle_in_workspace(target.rectangle(),win32gui.GetWindowRect(d.handle)), (
+        "The overview did not reveal waiting work inside the Windows viewport")
+    v.capture("universal-overview-to-waiting-work")
+    assert d.head()==saved,"Opening waiting works from overview changed native Store"
+    print("ATLAS06_UNIVERSAL_OVERVIEW_PENDING_JUMP_PASS",flush=True)
+    v.find_control("Обзор",types={"Button"}).click_input()
+    d.wait_text("Схема проекта: работы и этапы",25)
+
     # Two predecessors in the already saved plan, never inferred by the map.
     detail=v.find_control("Предшествующих работ: 2")
     detail.click_input()

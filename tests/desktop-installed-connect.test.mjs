@@ -330,3 +330,15 @@ test("Installed Atlas filters source-free project work by recorded predecessor s
  assert.match(driver,/Filtering by outstanding dependencies changed native Store/);
  assert.match(driver,/Changing dependency filter changed native Store/);
 });
+
+
+test("Installed source-free Atlas opens all waiting work from overview despite stale table search",()=>{
+ const ui=read("../desktop/src/main.tsx");
+ const driver=read("../desktop/tests/installed-atlas06-universal.py");
+ assert.match(ui,/onClick=\{showPendingWorks\}>Показать работы/);
+ assert.match(driver,/d\.set_text\("Найти работу","Подготовить помещение"\)/);
+ assert.match(driver,/v\.find_control\("Показать работы с незавершёнными предшественниками",types=\{"Button"\}\)/);
+ assert.match(driver,/ATLAS06_UNIVERSAL_OVERVIEW_PENDING_JUMP_PASS/);
+ assert.match(driver,/The overview did not reveal waiting work inside the Windows viewport/);
+ assert.match(driver,/Opening waiting works from overview changed native Store/);
+});
