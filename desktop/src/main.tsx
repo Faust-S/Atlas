@@ -245,8 +245,12 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const [mapSearchReturn,setMapSearchReturn]=useState<{workId:string;query:string}|null>(null);
  const [graphJump,setGraphJump]=useState<{projectId:string;workId:string;query:string;origin:"overview"|"work"|"board"}|null>(null);
  const [workReturnId,setWorkReturnId]=useState<string|null>(null);
+ const [recentWorkId,setRecentWorkId]=useState<string|null>(null);
  const [recheckLimit,setRecheckLimit]=useState(25);
  const project=data.projects.find((p:any)=>p.id===active)||null;
+ const recentWork=recentWorkId?project?.items.find((item:any)=>item.id===recentWorkId):null;
+ const recentStage=recentWork?.stageId?
+  project?.stages.find((stage:any)=>stage.id===recentWork.stageId):null;
  const sourceJumpContext=useMemo(()=>sourceJump&&project&&
   sourceJump.projectId===project.id?
    projectSourcePlanWorkContext(project,sourceJump.workId):null,[project,sourceJump]);
@@ -516,6 +520,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   host?.onSelection?.({projectId:id,workId:null,revision:String(latestSnapshot.current.revision)});
   setActive(id);setTab("overview");setEditor(null);setForecastId(null);setConnectOpen(false);
   setSourceJump(null);setMapSearchReturn(null);setGraphJump(null);setWorkReturnId(null);
+  setRecentWorkId(null);
   setShowProjectRelations(false);setRelationLimit(12);setRequirementJump(null);setChangeJump(null);
   if(!afterSubmit)setMessage("");
   setWorkDependencyFilter("all");setWorkFilter("all");setWorkTargetFilter("all");setWorkObservationFilter("all");setWorkHistoryLimits({});setWorkQuery("");setWorkSort("title");setWorkLimit(200);setRealityLimit(8);
@@ -571,6 +576,14 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   editorDirtyRef.current=false;setEditor(null);
   if(embedded||window.innerWidth<=1220)setInspector(false);
  };
+ const revealWorkInTable=(id:string)=>{
+  // Keep the original ID-based jump: it can reveal rows beyond the preview limit.
+  resetWorkspaceScroll();setTab("work");setSourceJump(null);setGraphJump(null);
+  setMapSearchReturn(null);
+  setWorkFilter("all");setWorkTargetFilter("all");setWorkObservationFilter("all");
+  setWorkDependencyFilter("all");setWorkQuery("");setWorkSort("title");setWorkLimit(200);
+  setWorkReturnId(id);
+ };
  const submit=(event:React.FormEvent<HTMLFormElement>)=>{
   event.preventDefault();
   if(!editor||busy)return;
@@ -582,6 +595,10 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    const result=applyEditor(data,formProject,editor.action,form);
    mutate(result.state,"Изменение внесено в черновик. Для записи на диск нажмите «Сохранить».");
    if(result.projectId)selectProject(result.projectId,true);
+   if(result.workId){
+    setRecentWorkId(result.workId);
+    revealWorkInTable(result.workId);
+   }
    editorDirtyRef.current=false;setEditor(null);
    if(embedded||window.innerWidth<=1220)setInspector(false);
   }catch(e){issue(e)}
@@ -880,6 +897,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    graphJump.projectId===project?.id?
    {workId:graphJump.workId,query:graphJump.query}:null);
   setSourceJump(null);
+  if(tabId!=="work")setRecentWorkId(null);
   if(tabId!=="graph")setGraphJump(null);
   setTab(tabId);setEditor(null);setForecastId(null);
  };
@@ -1456,7 +1474,18 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     {tab==="work"&&<section className="surface atlas-work-surface">
      <div className="section-heading"><div><h2>Работы проекта</h2><p>Изменения отражаются в доске, графике и зависимостях.</p></div>
       <div className="button-row"><Action onClick={()=>openEditor("item")} primary title="Ctrl+Shift+N">＋ Работа</Action><Action onClick={()=>openEditor("stage")}>＋ Этап</Action><Action onClick={()=>openEditor("dep")} title="Ctrl+Shift+L">Связь работ</Action></div></div>
-     <div className="filter-row"><label>Требование <select aria-label="Фильтр работ по требованию"
+     {recentWork&&<div className="atlas-work-created" aria-label="Только что добавленная работа">
+       <div><strong>{recentWork.title}</strong>
+        <p role="status">{dirty?"Работа внесена в черновик. Сохраните изменения.":"Работа сохранена."}
+         {" "}{recentStage?"Этап: "+recentStage.name+".":"Этап пока не выбран."}</p></div>
+       <div className="button-row">
+        <Action onClick={()=>revealWorkInTable(recentWork.id)}>К работе</Action>
+        {recentStage&&<Action onClick={()=>openEditor("stage-edit:"+recentStage.id)}>Открыть этап</Action>}
+        <Action onClick={()=>{view("overview");setMapSearchReturn({workId:recentWork.id,query:""})}}>
+         Схема проекта</Action>
+       </div>
+      </div>}
+      <div className="filter-row"><label>Требование <select aria-label="Фильтр работ по требованию"
       value={workTargetFilter} onChange={e=>{setWorkTargetFilter(e.target.value);setWorkLimit(200)}}>
       <option value="all">Все требования</option>
       {(project.targets||[]).map((t:any)=><option key={t.id} value={t.id}>{t.title}</option>)}
@@ -1491,8 +1520,19 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       Это поиск заявленных фактов, не независимая приёмка.
      </p>
      <div className="table-scroll atlas-work-table-scroll"><table className="atlas-work-table" aria-label="Работы проекта"><thead><tr><th>Работа</th><th>Состояние</th><th>Длительность</th><th>Ответственный</th><th>Срок</th><th>Изменить</th></tr></thead>
-      <tbody>{filteredWork.slice(0,workLimit).map((w:any)=><tr key={w.id}>
-       <td data-label="Работа"><strong>{w.title}</strong><small>{project.stages.find((s:any)=>s.id===w.stageId)?.name||"Без этапа"}</small>
+      <tbody>{filteredWork.slice(0,workLimit).map((w:any)=><tr key={w.id}
+        className={recentWorkId===w.id?"atlas-recent-work":undefined}>
+       <td data-label="Работа">
+        <button type="button" className="text-link atlas-work-row-title" title={w.title}
+         aria-label={"Открыть работу "+w.title}
+         ref={workReturnId===w.id?workReturnRef:undefined}
+         onClick={()=>openEditor("work:"+w.id)}>{w.title}</button>
+        {w.stageId&&project.stages.some((stage:any)=>stage.id===w.stageId)?
+         <button type="button" className="text-link atlas-work-stage-link"
+          aria-label={"Открыть этап "+project.stages.find((stage:any)=>stage.id===w.stageId)!.name+" для работы "+w.title}
+          onClick={()=>openEditor("stage-edit:"+w.stageId)}>
+          {project.stages.find((stage:any)=>stage.id===w.stageId)!.name}</button>:
+         <small>Без этапа</small>}
         <WorkDependencyHint info={workLinks.get(w.id)} onOpenWork={id=>openEditor("work:"+id)}/>
         {workFolderUrl(project,w)&&<small>Каталог: <a className="text-link"
          href={workFolderUrl(project,w)!} target="_blank" rel="noopener noreferrer">
@@ -1548,7 +1588,6 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
          </div></details>}
         <button type="button" className="action-button"
          aria-label={"Связи работы "+w.title}
-         ref={workReturnId===w.id?workReturnRef:undefined}
          onClick={()=>openWorkGraph(w.id,workQuery,"work")}>Связи</button>
         <Action disabled={busy||dirty||!persisted||!!editor} onClick={()=>showSavedReference(project.id,w.id)} title="Только сохранённая редакция">Ссылка</Action>
         <Action onClick={()=>removeWork(w.id)}>Удалить</Action></td></tr>)}</tbody></table></div>

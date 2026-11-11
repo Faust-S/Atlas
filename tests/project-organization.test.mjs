@@ -69,6 +69,7 @@ test("A user-submitted editor creates one standard work linked to its real sourc
  assert.equal(serialize(state),before);
  const project=result.state.projects[0];
  assert.equal(project.items.length,1);
+ assert.equal(result.workId,project.items[0].id);
  assert.equal(project.items[0].title,"Проверить интерфейс сайта");
  assert.equal(project.items[0].sourceId,sourceId);
  assert.equal(project.items[0].sourcePath,"src");

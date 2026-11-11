@@ -394,11 +394,12 @@ export function applyEditor(snapshot,projectId,action,input){
   const r=createItem(workState,projectId,{title:get("title"),stageId,
    assignee:get("assignee"),targetIds:get("targetId")?[get("targetId")]:[],
    resourceId:get("resourceId"),allocationPct:percentage("allocationPct")});
+  // Return a newly created work ID for navigation, without altering stored data.
   return {state:editItem(r.state,projectId,r.id,{
    estimateDays:integer("estimateDays"),...(origin?{
     sourceId:origin.sourceId,sourcePath:origin.folder,sourceRevision:origin.commitSha
    }:{})
-  })};
+  }),workId:r.id};
  }
  if(action==="dep")return {state:connect(snapshot,projectId,get("from"),get("to"))};
  if(action==="target")return {state:addTarget(snapshot,projectId,{title:get("title"),desired:get("desired"),intent:get("intent")}).state};

@@ -686,3 +686,23 @@ test("Folder actions have distinct accessible names from the work editor submit 
  assert.match(map,/Создать работу<\/button>/);
  assert.doesNotMatch(map,/onSuggestFolder\([^\n]*\)[^\n]*\n\s*Добавить работу<\/button>/);
 });
+
+test("A newly created work is revealed by its saved identity, with its stage and source map",()=>{
+ const editor=read("../src/editor.mjs"),main=read("../desktop/src/main.tsx"),css=read("../desktop/src/style.css");
+ assert.match(editor,/workId:r\.id/);
+ assert.match(main,/if\(result\.workId\)\{/);
+ assert.match(main,/setRecentWorkId\(result\.workId\)/);
+ assert.match(main,/revealWorkInTable\(result\.workId\)/);
+ assert.match(main,/setWorkReturnId\(id\)/);
+ assert.match(main,/setWorkFilter\("all"\);setWorkTargetFilter\("all"\);setWorkObservationFilter\("all"\)/);
+ assert.match(main,/setWorkDependencyFilter\("all"\);setWorkQuery\(""\);setWorkSort\("title"\);setWorkLimit\(200\)/);
+ assert.match(main,/filteredWork\.findIndex\(\(item:any\)=>item\.id===workReturnId\)/);
+ assert.match(main,/if\(index>=workLimit\)\{setWorkLimit\(index\+1\);return;\}/);
+ assert.match(main,/ref=\{workReturnId===w\.id\?workReturnRef:undefined\}/);
+ assert.match(main,/aria-label=\{"Открыть работу "\+w\.title\}/);
+ assert.match(main,/aria-label=\{"Открыть этап "\+project\.stages\.find/);
+ assert.match(main,/view\("overview"\);setMapSearchReturn\(\{workId:recentWork\.id,query:""\}\)/);
+ assert.match(css,/\.atlas-work-table tbody tr\.atlas-recent-work/);
+ const a=main.indexOf("const revealWorkInTable="),b=main.indexOf("const submit=",a);
+ assert.doesNotMatch(main.slice(a,b),/mutate\(|commitWithReadback\(|localStorage/);
+});

@@ -510,6 +510,17 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 /* Installed 1024px UX: work rows become compact cards at the width of the
    actual workspace, including an embedded host. Desktop-wide tables remain
    native HTML tables, with the same keyboard and source-bound actions. */
+/* Show a new work's exact location without requiring a name search. */
+.atlas-work-created{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;
+ gap:10px;padding:11px 13px;margin:4px 0 14px;border:1px solid #c9dced;
+ border-radius:9px;background:#f7fbff}
+.atlas-work-created strong{font-size:13px;color:#24446d;overflow-wrap:anywhere}
+.atlas-work-created p{font-size:12px;margin:4px 0 0;line-height:1.5}
+.atlas-work-row-title{display:block;max-width:100%;font-size:13px;line-height:1.4;overflow-wrap:anywhere}
+.atlas-work-stage-link{display:block;margin-top:4px;font-size:12px;max-width:100%;overflow-wrap:anywhere}
+.atlas-work-table tbody tr.atlas-recent-work{background:#edf5ff}
+.atlas-work-row-title:focus-visible,.atlas-work-stage-link:focus-visible{
+ outline:3px solid #397cc4;outline-offset:3px;border-radius:3px}
 .atlas-work-surface{container-type:inline-size;container-name:atlas-work-surface}
 .atlas-work-observations{font-size:11px;color:#3e638a}
 @container atlas-work-surface (max-width:850px){
