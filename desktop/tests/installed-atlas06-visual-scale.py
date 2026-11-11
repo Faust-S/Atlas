@@ -388,8 +388,17 @@ def qualify_visual():
     assert d.head()==saved,"Choosing a predecessor wrote native storage"
     print("ATLAS06_VISUAL_PREDECESSOR_SELECTED_NATIVE_PASS",flush=True)
     assert d.head()==saved,"Opening the new-work form wrote to native storage"
-    # Ctrl+Enter is the existing user keyboard shortcut for applying the form.
-    keyboard.send_keys("^{ENTER}")
+    # After interacting with the native select, click the actual sticky
+    # confirmation button. A keyboard shortcut can be consumed by WebView2
+    # select/date controls; this must remain operable through visible UI.
+    submit=d.window().child_window(
+        title="Применить к черновику",control_type="Button")
+    assert submit.exists(timeout=10) and submit.is_enabled()
+    rect=submit.rectangle()
+    bounds=win32gui.GetWindowRect(d.handle)
+    assert rectangle_in_workspace(rect,bounds),(
+        "The form confirmation is not physically accessible on Windows")
+    submit.click_input()
     await_no_form()
     d.window_title_contains(PROJECT+" — Таблица",25)
     d.wait_text("Работа внесена в черновик.",35)

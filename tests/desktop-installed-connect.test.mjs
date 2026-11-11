@@ -399,3 +399,16 @@ test("Windows witness checks calendar feedback and a real selected predecessor",
  assert.ok(stress.includes('len(after["dependencies"])==len(expected["dependencies"])+1'));
  assert.ok(stress.includes('d.saved_project(changed)==after'));
 });
+
+test("Native predecessor form uses a visible confirmation after selecting an existing work",()=>{
+ const stress=read("../desktop/tests/installed-atlas06-visual-scale.py");
+ const editor=read("../src/editor.mjs");
+ assert.ok(stress.includes('title="Применить к черновику",control_type="Button"'));
+ assert.ok(stress.includes("rectangle_in_workspace(rect,bounds)"));
+ assert.ok(stress.includes("submit.click_input()"));
+ const a=editor.indexOf('return {title:target?"Работа по требованию: "+target.title:"Новая работа"');
+ const b=editor.indexOf('if(action==="dep")',a);
+ const regular=editor.slice(a,b);
+ assert.ok(regular.indexOf('field("estimateDays"')<regular.indexOf('field("assignee"'));
+ assert.ok(regular.indexOf('choice("predecessorId"')<regular.indexOf('choice("resourceId"'));
+});

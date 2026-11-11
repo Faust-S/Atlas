@@ -201,13 +201,13 @@ export function editorSpec(project,action,snapshot=null){
    field("title","Что нужно сделать?", "text",target?"Проверить: "+target.title:""),
    choice("targetId","Связать с ожидаемым результатом",optionalTargets(project),targetId,false),
    choice("stageId","Этап",stageOptions(project),"",false),
-   field("assignee","Ответственный (имя или роль)","text","",false),
-   choice("resourceId","Плановый ресурс",resourceChoiceOptions(snapshot),"",false),
-   field("allocationPct","Доля ресурса на работе, %","number","100"),
    field("estimateDays","Оценка длительности, календарных дней","number","1"),
    field("dueDate","Контрольный срок работы","date","",false),
    ...(project.items.length?[choice("predecessorId","Начать после работы",[
-    option("","Без зависимости"),...workItems(project)],"",false)]:[])
+    option("","Без зависимости"),...workItems(project)],"",false)]:[]),
+   field("assignee","Ответственный (имя или роль)","text","",false),
+   choice("resourceId","Плановый ресурс",resourceChoiceOptions(snapshot),"",false),
+   field("allocationPct","Доля ресурса на работе, %","number","100")
   ]};
  }
  if(action==="dep"){
