@@ -188,3 +188,17 @@ test("Installed Windows Atlas opens exact source folder inside source list",()=>
  assert.match(stress,/assert d\.head\(\)==saved,"Jump to exact source folder changed native Store"/);
  assert.match(main,/ref=\{selected\?sourceJumpRef:undefined\}/);
 });
+
+
+test("Installed Windows Atlas returns from source to saved work and diagram",()=>{
+ const driver=read("../desktop/tests/installed-atlas06-visual-scale.py");
+ const ui=read("../desktop/src/main.tsx");
+ assert.match(driver,/ATLAS06_VISUAL_SOURCE_TO_WORK_BACKLINK_PASS/);
+ assert.match(driver,/ATLAS06_VISUAL_SOURCE_TO_DIAGRAM_BACKLINK_PASS/);
+ assert.match(driver,/find_control\("Открыть связанную работу",types=\{"Button"\},scroll=False\)/);
+ assert.match(driver,/d\.window_title_contains\("Форма:",25\)/);
+ assert.match(driver,/assert d\.head\(\)==saved,"Opening linked work from source changed native Store"/);
+ assert.match(driver,/find_control\("К схеме",types=\{"Button"\},scroll=False\)/);
+ assert.match(driver,/assert d\.head\(\)==saved,"Returning to diagram from source changed native Store"/);
+ assert.match(ui,/onClick=\{\(\)=>openEditor\("work:"\+sourceJumpContext!\.id\)\}/);
+});

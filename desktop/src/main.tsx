@@ -1594,8 +1594,14 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       <p>Работа «{sourceJumpContext.title}» хранит прежнюю привязку
        {sourceJumpContext.source.folder?" к каталогу «"+sourceJumpContext.source.folder+"»":""}.
        Посмотреть её в текущих источниках нельзя.</p>
-      <button type="button" className="text-link" onClick={()=>setSourceJump(null)}>
-       Закрыть сведения</button>
+      <div className="button-row">
+       <button type="button" className="text-link" disabled={busy}
+        onClick={()=>openEditor("work:"+sourceJumpContext.id)}>Открыть связанную работу</button>
+       <button type="button" className="text-link"
+        onClick={()=>view("overview")}>К схеме</button>
+       <button type="button" className="text-link" onClick={()=>setSourceJump(null)}>
+        Закрыть сведения</button>
+      </div>
      </div>}
      {(project.sources||[]).map((s:any)=>{
       const review=sourceReview(s,{limit:sourceRowLimits[s.id]||12});
@@ -1626,6 +1632,10 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
         <div className="button-row">
          {linkedSource.url&&<a className="text-link" href={linkedSource.url}
           target="_blank" rel="noopener noreferrer">Открыть найденный каталог на GitHub</a>}
+         <button type="button" className="text-link" disabled={busy}
+          onClick={()=>openEditor("work:"+sourceJumpContext!.id)}>Открыть связанную работу</button>
+         <button type="button" className="text-link" onClick={()=>view("overview")}>
+          К схеме</button>
          <button type="button" className="text-link" onClick={()=>setSourceJump(null)}>
           Закрыть связь</button>
         </div>

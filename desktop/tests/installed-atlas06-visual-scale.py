@@ -222,8 +222,20 @@ def qualify_visual():
     capture("focused-source-folder-1024")
     assert d.head()==saved,"Jump to exact source folder changed native Store"
     print("ATLAS06_VISUAL_EXACT_SOURCE_FOLDER_JUMP_PASS",flush=True)
-    find_control("Обзор",types={"Button"}).click_input()
+    work_back=find_control("Открыть связанную работу",types={"Button"},scroll=False)
+    assert rectangle_in_workspace(work_back.rectangle(),win32gui.GetWindowRect(d.handle))
+    work_back.click_input()
+    d.window_title_contains("Форма:",25)
+    assert d.head()==saved,"Opening linked work from source changed native Store"
+    keyboard.send_keys("{ESC}")
+    await_no_form()
+    d.wait_text("Связь работы с каталогом",25)
+    assert d.head()==saved
+    print("ATLAS06_VISUAL_SOURCE_TO_WORK_BACKLINK_PASS",flush=True)
+    find_control("К схеме",types={"Button"},scroll=False).click_input()
     d.wait_text("Схема проекта: каталоги, работы и этапы",25)
+    assert d.head()==saved,"Returning to diagram from source changed native Store"
+    print("ATLAS06_VISUAL_SOURCE_TO_DIAGRAM_BACKLINK_PASS",flush=True)
     find_control("Найти",types={"Button"},scroll=False).click_input()
     d.set_text("Найти работу или этап","Работа 5 / 1080")
     d.wait_text("Найдено: 1",25)

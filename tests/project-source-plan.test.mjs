@@ -470,3 +470,19 @@ test("Historical source and unavailable folder keep their provenance separate",(
  assert.match(main,/Каталог найден при последней сверке редакции исходников/);
  assert.doesNotMatch(main,/Каталог найден в текущем репозитории/);
 });
+
+
+test("Source folder inspection can open the same work and return to the map",()=>{
+ const main=read("../desktop/src/main.tsx");
+ const from=main.indexOf('role="group" aria-label="Каталог связанной работы"');
+ const end=main.indexOf('<div className="attention-row">',from);
+ assert.ok(from>0&&end>from);
+ const source=main.slice(from,end);
+ assert.match(source,/onClick=\{\(\)=>openEditor\("work:"\+sourceJumpContext!\.id\)\}/);
+ assert.match(source,/Открыть связанную работу/);
+ assert.match(source,/onClick=\{\(\)=>view\("overview"\)\}/);
+ assert.match(source,/К схеме/);
+ assert.doesNotMatch(source,/mutate\(|commitWithReadback|createItem\(/);
+ const lost=main.slice(main.indexOf('role="status">\n      <strong>Источник больше не подключён'));
+ assert.match(lost,/onClick=\{\(\)=>openEditor\("work:"\+sourceJumpContext\.id\)\}/);
+});
