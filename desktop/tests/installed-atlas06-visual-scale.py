@@ -234,6 +234,7 @@ def qualify_visual():
     print("ATLAS06_VISUAL_SOURCE_TO_WORK_BACKLINK_PASS",flush=True)
     find_control("К схеме",types={"Button"},scroll=False).click_input()
     d.wait_text("Схема проекта: каталоги, работы и этапы",25)
+    assert d.head()==saved,"Returning to diagram from source changed native Store"
     d.wait_text("Найдено: 1",25)
     d.wait_text("Скрыть связи",25)
     d.wait_text("Показать каталог в Atlas",25)

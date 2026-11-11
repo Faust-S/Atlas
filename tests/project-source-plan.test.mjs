@@ -386,7 +386,7 @@ test("Diagram search uses existing work and stage editors without changing stora
  const guide=read("../desktop/src/ProjectOrganizationGuide.tsx");
  const css=read("../desktop/src/style.css");
  assert.match(guide,/ProjectSourcePlanMap projection=\{projection\} project=\{project\}/);
- assert.match(visual,/projectSourcePlanSearch\(project,searchQuery,\{limit:8\}\)/);
+ assert.match(visual,/projectSourcePlanSearch\(project,searchQuery,\{\s*limit:8,priorityWorkId:detailWorkId\s*\}\)/);
  assert.match(visual,/aria-label="Найти работу или этап"/);
  assert.match(visual,/openFound\(hit\)/);
  assert.match(visual,/if\(hit\.kind==="work"\)onOpenWork\(hit\.id\)/);
@@ -508,15 +508,15 @@ test("Source navigation retains the matching query and selected work only for a 
  const map=read("../desktop/src/ProjectVisuals.tsx");
  assert.match(main,/setMapSearchReturn\(tabId==="overview"&&tab==="sources"/);
  assert.match(main,/sourceJump\?\.projectId===project\?\.id\?/);
- assert.match(main,/\\{workId:sourceJump\\.workId,query:sourceJump\\.query\\}:null/);
+ assert.match(main,/\{workId:sourceJump\.workId,query:sourceJump\.query\}:null/);
  assert.match(main,/setSourceJump\(null\);setMapSearchReturn\(null\)/);
- assert.match(main,/onOpenLinkedSource=\\{openLinkedSource\\}/);
- assert.match(main,/restoreSearch=\\{mapSearchReturn\\}/);
- assert.match(guide,/restoreSearch=\\{restoreSearch\\}/);
- assert.match(map,/setDetailWorkId\(work\\.id\);setSearchOpen\(true\)/);
- assert.match(map,/setSearchQuery\(valid\?previous:work\\.title\)/);
+ assert.match(main,/onOpenLinkedSource=\{openLinkedSource\}/);
+ assert.match(main,/restoreSearch=\{mapSearchReturn\}/);
+ assert.match(guide,/restoreSearch=\{restoreSearch\}/);
+ assert.match(map,/setDetailWorkId\(work\.id\);setSearchOpen\(true\)/);
+ assert.match(map,/setSearchQuery\(valid\?previous:work\.title\)/);
  assert.match(map,/priorityWorkId:detailWorkId/);
- assert.match(map,/onOpenLinkedSource\(detail\\.id,searchQuery\)/);
+ assert.match(map,/onOpenLinkedSource\(detail\.id,searchQuery\)/);
  assert.doesNotMatch(map.slice(map.indexOf("export function ProjectSourcePlanMap")),
   /localStorage|createItem\(|mutate\(|fetch\(/);
 });
