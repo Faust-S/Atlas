@@ -33,3 +33,20 @@ test('schedule does not change project state or status',()=>{
   assert.equal(a.state.projects[0].status,'planned');
   assert.match(plan.warning,/not execution authority/);
 });
+
+test('editing the deadline of a saved work updates its dated risk without rewriting the source snapshot',()=>{
+ const made=createProject(empty(),{name:'Late direct edit'});
+ const item=createItem(made.state,made.id,{title:'A task'});
+ const started=editProject(item.state,made.id,{startDate:'2026-11-10'});
+ const original=editItem(started,made.id,item.id,{estimateDays:3,dueDate:'2026-11-12'});
+ const beforeText=serialize(original);
+ const before=scheduleProject(original.projects[0]);
+ assert.equal(before.rows[0].finishDate,'2026-11-13');
+ assert.ok(before.rows[0].finishDate>before.rows[0].dueDate);
+ const revised=editItem(original,made.id,item.id,{dueDate:'2026-11-15'});
+ const after=scheduleProject(revised.projects[0]);
+ assert.equal(after.rows[0].finishDate,'2026-11-13');
+ assert.ok(after.rows[0].finishDate<=after.rows[0].dueDate);
+ assert.equal(serialize(original),beforeText,'Direct edit mutated the original project');
+ assert.equal(deserialize(serialize(revised)).projects[0].items[0].dueDate,'2026-11-15');
+});

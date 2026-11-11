@@ -624,12 +624,21 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     setRecentWorkKind(isDependencyChange?"dependency":"created");
     setRecentWorkId(result.workId);
     revealWorkInTable(result.workId,!isDependencyChange);
-   }else if(editor.action.startsWith("work:")&&recentScheduleEffect&&
-     (recentWorkKind==="dependency"||recentWorkKind==="adjusted")){
-    // Only a work from the displayed impact list keeps the recalculation route.
+   }else if(editor.action.startsWith("work:")){
     const correctedId=editor.action.slice(5);
-    if(recentScheduleEffect.examples.some(item=>item.id===correctedId)){
-     const updatedProject=result.state.projects.find((p:any)=>p.id===formProject);
+    const previousWork=project?.items.find((item:any)=>item.id===correctedId);
+    const updatedProject=result.state.projects.find((p:any)=>p.id===formProject);
+    const correctedWork=updatedProject?.items.find((item:any)=>item.id===correctedId);
+    // Any direct duration or deadline edit deserves a fresh calculation,
+    // even when opened from Gantt or ordinary table rather than an impact
+    // warning. State/assignee-only edits keep their current view.
+    const scheduleFieldsChanged=previousWork&&correctedWork&&(
+     (previousWork.estimateDays??1)!==(correctedWork.estimateDays??1)||
+     (previousWork.dueDate??null)!==(correctedWork.dueDate??null));
+    const fromImpactList=recentScheduleEffect&&
+     (recentWorkKind==="dependency"||recentWorkKind==="adjusted")&&
+     recentScheduleEffect.examples.some(item=>item.id===correctedId);
+    if(scheduleFieldsChanged||fromImpactList){
      const change=plan&&updatedProject?scheduleChangeSummary(plan,scheduleProject(updatedProject)):null;
      setRecentPlanBefore({workId:correctedId,revision:result.state.revision,
       days:plan?.durationDays??0,change});

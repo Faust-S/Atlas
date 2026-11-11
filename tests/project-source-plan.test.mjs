@@ -793,7 +793,9 @@ test("Affected-work actions are placed before secondary schedule details",()=>{
 test("Correcting a work named in the impact list recalculates the schedule before Save",()=>{
  const ui=read("../desktop/src/main.tsx");
  assert.match(ui,/recentWorkKind==="adjusted"/);
- assert.match(ui,/editor\.action\.startsWith\("work:"\)&&recentScheduleEffect/);
+ assert.match(ui,/else if\(editor\.action\.startsWith\("work:"\)\)/);
+ assert.match(ui,/const scheduleFieldsChanged=previousWork&&correctedWork/);
+ assert.match(ui,/const fromImpactList=recentScheduleEffect&&/);
  assert.match(ui,/recentScheduleEffect\.examples\.some\(item=>item\.id===correctedId\)/);
  assert.match(ui,/const correctedId=editor\.action\.slice\(5\)/);
  assert.match(ui,/scheduleChangeSummary\(plan,scheduleProject\(updatedProject\)\)/);
@@ -832,4 +834,19 @@ test("Works table finds calculated deadline overruns without searching a long pr
  assert.match(ui,/overdueWorkFinishes\.get\(w\.id\)/);
  assert.match(ui,/Расчётное окончание: \{overdueWorkFinishes\.get\(w\.id\)\}/);
  assert.match(css,/\.atlas-work-overdue-label/);
+});
+
+test("A direct work duration or deadline change recalculates without leaving the original editor flow stale",()=>{
+ const ui=read("../desktop/src/main.tsx");
+ const start=ui.indexOf('}else if(editor.action.startsWith("work:"))');
+ const end=ui.indexOf("editorDirtyRef.current=false;setEditor(null);",start);
+ assert.ok(start>0&&end>start);
+ const route=ui.slice(start,end);
+ assert.match(route,/\(previousWork\.estimateDays\?\?1\)!==\(correctedWork\.estimateDays\?\?1\)/);
+ assert.match(route,/\(previousWork\.dueDate\?\?null\)!==\(correctedWork\.dueDate\?\?null\)/);
+ assert.match(route,/if\(scheduleFieldsChanged\|\|fromImpactList\)/);
+ assert.match(route,/scheduleChangeSummary\(plan,scheduleProject\(updatedProject\)\)/);
+ assert.match(route,/setRecentWorkKind\("adjusted"\)/);
+ assert.match(route,/revealWorkInTable\(correctedId,false\)/);
+ assert.doesNotMatch(route,/commitWithReadback\(|nativeInvoke\(|localStorage|fetch\(/);
 });
