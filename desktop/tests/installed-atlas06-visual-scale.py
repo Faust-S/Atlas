@@ -149,11 +149,16 @@ def select_project():
     capture("synthetic-project-navigation-missing")
     raise AssertionError("Synthetic project not accessible from native sidebar")
 
+def saved_head_or_none():
+    # Offline visual qualification can begin before live GitHub first-use.
+    # Absent native index means nothing has been saved yet.
+    return d.head() if (d.STORE/"head.json").exists() else None
+
 def await_saved(baseline):
     end=time.monotonic()+45
     while time.monotonic()<end:
         now=d.head()
-        if now["generation"]!=baseline["generation"]:
+        if baseline is None or now["generation"]!=baseline["generation"]:
             return now
         time.sleep(0.25)
     capture("visual-native-save-timeout")
@@ -170,18 +175,18 @@ def await_no_form():
 
 def qualify_visual():
     expected=imported_snapshot()
-    before=d.head()
-    assert len(before["projects"])==1,"Expected preceding real GitHub wizard qualification"
+    before=saved_head_or_none()
+    assert before is None or len(before["projects"])==1, ("Expected an empty profile or one preceding project")
     d.launch()
     d.wait_text("Портфель проектов",45)
     open_file_menu()
     d.click_button("Открыть архив .iwxa")
     choose_archive()
     d.wait_text("Заменить портфель в черновике",45)
-    assert d.head()==before,"Opening IWXA preview modified native data"
+    assert saved_head_or_none()==before,"Opening IWXA preview modified native data"
     capture("import-preview")
     d.click_button("Заменить портфель в черновике")
-    assert d.head()==before,"Approving IWXA preview bypassed native Save"
+    assert saved_head_or_none()==before,"Approving IWXA preview bypassed native Save"
     print("ATLAS06_VISUAL_IWXA_PREVIEW_READONLY_PASS",flush=True)
     d.click_button("Сохранить")
     saved=await_saved(before)

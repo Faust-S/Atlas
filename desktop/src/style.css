@@ -103,9 +103,9 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .board-card{background:#fff;border:1px solid #dbe6f3;border-radius:10px;padding:12px;margin:8px 0;box-shadow:0 3px 7px #7b91ab1b}
 .board-card strong{font-size:12px;display:block;line-height:1.5;color:#283c55}
 .board-card small{display:block;font-size:10px;color:#7086a2;margin-top:6px}
-.board-actions{display:flex;gap:5px;justify-content:space-between;margin-top:10px}
-.board-actions select{min-width:0;max-width:140px;font-size:10px;padding:5px 3px}
-.board-actions button{border:0;background:#e9f2fc;color:#235b98;border-radius:6px;padding:6px;font-size:10px}
+.board-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;min-width:0}
+.board-actions select{flex:1 1 100%;width:100%;min-width:0;max-width:100%;font-size:11px;padding:6px 4px}
+.board-actions button{flex:1 1 auto;min-width:0;border:0;background:#e9f2fc;color:#235b98;border-radius:6px;padding:7px 6px;font-size:11px}
 .timeline{display:grid;gap:12px;margin-top:17px}.timeline-line{display:grid;grid-template-columns:minmax(110px,180px) minmax(120px,1fr) 48px;gap:12px;align-items:center}
 .timeline-line button{background:none;border:0;text-decoration:underline;color:#325477;text-align:left;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .timeline-line small{font-size:10px;color:#647c97}

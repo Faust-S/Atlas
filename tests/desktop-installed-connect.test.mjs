@@ -256,3 +256,19 @@ test("Installed ordinary project opens board card dependencies and restores its 
  assert.match(driver,/Returning to board card modified native Store/);
  assert.match(main,/onClick=\{\(\)=>openWorkGraph\(w\.id,"","board"\)\}/);
 });
+
+test("Installed Atlas keeps offline Windows qualification independent of public GitHub quota",()=>{
+ const workflow=read("../.github/workflows/atlas-0-2-1-branding.yml");
+ const visual=read("../desktop/tests/installed-atlas06-visual-scale.py");
+ const style=read("../desktop/src/style.css");
+ assert.match(workflow,/id: atlas06_github_first_use[\s\S]*?continue-on-error: true/);
+ assert.match(workflow,/steps\.atlas06_github_first_use\.outcome == 'failure'/);
+ assert.match(workflow,/ATLAS06_GITHUB_FIRST_USE_NOT_ACCEPTED/);
+ assert.match(visual,/def saved_head_or_none\(\):/);
+ assert.match(visual,/before=saved_head_or_none\(\)/);
+ assert.match(visual,/assert saved_head_or_none\(\)==before,"Opening IWXA preview modified native data"/);
+ assert.match(visual,/assert saved_head_or_none\(\)==before,"Approving IWXA preview bypassed native Save"/);
+ assert.match(style,/\.board-actions\{display:flex;flex-wrap:wrap;/);
+ assert.match(style,/\.board-actions select\{flex:1 1 100%;width:100%;/);
+ assert.match(style,/\.board-actions button\{flex:1 1 auto;/);
+});

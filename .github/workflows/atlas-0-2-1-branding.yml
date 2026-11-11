@@ -113,7 +113,9 @@ jobs:
           "ATLAS_R5_PORTFOLIO_JSON=$fixture" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           cargo test --release --locked --manifest-path desktop/src-tauri/Cargo.toml --lib persistence_tests::native_r5_scale_and_incremental_readback -- --exact --nocapture
       - name: Verify first-use connection on installed Atlas 0.6 Windows
+        id: atlas06_github_first_use
         if: github.ref_name == 'work/2026-11-10-atlas-0-6'
+        continue-on-error: true
         shell: pwsh
         timeout-minutes: 9
         run: |
@@ -297,6 +299,12 @@ jobs:
         shell: pwsh
         timeout-minutes: 7
         run: ./desktop/tests/installed-center-e2e.ps1
+      # Offline Windows scenarios remain executable after a public API quota error.
+      # The first-use gate stays unaccepted and fails this job at the end.
+      - name: Require successful live GitHub first-use on Atlas 0.6
+        if: github.ref_name == 'work/2026-11-10-atlas-0-6' && steps.atlas06_github_first_use.outcome == 'failure'
+        shell: pwsh
+        run: throw 'ATLAS06_GITHUB_FIRST_USE_NOT_ACCEPTED - inspect live API failure'
       - name: Retain installed GUI screenshot evidence on success or failure
         if: always()
         uses: actions/upload-artifact@v4
