@@ -464,8 +464,9 @@ export function ProjectSourcePlanMap({projection,project,restoreSearch,onOpenWor
       <div className="atlas-source-plan-unassigned">
        <small>Работ по этому каталогу ещё нет.</small>
        <button type="button" className="action-button"
+        aria-label={"Создать работу по каталогу "+folder.name}
         onClick={()=>onSuggestFolder(source.sourceId,folder.commitSha,folder.name)}>
-        Добавить работу</button>
+        Создать работу</button>
       </div>}
       {folder.hiddenWorks>0&&<p className="minor">Ещё {folder.hiddenWorks} работ.
        {" "}<button type="button" className="text-link"
