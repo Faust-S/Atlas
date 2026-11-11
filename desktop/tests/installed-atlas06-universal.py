@@ -161,6 +161,26 @@ def qualify():
     assert d.head()==saved,"Returning from ordinary work graph changed native Store"
     print("ATLAS06_UNIVERSAL_TABLE_GRAPH_ROUNDTRIP_PASS",flush=True)
 
+    # Keep the existing search while selecting outstanding dependencies.
+    # This is ordinary keyboard interaction with the installed HTML select.
+    filter_control=v.find_control("Фильтр работ по зависимостям",types={"ComboBox"})
+    filter_control.set_focus()
+    keyboard.send_keys("{HOME}{DOWN}{ENTER}")
+    d.wait_text("Показано 1 из 1 работ по фильтру",25)
+    v.capture("universal-dependency-filter-pending")
+    assert d.head()==saved,"Filtering by outstanding dependencies changed native Store"
+    filter_control=v.find_control("Фильтр работ по зависимостям",types={"ComboBox"})
+    filter_control.set_focus()
+    keyboard.send_keys("{HOME}{DOWN}{DOWN}{ENTER}")
+    d.wait_text("Показано 0 из 0 работ по фильтру",25)
+    v.capture("universal-dependency-filter-without-pending")
+    assert d.head()==saved,"Changing dependency filter changed native Store"
+    filter_control=v.find_control("Фильтр работ по зависимостям",types={"ComboBox"})
+    filter_control.set_focus()
+    keyboard.send_keys("{HOME}{ENTER}")
+    d.wait_text("Показано 1 из 1 работ по фильтру",25)
+    print("ATLAS06_UNIVERSAL_DEPENDENCY_FILTER_COMBINED_PASS",flush=True)
+
     # The same work must be reachable from the board without a source.
     # Only actual Windows-visible controls are clicked.
     v.find_control("Другие разделы").click_input()

@@ -94,6 +94,7 @@ tbody tr:hover{background:#f6f9fe}
 .tabbar button.selected{font-weight:700;color:#1b61be;border-color:#316fdf;background:#e4effc}
 .filter-row{display:flex;justify-content:flex-start;gap:12px;margin-bottom:16px}
 .filter-row label{display:flex;gap:9px;align-items:center;color:#677d98;font-size:11px}
+.atlas-work-surface .filter-row{flex-wrap:wrap}
 select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbfdff;padding:8px 10px;max-width:100%;
  color:#273f5f}
 .board{display:grid;grid-template-columns:repeat(4,minmax(190px,1fr));gap:12px;overflow-x:auto;padding-bottom:15px}

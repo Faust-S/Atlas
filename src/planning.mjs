@@ -105,3 +105,20 @@ export function workDependencyOverview(project,plan,{maxNames=2}={}){
  }
  return hints;
 }
+
+
+/**
+ * Filter existing work rows by recorded unfinished predecessors.
+ * No pending predecessors is not proof that execution can start or has passed.
+ * Sorting, searching and other filters remain in the existing work table.
+ */
+export function filterWorkRowsByDependencies(items,overview,mode="all"){
+ if(!Array.isArray(items)||!(overview instanceof Map)||
+    !["all","has_pending","no_pending"].includes(mode))
+  throw new Error("Invalid work dependency filter");
+ if(mode==="all")return items;
+ return items.filter(item=>{
+  const pending=(overview.get(item.id)?.pendingTotal??0)>0;
+  return mode==="has_pending"?pending:!pending;
+ });
+}

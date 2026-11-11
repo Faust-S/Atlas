@@ -310,3 +310,23 @@ test("Installed Atlas opens the exact unfinished predecessor from table and boar
  assert.match(driver,/Opening a predecessor from table changed native Store/);
  assert.match(driver,/Opening a predecessor from board changed native Store/);
 });
+
+
+test("Installed Atlas filters source-free project work by recorded predecessor state",()=>{
+ const ui=read("../desktop/src/main.tsx");
+ const model=read("../src/planning.mjs");
+ const style=read("../desktop/src/style.css");
+ const driver=read("../desktop/tests/installed-atlas06-universal.py");
+ assert.match(ui,/aria-label="Фильтр работ по зависимостям"/);
+ assert.match(ui,/option value="has_pending">Есть незавершённые/);
+ assert.match(ui,/option value="no_pending">Нет незавершённых/);
+ assert.match(ui,/filterWorkRowsByDependencies\(/);
+ assert.match(ui,/workDependencyFilter,workLinks,findingsByWork/);
+ assert.match(ui,/setWorkDependencyFilter\("all"\)/);
+ assert.match(model,/export function filterWorkRowsByDependencies/);
+ assert.match(style,/\.atlas-work-surface \.filter-row\{flex-wrap:wrap\}/);
+ assert.match(driver,/filter_control=v\.find_control\("Фильтр работ по зависимостям",types=\{"ComboBox"\}\)/);
+ assert.match(driver,/ATLAS06_UNIVERSAL_DEPENDENCY_FILTER_COMBINED_PASS/);
+ assert.match(driver,/Filtering by outstanding dependencies changed native Store/);
+ assert.match(driver,/Changing dependency filter changed native Store/);
+});

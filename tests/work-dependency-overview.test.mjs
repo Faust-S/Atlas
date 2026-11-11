@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {scheduleProject,workDependencyOverview} from "../src/planning.mjs";
+import {scheduleProject,workDependencyOverview,filterWorkRowsByDependencies} from "../src/planning.mjs";
 import {atlas06UniversalPortfolio} from "./fixtures/atlas06-universal-portfolio.mjs";
 
 const universal=()=>atlas06UniversalPortfolio().projects[0];
@@ -66,4 +66,54 @@ test("Unlinked work remains uncluttered and invalid preview limits fail",()=>{
   predecessorTotal:0,pendingTotal:0,pendingWorks:[],successorTotal:0
  });
  assert.throws(()=>workDependencyOverview(project,scheduleProject(project),{maxNames:0}),/preview limit/);
+});
+
+
+test("Dependency filter combines with the work search and does not change data",()=>{
+ const project=universal(),before=JSON.stringify(project);
+ const overview=workDependencyOverview(project,scheduleProject(project));
+ assert.equal(filterWorkRowsByDependencies(project.items,overview,"all"),project.items);
+ assert.deepEqual(filterWorkRowsByDependencies(project.items,overview,"has_pending").map(w=>w.title),
+  ["Открыть площадку"]);
+ assert.deepEqual(filterWorkRowsByDependencies(project.items,overview,"no_pending").map(w=>w.title),
+  ["Подготовить помещение","Согласовать программу"]);
+ const searched=project.items.filter(w=>w.title.includes("Открыть"));
+ assert.equal(filterWorkRowsByDependencies(searched,overview,"has_pending").length,1);
+ assert.equal(filterWorkRowsByDependencies(searched,overview,"no_pending").length,0);
+ assert.equal(JSON.stringify(project),before);
+});
+
+test("Dependency filter reflects saved work states and uses IDs for equal names",()=>{
+ const project=universal(),opening=project.items[2];
+ project.items[0].title="Общее название";
+ project.items[1].title="Общее название";
+ let overview=workDependencyOverview(project,scheduleProject(project));
+ assert.deepEqual(filterWorkRowsByDependencies(project.items,overview,"has_pending").map(w=>w.id),
+  [opening.id]);
+ project.items[0].state="done";
+ overview=workDependencyOverview(project,scheduleProject(project));
+ assert.deepEqual(overview.get(opening.id).pendingWorks.map(w=>w.id),[project.items[1].id]);
+ assert.deepEqual(filterWorkRowsByDependencies(project.items,overview,"has_pending").map(w=>w.id),
+  [opening.id]);
+ project.items[1].state="done";
+ overview=workDependencyOverview(project,scheduleProject(project));
+ assert.deepEqual(filterWorkRowsByDependencies(project.items,overview,"has_pending"),[]);
+ assert.equal(filterWorkRowsByDependencies(project.items,overview,"no_pending").length,3);
+ assert.equal(overview.get(opening.id).predecessorTotal,2);
+});
+
+test("Dependency filter on 1200 works stays bounded and strictly read-only",()=>{
+ const items=Array.from({length:1200},(_,i)=>({
+  id:"task-"+i,title:"Работа",state:i%3===0?"done":"todo",estimateDays:1
+ }));
+ const project={items,dependencies:items.slice(0,-1).map((work,i)=>({from:work.id,to:items[i+1].id}))};
+ const before=JSON.stringify(project);
+ const overview=workDependencyOverview(project,scheduleProject(project));
+ const waiting=filterWorkRowsByDependencies(items,overview,"has_pending");
+ const withoutPending=filterWorkRowsByDependencies(items,overview,"no_pending");
+ assert.equal(waiting.length,799);
+ assert.equal(withoutPending.length,401);
+ assert.equal(waiting.length+withoutPending.length,items.length);
+ assert.equal(JSON.stringify(project),before);
+ assert.throws(()=>filterWorkRowsByDependencies(items,overview,"invalid"),/Invalid work dependency filter/);
 });

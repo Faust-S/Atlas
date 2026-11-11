@@ -9,7 +9,7 @@ import {projectImpact,projectNextStep} from "../../src/impact.mjs";
 import {buildPortfolioCommand,filterPortfolioCommand} from "../../src/portfolio-command.mjs";
 import {realityOverview,workObservationIndex} from "../../src/reality-overview.mjs";
 import {responseState} from "../../src/response.mjs";
-import {scheduleProject,workDependencyOverview} from "../../src/planning.mjs";
+import {scheduleProject,workDependencyOverview,filterWorkRowsByDependencies} from "../../src/planning.mjs";
 import {portfolioSchedule,projectedFinishLabel} from "../../src/portfolio-schedule.mjs";
 import {portfolioResources} from "../../src/portfolio-resources.mjs";
 import {planReviewQueue,planReviewAction,planProposalAction} from "../../src/plan-review.mjs";
@@ -217,6 +217,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const [forecastId,setForecastId]=useState<string|null>(null);
  const [workFilter,setWorkFilter]=useState("all"),[workQuery,setWorkQuery]=useState("");
  const [workTargetFilter,setWorkTargetFilter]=useState("all");
+ const [workDependencyFilter,setWorkDependencyFilter]=useState("all");
  const [workObservationFilter,setWorkObservationFilter]=useState("all");
  const [workHistoryLimits,setWorkHistoryLimits]=useState<Record<string,number>>({});
  const [workSort,setWorkSort]=useState("title");
@@ -377,8 +378,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    (workTargetFilter==="all"||(item.targetIds||[]).includes(workTargetFilter))&&
    (!query||item.title.toLocaleLowerCase("ru-RU").includes(query)||
     String(item.assignee||"").toLocaleLowerCase("ru-RU").includes(query)));
-  return sortWorkRows(filterWorkRowsByObservation(matching,findingsByWork,workObservationFilter),workSort);
- },[project,workFilter,workQuery,workSort,workTargetFilter,workObservationFilter,findingsByWork]);
+  return sortWorkRows(filterWorkRowsByDependencies(
+    filterWorkRowsByObservation(matching,findingsByWork,workObservationFilter),workLinks,workDependencyFilter),workSort);
+ },[project,workFilter,workQuery,workSort,workTargetFilter,workObservationFilter,workDependencyFilter,workLinks,findingsByWork]);
  useEffect(()=>{
   if(tab!=="work"||!ready||!workReturnId||!project)return;
   const index=filteredWork.findIndex((item:any)=>item.id===workReturnId);
@@ -514,7 +516,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   setSourceJump(null);setMapSearchReturn(null);setGraphJump(null);setWorkReturnId(null);
   setShowProjectRelations(false);setRelationLimit(12);setRequirementJump(null);setChangeJump(null);
   if(!afterSubmit)setMessage("");
-  setWorkFilter("all");setWorkTargetFilter("all");setWorkObservationFilter("all");setWorkHistoryLimits({});setWorkQuery("");setWorkSort("title");setWorkLimit(200);setRealityLimit(8);
+  setWorkFilter("all");setWorkTargetFilter("all");setWorkObservationFilter("all");setWorkDependencyFilter("all");setWorkHistoryLimits({});setWorkQuery("");setWorkSort("title");setWorkLimit(200);setRealityLimit(8);
   setHistoryQuery("");setHistoryType("all");setHistoryLimit(120);setRecheckLimit(25);
  };
  const openProjectTab=(id:string,tabId:Tab,changeId:string|null=null)=>{
@@ -1456,6 +1458,12 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       <option value="without">Без наблюдений</option>
       <option value="done_without">Выполнены без наблюдений</option>
      </select></label>
+     <label>Зависимости <select aria-label="Фильтр работ по зависимостям"
+      value={workDependencyFilter} onChange={e=>{setWorkDependencyFilter(e.target.value);setWorkLimit(200)}}>
+      <option value="all">Все работы</option>
+      <option value="has_pending">Есть незавершённые</option>
+      <option value="no_pending">Нет незавершённых</option>
+     </select></label>
       <label>Найти работу <input type="search" value={workQuery} aria-label="Найти работу"
        placeholder="Название или ответственный" onChange={e=>{setWorkQuery(e.target.value);setWorkLimit(200)}}/></label>
       <label>Сортировка <select aria-label="Сортировка работ" value={workSort} onChange={e=>{setWorkSort(e.target.value);setWorkLimit(200)}}>
@@ -1535,7 +1543,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
         <Action onClick={()=>removeWork(w.id)}>Удалить</Action></td></tr>)}</tbody></table></div>
      {project.items.length>0&&<p className="minor">Показано {Math.min(filteredWork.length,workLimit)} из {filteredWork.length} работ по фильтру; всего в проекте: {project.items.length}.</p>}
      {filteredWork.length>workLimit&&<Action onClick={()=>setWorkLimit(n=>Math.min(filteredWork.length,n+200))}>Показать ещё работы</Action>}
-     {project.items.length>0&&!filteredWork.length&&<Fallback message="По выбранным фильтрам работ нет. Измените требование, состояние, наблюдения или поисковый запрос."/>}
+     {project.items.length>0&&!filteredWork.length&&<Fallback message="По выбранным фильтрам работ нет. Измените требование, состояние, зависимости, наблюдения или поиск."/>}
      {!project.items.length&&<Fallback message="Пока нет работ. Добавьте первую работу и сохраните проект."/>}
     </section>}
     {tab==="board"&&<div className="board">
