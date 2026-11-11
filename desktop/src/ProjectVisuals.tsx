@@ -3,7 +3,7 @@ import {dependencyDiagram,ganttViewport,ganttFocusOffset} from './visual-layout.
 import {portfolioNetwork} from '../../src/portfolio.mjs';
 import {projectSourcePlanSearch,projectSourcePlanWorkContext} from '../../src/project-organization.mjs';
 
-type CPM={durationDays:number;rows:Array<{id:string;title:string;earlyStart:number;earlyFinish:number;durationDays:number;critical:boolean;state:string;predecessors:string[];blockedBy:string[];floatDays:number}>};
+type CPM={durationDays:number;rows:Array<{id:string;title:string;earlyStart:number;earlyFinish:number;durationDays:number;critical:boolean;state:string;predecessors:string[];blockedBy:string[];floatDays:number;dueDate?:string|null;finishDate?:string|null}>};
 type Mode='fit'|'30'|'90';
 const statusName:Record<string,string>={todo:'Запланировано',in_progress:'В работе',blocked:'Заблокировано',done:'Выполнено (заявлено)'};
 const trim=(value:string,max=110)=>value.length>max?value.slice(0,max-1)+'…':value;
@@ -19,6 +19,7 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
  const [query,setQuery]=useState('');
  const [matchIndex,setMatchIndex]=useState(0);
  const [criticalOnly,setCriticalOnly]=useState(false);
+ const [deadlineOnly,setDeadlineOnly]=useState(false);
  const [visibleLimit,setVisibleLimit]=useState(160);
  const [expanded,setExpanded]=useState(false);
  useEffect(()=>{
@@ -29,7 +30,10 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
  },[expanded]);
  const view=useMemo(()=>ganttViewport(schedule,{scale,offset,startDate:projectStart,dueDate:projectDue} as any),
   [schedule,scale,offset,projectStart,projectDue]);
- const matching=view.rows.filter((r:any)=>(!criticalOnly||r.critical)&&r.title.toLocaleLowerCase('ru-RU').includes(query.trim().toLocaleLowerCase('ru-RU')));
+ const missedDeadlineTotal=view.rows.filter((row:any)=>row.missedDeadline).length;
+ const matching=view.rows.filter((r:any)=>(!criticalOnly||r.critical)&&
+  (!deadlineOnly||r.missedDeadline)&&
+  r.title.toLocaleLowerCase('ru-RU').includes(query.trim().toLocaleLowerCase('ru-RU')));
  const focusMatch=(index:number)=>{
   const row=matching[index];
   if(!row)return;
@@ -69,6 +73,9 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
    <span className="atlas-range">{view.windowLabel}</span>
    <label className="atlas-gantt-query">Поиск <input type="search" value={query} onChange={e=>{setQuery(e.target.value);setMatchIndex(0);setVisibleLimit(160)}} placeholder="Название работы"/></label>
    <label className="atlas-check"><input type="checkbox" checked={criticalOnly} onChange={e=>{setCriticalOnly(e.target.checked);setMatchIndex(0);setVisibleLimit(160)}}/> Критический путь</label>
+   <label className="atlas-check"><input type="checkbox" aria-label="Только работы позже контрольного срока"
+    checked={deadlineOnly} onChange={e=>{setDeadlineOnly(e.target.checked);setMatchIndex(0);setVisibleLimit(160)}}/>
+    Позже срока ({missedDeadlineTotal})</label>
    {!!query.trim()&&<div className="atlas-gantt-matches">
     <span className="atlas-range">{matching.length?String(Math.min(matchIndex+1,matching.length))+' из '+matching.length+' работ':'Нет совпадений'}</span>
     {matching.length>0&&<>
@@ -109,11 +116,13 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
    </div>
    {displayed.map((row:any)=><div className="atlas-gantt-row" key={row.id}>
     <button className="atlas-gantt-work" title={row.title} onClick={()=>{setExpanded(false);onOpenWork(row.id)}}>{trim(row.title,65)}
-     <small>{statusName[row.state]||row.state}{row.critical?' · критическая':''}</small></button>
+     <small>{statusName[row.state]||row.state}{row.critical?' · критическая':''}</small>
+     {row.missedDeadline&&<small className="atlas-gantt-work-overdue">
+      Расчётный финиш позже срока {row.dueDate}</small>}</button>
     <div className="atlas-gantt-track">
      {guide(row.id)}
      {row.visible&&<button type="button" onClick={()=>{setExpanded(false);onOpenWork(row.id)}}
-      title={row.title+' · '+row.dateStart+' → '+row.dateFinish+' · '+row.durationDays+' дн. · '+(statusName[row.state]||row.state)}
+      title={row.title+' · '+row.dateStart+' → '+row.dateFinish+' · '+row.durationDays+' дн. · '+(statusName[row.state]||row.state)+(row.missedDeadline?' · Расчётный финиш позже срока '+row.dueDate:'')}
       aria-label={'Открыть работу '+row.title}
       className={'atlas-gantt-bar'+(row.isMilestone?' is-milestone':'')+(row.critical?' is-critical':'')+(row.state==='done'?' is-done':'')+(row.state==='blocked'?' is-blocked':'')}
       style={{left:row.leftPct+'%',width:row.isMilestone?'10px':Math.max(0.45,row.widthPct)+'%'}}/>}

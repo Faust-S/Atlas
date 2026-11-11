@@ -547,6 +547,29 @@ def qualify_visual():
     assert d.saved_project(final_head)==final
     print("ATLAS06_VISUAL_AFFECTED_WORK_LINK_RESTART_PASS",flush=True)
 
+    # The existing Gantt can now show the single work whose calculated
+    # finish passes its own control date. Filtering and opening it are
+    # read-only; no synthetic native state or implicit Save.
+    select_project()
+    d.click_button("График")
+    d.wait_text("Позже срока (1)",35)
+    deadline_filter=d.window().child_window(
+        title="Только работы позже контрольного срока",control_type="CheckBox")
+    assert deadline_filter.exists(timeout=15) and deadline_filter.is_enabled()
+    deadline_filter.click_input()
+    d.wait_text("Показано 1 из 1 работ на графике.",35)
+    d.wait_text("Расчётный финиш позже срока 2026-11-11",35)
+    assert d.head()==final_head,"Filtering overdue Gantt work changed native Store"
+    overdue=find_control("Открыть работу Работа 0 / 2",types={"Button"})
+    overdue.click_input()
+    d.window_title_contains("Форма: Работа: Работа 0 / 2",25)
+    assert d.head()==final_head,"Opening overdue work from Gantt changed native Store"
+    keyboard.send_keys("{ESC}")
+    await_no_form()
+    assert d.saved_project(final_head)==final
+    capture("gantt-work-deadline-filter")
+    print("ATLAS06_VISUAL_GANTT_WORK_DEADLINE_FILTER_PASS",flush=True)
+
 if __name__=="__main__":
     try:
         qualify_visual()

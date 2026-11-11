@@ -143,10 +143,10 @@ def click_scrolled_button(name,main=False):
     raise AssertionError("Installed action not accessible after scrolling: "+name)
 
 def set_text(name,value):
-    # HTML input[list] is represented by Windows UIA as ComboBox, while
-    # an ordinary text field is Edit. Both must support native typing.
+    # Windows WebView2 exposes HTML text as Edit, input[list] as ComboBox,
+    # and input[type=number] as Spinner. Use physical typing for all three.
     controls = []
-    for role in ("Edit","ComboBox"):
+    for role in ("Edit","ComboBox","Spinner"):
         candidate=window().child_window(title=name,control_type=role)
         if candidate.exists(timeout=2) and candidate.is_visible() and candidate.is_enabled():
             controls.append(candidate)

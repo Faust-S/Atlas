@@ -195,6 +195,7 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .atlas-gantt-work{border:0;border-right:1px solid #e2e8f3;background:transparent;color:#29537f;padding:8px 11px;text-align:left;font-size:13px;overflow:hidden;text-overflow:ellipsis}
 .atlas-gantt-work:hover{text-decoration:underline}
 .atlas-gantt-work small{display:block;color:#4d627d;font-size:11px;margin-top:2px}
+.atlas-gantt-work small.atlas-gantt-work-overdue{color:#87501d;font-weight:600}
 .atlas-gantt-track{position:relative;min-width:0}.atlas-gantt-guide{position:absolute;top:0;bottom:0;width:1px;background:#dfebf5;pointer-events:none}
 .atlas-gantt-deadline{position:absolute;top:0;bottom:0;width:2px;background:#b47539;z-index:1;opacity:.75;pointer-events:none}
 .atlas-gantt-tick{position:absolute;top:6px;transform:translateX(-50%);font-size:9px;white-space:nowrap;color:#4d6788;z-index:2}

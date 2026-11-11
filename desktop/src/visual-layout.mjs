@@ -40,8 +40,13 @@ export function ganttViewport(schedule,{scale='fit',offset=0,startDate=null,dueD
   const visible=isMilestone?start>=from&&start<=until:finish>from&&start<until;
   const left=clamp(100*(start-from)/days,0,100);
   const right=clamp(100*(finish-from)/days,0,100);
+  // Only the canonical CPM's real calendar finish can establish a missed
+  // work deadline. A relative-day project must not invent calendar risk.
+  const dueDay=calendarDay(row.dueDate),finishDay=calendarDay(row.finishDate);
+  const missedDeadline=dueDay!==null&&finishDay!==null&&finishDay>dueDay;
   return {id:row.id,title:row.title,critical:!!row.critical,
    state:row.state||'todo',blockedBy:row.blockedBy||[],floatDays:row.floatDays,
+   dueDate:row.dueDate??null,missedDeadline,
    durationDays:row.durationDays??finish-start,earlyStart:start,earlyFinish:finish,
    dateStart:calendarLabel(startDate,start),dateFinish:calendarLabel(startDate,finish),
    isMilestone,visible,leftPct:left,widthPct:Math.max(0,right-left)};

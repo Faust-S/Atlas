@@ -463,3 +463,22 @@ test("Installed large-project warning reports a real missed control date without
  assert.match(native,/Расчётный финиш позже контрольного срока\. Затронуто работ: 1\./);
  assert.match(native,/Контрольный срок 2026-11-11 не выдержан\./);
 });
+
+test("Installed Windows Gantt filters dated work deadline violations and opens the saved work without writes",()=>{
+ const script=read("../desktop/tests/installed-atlas06-visual-scale.py");
+ const component=read("../desktop/src/ProjectVisuals.tsx");
+ assert.match(script,/ATLAS06_VISUAL_GANTT_WORK_DEADLINE_FILTER_PASS/);
+ assert.match(script,/d\.click_button\("График"\)/);
+ assert.match(script,/Только работы позже контрольного срока/);
+ assert.match(script,/Показано 1 из 1 работ на графике/);
+ assert.match(script,/Filtering overdue Gantt work changed native Store/);
+ assert.match(script,/Opening overdue work from Gantt changed native Store/);
+ assert.match(component,/Позже срока \(\{missedDeadlineTotal\}\)/);
+});
+
+test("Installed Windows numeric work-duration editor uses WebView2 Spinner input",()=>{
+ const driver=read("../desktop/tests/installed-atlas06-connect.py");
+ const editor=read("../src/editor.mjs");
+ assert.match(driver,/for role in \("Edit","ComboBox","Spinner"\):/);
+ assert.match(editor,/field\("estimateDays","Плановая длительность, дней","number"/);
+});

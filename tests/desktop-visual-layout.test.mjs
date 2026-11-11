@@ -170,3 +170,23 @@ test("fullscreen views release overlay before invoking project/work editors",()=
  assert.equal((ts.match(/setExpanded\(false\);onOpenWork\(row\.id\)/g)||[]).length,2);
  assert.match(ts,/setExpanded\(false\);onOpenWork\(node\.id\)/);
 });
+
+test('Gantt exposes dated work deadline overruns and can filter to the real affected work',()=>{
+ const source={durationDays:4,rows:[
+  {id:'on-time',title:'В срок',earlyStart:0,earlyFinish:2,dueDate:'2026-11-03',finishDate:'2026-11-03'},
+  {id:'missed',title:'Позже срока',earlyStart:2,earlyFinish:4,dueDate:'2026-11-04',finishDate:'2026-11-05'},
+  {id:'unknown',title:'Без календаря',earlyStart:1,earlyFinish:3,dueDate:'2026-11-03',finishDate:null}
+ ]};
+ const original=JSON.stringify(source);
+ const view=ganttViewport(source,{startDate:'2026-11-01'});
+ assert.deepEqual(view.rows.filter(r=>r.missedDeadline).map(r=>r.id),['missed']);
+ assert.equal(view.rows.find(r=>r.id==='missed').dueDate,'2026-11-04');
+ assert.equal(view.rows.find(r=>r.id==='unknown').missedDeadline,false);
+ assert.equal(ganttViewport({...source,rows:source.rows.map(r=>({...r,finishDate:null}))},
+  {startDate:null}).rows.some(r=>r.missedDeadline),false);
+ assert.equal(JSON.stringify(source),original);
+ const ui=readFileSync(new URL('../desktop/src/ProjectVisuals.tsx',import.meta.url),'utf8');
+ assert.match(ui,/aria-label="Только работы позже контрольного срока"/);
+ assert.ok(ui.includes('(!deadlineOnly||r.missedDeadline)'));
+ assert.ok(ui.includes('Расчётный финиш позже срока {row.dueDate}'));
+});
