@@ -236,8 +236,11 @@ def qualify_visual():
     d.wait_text("Схема проекта: каталоги, работы и этапы",25)
     assert d.head()==saved,"Returning to diagram from source changed native Store"
     d.wait_text("Найдено: 1",25)
-    d.wait_text("Скрыть связи",25)
-    d.wait_text("Показать каталог в Atlas",25)
+    # The button's accessible name is the full work title, even when its
+    # displayed text changes to "Скрыть связи". Check the revealed source
+    # control to prove that the work's saved context is actually expanded.
+    find_control("Связи работы Работа 5 / 1080",types={"Button"},scroll=False)
+    find_control("Показать каталог в Atlas",types={"Button"},scroll=False)
     restored=find_control("Открыть работу Работа 5 / 1080",types={"Button"},scroll=False)
     assert rectangle_in_workspace(restored.rectangle(),win32gui.GetWindowRect(d.handle))
     assert d.head()==saved,"Restoring source search changed native Store"
