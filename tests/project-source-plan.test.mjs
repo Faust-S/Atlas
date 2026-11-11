@@ -117,7 +117,8 @@ test("Atlas uses its existing editors, schedule, and dependency graph from a nav
  assert.match(visual,/onAddDependency/);
  assert.match(visual,/source\.status==="current"/);
  assert.match(guide,/projectSourcePlanProjection\(snapshot,projectId,moreLinks\?/);
- assert.match(guide,/open=\{projection\.workTotal>0\|\|projection\.stageTotal>0\|\|linkedFolderWorks\|\|undefined\}/);
+ assert.match(guide,/open=\{projection\.sources\.length>0\|\|projection\.workTotal>0\|\|/);
+ assert.match(guide,/projection\.stageTotal>0\|\|linkedFolderWorks\|\|undefined\}/);
  assert.match(guide,/onOpenWork=\{id=>onEdit\("work:"\+id\)\}/);
  assert.match(guide,/onEditStage=\{id=>onEdit\("stage-edit:"\+id\)\}/);
  assert.match(guide,/onCreateStage=\{\(\)=>onEdit\("stage"\)\}/);
@@ -574,4 +575,56 @@ test("Board cards navigate by work ID to the existing graph and restore the same
  assert.match(main,/ref=\{workReturnId===w\.id\?workReturnRef:undefined\}/);
  const nav=main.slice(main.indexOf("const openWorkGraph="),main.indexOf("useEffect(()=>{",main.indexOf("const openWorkGraph=")));
  assert.doesNotMatch(nav,/mutate\(|commitWithReadback\(|localStorage|createItem\(/);
+});
+
+
+test("Freshly connected repository shows known catalogs before any work or stages",()=>{
+ const created=createProject(empty(),{name:"Connected",type:"engineering"});
+ const linked=attach(created.state,created.id,"github","example/site",{branch:"work/dev"});
+ const observed=observe(linked.state,created.id,linked.id,"ok",{
+  scope:"repository",repository:"example/site",defaultBranch:"work/dev",
+  branchHeads:{"work/dev":SHA},complete:true,readiness:"not_assessed",
+  structure:{status:"observed",branch:"work/dev",commitSha:SHA,treeSha:TREE,
+   folders:["src","docs"],files:["package.json"],totalFolders:2,totalFiles:1}
+ });
+ const before=serialize(observed);
+ const map=projectSourcePlanProjection(observed,created.id);
+ assert.equal(map.workTotal,0);
+ assert.equal(map.stageTotal,0);
+ assert.equal(map.sources[0].status,"current");
+ assert.deepEqual(map.sources[0].folders.map(x=>x.name),["src","docs"]);
+ assert.equal(map.sources[0].folders[0].totalWorks,0);
+ assert.equal(serialize(observed),before);
+ const guide=read("../desktop/src/ProjectOrganizationGuide.tsx");
+ const visual=read("../desktop/src/ProjectVisuals.tsx");
+ assert.match(guide,/open=\{projection\.sources\.length>0\|\|projection\.workTotal>0\|\|/);
+ assert.match(visual,/Работ по этому каталогу ещё нет/);
+ assert.match(visual,/onSuggestFolder\(source\.sourceId,folder\.commitSha,folder\.name\)/);
+});
+
+test("Stale or unobserved catalogs offer an explicit refresh through the original source port",()=>{
+ const f=fixture(),initial=serialize(f.state);
+ const missing=structuredClone(f.state);
+ delete missing.projects[0].sources[0].summary.structure;
+ const unavailable=projectSourcePlanProjection(missing,f.projectId);
+ assert.equal(unavailable.sources[0].status,"unavailable");
+ assert.equal(unavailable.sources[0].branch,"work/dev");
+ assert.equal(unavailable.sources[0].folders.length,0);
+ const stale=structuredClone(f.state);
+ stale.projects[0].sources[0].summary.branchHeads["work/dev"]=OLD;
+ assert.equal(projectSourcePlanProjection(stale,f.projectId).sources[0].status,"stale");
+ const visual=read("../desktop/src/ProjectVisuals.tsx");
+ const guide=read("../desktop/src/ProjectOrganizationGuide.tsx");
+ const ui=read("../desktop/src/main.tsx");
+ assert.match(visual,/source\.status==="stale"/);
+ assert.match(visual,/Структуру каталогов этой ветки пока не удалось получить/);
+ assert.match(visual,/onRefreshSource\(source\.sourceId\)/);
+ assert.match(visual,/disabled=\{busy\}/);
+ assert.match(visual,/source\.branch\?/);
+ assert.match(visual,/onClick=\{onOpenSources\}>Указать ветку/);
+ assert.match(guide,/onRefreshSource=\{onRefresh\} busy=\{busy\}/);
+ assert.match(ui,/onRefresh=\{sourceId=>void syncPublic\(\{projectId:project\.id,sourceId\}\)\}/);
+ const from=visual.indexOf("export function ProjectSourcePlanMap");
+ assert.doesNotMatch(visual.slice(from),/fetch\(|mutate\(|localStorage|createItem\(/);
+ assert.equal(serialize(f.state),initial);
 });

@@ -253,14 +253,15 @@ export function PortfolioNetworkMap({snapshot,onOpenProject}:{
 // The connectors illustrate only confirmed user-created work/stage assignments.
 // No component or dependency is created by opening the diagram.
 export function ProjectSourcePlanMap({projection,project,restoreSearch,onOpenWork,onEditStage,onSuggestFolder,
- onOpenTimeline,onOpenGraph,onOpenWorks,onOpenSources,onOpenLinkedSource,onOpenStages,
+ onOpenTimeline,onOpenGraph,onOpenWorks,onOpenSources,onRefreshSource,onOpenLinkedSource,onOpenStages,
  onCreateStage,onAddDependency,
- expanded,hasMoreLinks,onToggleExpansion}:{
+ expanded,hasMoreLinks,onToggleExpansion,busy=false}:{
  projection:any;project:any;restoreSearch:{workId:string;query:string}|null;
  onOpenWork:(id:string)=>void;onEditStage:(id:string)=>void;
  onSuggestFolder:(sourceId:string,commitSha:string,folder:string)=>void;
  onOpenTimeline:()=>void;onOpenGraph:(workId?:string,query?:string)=>void;
- onOpenWorks:()=>void;onOpenSources:()=>void;onOpenStages:()=>void;
+ onOpenWorks:()=>void;onOpenSources:()=>void;onRefreshSource:(sourceId:string)=>void;
+ onOpenStages:()=>void;busy?:boolean;
  onOpenLinkedSource:(workId:string,query:string)=>void;
  onCreateStage:()=>void;onAddDependency:()=>void;
  expanded:boolean;hasMoreLinks:boolean;onToggleExpansion:()=>void;
@@ -476,8 +477,20 @@ export function ProjectSourcePlanMap({projection,project,restoreSearch,onOpenWor
      Сведения об исходниках неполные. Не все каталоги удалось определить.
      {" "}<button type="button" className="text-link" onClick={onOpenSources}>
       Проверить источник</button></p>}
-   </>:<p className="minor">Сведения о каталогах этой ветки сейчас недоступны.
-    Работы остаются в плане. Обновите источник, чтобы сравнить их со структурой.</p>}
+   </>:<div className="atlas-source-plan-unavailable">
+    <p className="minor">{source.status==="stale"?
+     "Сведения о каталогах относятся к прежней редакции исходников.":
+     "Структуру каталогов этой ветки пока не удалось получить."}
+     {" "}Существующие работы остаются в плане.</p>
+    {source.branch?
+     <button type="button" className="action-button"
+      aria-label={"Проверить каталоги "+source.repository}
+      onClick={()=>onRefreshSource(source.sourceId)} disabled={busy}>
+      Проверить каталоги</button>:
+     <button type="button" className="action-button"
+      aria-label={"Указать ветку для "+source.repository}
+      onClick={onOpenSources}>Указать ветку</button>}
+   </div>}
   </div>)}
   {!!projection.otherWorks.length&&<div className="atlas-source-plan-other">
    <h4>{projection.sources.length?"Работы без показанной связи с каталогом":

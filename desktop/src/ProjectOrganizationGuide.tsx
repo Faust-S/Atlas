@@ -50,7 +50,8 @@ export function ProjectOrganizationGuide({snapshot,projectId,restoreSearch,onEdi
   </p>}
   {!showMap&&<p className="minor">Добавьте этап или работу, чтобы увидеть план проекта.</p>}
   {showMap&&<details className="atlas-source-plan-disclosure"
-   open={projection.workTotal>0||projection.stageTotal>0||linkedFolderWorks||undefined}>
+   open={projection.sources.length>0||projection.workTotal>0||
+    projection.stageTotal>0||linkedFolderWorks||undefined}>
    <summary>{hasSources?"Схема проекта: каталоги, работы и этапы":
     "Схема проекта: работы и этапы"}</summary>
    <ProjectSourcePlanMap projection={projection} project={project}
@@ -62,6 +63,7 @@ export function ProjectOrganizationGuide({snapshot,projectId,restoreSearch,onEdi
      onEdit(folderWorkAction(sourceId,commitSha,folder))}
     onOpenTimeline={onOpenTimeline} onOpenGraph={onOpenGraph}
     onOpenWorks={onOpenWorks} onOpenSources={onOpenSources}
+    onRefreshSource={onRefresh} busy={busy}
     onOpenLinkedSource={onOpenLinkedSource}
     onOpenStages={onOpenStages}
     onCreateStage={()=>onEdit("stage")}

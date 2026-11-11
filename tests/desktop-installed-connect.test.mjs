@@ -346,3 +346,18 @@ test("Installed source-free Atlas opens all waiting work from overview despite s
  assert.match(driver,/The overview did not reveal waiting work inside the Windows viewport/);
  assert.match(driver,/Opening waiting works from overview changed native Store/);
 });
+
+
+test("Installed Atlas shows observed root catalogs immediately after adding a repository",()=>{
+ const guide=read("../desktop/src/ProjectOrganizationGuide.tsx");
+ const visual=read("../desktop/src/ProjectVisuals.tsx");
+ const installed=read("../desktop/tests/installed-atlas06-connect.py");
+ assert.match(guide,/open=\{projection\.sources\.length>0\|\|projection\.workTotal>0\|\|/);
+ assert.match(guide,/onRefreshSource=\{onRefresh\} busy=\{busy\}/);
+ assert.match(visual,/onClick=\{\(\)=>onRefreshSource\(source\.sourceId\)\}/);
+ assert.match(visual,/aria-label=\{"Проверить каталоги "\+source\.repository\}/);
+ assert.match(installed,/wait_text\("Как связаны части проекта",35\)/);
+ assert.match(installed,/wait_text\("Работ по этому каталогу ещё нет\.",35\)/);
+ assert.match(installed,/ATLAS06_CONNECT_SOURCE_MAP_FIRST_VIEW_PASS/);
+ assert.match(installed,/Viewing project parts changed native storage/);
+});

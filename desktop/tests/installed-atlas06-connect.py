@@ -337,7 +337,12 @@ def verify_organization_work(previous,original_project):
     click_button("Обзор")
     window_title_contains("Atlas — Обзор")
     wait_text("Состав проекта",35)
-    screenshot("suggested-structure")
+    # The first connected repository must expose its observed catalog tree
+    # without another disclosure or automatically inventing a work.
+    wait_text("Как связаны части проекта",35)
+    wait_text("Работ по этому каталогу ещё нет.",35)
+    screenshot("source-map-first-connection-no-work")
+    print("ATLAS06_CONNECT_SOURCE_MAP_FIRST_VIEW_PASS",flush=True)
     assert head()==previous,"Viewing project parts changed native storage"
     click_scrolled_button("Предложить работу по каталогу src",main=True)
     wait_text("Работа по каталогу: src",35)
