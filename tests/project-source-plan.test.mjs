@@ -328,3 +328,40 @@ test("Stage-only projects display the existing map and link to all saved stages"
  assert.match(visual,/onEditStage\(stage\.id\)/);
  assert.match(visual,/Открыть все этапы/);
 });
+
+
+test("Bounded known folders are distinct from incomplete source observations",()=>{
+ const f=fixture();
+ const state=structuredClone(f.state);
+ const tree=state.projects[0].sources[0].summary.structure;
+ tree.folders=["src","docs","assets","tests","scripts"];
+ tree.totalFolders=5;
+ tree.truncated=false;tree.limited=false;
+ const before=serialize(state);
+ const result=projectSourcePlanProjection(state,f.projectId,{
+  maxSources:1,maxFoldersPerSource:2,maxWorksPerFolder:3,maxOtherWorks:2
+ });
+ assert.equal(result.sources[0].hiddenKnownFolders,3);
+ assert.equal(result.sources[0].observationIncomplete,false);
+ assert.equal(result.sources[0].incomplete,true);
+ assert.equal(result.sources[0].folderCount,5);
+ assert.equal(serialize(state),before);
+ tree.totalFolders=9;
+ tree.truncated=true;
+ const partial=projectSourcePlanProjection(state,f.projectId,{
+  maxSources:1,maxFoldersPerSource:5,maxWorksPerFolder:3,maxOtherWorks:2
+ });
+ assert.equal(partial.sources[0].hiddenKnownFolders,0);
+ assert.equal(partial.sources[0].observationIncomplete,true);
+ assert.equal(partial.sources[0].incomplete,true);
+});
+test("Atlas tells hidden known folders apart from incomplete source readings",()=>{
+ const visual=read("../desktop/src/ProjectVisuals.tsx");
+ const guide=read("../desktop/src/ProjectOrganizationGuide.tsx");
+ assert.match(visual,/source\.hiddenKnownFolders>0/);
+ assert.match(visual,/source\.observationIncomplete/);
+ assert.match(visual,/Проверить источник/);
+ assert.match(guide,/source\.hiddenKnownFolders>0/);
+ assert.match(guide,/source\.observationIncomplete/);
+ assert.doesNotMatch(visual,/Другие каталоги могут быть не получены/);
+});

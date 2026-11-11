@@ -70,7 +70,8 @@ export function ProjectOrganizationGuide({snapshot,projectId,onEdit,onRefresh,on
    </div>
    {source.status==="current"?<>
     <p className="minor">Найдено каталогов: {source.folderCount}.
-     {source.incomplete?" Часть структуры пока не показана.":""}
+     {source.hiddenKnownFolders>0?" Часть известных каталогов скрыта в обзоре.":""}
+     {source.observationIncomplete?" Сведения об источнике неполные.":""}
      {" "}Назначение каталогов требует уточнения.</p>
     <details className="atlas-organization-folders" open={snapshot.projects.find((p:any)=>p.id===projectId)?.items.length===0||undefined}>
      <summary>Каталоги и предполагаемое назначение</summary>

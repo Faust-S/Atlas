@@ -72,14 +72,17 @@ export function projectStructureGuide(snapshot,projectId,{maxFolders=24,maxSourc
     workCount:folderCounts.get(source.id)?.get(name)||0,
     url:"https://github.com/"+repo+"/tree/"+tree.commitSha+"/"+encodeURIComponent(name)
    }));
+  const hiddenKnownFolders=Math.max(0,names.length-folders.length);
+  const observationIncomplete=Boolean(tree&&(tree.truncated||tree.limited||
+   (Number.isInteger(tree.totalFolders)&&tree.totalFolders>names.length)));
   const knownFiles=tree&&Array.isArray(tree.detected)?
    tree.detected.filter(rootName).slice(0,8):[];
   return {...textOfSource(source),status,
    commitSha:tree?.commitSha??null,
    folderCount:tree?.totalFolders??null,
    displayed:folders.length,folders,knownFiles,
-   incomplete:Boolean(tree&&(tree.truncated||tree.limited||
-    Number(tree.totalFolders)>folders.length)),
+   hiddenKnownFolders,observationIncomplete,
+   incomplete:hiddenKnownFolders>0||observationIncomplete,
    linkedWorkCount:linkCounts.get(source.id)||0};
  });
  const allRepos=new Set(sources.map(s=>s.repository.toLowerCase()));
