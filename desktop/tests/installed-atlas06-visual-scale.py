@@ -504,7 +504,10 @@ def qualify_visual():
     await_no_form()
     assert d.head()==linked_head,"Dependency was saved without user approval"
     d.wait_text("Изменились расчётные сроки. Затронуто работ: 2.",35)
+    d.wait_text("Расчётный финиш позже контрольного срока. Затронуто работ: 1.",35)
+    d.wait_text("Контрольный срок 2026-11-11 не выдержан.",35)
     d.wait_text("Расчётное окончание: было",35)
+    print("ATLAS06_VISUAL_AFFECTED_WORK_DEADLINE_PASS",flush=True)
     print("ATLAS06_VISUAL_EXISTING_WORK_SHIFT_EXPLAINED_PASS",flush=True)
     edit=find_control("Изменить затронутую работу Работа 0 / 2",
                       types={"Button"},scroll=False)
@@ -523,6 +526,7 @@ def qualify_visual():
     assert d.head()==linked_head,"Correcting affected work saved without confirmation"
     d.wait_text("Работа изменена в черновике.",35)
     d.wait_text("Изменились расчётные сроки. Затронуто работ: 2.",35)
+    d.wait_text("Расчётный финиш позже контрольного срока. Затронуто работ: 1.",35)
     capture("affected-work-duration-updated-feedback")
     print("ATLAS06_VISUAL_AFFECTED_WORK_REPLANNED_PASS",flush=True)
     d.click_button("Сохранить")

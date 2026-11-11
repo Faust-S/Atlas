@@ -1527,8 +1527,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
            {recentScheduleEffect.criticalChangedTotal>0?
             " Критический путь изменился. Затронуто работ: "+recentScheduleEffect.criticalChangedTotal+".":""}
            {recentScheduleEffect.deadlineMissedTotal>0?
-            " Контрольный срок не выдержан у "+recentScheduleEffect.deadlineMissedTotal+
-            " затронутых работ.":""}
+            " Расчётный финиш позже контрольного срока. Затронуто работ: "+
+            recentScheduleEffect.deadlineMissedTotal+".":""}
           </p>
           {recentScheduleEffect.examples.length>0&&<ul className="atlas-work-effect-list">
            {recentScheduleEffect.examples.map(item=><li key={item.id}>

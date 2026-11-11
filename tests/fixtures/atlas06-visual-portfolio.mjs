@@ -39,7 +39,8 @@ export function atlas06VisualPortfolio(){
    items.push({id,
     title:s===5&&i===0?LONG_WORK:"Работа "+s+" / "+(i+1),
     state:"todo",stageId:stages[stageIndex].id,
-    priority:"normal",assignee:"",dueDate:null,resourceId:null,
+    priority:"normal",assignee:"",
+     dueDate:s===0&&i===1?"2026-11-11":null,resourceId:null,
     allocationPct:100,executor:null,sourceId,sourcePath,sourceRevision:SHA,
     estimateDays:1,targetIds:[]});
    if(i>0&&i%4===0)dependencies.push({from:"visual-work-"+s+"-"+(i-1),to:id});

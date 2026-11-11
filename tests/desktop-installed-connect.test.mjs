@@ -454,3 +454,12 @@ test("Installed Windows corrects a shifted work and verifies the new plan after 
  assert.match(stress,/changes\[0\]\["estimateDays"\]==2/);
  assert.match(stress,/d\.saved_project\(final_head\)==final/);
 });
+
+test("Installed large-project warning reports a real missed control date without inferring one",()=>{
+ const fixture=read("../tests/fixtures/atlas06-visual-portfolio.mjs");
+ const native=read("../desktop/tests/installed-atlas06-visual-scale.py");
+ assert.match(fixture,/dueDate:s===0&&i===1\?"2026-11-11":null/);
+ assert.match(native,/ATLAS06_VISUAL_AFFECTED_WORK_DEADLINE_PASS/);
+ assert.match(native,/Расчётный финиш позже контрольного срока\. Затронуто работ: 1\./);
+ assert.match(native,/Контрольный срок 2026-11-11 не выдержан\./);
+});

@@ -801,7 +801,7 @@ test("Affected work deadlines are visible only when the calculated finish can be
  assert.match(source,/row\.dueDate&&row\.finishDate&&row\.finishDate>row\.dueDate/);
  assert.match(source,/deadlineMissedTotal/);
  assert.match(ui,/recentScheduleEffect\.deadlineMissedTotal>0/);
- assert.match(ui,/Контрольный срок не выдержан у/);
+ assert.match(ui,/Расчётный финиш позже контрольного срока\. Затронуто работ:/);
  assert.match(ui,/item\.missedDeadline&&<small className="atlas-work-effect-deadline">/);
  assert.match(ui,/Контрольный срок \{item\.dueDate\} не выдержан/);
  assert.match(css,/\.atlas-work-effect-list small\.atlas-work-effect-deadline/);
