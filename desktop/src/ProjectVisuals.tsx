@@ -137,10 +137,11 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
  </section>;
 }
 
-export function ProjectDependencyDiagram({schedule,onOpenWork}:{schedule:CPM;onOpenWork:(id:string)=>void}){
+export function ProjectDependencyDiagram({schedule,onOpenWork,focusWorkId=null}:{schedule:CPM;onOpenWork:(id:string)=>void;focusWorkId?:string|null}){
  const [query,setQuery]=useState('');
  const [matchIndex,setMatchIndex]=useState(0);
  const [expanded,setExpanded]=useState(false);
+ const graphViewportRef=useRef<HTMLDivElement|null>(null);
  useEffect(()=>{
   if(!expanded)return;
   const close=(event:KeyboardEvent)=>{if(event.key==='Escape'){event.preventDefault();setExpanded(false)}};
@@ -149,7 +150,16 @@ export function ProjectDependencyDiagram({schedule,onOpenWork}:{schedule:CPM;onO
  },[expanded]);
  const matches=useMemo(()=>query.trim()?schedule.rows.filter(row=>row.title.toLocaleLowerCase('ru-RU').includes(query.trim().toLocaleLowerCase('ru-RU'))):[],[schedule,query]);
  const activeMatch=matches[Math.min(matchIndex,Math.max(0,matches.length-1))];
- const display=useMemo(()=>dependencyDiagram(schedule,{limit:80,focusId:activeMatch?.id||null} as any),[schedule,activeMatch?.id]);
+ const focusedId=activeMatch?.id||(!query.trim()?focusWorkId:null);
+ const display=useMemo(()=>dependencyDiagram(schedule,{limit:80,focusId:focusedId} as any),[schedule,focusedId]);
+ useEffect(()=>{
+  if(!focusWorkId||focusedId!==focusWorkId)return;
+  const node=display.nodes.find((item:any)=>item.id===focusWorkId);
+  const scroller=graphViewportRef.current;
+  if(!node||!scroller)return;
+  scroller.scrollLeft=Math.max(0,node.x+node.width/2-scroller.clientWidth/2);
+  scroller.scrollTop=Math.max(0,node.y+node.height/2-scroller.clientHeight/2);
+ },[focusWorkId,focusedId,display]);
  return <div className={'atlas-dag-panel'+(expanded?' is-expanded':'')} role={expanded?'dialog':undefined}
   aria-label={expanded?'Развёрнутый граф зависимостей':undefined} aria-modal={expanded?'true':undefined}>
   <div className="atlas-graph-tools">
@@ -163,7 +173,7 @@ export function ProjectDependencyDiagram({schedule,onOpenWork}:{schedule:CPM;onO
   {!schedule.rows.length?<p className="minor">Работ пока нет. Добавьте их в таблице.</p>:
    query.trim()&&!matches.length?<p className="minor">Не найдено ни одной работы с таким названием.</p>:<>
     <p className="minor">Слева — предшественники, справа — зависимые работы. Красными линиями выделены связи на критическом пути. Нажатие на узел открывает работу.</p>
-    <div className="atlas-dependency-scroll" role="region" tabIndex={0} aria-label="Ориентированный граф работ с прокруткой">
+    <div ref={graphViewportRef} className="atlas-dependency-scroll" role="region" tabIndex={0} aria-label="Ориентированный граф работ с прокруткой">
      <div className="atlas-dependency-layout" style={{width:display.width,height:display.height}}>
       <svg className="atlas-dependency-lines" width={display.width} height={display.height} viewBox={'0 0 '+display.width+' '+display.height} aria-hidden="true">
        <defs><marker id="atlas-dag-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#7394bb"/></marker>
@@ -174,14 +184,14 @@ export function ProjectDependencyDiagram({schedule,onOpenWork}:{schedule:CPM;onO
       </svg>
       {display.nodes.map((node:any)=><button key={node.id} type="button" title={node.title}
        onClick={()=>{setExpanded(false);onOpenWork(node.id)}}
-       className={'atlas-dependency-node'+(node.critical?' critical':'')+(node.state==='done'?' done':'')+(activeMatch?.id===node.id?' focused':'')}
+       className={'atlas-dependency-node'+(node.critical?' critical':'')+(node.state==='done'?' done':'')+(focusedId===node.id?' focused':'')}
        style={{left:node.x,top:node.y,width:node.width,height:node.height}}>
        <strong>{trim(node.title,66)}</strong><small>{statusName[node.state]||node.state}
         {node.critical?' · критическая':' · резерв '+node.floatDays+' дн.'}</small>
       </button>)}
      </div>
     </div>
-    {display.partial&&<p className="minor">Визуально показано {display.shown} из {display.total} работ. {activeMatch?'Это окружение выбранной работы (до двух связей в каждую сторону).':'Для большого проекта найдите работу, чтобы увидеть её окружение.'} Полный список связей находится в таблице ниже.</p>}
+    {display.partial&&<p className="minor">Визуально показано {display.shown} из {display.total} работ. {focusedId?'Это окружение выбранной работы (до двух связей в каждую сторону).':'Для большого проекта найдите работу, чтобы увидеть её окружение.'} Полный список связей находится в таблице ниже.</p>}
    </>}
  </div>;
 }
@@ -249,7 +259,7 @@ export function ProjectSourcePlanMap({projection,project,restoreSearch,onOpenWor
  projection:any;project:any;restoreSearch:{workId:string;query:string}|null;
  onOpenWork:(id:string)=>void;onEditStage:(id:string)=>void;
  onSuggestFolder:(sourceId:string,commitSha:string,folder:string)=>void;
- onOpenTimeline:()=>void;onOpenGraph:()=>void;
+ onOpenTimeline:()=>void;onOpenGraph:(workId?:string,query?:string)=>void;
  onOpenWorks:()=>void;onOpenSources:()=>void;onOpenStages:()=>void;
  onOpenLinkedSource:(workId:string,query:string)=>void;
  onCreateStage:()=>void;onAddDependency:()=>void;
@@ -383,7 +393,7 @@ export function ProjectSourcePlanMap({projection,project,restoreSearch,onOpenWor
           {(detail.predecessorTotal>detail.predecessors.length||
             detail.successorTotal>detail.successors.length)&&
            <button type="button" className="text-link"
-            onClick={()=>{closeSearch();onOpenGraph()}}>
+            onClick={()=>{closeSearch();onOpenGraph(detail.id,searchQuery)}}>
             Все зависимости на схеме</button>}
           {!detail.source&&!detail.stage&&!detail.predecessorTotal&&
            !detail.successorTotal&&<small>Связи пока не записаны.</small>}
@@ -398,7 +408,7 @@ export function ProjectSourcePlanMap({projection,project,restoreSearch,onOpenWor
     <button type="button" className="action-button" disabled={!projection.workTotal}
      onClick={onOpenTimeline}>План-график</button>
     <button type="button" className="action-button" disabled={!projection.workTotal}
-     onClick={onOpenGraph}>Зависимости работ</button>
+     onClick={()=>onOpenGraph()}>Зависимости работ</button>
     {(hasMoreLinks||expanded)&&<button type="button" className="action-button"
      aria-expanded={expanded} onClick={onToggleExpansion}>
      {expanded?"Свернуть схему":"Показать больше связей"}</button>}
@@ -435,7 +445,7 @@ export function ProjectSourcePlanMap({projection,project,restoreSearch,onOpenWor
           className="text-link" title={previous.title}
           onClick={()=>onOpenWork(previous.id)}>{previous.title}</button>)}
          {work.predecessorTotal>work.predecessors.length&&<button type="button"
-          className="text-link" onClick={onOpenGraph}>Открыть остальные зависимости</button>}
+          className="text-link" onClick={()=>onOpenGraph()}>Открыть остальные зависимости</button>}
         </details>}
        </div>
        <span className="atlas-source-plan-arrow" aria-hidden="true">→</span>
@@ -486,7 +496,7 @@ export function ProjectSourcePlanMap({projection,project,restoreSearch,onOpenWor
         type="button" className="text-link" title={previous.title}
         onClick={()=>onOpenWork(previous.id)}>{previous.title}</button>)}
        {work.predecessorTotal>work.predecessors.length&&<button type="button"
-        className="text-link" onClick={onOpenGraph}>Открыть остальные зависимости</button>}
+        className="text-link" onClick={()=>onOpenGraph()}>Открыть остальные зависимости</button>}
       </details>}
      </div>
      <div className="atlas-source-plan-other-stage">

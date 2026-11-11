@@ -220,11 +220,14 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const [sourceRowLimits,setSourceRowLimits]=useState<Record<string,number>>({});
  const [sourceJump,setSourceJump]=useState<{projectId:string;workId:string;query:string}|null>(null);
  const [mapSearchReturn,setMapSearchReturn]=useState<{workId:string;query:string}|null>(null);
+ const [graphJump,setGraphJump]=useState<{projectId:string;workId:string;query:string}|null>(null);
  const [recheckLimit,setRecheckLimit]=useState(25);
  const project=data.projects.find((p:any)=>p.id===active)||null;
  const sourceJumpContext=useMemo(()=>sourceJump&&project&&
   sourceJump.projectId===project.id?
    projectSourcePlanWorkContext(project,sourceJump.workId):null,[project,sourceJump]);
+ const graphFocusWork=useMemo(()=>graphJump&&project&&graphJump.projectId===project.id?
+  project.items.find((work:any)=>work.id===graphJump.workId)||null:null,[project,graphJump]);
  // Canonical snapshot text is expensive for large portfolios: compute only
  // when domain data change, not for typing, scrolling, or tab switches.
  const dataSignature=useMemo(()=>snapshotText(data),[data]);
@@ -456,7 +459,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   resetWorkspaceScroll();
   host?.onSelection?.({projectId:id,workId:null,revision:String(latestSnapshot.current.revision)});
   setActive(id);setTab("overview");setEditor(null);setForecastId(null);setConnectOpen(false);
-  setSourceJump(null);setMapSearchReturn(null);
+  setSourceJump(null);setMapSearchReturn(null);setGraphJump(null);
   setShowProjectRelations(false);setRelationLimit(12);setRequirementJump(null);setChangeJump(null);
   if(!afterSubmit)setMessage("");
   setWorkFilter("all");setWorkTargetFilter("all");setWorkObservationFilter("all");setWorkHistoryLimits({});setWorkQuery("");setWorkSort("title");setWorkLimit(200);setRealityLimit(8);
@@ -816,14 +819,24 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   // context. Ordinary tab changes leave no retained search.
   setMapSearchReturn(tabId==="overview"&&tab==="sources"&&sourceJump!==null&&
    sourceJump.projectId===project?.id?
-   {workId:sourceJump.workId,query:sourceJump.query}:null);
+   {workId:sourceJump.workId,query:sourceJump.query}:
+   tabId==="overview"&&tab==="graph"&&graphJump!==null&&
+   graphJump.projectId===project?.id?
+   {workId:graphJump.workId,query:graphJump.query}:null);
   setSourceJump(null);
+  if(tabId!=="graph")setGraphJump(null);
   setTab(tabId);setEditor(null);setForecastId(null);
  };
  const openLinkedSource=(workId:string,query:string)=>{
   if(!project||!requireClosedForm())return;
   view("sources");
   setSourceJump({projectId:project.id,workId,query});
+ };
+ const openWorkGraph=(workId?:string,query?:string)=>{
+  if(!project||!requireClosedForm())return;
+  view("graph");
+  const work=workId&&project.items.find((item:any)=>item.id===workId);
+  setGraphJump(work?{projectId:project.id,workId:work.id,query:query||""}:null);
  };
  useEffect(()=>{
   const key=(event:KeyboardEvent)=>{
@@ -1182,7 +1195,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       onOpenWorks={()=>view("work")}
       onOpenStages={()=>document.getElementById("atlas-project-stages")?.scrollIntoView({behavior:"smooth",block:"start"})}
       onOpenTimeline={()=>view("timeline")}
-      onOpenGraph={()=>view("graph")}
+      onOpenGraph={openWorkGraph}
       onOpenProject={id=>selectProject(id)}
       onAddRelation={()=>openEditor("portfolio-link")}
       busy={busy}/>}
@@ -1482,7 +1495,12 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     {tab==="graph"&&<section className="surface"><div className="section-heading">
       <div><h2>Зависимости работ</h2><p>Интерактивный DAG существующего CPM; выделенный путь не означает подтверждение исполнения.</p></div>
       <Action onClick={()=>openEditor("dep")}>＋ Зависимость</Action></div>
-      {plan&&<ProjectDependencyDiagram key={project.id} schedule={plan} onOpenWork={id=>openEditor("work:"+id)}/>}
+      {graphFocusWork&&<div className="button-row">
+       <p className="minor" style={{overflowWrap:"anywhere"}}>Связи работы: <strong>{graphFocusWork.title}</strong></p>
+       <Action onClick={()=>view("overview")}>К найденной работе</Action>
+      </div>}
+      {plan&&<ProjectDependencyDiagram key={project.id} schedule={plan}
+       focusWorkId={graphFocusWork?.id||null} onOpenWork={id=>openEditor("work:"+id)}/>}
       <div className="table-scroll"><table><thead><tr><th>Предшествующая работа</th><th>Зависимая работа</th><th>Переход</th></tr></thead>
        <tbody>{project.dependencies.map((d:any,i:number)=><tr key={d.from+"-"+d.to+"-"+i}>
         <td>{project.items.find((w:any)=>w.id===d.from)?.title||d.from}</td>

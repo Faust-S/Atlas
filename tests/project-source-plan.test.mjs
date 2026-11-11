@@ -416,7 +416,7 @@ test("Search context stays inside one dialog and uses existing editors and sourc
  assert.match(visual,/Открыть зависящую работу/);
  assert.match(visual,/Открыть каталог GitHub/);
  assert.match(visual,/onClick=\{\(\)=>onOpenLinkedSource\(detail\.id,searchQuery\)\}/);
- assert.match(visual,/onClick=\{\(\)=>\{closeSearch\(\);onOpenGraph\(\)\}\}/);
+ assert.match(visual,/onClick=\{\(\)=>\{closeSearch\(\);onOpenGraph\(detail\.id,searchQuery\)\}\}/);
  assert.match(visual,/onClick=\{\(\)=>\{if\(detail\.stage\)openFound\(\{kind:"stage",id:detail\.stage\.id\}\)\}\}/);
  assert.match(css,/\.atlas-source-plan-find-context\{display:grid/);
  assert.doesNotMatch(visual.slice(visual.indexOf("export function ProjectSourcePlanMap")),
@@ -519,4 +519,21 @@ test("Source navigation retains the matching query and selected work only for a 
  assert.match(map,/onOpenLinkedSource\(detail\.id,searchQuery\)/);
  assert.doesNotMatch(map.slice(map.indexOf("export function ProjectSourcePlanMap")),
   /localStorage|createItem\(|mutate\(|fetch\(/);
+});
+
+test("Full dependency graph focuses the selected work and restores search on return",()=>{
+ const main=read("../desktop/src/main.tsx");
+ const visual=read("../desktop/src/ProjectVisuals.tsx");
+ const guide=read("../desktop/src/ProjectOrganizationGuide.tsx");
+ assert.match(visual,/const focusedId=activeMatch\?\.id\|\|\(!query\.trim\(\)\?focusWorkId:null\)/);
+ assert.match(visual,/focusId:focusedId/);
+ assert.match(visual,/graphViewportRef\.current/);
+ assert.match(visual,/onOpenGraph\(detail\.id,searchQuery\)/);
+ assert.match(main,/const \[graphJump,setGraphJump\]=useState/);
+ assert.match(main,/tabId==="overview"&&tab==="graph"/);
+ assert.match(main,/onOpenGraph=\{openWorkGraph\}/);
+ assert.match(main,/focusWorkId=\{graphFocusWork\?\.id\|\|null\}/);
+ assert.match(main,/К найденной работе/);
+ assert.match(guide,/onOpenGraph:\(workId\?:string,query\?:string\)=>void/);
+ assert.doesNotMatch(main.slice(main.indexOf("const view=(tabId:Tab)=>"),main.indexOf("useEffect(()=>{",main.indexOf("const view=(tabId:Tab)=>"))),/mutate\(|commitWithReadback/);
 });

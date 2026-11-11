@@ -12,7 +12,7 @@ export function ProjectOrganizationGuide({snapshot,projectId,restoreSearch,onEdi
  onRefresh:(sourceId:string)=>void;onOpenProject:(id:string)=>void;
  onOpenSources:()=>void;onOpenLinkedSource:(workId:string,query:string)=>void;
  onOpenWorks:()=>void;onOpenStages:()=>void;onAddRelation:()=>void;
- onOpenTimeline:()=>void;onOpenGraph:()=>void;busy?:boolean;
+ onOpenTimeline:()=>void;onOpenGraph:(workId?:string,query?:string)=>void;busy?:boolean;
 }){
  const [moreLinks,setMoreLinks]=useState(false);
  useEffect(()=>setMoreLinks(false),[projectId]);
