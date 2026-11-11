@@ -280,7 +280,9 @@ test("Installed source-free project shows recorded predecessor names before open
  const css=read("../desktop/src/style.css");
  assert.match(driver,/ATLAS06_UNIVERSAL_TABLE_DEPENDENCY_HINT_PASS/);
  assert.match(driver,/ATLAS06_UNIVERSAL_BOARD_DEPENDENCY_HINT_PASS/);
- assert.match(driver,/d\.wait_text\("Не отмечены выполненными: Подготовить помещение, Согласовать программу",25\)/);
+ assert.match(driver,/d\.wait_text\("Не отмечены выполненными:",25\)/);
+ assert.match(driver,/d\.wait_text\("Подготовить помещение",25\)/);
+ assert.match(driver,/d\.wait_text\("Согласовать программу",25\)/);
  assert.match(driver,/Reading predecessor hints in table changed native Store/);
  assert.match(driver,/Reading predecessor hints on board changed native Store/);
  assert.match(main,/workDependencyOverview\(project,plan\)/);

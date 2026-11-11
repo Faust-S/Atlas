@@ -129,7 +129,11 @@ def qualify():
     d.click_button("Таблица")
     d.wait_text("Работы проекта",25)
     d.set_text("Найти работу","Открыть площадку")
-    d.wait_text("Не отмечены выполненными: Подготовить помещение, Согласовать программу",25)
+    # WebView2 UIA may expose JSX text fragments separately even when the
+    # complete sentence is clearly visible in the installed Windows window.
+    d.wait_text("Не отмечены выполненными:",25)
+    d.wait_text("Подготовить помещение",25)
+    d.wait_text("Согласовать программу",25)
     v.capture("universal-table-work-conditions")
     assert d.head()==saved,"Reading predecessor hints in table changed native Store"
     print("ATLAS06_UNIVERSAL_TABLE_DEPENDENCY_HINT_PASS",flush=True)
@@ -153,7 +157,11 @@ def qualify():
     # Only actual Windows-visible controls are clicked.
     v.find_control("Другие разделы").click_input()
     v.find_control("Доска",types={"Button"}).click_input()
-    d.wait_text("Не отмечены выполненными: Подготовить помещение, Согласовать программу",25)
+    # WebView2 UIA may expose JSX text fragments separately even when the
+    # complete sentence is clearly visible in the installed Windows window.
+    d.wait_text("Не отмечены выполненными:",25)
+    d.wait_text("Подготовить помещение",25)
+    d.wait_text("Согласовать программу",25)
     v.capture("universal-board-work-conditions")
     assert d.head()==saved,"Reading predecessor hints on board changed native Store"
     print("ATLAS06_UNIVERSAL_BOARD_DEPENDENCY_HINT_PASS",flush=True)
