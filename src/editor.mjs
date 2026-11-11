@@ -210,6 +210,18 @@ export function editorSpec(project,action,snapshot=null){
    field("allocationPct","Доля ресурса на работе, %","number","100")
   ]};
  }
+ if(action.startsWith("dep-to:")){
+  const id=decodeURIComponent(action.slice("dep-to:".length));
+  const target=project.items.find(item=>item.id===id);
+  if(!target)throw Error("Работа для зависимости не найдена");
+  const linked=new Set(project.dependencies.filter(dep=>dep.to===id).map(dep=>dep.from));
+  const candidates=project.items.filter(item=>item.id!==id&&!linked.has(item.id))
+   .map(item=>option(item.id,item.title));
+  if(!candidates.length)throw Error("Нет других работ для новой зависимости");
+  return {title:"Предшествующая работа для: "+target.title,
+   hint:"Выберите работу, которую нужно закончить раньше. Связь появится только после подтверждения.",
+   fields:[choice("from","Что должно быть выполнено раньше?",candidates,candidates[0].value)]};
+ }
  if(action==="dep"){
   const options=workItems(project);
   if(options.length<2)throw Error("Для зависимости необходимы минимум две работы");
@@ -408,6 +420,14 @@ export function applyEditor(snapshot,projectId,action,input){
   });
   const predecessorId=get("predecessorId");
   return {state:predecessorId?connect(work,projectId,predecessorId,r.id):work,workId:r.id};
+ }
+ if(action.startsWith("dep-to:")){
+  const id=decodeURIComponent(action.slice("dep-to:".length));
+  const from=get("from");
+  if(!p.items.some(item=>item.id===id)||!p.items.some(item=>item.id===from&&item.id!==id)||
+     p.dependencies.some(dep=>dep.from===from&&dep.to===id))
+   throw Error("Связь работ больше недоступна. Откройте форму заново.");
+  return {state:connect(snapshot,projectId,from,id)};
  }
  if(action==="dep")return {state:connect(snapshot,projectId,get("from"),get("to"))};
  if(action==="target")return {state:addTarget(snapshot,projectId,{title:get("title"),desired:get("desired"),intent:get("intent")}).state};

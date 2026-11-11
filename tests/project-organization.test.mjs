@@ -272,3 +272,36 @@ test("A project without GitHub can create work with the same scheduling fields",
  assert.equal(result.state.projects[0].items.at(-1).dueDate,"2026-12-01");
  assert.deepEqual(deserialize(serialize(result.state)),result.state);
 });
+
+test("An existing work selects one predecessor without choosing the dependent work",()=>{
+ const p=createProject(empty(),{name:"План",type:"other"});
+ const first=createItem(p.state,p.id,{title:"Подготовка"});
+ const second=createItem(first.state,p.id,{title:"Проверка"});
+ const third=createItem(second.state,p.id,{title:"Публикация"});
+ const before=serialize(third.state),action="dep-to:"+encodeURIComponent(third.id);
+ const spec=editorSpec(third.state.projects[0],action,third.state);
+ assert.equal(spec.title,"Предшествующая работа для: Публикация");
+ assert.deepEqual(spec.fields.map(field=>field.name),["from"]);
+ assert.deepEqual(spec.fields[0].options.map(o=>o.value),[first.id,second.id]);
+ const form=new FormData();form.set("from",second.id);
+ const result=applyEditor(third.state,p.id,action,form);
+ assert.deepEqual(result.state.projects[0].dependencies,[{from:second.id,to:third.id}]);
+ assert.deepEqual(deserialize(serialize(result.state)),result.state);
+ assert.equal(serialize(third.state),before);
+ assert.deepEqual(editorSpec(result.state.projects[0],action,result.state).fields[0].options.map(o=>o.value),[first.id]);
+ assert.throws(()=>applyEditor(result.state,p.id,action,form),/больше недоступна/);
+ const self=new FormData();self.set("from",third.id);
+ assert.throws(()=>applyEditor(third.state,p.id,action,self),/больше недоступна/);
+ const invalid=new FormData();invalid.set("from","missing");
+ assert.throws(()=>applyEditor(third.state,p.id,action,invalid),/больше недоступна/);
+ const cycle=new FormData();cycle.set("from",third.id);
+ assert.throws(()=>applyEditor(result.state,p.id,"dep-to:"+encodeURIComponent(second.id),cycle));
+ assert.throws(()=>editorSpec(third.state.projects[0],"dep-to:missing",third.state),/не найдена/);
+ assert.equal(serialize(third.state),before);
+});
+test("The work row offers a direct existing-work predecessor action",()=>{
+ const ui=read("../desktop/src/main.tsx");
+ assert.match(ui,/onClick=\{\(\)=>openEditor\("dep-to:"\+encodeURIComponent\(w\.id\)\)\}/);
+ assert.match(ui,/ariaLabel=\{"Добавить предшественника для работы "\+w\.title\}/);
+ assert.match(ui,/>После работы<\/Action>/);
+});

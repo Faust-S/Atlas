@@ -1610,6 +1610,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
            ariaLabel={"Зафиксировать факт по работе: "+w.title+" — "+targetById.get(id).title}
            onClick={()=>openEditor("finding-work:"+encodeURIComponent(w.id)+":"+encodeURIComponent(id))}>{targetById.get(id).title}</Action>)}
          </div></details>}
+        {project.items.length>1&&<Action ariaLabel={"Добавить предшественника для работы "+w.title}
+         onClick={()=>openEditor("dep-to:"+encodeURIComponent(w.id))}>После работы</Action>}
         <button type="button" className="action-button"
          aria-label={"Связи работы "+w.title}
          onClick={()=>openWorkGraph(w.id,workQuery,"work")}>Связи</button>
