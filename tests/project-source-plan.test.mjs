@@ -761,3 +761,18 @@ test("Changing an existing dependency keeps its impact summary on screen",()=>{
  assert.match(ui,/onClick=\{\(\)=>revealWorkInTable\(recentWork\.id\)\}/);
  assert.doesNotMatch(helper,/mutate\(|commitWithReadback\(|nativeInvoke\(|localStorage/);
 });
+
+test("Affected-work actions are placed before secondary schedule details",()=>{
+ const ui=read("../desktop/src/main.tsx");
+ const section=ui.indexOf('{recentWork&&<div className="atlas-work-created"');
+ const end=ui.indexOf('<div className="filter-row">',section);
+ const block=ui.slice(section,end);
+ const impact=block.indexOf('className="atlas-work-plan-effect"');
+ const estimate=block.indexOf('<p className="minor">Оценка:');
+ const duration=block.indexOf('Продолжительность плана: было');
+ assert.ok(section>0&&end>section&&impact>0&&estimate>impact&&duration>estimate);
+ assert.match(block,/aria-label=\{"Изменить затронутую работу "\+item\.title\}/);
+ const witness=read("../desktop/tests/installed-atlas06-visual-scale.py");
+ assert.match(witness,/ATLAS06_VISUAL_AFFECTED_WORK_ACTION_VISIBLE_PASS/);
+ assert.match(witness,/scroll=False\)/);
+});

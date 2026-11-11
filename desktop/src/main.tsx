@@ -1500,17 +1500,6 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
          dirty?"Связь внесена в черновик. Сохраните изменения.":"Связь сохранена.":
          dirty?"Работа внесена в черновик. Сохраните изменения.":"Работа сохранена."}
          {" "}{recentStage?"Этап: "+recentStage.name+".":"Этап пока не выбран."}</p>
-        <p className="minor">Оценка: {recentWork.estimateDays??1} календарных дней.
-         {recentWork.dueDate?" Контрольный срок: "+recentWork.dueDate+".":""}</p>
-        {recentPlanRow&&<p className="minor">По записанным зависимостям: {recentPlanRow.startDate?
-         "начало "+recentPlanRow.startDate+", расчётный финиш "+recentPlanRow.finishDate+".":
-         "начало через "+recentPlanRow.earlyStart+" дн., финиш через "+recentPlanRow.earlyFinish+
-         " дн. от начала проекта."}
-         {recentPlanRow.predecessors.length?" Предшествующих работ: "+recentPlanRow.predecessors.length+".":""}
-        </p>}
-        {planBeforeRecent!==null&&plan&&<p className="minor">
-         Продолжительность плана: было {planBeforeRecent} дн., стало {plan.durationDays} дн.
-         Расчёт по календарным дням без распределения ресурсов.</p>}
         {recentWorkKind==="dependency"&&recentScheduleEffect&&
          <div className="atlas-work-plan-effect" aria-label="Последствия изменения зависимости">
           <p>{recentScheduleEffect.movedTotal>0?
@@ -1538,6 +1527,17 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
            <p className="minor">Ещё {recentScheduleEffect.movedTotal-
             recentScheduleEffect.examples.length} работ в полном графике.</p>}
          </div>}
+        <p className="minor">Оценка: {recentWork.estimateDays??1} календарных дней.
+         {recentWork.dueDate?" Контрольный срок: "+recentWork.dueDate+".":""}</p>
+        {recentPlanRow&&<p className="minor">По записанным зависимостям: {recentPlanRow.startDate?
+         "начало "+recentPlanRow.startDate+", расчётный финиш "+recentPlanRow.finishDate+".":
+         "начало через "+recentPlanRow.earlyStart+" дн., финиш через "+recentPlanRow.earlyFinish+
+         " дн. от начала проекта."}
+         {recentPlanRow.predecessors.length?" Предшествующих работ: "+recentPlanRow.predecessors.length+".":""}
+        </p>}
+        {planBeforeRecent!==null&&plan&&<p className="minor">
+         Продолжительность плана: было {planBeforeRecent} дн., стало {plan.durationDays} дн.
+         Расчёт по календарным дням без распределения ресурсов.</p>}
         {recentPlanRow?.finishDate&&recentWork.dueDate&&
          recentPlanRow.finishDate>recentWork.dueDate&&<p className="atlas-schedule-warning">
           Расчётный финиш позже указанного срока. Проверьте длительность и зависимости.</p>}
