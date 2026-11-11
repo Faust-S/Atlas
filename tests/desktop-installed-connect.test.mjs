@@ -236,6 +236,8 @@ test("Installed ordinary project without GitHub returns from exact work graph to
  assert.match(driver,/v\.find_control\("К работе в таблице",types=\{"Button"\},scroll=False\)/);
  assert.match(driver,/The original work was not restored inside the Windows viewport/);
  assert.match(driver,/ATLAS06_UNIVERSAL_TABLE_GRAPH_ROUNDTRIP_PASS/);
+ assert.match(driver,/v\.find_control\("Обзор",types=\{"Button"\}\)\.click_input\(\)/);
+ assert.match(driver,/d\.wait_text\("Схема проекта: работы и этапы",25\)/);
  assert.match(driver,/Opening graph from ordinary work changed native Store/);
  assert.match(driver,/Returning from ordinary work graph changed native Store/);
  assert.match(ui,/ref=\{workReturnId===w\.id\?workReturnRef:undefined\}/);

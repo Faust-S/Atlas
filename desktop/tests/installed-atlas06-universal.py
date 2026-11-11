@@ -144,7 +144,10 @@ def qualify():
     v.capture("universal-work-dependency-return")
     assert d.head()==saved,"Returning from ordinary work graph changed native Store"
     print("ATLAS06_UNIVERSAL_TABLE_GRAPH_ROUNDTRIP_PASS",flush=True)
-    d.click_button("Обзор")
+    # The tab strip can be above the Windows viewport after returning to a
+    # filtered table row. Scroll it into the physical window before clicking.
+    v.find_control("Обзор",types={"Button"}).click_input()
+    d.wait_text("Схема проекта: работы и этапы",25)
 
     # Two predecessors in the already saved plan, never inferred by the map.
     detail=v.find_control("Предшествующих работ: 2")
