@@ -288,8 +288,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   [project,historyType,historyQuery]);
  const plan=useMemo(()=>project?scheduleProject(project):null,[project]);
  const recentPlanRow=recentWork&&plan?plan.rows.find((row:any)=>row.id===recentWork.id):null;
- const planBeforeRecent=recentWork&&recentPlanBefore?.workId===recentWork.id&&
-  recentPlanBefore.revision===data.revision?recentPlanBefore.days:null;
+ const planBeforeRecent=recentWork&&recentPlanBefore&&
+  recentPlanBefore.workId===recentWork.id&&recentPlanBefore.revision===data.revision?
+  recentPlanBefore.days:null;
  const workLinks=useMemo(()=>project&&plan?workDependencyOverview(project,plan):new Map(),[project,plan]);
  const pendingWorkCount=useMemo(()=>Array.from(workLinks.values())
   .filter((entry:any)=>entry.pendingTotal>0).length,[workLinks]);
