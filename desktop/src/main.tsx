@@ -1510,6 +1510,13 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       aria-label={recentWorkKind==="dependency"?"Изменение зависимостей работы":
        recentWorkKind==="adjusted"?"Изменение работы":"Только что добавленная работа"}>
        <div><strong>{recentWork.title}</strong>
+        {(recentWorkKind==="dependency"||recentWorkKind==="adjusted")&&
+         recentScheduleEffect?.examples.length>0&&
+         <button type="button" className="text-link atlas-work-effect-primary"
+          aria-label={"Изменить затронутую работу "+recentScheduleEffect.examples[0].title}
+          onClick={()=>openEditor("work:"+recentScheduleEffect.examples[0].id)}>
+          Исправить затронутую работу: {recentScheduleEffect.examples[0].title}
+         </button>}
         <p role="status">{recentWorkKind==="dependency"?
          dirty?"Связь внесена в черновик. Сохраните изменения.":"Связь сохранена.":
          recentWorkKind==="adjusted"?
@@ -1531,10 +1538,10 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
             recentScheduleEffect.deadlineMissedTotal+".":""}
           </p>
           {recentScheduleEffect.examples.length>0&&<ul className="atlas-work-effect-list">
-           {recentScheduleEffect.examples.map(item=><li key={item.id}>
-            <button type="button" className="text-link"
+           {recentScheduleEffect.examples.map((item,index)=><li key={item.id}>
+            {index===0?<strong>{item.title}</strong>:<button type="button" className="text-link"
              aria-label={"Изменить затронутую работу "+item.title}
-             onClick={()=>openEditor("work:"+item.id)}>{item.title}</button>
+             onClick={()=>openEditor("work:"+item.id)}>{item.title}</button>}
             <small>Расчётное окончание: {item.previousFinishDate&&item.finishDate?
              "было "+item.previousFinishDate+", стало "+item.finishDate:
              "было через "+item.previousFinishOffset+" дн., стало через "+

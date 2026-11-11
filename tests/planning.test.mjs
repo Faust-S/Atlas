@@ -126,3 +126,20 @@ test('affected work exposes a missed control date without changing planned value
  assert.equal(withoutStart.deadlineMissedTotal,0);
  assert.equal(withoutStart.examples.find(x=>x.id==='b').finishDate,null);
 });
+
+test('a missed work deadline stays actionable in a limited schedule impact preview',()=>{
+ const baseline=project([['big',5],['small',1],['x',1],['y',1],['z',1],['w',1],['late',1]],[],'2026-11-01');
+ baseline.items.find(item=>item.id==='late').dueDate='2026-11-02';
+ const revised={...baseline,dependencies:[
+  ...['x','y','z','w'].map(to=>({from:'big',to})),
+  {from:'small',to:'late'}
+ ]};
+ const result=scheduleChangeSummary(scheduleProject(baseline),scheduleProject(revised),{limit:4});
+ assert.equal(result.movedTotal,5);
+ assert.equal(result.deadlineMissedTotal,1);
+ assert.equal(result.examples.length,4);
+ assert.equal(result.examples[0].id,'late');
+ assert.equal(result.examples[0].shiftDays,1);
+ assert.equal(result.examples[0].missedDeadline,true);
+ assert.equal(result.examples[0].dueDate,'2026-11-02');
+});

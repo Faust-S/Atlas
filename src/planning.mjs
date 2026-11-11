@@ -110,8 +110,10 @@ export function scheduleChangeSummary(before,after,{limit=4}={}){
    critical:Boolean(row.critical)
   });
  }
- // Most affected works first; stable ties preserve their source schedule order.
- affected.sort((a,b)=>Number(b.shiftDays>0)-Number(a.shiftDays>0)||
+ // Show missed control dates first: a short preview must not hide an actionable deadline.
+ // Among equally urgent items, keep delayed work and larger shifts first.
+ affected.sort((a,b)=>Number(b.missedDeadline)-Number(a.missedDeadline)||
+  Number(b.shiftDays>0)-Number(a.shiftDays>0)||
   Math.abs(b.shiftDays)-Math.abs(a.shiftDays)||Number(b.critical)-Number(a.critical));
  return {durationBefore:before.durationDays,durationAfter:after.durationDays,
   movedTotal,delayedTotal,earlierTotal,criticalChangedTotal,deadlineMissedTotal,examples:affected.slice(0,limit)};

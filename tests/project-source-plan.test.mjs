@@ -768,9 +768,12 @@ test("Affected-work actions are placed before secondary schedule details",()=>{
  const end=ui.indexOf('<div className="filter-row">',section);
  const block=ui.slice(section,end);
  const impact=block.indexOf('className="atlas-work-plan-effect"');
+ const priority=block.indexOf('className="text-link atlas-work-effect-primary"');
  const estimate=block.indexOf('<p className="minor">Оценка:');
  const duration=block.indexOf('Продолжительность плана: было');
- assert.ok(section>0&&end>section&&impact>0&&estimate>impact&&duration>estimate);
+ assert.ok(section>0&&end>section&&priority>0&&priority<impact&&estimate>impact&&duration>estimate);
+ assert.match(block,/recentScheduleEffect\.examples\[0\]\.title/);
+ assert.match(block,/index===0\?<strong>/);
  assert.match(block,/aria-label=\{"Изменить затронутую работу "\+item\.title\}/);
  const witness=read("../desktop/tests/installed-atlas06-visual-scale.py");
  assert.match(witness,/ATLAS06_VISUAL_AFFECTED_WORK_ACTION_VISIBLE_PASS/);
