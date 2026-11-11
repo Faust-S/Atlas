@@ -300,7 +300,7 @@ test("An existing work selects one predecessor without choosing the dependent wo
  assert.equal(serialize(third.state),before);
 });
 test("The work row offers a direct existing-work predecessor action",()=>{
- const ui=read("../desktop/src/main.tsx");
+ const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
  assert.match(ui,/onClick=\{\(\)=>openEditor\("dep-to:"\+encodeURIComponent\(w\.id\)\)\}/);
  assert.match(ui,/ariaLabel=\{"Добавить предшественника для работы "\+w\.title\}/);
  assert.match(ui,/>После работы<\/Action>/);
