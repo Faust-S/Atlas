@@ -278,6 +278,19 @@ def qualify_visual():
     d.wait_text("Все зависимости на схеме",25)
     capture("search-recorded-dependencies-1024")
     assert d.head()==saved,"Inspecting dependencies changed native Store"
+    # From a work with more relations than the short preview, open its exact
+    # neighborhood in the existing graph and return to the same search.
+    find_control("Все зависимости на схеме",types={"Button"},scroll=False).click_input()
+    d.wait_text("Зависимости работ",25)
+    d.wait_text("К найденной работе",25)
+    d.wait_text("Это окружение выбранной работы",25)
+    assert d.head()==saved,"Focused graph navigation changed native Store"
+    capture("focused-work-dependency-graph")
+    find_control("К найденной работе",types={"Button"}).click_input()
+    d.wait_text("Найдено: 1",25)
+    d.wait_text("Предшествующих работ: 5",25)
+    assert d.head()==saved,"Return from focused graph changed native Store"
+    print("ATLAS06_VISUAL_GRAPH_WORK_FOCUS_ROUNDTRIP_PASS",flush=True)
     predecessor=find_control("Открыть предшествующую работу Работа 0 / 4",
                             types={"Button"},scroll=False)
     bounds=win32gui.GetWindowRect(d.handle)

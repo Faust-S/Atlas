@@ -215,3 +215,14 @@ test("Installed Atlas restores the work search when returning from source",()=>{
  assert.match(main,/setMapSearchReturn\(tabId==="overview"&&tab==="sources"/);
  assert.match(map,/priorityWorkId:detailWorkId\|\|""/);
 });
+
+test("Installed Atlas focuses a selected work in its graph and returns without data writes",()=>{
+ const driver=read("../desktop/tests/installed-atlas06-visual-scale.py");
+ const ui=read("../desktop/src/main.tsx");
+ assert.match(driver,/find_control\("Все зависимости на схеме",types=\{"Button"\},scroll=False\)\.click_input\(\)/);
+ assert.match(driver,/d\.wait_text\("К найденной работе",25\)/);
+ assert.match(driver,/ATLAS06_VISUAL_GRAPH_WORK_FOCUS_ROUNDTRIP_PASS/);
+ assert.match(driver,/Focused graph navigation changed native Store/);
+ assert.match(driver,/Return from focused graph changed native Store/);
+ assert.match(ui,/focusWorkId=\{graphFocusWork\?\.id\|\|null\}/);
+});
