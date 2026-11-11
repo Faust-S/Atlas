@@ -246,6 +246,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const [graphJump,setGraphJump]=useState<{projectId:string;workId:string;query:string;origin:"overview"|"work"|"board"}|null>(null);
  const [workReturnId,setWorkReturnId]=useState<string|null>(null);
  const [recentWorkId,setRecentWorkId]=useState<string|null>(null);
+ const [recentPlanBefore,setRecentPlanBefore]=useState<{workId:string;revision:number;days:number}|null>(null);
  const [recheckLimit,setRecheckLimit]=useState(25);
  const project=data.projects.find((p:any)=>p.id===active)||null;
  const recentWork=recentWorkId?project?.items.find((item:any)=>item.id===recentWorkId):null;
@@ -286,6 +287,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const history=useMemo(()=>project?projectHistoryRows(project,{kind:historyType,query:historyQuery}):[],
   [project,historyType,historyQuery]);
  const plan=useMemo(()=>project?scheduleProject(project):null,[project]);
+ const recentPlanRow=recentWork&&plan?plan.rows.find((row:any)=>row.id===recentWork.id):null;
+ const planBeforeRecent=recentWork&&recentPlanBefore?.workId===recentWork.id&&
+  recentPlanBefore.revision===data.revision?recentPlanBefore.days:null;
  const workLinks=useMemo(()=>project&&plan?workDependencyOverview(project,plan):new Map(),[project,plan]);
  const pendingWorkCount=useMemo(()=>Array.from(workLinks.values())
   .filter((entry:any)=>entry.pendingTotal>0).length,[workLinks]);
@@ -520,7 +524,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   host?.onSelection?.({projectId:id,workId:null,revision:String(latestSnapshot.current.revision)});
   setActive(id);setTab("overview");setEditor(null);setForecastId(null);setConnectOpen(false);
   setSourceJump(null);setMapSearchReturn(null);setGraphJump(null);setWorkReturnId(null);
-  setRecentWorkId(null);
+  setRecentWorkId(null);setRecentPlanBefore(null);
   setShowProjectRelations(false);setRelationLimit(12);setRequirementJump(null);setChangeJump(null);
   if(!afterSubmit)setMessage("");
   setWorkDependencyFilter("all");setWorkFilter("all");setWorkTargetFilter("all");setWorkObservationFilter("all");setWorkHistoryLimits({});setWorkQuery("");setWorkSort("title");setWorkLimit(200);setRealityLimit(8);
@@ -596,6 +600,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    mutate(result.state,"Изменение внесено в черновик. Для записи на диск нажмите «Сохранить».");
    if(result.projectId)selectProject(result.projectId,true);
    if(result.workId){
+    setRecentPlanBefore({workId:result.workId,revision:result.state.revision,
+     days:plan?.durationDays??0});
     setRecentWorkId(result.workId);
     revealWorkInTable(result.workId);
    }
@@ -1477,10 +1483,27 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      {recentWork&&<div className="atlas-work-created" aria-label="Только что добавленная работа">
        <div><strong>{recentWork.title}</strong>
         <p role="status">{dirty?"Работа внесена в черновик. Сохраните изменения.":"Работа сохранена."}
-         {" "}{recentStage?"Этап: "+recentStage.name+".":"Этап пока не выбран."}</p></div>
+         {" "}{recentStage?"Этап: "+recentStage.name+".":"Этап пока не выбран."}</p>
+        <p className="minor">Оценка: {recentWork.estimateDays??1} календарных дней.
+         {recentWork.dueDate?" Контрольный срок: "+recentWork.dueDate+".":""}</p>
+        {recentPlanRow&&<p className="minor">По записанным зависимостям: {recentPlanRow.startDate?
+         "начало "+recentPlanRow.startDate+", расчётный финиш "+recentPlanRow.finishDate+".":
+         "начало через "+recentPlanRow.earlyStart+" дн., финиш через "+recentPlanRow.earlyFinish+
+         " дн. от начала проекта."}
+         {recentPlanRow.predecessors.length?" Предшествующих работ: "+recentPlanRow.predecessors.length+".":""}
+        </p>}
+        {planBeforeRecent!==null&&plan&&<p className="minor">
+         Продолжительность плана: было {planBeforeRecent} дн., стало {plan.durationDays} дн.
+         Расчёт по календарным дням без распределения ресурсов.</p>}
+        {recentPlanRow?.finishDate&&recentWork.dueDate&&
+         recentPlanRow.finishDate>recentWork.dueDate&&<p className="atlas-schedule-warning">
+          Расчётный финиш позже указанного срока. Проверьте длительность и зависимости.</p>}
+       </div>
        <div className="button-row">
         <Action onClick={()=>revealWorkInTable(recentWork.id)}>К работе</Action>
         {recentStage&&<Action onClick={()=>openEditor("stage-edit:"+recentStage.id)}>Открыть этап</Action>}
+        {recentPlanRow?.predecessors.length>0&&<Action onClick={()=>openWorkGraph(recentWork.id,"","work")}>
+         Зависимости</Action>}
         <Action onClick={()=>{view("overview");setMapSearchReturn({workId:recentWork.id,query:""})}}>
          Схема проекта</Action>
        </div>

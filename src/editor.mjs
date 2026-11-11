@@ -191,7 +191,10 @@ export function editorSpec(project,action,snapshot=null){
     ]:[]),
     ...(project.stages.length?[choice("stageId","Этап",stageOptions(project),"",false)]:[]),
     field("newStageName","Новый этап (необязательно)","text","",false),
-    field("estimateDays","Оценка длительности, календарных дней","number","1")
+    field("estimateDays","Оценка длительности, календарных дней","number","1"),
+    field("dueDate","Контрольный срок работы","date","",false),
+    ...(project.items.length?[choice("predecessorId","Начать после работы",[
+     option("","Без зависимости"),...workItems(project)],"",false)]:[])
    ]
   };
   return {title:target?"Работа по требованию: "+target.title:"Новая работа",fields:[
@@ -201,7 +204,10 @@ export function editorSpec(project,action,snapshot=null){
    field("assignee","Ответственный (имя или роль)","text","",false),
    choice("resourceId","Плановый ресурс",resourceChoiceOptions(snapshot),"",false),
    field("allocationPct","Доля ресурса на работе, %","number","100"),
-   field("estimateDays","Оценка длительности, календарных дней","number","1")
+   field("estimateDays","Оценка длительности, календарных дней","number","1"),
+   field("dueDate","Контрольный срок работы","date","",false),
+   ...(project.items.length?[choice("predecessorId","Начать после работы",[
+    option("","Без зависимости"),...workItems(project)],"",false)]:[])
   ]};
  }
  if(action==="dep"){
@@ -394,12 +400,14 @@ export function applyEditor(snapshot,projectId,action,input){
   const r=createItem(workState,projectId,{title:get("title"),stageId,
    assignee:get("assignee"),targetIds:get("targetId")?[get("targetId")]:[],
    resourceId:get("resourceId"),allocationPct:percentage("allocationPct")});
-  // Return a newly created work ID for navigation, without altering stored data.
-  return {state:editItem(r.state,projectId,r.id,{
-   estimateDays:integer("estimateDays"),...(origin?{
+  // Only explicit choices affect the plan; discovery alone adds no dependency.
+  const work=editItem(r.state,projectId,r.id,{
+   estimateDays:integer("estimateDays"),dueDate:get("dueDate")||null,...(origin?{
     sourceId:origin.sourceId,sourcePath:origin.folder,sourceRevision:origin.commitSha
    }:{})
-  }),workId:r.id};
+  });
+  const predecessorId=get("predecessorId");
+  return {state:predecessorId?connect(work,projectId,predecessorId,r.id):work,workId:r.id};
  }
  if(action==="dep")return {state:connect(snapshot,projectId,get("from"),get("to"))};
  if(action==="target")return {state:addTarget(snapshot,projectId,{title:get("title"),desired:get("desired"),intent:get("intent")}).state};
