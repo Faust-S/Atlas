@@ -1511,7 +1511,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
        recentWorkKind==="adjusted"?"Изменение работы":"Только что добавленная работа"}>
        <div><strong>{recentWork.title}</strong>
         {(recentWorkKind==="dependency"||recentWorkKind==="adjusted")&&
-         recentScheduleEffect?.examples.length>0&&
+         recentScheduleEffect&&recentScheduleEffect.examples.length>0&&
          <button type="button" className="text-link atlas-work-effect-primary"
           aria-label={"Изменить затронутую работу "+recentScheduleEffect.examples[0].title}
           onClick={()=>openEditor("work:"+recentScheduleEffect.examples[0].id)}>
