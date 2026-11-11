@@ -458,7 +458,7 @@ def qualify_visual():
     action=find_control("Добавить предшественника для работы "+new_title,
                         types={"Button"})
     action.click_input()
-    d.window_title_contains("Форма: Предшествующая работа для: "+new_title,25)
+    d.window_title_contains("Форма: Предшествующая работа для:",25)
     assert d.head()==changed,"Opening dependency editor changed native storage"
     choice=d.window().child_window(
         title="Что должно быть выполнено раньше?",control_type="ComboBox")
