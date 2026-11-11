@@ -166,3 +166,12 @@ test("Installed search inspects recorded sources and dependencies without writin
  assert.match(universal,/Связи работы Открыть площадку/);
  assert.match(universal,/assert d\.head\(\)==saved,"Inspecting ordinary work links changed native Store"/);
 });
+
+
+test("Installed search requires a physical click on a predecessor of a long-named work",()=>{
+ const driver=read("../desktop/tests/installed-atlas06-visual-scale.py");
+ assert.match(driver,/ATLAS06_VISUAL_SEARCH_PREDECESSOR_CLICK_PASS/);
+ assert.match(driver,/Открыть предшествующую работу Работа 0 \/ 4/);
+ assert.match(driver,/Predecessor is outside Windows viewport/);
+ assert.match(driver,/Opening a searched predecessor changed native Store/);
+});

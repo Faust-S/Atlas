@@ -243,7 +243,17 @@ def qualify_visual():
     d.wait_text("Все зависимости на схеме",25)
     capture("search-recorded-dependencies-1024")
     assert d.head()==saved,"Inspecting dependencies changed native Store"
+    predecessor=find_control("Открыть предшествующую работу Работа 0 / 4",
+                            types={"Button"},scroll=False)
+    bounds=win32gui.GetWindowRect(d.handle)
+    assert rectangle_in_workspace(predecessor.rectangle(),bounds), "Predecessor is outside Windows viewport"
+    predecessor.click_input()
+    d.window_title_contains("Форма:",25)
+    assert d.head()==saved,"Opening a searched predecessor changed native Store"
     keyboard.send_keys("{ESC}")
+    await_no_form()
+    assert d.head()==saved
+    print("ATLAS06_VISUAL_SEARCH_PREDECESSOR_CLICK_PASS",flush=True)
     print("ATLAS06_VISUAL_SEARCH_DEPENDENCY_CONTEXT_PASS",flush=True)
     print("ATLAS06_VISUAL_SEARCH_READONLY_PASS",flush=True)
 

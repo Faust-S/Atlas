@@ -309,7 +309,8 @@ export function ProjectSourcePlanMap({projection,project,onOpenWork,onEditStage,
           onClick={()=>openFound(hit)}>
           <small>{hit.kind==="work"?"Работа":"Этап"}</small>
           <strong>{hit.title}</strong>
-          {hit.kind==="work"&&<small>{hit.stageName}</small>}
+          {hit.kind==="work"&&<small className="atlas-source-plan-find-stage"
+           title={hit.stageName}>{hit.stageName}</small>}
          </button>
          {hit.kind==="work"&&<button type="button" className="text-link"
           aria-label={"Связи работы "+hit.title}
@@ -319,31 +320,6 @@ export function ProjectSourcePlanMap({projection,project,onOpenWork,onEditStage,
          </button>}
          {detailWorkId===hit.id&&detail&&<div className="atlas-source-plan-find-context"
           role="group" aria-label="Связи выбранной работы">
-          {detail.stage&&<div className="atlas-source-plan-find-relation">
-           <small>Этап</small>
-           <button type="button" className="text-link"
-            aria-label={"Открыть этап работы "+detail.stage.title}
-            onClick={()=>{if(detail.stage)openFound({kind:"stage",id:detail.stage.id})}}>
-            {detail.stage.title}</button>
-          </div>}
-          {detail.source&&<div className="atlas-source-plan-find-relation">
-           <small>Исходники</small>
-           <span title={detail.source.repository||"Источник не найден"}>
-            {detail.source.repository||"Подключённый источник отсутствует"}
-            {detail.source.folder?" / "+detail.source.folder:""}</span>
-           <small>{detail.source.status==="missing"?
-            "Источник больше не подключён":detail.source.status==="unavailable"?
-            "Сведения об источнике сейчас недоступны":
-            detail.source.revisionCurrent?"Редакция исходников совпадает":
-            "Работа связана с прежней редакцией исходников"}</small>
-           <div className="atlas-source-plan-find-links">
-            <button type="button" className="text-link"
-             onClick={()=>{closeSearch();onOpenSources()}}>Посмотреть источники</button>
-            {detail.source.url&&<a className="text-link"
-             href={detail.source.url} target="_blank" rel="noopener noreferrer">
-             Открыть каталог GitHub</a>}
-           </div>
-          </div>}
           {detail.predecessorTotal>0&&<div className="atlas-source-plan-find-relation">
            <small>Предшествующих работ: {detail.predecessorTotal}</small>
            {detail.predecessors.map((related:any)=><button key={related.id}
@@ -359,6 +335,32 @@ export function ProjectSourcePlanMap({projection,project,onOpenWork,onEditStage,
             aria-label={"Открыть зависящую работу "+related.title}
             onClick={()=>openFound({kind:"work",id:related.id})}>
             {related.title}</button>)}
+          </div>}
+          {detail.stage&&<div className="atlas-source-plan-find-relation">
+           <small>Этап</small>
+           <button type="button" className="text-link"
+            aria-label={"Открыть этап работы "+detail.stage.title}
+            onClick={()=>{if(detail.stage)openFound({kind:"stage",id:detail.stage.id})}}>
+            {detail.stage.title}</button>
+          </div>}
+          {detail.source&&<div className="atlas-source-plan-find-relation">
+           <small>Исходники</small>
+           <span title={(detail.source.repository||"Источник не найден")+
+            (detail.source.folder?" / "+detail.source.folder:"")}>
+            {detail.source.repository||"Подключённый источник отсутствует"}
+            {detail.source.folder?" / "+detail.source.folder:""}</span>
+           <small>{detail.source.status==="missing"?
+            "Источник больше не подключён":detail.source.status==="unavailable"?
+            "Сведения об источнике сейчас недоступны":
+            detail.source.revisionCurrent?"Редакция исходников совпадает":
+            "Работа связана с прежней редакцией исходников"}</small>
+           <div className="atlas-source-plan-find-links">
+            <button type="button" className="text-link"
+             onClick={()=>{closeSearch();onOpenSources()}}>Посмотреть источники</button>
+            {detail.source.url&&<a className="text-link"
+             href={detail.source.url} target="_blank" rel="noopener noreferrer">
+             Открыть каталог GitHub</a>}
+           </div>
           </div>}
           {(detail.predecessorTotal>detail.predecessors.length||
             detail.successorTotal>detail.successors.length)&&

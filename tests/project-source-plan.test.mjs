@@ -422,3 +422,19 @@ test("Search context stays inside one dialog and uses existing editors and sourc
  assert.doesNotMatch(visual.slice(visual.indexOf("export function ProjectSourcePlanMap")),
   /localStorage|createItem\(|mutate\(|fetch\(/);
 });
+
+
+test("Long search result labels are bounded and recorded dependencies appear before source notes",()=>{
+ const visual=read("../desktop/src/ProjectVisuals.tsx");
+ const css=read("../desktop/src/style.css");
+ assert.match(visual,/className="atlas-source-plan-find-stage"/);
+ assert.match(visual,/title=\{hit\.stageName\}/);
+ assert.match(css,/\.atlas-source-plan-find-stage,\.atlas-source-plan-find-relation>\.text-link,/);
+ assert.match(css,/-webkit-line-clamp:2;/);
+ const from=visual.indexOf("export function ProjectSourcePlanMap");
+ const deps=visual.indexOf("detail.predecessorTotal>0&&",from);
+ const stage=visual.indexOf("detail.stage&&",from);
+ const source=visual.indexOf("detail.source&&",from);
+ assert.ok(deps>from&&stage>deps&&source>stage);
+ assert.doesNotMatch(visual.slice(from),/[—–]/);
+});

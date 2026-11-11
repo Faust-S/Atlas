@@ -692,6 +692,10 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
  overflow:hidden;line-height:1.35}
 .atlas-source-plan-find-hit small{font-size:11px;color:#60758d}
+.atlas-source-plan-find-stage,.atlas-source-plan-find-relation>.text-link,
+.atlas-source-plan-find-relation>span{
+ display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;
+ overflow:hidden;text-overflow:ellipsis;overflow-wrap:anywhere;line-height:1.4}
 @media(max-width:640px){.atlas-source-plan-find-panel{
  width:min(310px,calc(100vw - 24px))}}
 .atlas-source-plan-preview-actions{display:flex;justify-content:flex-start;
