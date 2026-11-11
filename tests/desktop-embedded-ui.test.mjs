@@ -249,10 +249,13 @@ test("filter shows the selected row count next to controls even when zero",()=>{
 test("Project overview opens pending recorded work without retaining hidden table filters",()=>{
  assert.match(main,/const pendingWorkCount=useMemo\(\(\)=>Array\.from\(workLinks\.values\(\)\)/);
  assert.match(main,/\.filter\(\(entry:any\)=>entry\.pendingTotal>0\)\.length,\[workLinks\]\)/);
- assert.match(main,/pendingWorkCount>0&&<p className="minor atlas-pending-work-entry"/);
- assert.match(main,/aria-label="Работы с незавершёнными предшественниками"/);
- assert.match(main,/aria-label="Показать работы с незавершёнными предшественниками"/);
- assert.match(main,/onClick=\{showPendingWorks\}>Показать работы/);
+ const guide=file("ProjectOrganizationGuide.tsx");
+ assert.match(main,/pendingWorkCount=\{pendingWorkCount\} onOpenPendingWorks=\{showPendingWorks\}/);
+ assert.doesNotMatch(main,/atlas-pending-work-entry/);
+ assert.match(guide,/pendingWorkCount>0&&<button type="button"/);
+ assert.match(guide,/aria-label="Показать работы с незавершёнными предшественниками"/);
+ assert.match(guide,/onClick=\{onOpenPendingWorks\}>Ждут других работ: \{pendingWorkCount\}/);
+ assert.match(css,/\.atlas-project-organization h2 \.atlas-pending-work-link\{/);
  const from=main.indexOf("const showPendingWorks=()=>");
  const to=main.indexOf("const openLinkedSource=",from);
  assert.ok(from>0&&to>from);

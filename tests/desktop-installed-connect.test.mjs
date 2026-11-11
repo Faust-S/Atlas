@@ -335,9 +335,13 @@ test("Installed Atlas filters source-free project work by recorded predecessor s
 test("Installed source-free Atlas opens all waiting work from overview despite stale table search",()=>{
  const ui=read("../desktop/src/main.tsx");
  const driver=read("../desktop/tests/installed-atlas06-universal.py");
- assert.match(ui,/onClick=\{showPendingWorks\}>Показать работы/);
+ const guide=read("../desktop/src/ProjectOrganizationGuide.tsx");
+ assert.match(ui,/pendingWorkCount=\{pendingWorkCount\} onOpenPendingWorks=\{showPendingWorks\}/);
+ assert.match(guide,/onClick=\{onOpenPendingWorks\}>Ждут других работ: \{pendingWorkCount\}/);
  assert.match(driver,/d\.set_text\("Найти работу","Подготовить помещение"\)/);
- assert.match(driver,/v\.find_control\("Показать работы с незавершёнными предшественниками",types=\{"Button"\}\)/);
+ assert.match(driver,/jump=v\.find_control\("Показать работы с незавершёнными предшественниками",types=\{"Button"\},scroll=False\)/);
+ assert.match(driver,/Pending-work entry must be visible on the first 820x650 Windows screen/);
+ assert.match(driver,/universal-pending-work-first-screen-820/);
  assert.match(driver,/ATLAS06_UNIVERSAL_OVERVIEW_PENDING_JUMP_PASS/);
  assert.match(driver,/The overview did not reveal waiting work inside the Windows viewport/);
  assert.match(driver,/Opening waiting works from overview changed native Store/);

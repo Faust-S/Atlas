@@ -225,8 +225,9 @@ def qualify():
     d.set_text("Найти работу","Подготовить помещение")
     d.wait_text("Показано 1 из 1 работ по фильтру",25)
     v.find_control("Обзор",types={"Button"}).click_input()
-    d.wait_text("Работ с незавершёнными предшественниками:",25)
-    jump=v.find_control("Показать работы с незавершёнными предшественниками",types={"Button"})
+    jump=v.find_control("Показать работы с незавершёнными предшественниками",types={"Button"},scroll=False)
+    assert v.rectangle_in_workspace(jump.rectangle(),win32gui.GetWindowRect(d.handle)), (
+        "The overview pending-work link was below the current Windows viewport")
     jump.click_input()
     d.wait_text("Работы проекта",25)
     d.wait_text("Показано 1 из 1 работ по фильтру",25)
@@ -263,6 +264,14 @@ def qualify():
     assert d.head()==saved
     win32gui.MoveWindow(d.handle,0,0,820,650,True)
     time.sleep(0.3)
+    v.find_control("Обзор",types={"Button"}).click_input()
+    d.wait_text("Схема проекта: работы и этапы",25)
+    first_screen_link=v.find_control("Показать работы с незавершёнными предшественниками",
+        types={"Button"},scroll=False)
+    assert v.rectangle_in_workspace(first_screen_link.rectangle(),win32gui.GetWindowRect(d.handle)), (
+        "Pending-work entry must be visible on the first 820x650 Windows screen")
+    v.capture("universal-pending-work-first-screen-820")
+    assert d.head()==saved,"Moving pending-work entry modified native Store"
     visible=v.find_control("Открыть площадку",types={"Button"})
     assert v.rectangle_in_workspace(visible.rectangle(),win32gui.GetWindowRect(d.handle))
     v.capture("universal-project-820")

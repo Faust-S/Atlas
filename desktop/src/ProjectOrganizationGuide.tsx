@@ -6,12 +6,14 @@ import {ProjectSourcePlanMap} from "./ProjectVisuals";
 // stage and dependency links remain usable in any project without GitHub.
 // Suggested roles are explanations to review, never new project entities.
 export function ProjectOrganizationGuide({snapshot,projectId,restoreSearch,onEdit,onRefresh,onOpenProject,
- onOpenSources,onOpenLinkedSource,onOpenWorks,onOpenStages,onAddRelation,onOpenTimeline,onOpenGraph,busy=false}:{
+ onOpenSources,onOpenLinkedSource,onOpenWorks,onOpenPendingWorks,pendingWorkCount,
+ onOpenStages,onAddRelation,onOpenTimeline,onOpenGraph,busy=false}:{
  snapshot:any;projectId:string;restoreSearch:{workId:string;query:string}|null;
  onEdit:(action:string)=>void;
  onRefresh:(sourceId:string)=>void;onOpenProject:(id:string)=>void;
  onOpenSources:()=>void;onOpenLinkedSource:(workId:string,query:string)=>void;
- onOpenWorks:()=>void;onOpenStages:()=>void;onAddRelation:()=>void;
+ onOpenWorks:()=>void;onOpenPendingWorks:()=>void;pendingWorkCount:number;
+ onOpenStages:()=>void;onAddRelation:()=>void;
  onOpenTimeline:()=>void;onOpenGraph:(workId?:string,query?:string)=>void;busy?:boolean;
 }){
  const [moreLinks,setMoreLinks]=useState(false);
@@ -32,7 +34,10 @@ export function ProjectOrganizationGuide({snapshot,projectId,restoreSearch,onEdi
    source.folders.some((folder:any)=>folder.hiddenWorks>0));
  return <section className="surface atlas-project-organization" aria-label="Состав проекта и возможные следующие действия">
   <div className="section-heading"><div>
-   <h2>Состав проекта</h2>
+   <h2>Состав проекта{pendingWorkCount>0&&<button type="button"
+     className="text-link atlas-pending-work-link"
+     aria-label="Показать работы с незавершёнными предшественниками"
+     onClick={onOpenPendingWorks}>Ждут других работ: {pendingWorkCount}</button>}</h2>
    <p>{hasSources?
     "Здесь показаны найденные каталоги и связи, которые уже записаны в плане.":
     "Здесь показаны ваши работы, этапы и записанные зависимости."}</p>

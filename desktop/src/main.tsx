@@ -1266,6 +1266,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       onOpenSources={()=>view("sources")}
       onOpenLinkedSource={openLinkedSource}
       onOpenWorks={()=>view("work")}
+      pendingWorkCount={pendingWorkCount} onOpenPendingWorks={showPendingWorks}
       onOpenStages={()=>document.getElementById("atlas-project-stages")?.scrollIntoView({behavior:"smooth",block:"start"})}
       onOpenTimeline={()=>view("timeline")}
       onOpenGraph={openWorkGraph}
@@ -1274,13 +1275,6 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       busy={busy}/>}
      <div className="metric-grid"><Metric value={project.targets?.length||0} label="Ожидаемых результатов"/><Metric value={impact?.attention??0} label="Требуют внимания"/>
       <Metric value={project.items.length} label="Работ"/><Metric value={projected?.deadlineSlipDays??"?"} label="Дней риска срока"/></div>
-     {pendingWorkCount>0&&<p className="minor atlas-pending-work-entry" role="group"
-      aria-label="Работы с незавершёнными предшественниками">
-      Работ с незавершёнными предшественниками: {pendingWorkCount}.{" "}
-      <button type="button" className="text-link"
-       aria-label="Показать работы с незавершёнными предшественниками"
-       onClick={showPendingWorks}>Показать работы</button>
-     </p>}
      {nextStep&&<section className="surface atlas-next-step" aria-label="Следующий шаг проекта">
       <div className="section-heading"><div><small>Подсказка по текущему плану</small>
        <h2>{nextStep.title}</h2><p>{nextStep.note}</p></div>

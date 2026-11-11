@@ -639,6 +639,13 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 
 /* Proposed project parts use the existing saved observations and editor. */
 .atlas-project-organization .section-heading p{max-width:670px}
+.atlas-project-organization h2 .atlas-pending-work-link{
+ display:inline-block;vertical-align:baseline;margin-left:12px;
+ font-size:12px;line-height:1.35;white-space:normal
+}
+.atlas-project-organization h2 .atlas-pending-work-link:focus-visible{
+ outline:2px solid #316fdf;outline-offset:3px;border-radius:3px
+}
 .atlas-organization-source{border-top:1px solid #e0e8f1;padding:14px 0}
 .atlas-organization-source-heading{display:flex;align-items:center;flex-wrap:wrap;gap:10px}
 .atlas-organization-source-heading strong{font-size:14px;overflow-wrap:anywhere}
