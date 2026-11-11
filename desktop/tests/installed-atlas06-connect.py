@@ -359,11 +359,15 @@ def verify_organization_work(previous,original_project):
     wait_text("Работа по каталогу: src",35)
     assert head()==previous,"Opening a work editor wrote a task before confirmation"
     set_text("Что нужно сделать?","Проверить исходники сайта")
+    wait_text("Контрольный срок работы",25)
     set_text("Новый этап (необязательно)","Проверка исходников")
     screenshot("source-work-editor")
     click_editor_submit()
     window_title_contains("Atlas — Таблица",35)
     wait_text("Работы проекта",35)
+    wait_text("Продолжительность плана: было",35)
+    wait_text("По записанным зависимостям:",35)
+    print("ATLAS06_CREATED_WORK_CALENDAR_PREVIEW_PASS",flush=True)
     # The just-created work must be physically on screen, not only present in UIA.
     title_button=wait_button("Открыть работу Проверить исходники сайта",25)
     bounds=win32gui.GetWindowRect(handle)

@@ -377,12 +377,25 @@ def qualify_visual():
     d.click_button("＋ Работа")
     d.window_title_contains("Форма: Новая работа",25)
     d.set_text("Что нужно сделать?",new_title)
+    d.wait_text("Начать после работы",25)
+    # Ordinary select: first entry is "Без зависимости", second is the first
+    # recorded work. Only this deliberate choice creates a dependency.
+    predecessor=d.window().child_window(
+        title="Начать после работы",control_type="ComboBox")
+    assert predecessor.exists(timeout=10) and predecessor.is_enabled()
+    predecessor.click_input()
+    keyboard.send_keys("{HOME}{DOWN}{ENTER}")
+    assert d.head()==saved,"Choosing a predecessor wrote native storage"
+    print("ATLAS06_VISUAL_PREDECESSOR_SELECTED_NATIVE_PASS",flush=True)
     assert d.head()==saved,"Opening the new-work form wrote to native storage"
     # Ctrl+Enter is the existing user keyboard shortcut for applying the form.
     keyboard.send_keys("^{ENTER}")
     await_no_form()
     d.window_title_contains(PROJECT+" — Таблица",25)
     d.wait_text("Работа внесена в черновик.",35)
+    d.wait_text("Предшествующих работ: 1",35)
+    d.wait_text("Продолжительность плана: было",35)
+    print("ATLAS06_VISUAL_PREDECESSOR_EFFECT_VISIBLE_PASS",flush=True)
     deadline=time.monotonic()+45
     visible=False
     while time.monotonic()<deadline:
@@ -411,9 +424,15 @@ def qualify_visual():
     added=[item for item in after["items"] if item["title"]==new_title]
     assert len(added)==1,"Created work must be uniquely stored"
     assert added[0]["id"] not in {item["id"] for item in expected["items"]}
-    for field in ("id","name","type","goal","stages","sources","dependencies",
+    assert len(after["dependencies"])==len(expected["dependencies"])+1
+    appended=[edge for edge in after["dependencies"]
+              if edge not in expected["dependencies"]]
+    assert len(appended)==1
+    assert appended[0]=={"from":"visual-work-0-0","to":added[0]["id"]},appended
+    for field in ("id","name","type","goal","stages","sources",
                   "targets","findings","changes","decisions","risks"):
         assert after.get(field)==expected.get(field),"New work changed "+field
+    print("ATLAS06_VISUAL_PREDECESSOR_SAVED_PASS",flush=True)
     d.stop()
     d.launch()
     d.wait_text("Портфель проектов",45)

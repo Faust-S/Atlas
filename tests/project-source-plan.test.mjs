@@ -706,3 +706,18 @@ test("A newly created work is revealed by its saved identity, with its stage and
  const a=main.indexOf("const revealWorkInTable="),b=main.indexOf("const submit=",a);
  assert.doesNotMatch(main.slice(a,b),/mutate\(|commitWithReadback\(|localStorage/);
 });
+
+test("Plan feedback is calculated from the existing schedule, without background writes",()=>{
+ const ui=read("../desktop/src/main.tsx");
+ assert.ok(ui.includes("const plan=useMemo(()=>project?scheduleProject(project):null,[project]);"));
+ assert.ok(ui.includes("const recentPlanRow=recentWork&&plan?plan.rows.find"));
+ assert.ok(ui.includes("recentPlanBefore.revision===data.revision?recentPlanBefore.days:null"));
+ assert.ok(ui.includes("days:plan?.durationDays??0"));
+ assert.ok(ui.includes("revision:result.state.revision"));
+ assert.ok(ui.includes("Продолжительность плана: было {planBeforeRecent} дн., стало {plan.durationDays} дн."));
+ assert.ok(ui.includes("recentPlanRow.predecessors.length"));
+ assert.ok(ui.includes('openWorkGraph(recentWork.id,"","work")'));
+ assert.ok(ui.includes("recentPlanRow.finishDate>recentWork.dueDate"));
+ const a=ui.indexOf("const recentPlanRow="),b=ui.indexOf("const workLinks=",a);
+ assert.doesNotMatch(ui.slice(a,b),/commitWithReadback\(|nativeInvoke\(|fetch\(/);
+});

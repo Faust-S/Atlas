@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
-import {empty,createProject,attach,observe,serialize,deserialize} from "../src/core.mjs";
+import {empty,createProject,attach,observe,serialize,deserialize,createItem,editItem,editProject} from "../src/core.mjs";
+import {scheduleProject} from "../src/planning.mjs";
 import {projectStructureGuide,folderWorkAction,selectedSourceFolder} from "../src/project-organization.mjs";
 import {editorSpec,applyEditor} from "../src/editor.mjs";
 const SHA="a".repeat(40),NEXT="b".repeat(40),TREE="c".repeat(40);
@@ -58,7 +59,7 @@ test("A user-submitted editor creates one standard work linked to its real sourc
   {sourceId,folder:"src",repository:"example/site",branch:"work/dev",commitSha:SHA});
  const spec=editorSpec(state.projects[0],action,state);
  assert.equal(spec.title,"Работа по каталогу: src");
- assert.deepEqual(spec.fields.map(field=>field.name),["title","newStageName","estimateDays"]);
+ assert.deepEqual(spec.fields.map(field=>field.name),["title","newStageName","estimateDays","dueDate"]);
  assert.ok(spec.hint.includes("Назовите работу"));
  assert.equal(spec.fields.find(x=>x.name==="title").value,"Уточнить назначение каталога src");
  const form=new FormData();
@@ -168,7 +169,7 @@ test("User chooses an existing stage or creates one with a source-linked work",(
  assert.deepEqual(deserialize(serialize(created)),created);
  const spec=editorSpec(p,action,created);
  assert.deepEqual(spec.fields.map(f=>f.name),
-  ["title","stageId","newStageName","estimateDays"]);
+  ["title","stageId","newStageName","estimateDays","dueDate","predecessorId"]);
  assert.equal(spec.fields.find(f=>f.name==="stageId").options[1].value,p.stages[0].id);
  const existing=new FormData();
  existing.set("title","Доработать интерфейс");
@@ -203,5 +204,71 @@ test("An ordinary non-GitHub project also returns the new work ID without extra 
  assert.equal(result.state.projects[0].items.length,1);
  assert.equal(result.workId,result.state.projects[0].items[0].id);
  assert.equal(serialize(p.state),before);
+ assert.deepEqual(deserialize(serialize(result.state)),result.state);
+});
+
+test("New folder work saves a deadline, explicit predecessor, and schedule effects",()=>{
+ const {state,projectId,sourceId}=fixture();
+ const first=createItem(state,projectId,{title:"Подготовить каталог"});
+ const measured=editItem(first.state,projectId,first.id,{estimateDays:4});
+ const started=editProject(measured,projectId,{startDate:"2026-11-01"});
+ const original=serialize(started),action=folderWorkAction(sourceId,SHA,"src");
+ const spec=editorSpec(started.projects[0],action,started);
+ assert.deepEqual(spec.fields.map(x=>x.name),
+  ["title","newStageName","estimateDays","dueDate","predecessorId"]);
+ const predecessor=spec.fields.find(x=>x.name==="predecessorId");
+ assert.equal(predecessor.required,false);
+ assert.deepEqual(predecessor.options.map(o=>o.label),
+  ["Без зависимости","Подготовить каталог"]);
+ const form=new FormData();
+ form.set("title","Проверить интерфейс");form.set("newStageName","Контроль");
+ form.set("estimateDays","3");form.set("dueDate","2026-11-10");
+ form.set("predecessorId",first.id);
+ const result=applyEditor(started,projectId,action,form);
+ assert.equal(serialize(started),original);
+ const p=result.state.projects[0],added=p.items.find(x=>x.id===result.workId);
+ assert.equal(p.items.length,2);
+ assert.equal(p.stages.length,1);
+ assert.equal(added.stageId,p.stages[0].id);
+ assert.equal(added.sourceId,sourceId);
+ assert.equal(added.sourcePath,"src");
+ assert.equal(added.sourceRevision,SHA);
+ assert.equal(added.estimateDays,3);
+ assert.equal(added.dueDate,"2026-11-10");
+ assert.deepEqual(p.dependencies,[{from:first.id,to:result.workId}]);
+ const before=scheduleProject(started.projects[0]),after=scheduleProject(p);
+ assert.equal(before.durationDays,4);
+ assert.equal(after.durationDays,7);
+ const row=after.rows.find(x=>x.id===result.workId);
+ assert.equal(row.earlyStart,4);assert.equal(row.earlyFinish,7);
+ assert.equal(row.startDate,"2026-11-05");assert.equal(row.finishDate,"2026-11-08");
+ assert.deepEqual(row.predecessors,[first.id]);
+ assert.deepEqual(deserialize(serialize(result.state)),result.state);
+ for(const [field,badValue,rejection] of [
+  ["predecessorId","not-existing",/Unknown work item/],
+  ["dueDate","2026-02-30",/Invalid work dueDate/]
+ ]){
+  const invalid=new FormData();
+  for(const [k,v] of form.entries())invalid.set(k,v);
+  invalid.set(field,badValue);
+  assert.throws(()=>applyEditor(started,projectId,action,invalid),rejection);
+  assert.equal(serialize(started),original);
+ }
+});
+test("A project without GitHub can create work with the same scheduling fields",()=>{
+ const p=createProject(empty(),{name:"Личный план",type:"personal"});
+ const first=createItem(p.state,p.id,{title:"Подготовить материалы"});
+ const before=serialize(first.state);
+ const spec=editorSpec(first.state.projects[0],"item",first.state);
+ assert.equal(spec.fields.find(x=>x.name==="predecessorId").options[1].value,first.id);
+ assert.ok(spec.fields.some(x=>x.name==="dueDate"));
+ const form=new FormData();
+ form.set("title","Провести встречу");form.set("estimateDays","2");
+ form.set("dueDate","2026-12-01");form.set("predecessorId",first.id);
+ const result=applyEditor(first.state,p.id,"item",form);
+ assert.equal(serialize(first.state),before);
+ assert.equal(result.state.projects[0].sources.length,0);
+ assert.deepEqual(result.state.projects[0].dependencies,[{from:first.id,to:result.workId}]);
+ assert.equal(result.state.projects[0].items.at(-1).dueDate,"2026-12-01");
  assert.deepEqual(deserialize(serialize(result.state)),result.state);
 });

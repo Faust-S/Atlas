@@ -383,3 +383,19 @@ test("Installed Windows witnesses immediate work and stage access and the 1212-w
  assert.match(stress,/d\.saved_project\(changed\)==after/);
  assert.doesNotMatch(stress,/execute_script\(|invoke\(|write_bytes\(d\.STORE|localStorage/);
 });
+
+test("Windows witness checks calendar feedback and a real selected predecessor",()=>{
+ const first=read("../desktop/tests/installed-atlas06-connect.py");
+ const stress=read("../desktop/tests/installed-atlas06-visual-scale.py");
+ for(const marker of ["ATLAS06_CREATED_WORK_CALENDAR_PREVIEW_PASS"])
+  assert.ok(first.includes(marker));
+ for(const marker of ["ATLAS06_VISUAL_PREDECESSOR_SELECTED_NATIVE_PASS",
+  "ATLAS06_VISUAL_PREDECESSOR_EFFECT_VISIBLE_PASS",
+  "ATLAS06_VISUAL_PREDECESSOR_SAVED_PASS"])
+  assert.ok(stress.includes(marker));
+ assert.ok(stress.includes('title="Начать после работы",control_type="ComboBox"'));
+ assert.ok(stress.includes('keyboard.send_keys("{HOME}{DOWN}{ENTER}")'));
+ assert.ok(stress.includes('{"from":"visual-work-0-0","to":added[0]["id"]}'));
+ assert.ok(stress.includes('len(after["dependencies"])==len(expected["dependencies"])+1'));
+ assert.ok(stress.includes('d.saved_project(changed)==after'));
+});
