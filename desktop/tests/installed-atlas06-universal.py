@@ -137,6 +137,14 @@ def qualify():
     v.capture("universal-table-work-conditions")
     assert d.head()==saved,"Reading predecessor hints in table changed native Store"
     print("ATLAS06_UNIVERSAL_TABLE_DEPENDENCY_HINT_PASS",flush=True)
+    # Open the recorded predecessor by its visible name, then return to the
+    # same table without applying a work edit or writing the native Store.
+    open_editor_by_visible_control("Открыть предшествующую работу Подготовить помещение")
+    v.capture("universal-table-predecessor-opened")
+    keyboard.send_keys("{ESC}")
+    v.await_no_form()
+    assert d.head()==saved,"Opening a predecessor from table changed native Store"
+    print("ATLAS06_UNIVERSAL_TABLE_PREDECESSOR_OPEN_PASS",flush=True)
     work_link=v.find_control("Связи работы Открыть площадку",types={"Button"})
     work_link.click_input()
     d.wait_text("Зависимости работ",25)
@@ -165,6 +173,12 @@ def qualify():
     v.capture("universal-board-work-conditions")
     assert d.head()==saved,"Reading predecessor hints on board changed native Store"
     print("ATLAS06_UNIVERSAL_BOARD_DEPENDENCY_HINT_PASS",flush=True)
+    open_editor_by_visible_control("Открыть предшествующую работу Согласовать программу")
+    v.capture("universal-board-predecessor-opened")
+    keyboard.send_keys("{ESC}")
+    v.await_no_form()
+    assert d.head()==saved,"Opening a predecessor from board changed native Store"
+    print("ATLAS06_UNIVERSAL_BOARD_PREDECESSOR_OPEN_PASS",flush=True)
     board_work=v.find_control("Связи работы Открыть площадку",types={"Button"})
     board_work.click_input()
     d.wait_text("Зависимости работ",25)

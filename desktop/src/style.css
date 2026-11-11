@@ -107,6 +107,10 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
  font-size:11px;line-height:1.4;color:#486581}
 .atlas-work-dependency-hint span{display:block;min-width:0;overflow-wrap:anywhere}
 .atlas-work-dependency-pending{color:#765325}
+.atlas-work-dependency-hint .atlas-work-predecessor-link{font-size:inherit;line-height:inherit;
+ font-weight:650;white-space:normal;overflow-wrap:anywhere;vertical-align:baseline}
+.atlas-work-dependency-hint .atlas-work-predecessor-link:focus-visible{outline:2px solid #316fdf;
+ outline-offset:2px;border-radius:2px}
 .board-card .atlas-work-dependency-hint{margin:8px 0 0;font-size:11px}
 .board-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;min-width:0}
 .board-actions select{flex:1 1 100%;width:100%;min-width:0;max-width:100%;font-size:11px;padding:6px 4px}

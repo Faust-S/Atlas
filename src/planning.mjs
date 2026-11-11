@@ -89,15 +89,15 @@ export function workDependencyOverview(project,plan,{maxNames=2}={}){
   throw Error("Invalid work dependency preview limit");
  const byId=new Map(project.items.map(work=>[work.id,work]));
  const hints=new Map(project.items.map(work=>[work.id,{
-  predecessorTotal:0,pendingTotal:0,pendingTitles:[],successorTotal:0
+  predecessorTotal:0,pendingTotal:0,pendingWorks:[],successorTotal:0
  }]));
  for(const row of plan.rows){
   const entry=hints.get(row.id);
   if(!entry)continue;
   entry.predecessorTotal=row.predecessors.length;
   entry.pendingTotal=row.blockedBy.length;
-  entry.pendingTitles=row.blockedBy.slice(0,maxNames)
-   .map(id=>byId.get(id)?.title).filter(Boolean);
+  entry.pendingWorks=row.blockedBy.slice(0,maxNames)
+   .filter(id=>byId.has(id)).map(id=>({id,title:byId.get(id).title}));
  }
  for(const edge of project.dependencies){
   const entry=hints.get(edge.from);

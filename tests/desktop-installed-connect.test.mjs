@@ -290,3 +290,23 @@ test("Installed source-free project shows recorded predecessor names before open
  assert.match(main,/role="group"[\s\S]*?aria-label=\{\[first,later\]\.filter\(Boolean\)\.join\("\. "\)\}/);
  assert.match(css,/\.atlas-work-dependency-hint\{display:grid/);
 });
+
+
+test("Installed Atlas opens the exact unfinished predecessor from table and board without writes",()=>{
+ const main=read("../desktop/src/main.tsx");
+ const model=read("../src/planning.mjs");
+ const style=read("../desktop/src/style.css");
+ const driver=read("../desktop/tests/installed-atlas06-universal.py");
+ assert.match(model,/pendingWorks=row\.blockedBy\.slice\(0,maxNames\)/);
+ assert.match(model,/\.map\(id=>\(\{id,title:byId\.get\(id\)\.title\}\)\)/);
+ assert.match(main,/aria-label=\{"Открыть предшествующую работу "\+work\.title\}/);
+ assert.match(main,/onClick=\{\(\)=>onOpenWork\(work\.id\)\}/);
+ assert.match(main,/onOpenWork=\{id=>openEditor\("work:"\+id\)\}/);
+ assert.match(style,/\.atlas-work-dependency-hint \.atlas-work-predecessor-link:focus-visible/);
+ assert.match(driver,/open_editor_by_visible_control\("Открыть предшествующую работу Подготовить помещение"\)/);
+ assert.match(driver,/open_editor_by_visible_control\("Открыть предшествующую работу Согласовать программу"\)/);
+ assert.match(driver,/ATLAS06_UNIVERSAL_TABLE_PREDECESSOR_OPEN_PASS/);
+ assert.match(driver,/ATLAS06_UNIVERSAL_BOARD_PREDECESSOR_OPEN_PASS/);
+ assert.match(driver,/Opening a predecessor from table changed native Store/);
+ assert.match(driver,/Opening a predecessor from board changed native Store/);
+});

@@ -11,7 +11,7 @@ test("Recorded direct predecessors and dependents work without any GitHub source
  const opening=project.items.find(item=>item.title==="Открыть площадку");
  assert.deepEqual(hints.get(opening.id),{
   predecessorTotal:2,pendingTotal:2,
-  pendingTitles:["Подготовить помещение","Согласовать программу"],successorTotal:0
+  pendingWorks:project.items.slice(0,2).map(work=>({id:work.id,title:work.title})),successorTotal:0
  });
  for(const predecessor of project.items.filter(item=>item.id!==opening.id)){
   assert.equal(hints.get(predecessor.id).successorTotal,1);
@@ -29,11 +29,11 @@ test("Status changes recompute unfinished names without claiming independent com
  const partial=workDependencyOverview(project,scheduleProject(project));
  assert.equal(partial.get(opening.id).predecessorTotal,2);
  assert.equal(partial.get(opening.id).pendingTotal,1);
- assert.deepEqual(partial.get(opening.id).pendingTitles,["Согласовать программу"]);
+ assert.deepEqual(partial.get(opening.id).pendingWorks,[{id:project.items[1].id,title:"Согласовать программу"}]);
  project.items[1].state="done";
  const finished=workDependencyOverview(project,scheduleProject(project));
  assert.equal(finished.get(opening.id).pendingTotal,0);
- assert.deepEqual(finished.get(opening.id).pendingTitles,[]);
+ assert.deepEqual(finished.get(opening.id).pendingWorks,[]);
  assert.equal(finished.get(opening.id).predecessorTotal,2);
 });
 
@@ -51,8 +51,9 @@ test("Large plans with duplicate names preserve IDs and bound the preview",()=>{
  const selected=hints.get(items[10].id);
  assert.equal(selected.predecessorTotal,4);
  assert.equal(selected.pendingTotal,3);
- assert.deepEqual(selected.pendingTitles,[items[2].title,items[4].title]);
- assert.equal(selected.pendingTotal-selected.pendingTitles.length,1);
+ assert.deepEqual(selected.pendingWorks,[items[2],items[4]].map(work=>({id:work.id,title:work.title})));
+ assert.notEqual(selected.pendingWorks[0].id,selected.pendingWorks[1].id);
+ assert.equal(selected.pendingTotal-selected.pendingWorks.length,1);
  assert.equal(hints.get(items[5].id).successorTotal,2);
  assert.equal(hints.get(items[9].id).successorTotal,1);
  assert.equal(JSON.stringify(project),before);
@@ -62,7 +63,7 @@ test("Unlinked work remains uncluttered and invalid preview limits fail",()=>{
  const project=universal();project.dependencies=[];
  const hints=workDependencyOverview(project,scheduleProject(project));
  for(const item of project.items)assert.deepEqual(hints.get(item.id),{
-  predecessorTotal:0,pendingTotal:0,pendingTitles:[],successorTotal:0
+  predecessorTotal:0,pendingTotal:0,pendingWorks:[],successorTotal:0
  });
  assert.throws(()=>workDependencyOverview(project,scheduleProject(project),{maxNames:0}),/preview limit/);
 });

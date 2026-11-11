@@ -107,17 +107,24 @@ function Metric({value,label,note}:{value:number|string;label:string;note?:strin
  return <div className="metric"><small>{label}</small><strong>{value}</strong>{note&&<small>{note}</small>}</div>;
 }
 function Fallback({message}:{message:string}){return <div className="empty">{message}</div>}
-type WorkLinkPreview={predecessorTotal:number;pendingTotal:number;pendingTitles:string[];successorTotal:number};
-function WorkDependencyHint({info}:{info?:WorkLinkPreview|null}){
+type WorkLinkPreview={predecessorTotal:number;pendingTotal:number;pendingWorks:{id:string;title:string}[];successorTotal:number};
+function WorkDependencyHint({info,onOpenWork}:{info?:WorkLinkPreview|null;onOpenWork:(id:string)=>void}){
  if(!info||(!info.predecessorTotal&&!info.successorTotal))return null;
- const more=info.pendingTotal-info.pendingTitles.length;
+ const more=info.pendingTotal-info.pendingWorks.length;
  const first=info.pendingTotal>0?
-  "Не отмечены выполненными: "+info.pendingTitles.join(", ")+(more>0?" и ещё "+more:""):
+  "Не отмечены выполненными: "+info.pendingWorks.map(work=>work.title).join(", ")+(more>0?" и ещё "+more:""):
   info.predecessorTotal>0?"Предшествующие отмечены выполненными: "+info.predecessorTotal:"";
  const later=info.successorTotal>0?"От этой работы зависят: "+info.successorTotal:"";
  return <div className="atlas-work-dependency-hint" role="group"
    aria-label={[first,later].filter(Boolean).join(". ")}>
-  {first&&<span className={info.pendingTotal>0?"atlas-work-dependency-pending":undefined}>{first}</span>}
+  {info.pendingTotal>0?<span className="atlas-work-dependency-pending">
+   Не отмечены выполненными:{" "}
+   {info.pendingWorks.map((work,i)=><React.Fragment key={work.id}>
+    {i>0?", ":null}<button type="button" className="text-link atlas-work-predecessor-link"
+     aria-label={"Открыть предшествующую работу "+work.title}
+     onClick={()=>onOpenWork(work.id)}>{work.title}</button>
+   </React.Fragment>)}{more>0?" и ещё "+more:null}
+  </span>:first&&<span>{first}</span>}
   {later&&<span>{later}</span>}
  </div>;
 }
@@ -1467,7 +1474,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      <div className="table-scroll atlas-work-table-scroll"><table className="atlas-work-table" aria-label="Работы проекта"><thead><tr><th>Работа</th><th>Состояние</th><th>Длительность</th><th>Ответственный</th><th>Срок</th><th>Изменить</th></tr></thead>
       <tbody>{filteredWork.slice(0,workLimit).map((w:any)=><tr key={w.id}>
        <td data-label="Работа"><strong>{w.title}</strong><small>{project.stages.find((s:any)=>s.id===w.stageId)?.name||"Без этапа"}</small>
-        <WorkDependencyHint info={workLinks.get(w.id)}/>
+        <WorkDependencyHint info={workLinks.get(w.id)} onOpenWork={id=>openEditor("work:"+id)}/>
         {workFolderUrl(project,w)&&<small>Каталог: <a className="text-link"
          href={workFolderUrl(project,w)!} target="_blank" rel="noopener noreferrer">
          {w.sourcePath}</a></small>}
@@ -1534,7 +1541,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     {tab==="board"&&<div className="board">
      {Object.entries(workStatuses).map(([key,title])=><section className="board-column" key={key}><h3>{String(title)} <small>{project.items.filter((w:any)=>w.state===key).length}</small></h3>
       {project.items.filter((w:any)=>w.state===key).slice(0,boardLimits[key]||60).map((w:any)=><div className="board-card" key={w.id}><strong>{w.title}</strong><small>{w.assignee||"Нет ответственного"} · {w.estimateDays??1} дн.</small>
-        <WorkDependencyHint info={workLinks.get(w.id)}/>
+        <WorkDependencyHint info={workLinks.get(w.id)} onOpenWork={id=>openEditor("work:"+id)}/>
        <div className="board-actions"><select aria-label={"Состояние "+w.title} value={w.state} onChange={e=>quickWork(w.id,e.target.value)}>
         {Object.entries(workStatuses).map(([v,title])=><option key={v} value={v}>{String(title)}</option>)}</select>
         <button onClick={()=>openEditor("work:"+w.id)}>Детали</button>
