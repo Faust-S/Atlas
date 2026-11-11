@@ -678,3 +678,11 @@ test("Empty plans hide unavailable controls, while existing stage plans can crea
  assert.match(map,/Все каталоги в GitHub/);
  assert.doesNotMatch(map,/disabled=\{!projection\.workTotal\}|disabled=\{projection\.workTotal<2\}/);
 });
+
+test("Folder actions have distinct accessible names from the work editor submit button",()=>{
+ const visual=read("../desktop/src/ProjectVisuals.tsx");
+ const map=visual.slice(visual.indexOf("export function ProjectSourcePlanMap"));
+ assert.match(map,/aria-label=\{"Создать работу по каталогу "\+folder\.name\}/);
+ assert.match(map,/Создать работу<\/button>/);
+ assert.doesNotMatch(map,/onSuggestFolder\([^\n]*\)[^\n]*\n\s*Добавить работу<\/button>/);
+});
