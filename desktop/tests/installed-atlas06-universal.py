@@ -113,6 +113,16 @@ def qualify():
     v.await_no_form()
     assert d.head()==saved
     print("ATLAS06_UNIVERSAL_SEARCH_STAGE_PASS",flush=True)
+    v.find_control("Найти",types={"Button"}).click_input()
+    d.set_text("Найти работу или этап","Открыть площадку")
+    d.wait_text("Найдено: 1",25)
+    v.find_control("Связи работы Открыть площадку",types={"Button"},scroll=False).click_input()
+    d.wait_text("Предшествующих работ: 2",25)
+    d.wait_text("Подготовить помещение",25)
+    v.capture("universal-search-recorded-links")
+    assert d.head()==saved,"Inspecting ordinary work links changed native Store"
+    keyboard.send_keys("{ESC}")
+    print("ATLAS06_UNIVERSAL_SEARCH_DEPENDENCY_CONTEXT_PASS",flush=True)
 
     # Two predecessors in the already saved plan, never inferred by the map.
     detail=v.find_control("Предшествующих работ: 2")

@@ -1,7 +1,7 @@
 import React,{useEffect,useMemo,useRef,useState} from 'react';
 import {dependencyDiagram,ganttViewport,ganttFocusOffset} from './visual-layout.mjs';
 import {portfolioNetwork} from '../../src/portfolio.mjs';
-import {projectSourcePlanSearch} from '../../src/project-organization.mjs';
+import {projectSourcePlanSearch,projectSourcePlanWorkContext} from '../../src/project-organization.mjs';
 
 type CPM={durationDays:number;rows:Array<{id:string;title:string;earlyStart:number;earlyFinish:number;durationDays:number;critical:boolean;state:string;predecessors:string[];blockedBy:string[];floatDays:number}>};
 type Mode='fit'|'30'|'90';
@@ -254,13 +254,20 @@ export function ProjectSourcePlanMap({projection,project,onOpenWork,onEditStage,
 }){
  const [searchOpen,setSearchOpen]=useState(false);
  const [searchQuery,setSearchQuery]=useState("");
+ const [detailWorkId,setDetailWorkId]=useState<string|null>(null);
  const inputRef=useRef<HTMLInputElement|null>(null);
  const triggerRef=useRef<HTMLButtonElement|null>(null);
- useEffect(()=>{setSearchOpen(false);setSearchQuery("")},[projection.projectId]);
+ useEffect(()=>{
+  setSearchOpen(false);setSearchQuery("");setDetailWorkId(null);
+ },[projection.projectId]);
  useEffect(()=>{if(searchOpen)inputRef.current?.focus()},[searchOpen]);
  const found=useMemo(()=>projectSourcePlanSearch(project,searchQuery,{limit:8}),
   [project,searchQuery]);
- const closeSearch=()=>{setSearchOpen(false);setSearchQuery("")};
+ const detail=useMemo(()=>detailWorkId?
+  projectSourcePlanWorkContext(project,detailWorkId):null,[project,detailWorkId]);
+ const closeSearch=()=>{
+  setSearchOpen(false);setSearchQuery("");setDetailWorkId(null);
+ };
  const openFound=(hit:any)=>{
   closeSearch();
   if(hit.kind==="work")onOpenWork(hit.id);
@@ -287,20 +294,81 @@ export function ProjectSourcePlanMap({projection,project,onOpenWork,onEditStage,
       <label>Работа или этап
        <input ref={inputRef} type="search" aria-label="Найти работу или этап"
         placeholder="Название или фрагмент" value={searchQuery}
-        onChange={event=>setSearchQuery(event.target.value)}/>
+        onChange={event=>{
+         setSearchQuery(event.target.value);setDetailWorkId(null);
+        }}/>
       </label>
       {searchQuery.trim()?<>
        <p className="minor" role="status">{found.total?
         "Найдено: "+found.total:"Совпадений нет"}</p>
        <div className="atlas-source-plan-find-results">
-        {found.matches.map((hit:any)=><button key={hit.kind+":"+hit.id}
-         type="button" className="atlas-source-plan-find-hit" title={hit.title}
-         aria-label={(hit.kind==="work"?"Открыть работу ":"Открыть этап ")+hit.title}
-         onClick={()=>openFound(hit)}>
-         <small>{hit.kind==="work"?"Работа":"Этап"}</small>
-         <strong>{hit.title}</strong>
-         {hit.kind==="work"&&<small>{hit.stageName}</small>}
-        </button>)}
+        {found.matches.map((hit:any)=><div className="atlas-source-plan-find-item"
+         key={hit.kind+":"+hit.id}>
+         <button type="button" className="atlas-source-plan-find-hit" title={hit.title}
+          aria-label={(hit.kind==="work"?"Открыть работу ":"Открыть этап ")+hit.title}
+          onClick={()=>openFound(hit)}>
+          <small>{hit.kind==="work"?"Работа":"Этап"}</small>
+          <strong>{hit.title}</strong>
+          {hit.kind==="work"&&<small>{hit.stageName}</small>}
+         </button>
+         {hit.kind==="work"&&<button type="button" className="text-link"
+          aria-label={"Связи работы "+hit.title}
+          aria-expanded={detailWorkId===hit.id}
+          onClick={()=>setDetailWorkId(current=>current===hit.id?null:hit.id)}>
+          {detailWorkId===hit.id?"Скрыть связи":"Связи работы"}
+         </button>}
+         {detailWorkId===hit.id&&detail&&<div className="atlas-source-plan-find-context"
+          role="group" aria-label="Связи выбранной работы">
+          {detail.stage&&<div className="atlas-source-plan-find-relation">
+           <small>Этап</small>
+           <button type="button" className="text-link"
+            aria-label={"Открыть этап работы "+detail.stage.title}
+            onClick={()=>openFound({kind:"stage",id:detail.stage.id})}>
+            {detail.stage.title}</button>
+          </div>}
+          {detail.source&&<div className="atlas-source-plan-find-relation">
+           <small>Исходники</small>
+           <span title={detail.source.repository||"Источник не найден"}>
+            {detail.source.repository||"Подключённый источник отсутствует"}
+            {detail.source.folder?" / "+detail.source.folder:""}</span>
+           <small>{detail.source.status==="missing"?
+            "Источник больше не подключён":detail.source.status==="unavailable"?
+            "Сведения об источнике сейчас недоступны":
+            detail.source.revisionCurrent?"Редакция исходников совпадает":
+            "Работа связана с прежней редакцией исходников"}</small>
+           <div className="atlas-source-plan-find-links">
+            <button type="button" className="text-link"
+             onClick={()=>{closeSearch();onOpenSources()}}>Посмотреть источники</button>
+            {detail.source.url&&<a className="text-link"
+             href={detail.source.url} target="_blank" rel="noopener noreferrer">
+             Открыть каталог GitHub</a>}
+           </div>
+          </div>}
+          {detail.predecessorTotal>0&&<div className="atlas-source-plan-find-relation">
+           <small>Предшествующих работ: {detail.predecessorTotal}</small>
+           {detail.predecessors.map((related:any)=><button key={related.id}
+            type="button" className="text-link" title={related.title}
+            aria-label={"Открыть предшествующую работу "+related.title}
+            onClick={()=>openFound({kind:"work",id:related.id})}>
+            {related.title}</button>)}
+          </div>}
+          {detail.successorTotal>0&&<div className="atlas-source-plan-find-relation">
+           <small>Зависящих работ: {detail.successorTotal}</small>
+           {detail.successors.map((related:any)=><button key={related.id}
+            type="button" className="text-link" title={related.title}
+            aria-label={"Открыть зависящую работу "+related.title}
+            onClick={()=>openFound({kind:"work",id:related.id})}>
+            {related.title}</button>)}
+          </div>}
+          {(detail.predecessorTotal>detail.predecessors.length||
+            detail.successorTotal>detail.successors.length)&&
+           <button type="button" className="text-link"
+            onClick={()=>{closeSearch();onOpenGraph()}}>
+            Все зависимости на схеме</button>}
+          {!detail.source&&!detail.stage&&!detail.predecessorTotal&&
+           !detail.successorTotal&&<small>Связи пока не записаны.</small>}
+         </div>}
+        </div>)}
        </div>
        {found.hidden>0&&<p className="minor">
         Показаны первые {found.matches.length} результатов. Уточните название.</p>}

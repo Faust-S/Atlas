@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {serialize} from "../src/core.mjs";
-import {projectSourcePlanProjection,projectSourcePlanSearch} from "../src/project-organization.mjs";
+import {projectSourcePlanProjection,projectSourcePlanSearch,projectSourcePlanWorkContext} from "../src/project-organization.mjs";
 import {atlas06VisualPortfolio,LONG_FOLDER,LONG_WORK,LONG_STAGE} from "./fixtures/atlas06-visual-portfolio.mjs";
 
 test("Large multi-source diagram highlights the confirmed work rather than the oldest source",()=>{
@@ -88,5 +88,67 @@ test("Search stays bounded for common queries and preserves the full long name",
  assert.deepEqual(projectSourcePlanSearch(project,"несуществующее название"),
   {matches:[],total:0,hidden:0});
  assert.throws(()=>projectSourcePlanSearch(project,"работа",{limit:0}),/предел/);
+ assert.equal(serialize(snapshot),before);
+});
+
+
+test("Search context navigates recorded predecessors and linked current source",()=>{
+ const snapshot=atlas06VisualPortfolio(),project=snapshot.projects[0],before=serialize(snapshot);
+ const context=projectSourcePlanWorkContext(project,"visual-work-5-0");
+ assert.equal(context.title,LONG_WORK);
+ assert.equal(context.stage.title,LONG_STAGE);
+ assert.equal(context.predecessorTotal,5);
+ assert.deepEqual(context.predecessors.map(p=>p.title),
+  ["Работа 0 / 4","Работа 0 / 8","Работа 0 / 12"]);
+ assert.equal(context.successorTotal,0);
+ assert.equal(context.source.repository,"atlas-visual-fixture/project-5");
+ assert.equal(context.source.folder,LONG_FOLDER);
+ assert.equal(context.source.status,"current");
+ assert.equal(context.source.revisionCurrent,true);
+ assert.equal(context.source.url,"https://github.com/atlas-visual-fixture/project-5/tree/"+
+  "a".repeat(40)+"/"+encodeURIComponent(LONG_FOLDER));
+ assert.equal(serialize(snapshot),before);
+});
+test("Search context finds successors including cross-source recorded dependency",()=>{
+ const snapshot=atlas06VisualPortfolio(),project=snapshot.projects[0],before=serialize(snapshot);
+ const context=projectSourcePlanWorkContext(project,"visual-work-0-3");
+ assert.equal(context.successorTotal,2);
+ assert.deepEqual(context.successors.map(w=>w.id),["visual-work-0-4","visual-work-5-0"]);
+ assert.equal(context.predecessorTotal,0);
+ assert.equal(serialize(snapshot),before);
+});
+test("Search context reports old or unavailable sources without a current folder URL",()=>{
+ const snapshot=atlas06VisualPortfolio(),project=snapshot.projects[0];
+ const source=project.sources[5];
+ const oldRevision=source.summary.branchHeads.main;
+ source.summary.branchHeads.main="c".repeat(40);
+ let before=serialize(snapshot);
+ const stale=projectSourcePlanWorkContext(project,"visual-work-5-0");
+ assert.equal(stale.source.status,"stale");
+ assert.equal(stale.source.revisionCurrent,false);
+ assert.equal(stale.source.url,null);
+ assert.equal(serialize(snapshot),before);
+ source.summary.branchHeads.main=oldRevision;
+ source.status="error";
+ before=serialize(snapshot);
+ const unavailable=projectSourcePlanWorkContext(project,"visual-work-5-0");
+ assert.equal(unavailable.source.status,"unavailable");
+ assert.equal(unavailable.source.url,null);
+ assert.equal(serialize(snapshot),before);
+});
+test("Search context handles unlinked work, absent source and invalid limits read-only",()=>{
+ const snapshot=atlas06VisualPortfolio(),project=snapshot.projects[0],before=serialize(snapshot);
+ const unlinked=projectSourcePlanWorkContext(project,"visual-unlinked-0");
+ assert.equal(unlinked.source,null);
+ assert.equal(unlinked.stage,null);
+ assert.equal(unlinked.predecessorTotal,0);
+ assert.equal(projectSourcePlanWorkContext(project,"missing-work"),null);
+ assert.throws(()=>projectSourcePlanWorkContext(project,"visual-work-5-0",{maxRelated:0}),
+  /предел/);
+ const orphan=structuredClone(project);
+ orphan.sources=orphan.sources.filter(s=>s.id!=="visual-source-5");
+ const missing=projectSourcePlanWorkContext(orphan,"visual-work-5-0");
+ assert.equal(missing.source.status,"missing");
+ assert.equal(missing.source.url,null);
  assert.equal(serialize(snapshot),before);
 });

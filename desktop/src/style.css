@@ -670,9 +670,21 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
  border-radius:6px;background:#fff;color:#193c62}
 .atlas-source-plan-find-panel .minor{font-size:12px;margin:8px 0}
 .atlas-source-plan-find-results{display:grid;gap:6px}
+.atlas-source-plan-find-item{display:grid;gap:5px;min-width:0;
+ border:1px solid #dce7f3;border-radius:7px;background:#f7faff;padding:5px}
+.atlas-source-plan-find-item>.text-link{justify-self:start;padding:2px 6px;font-size:11px}
+.atlas-source-plan-find-context{display:grid;gap:8px;padding:8px;
+ border-top:1px solid #dce7f3;background:white;border-radius:5px}
+.atlas-source-plan-find-relation{display:grid;gap:3px;min-width:0}
+.atlas-source-plan-find-relation>small{font-size:11px;color:#5d7694}
+.atlas-source-plan-find-relation>span{font-size:12px;overflow-wrap:anywhere}
+.atlas-source-plan-find-relation>.text-link{text-align:left;justify-self:start;
+ font-size:12px;overflow-wrap:anywhere}
+.atlas-source-plan-find-links{display:flex;flex-wrap:wrap;gap:7px}
+.atlas-source-plan-find-links>.text-link{font-size:12px}
 .atlas-source-plan-find-hit{min-width:0;max-width:100%;display:flex;
  flex-direction:column;gap:3px;text-align:left;padding:8px 10px;
- border:1px solid #dce7f3;border-radius:7px;background:#f7faff;
+ border:0;border-radius:7px;background:transparent;
  color:#244d78;cursor:pointer}
 .atlas-source-plan-find-hit:focus-visible{outline:2px solid #3273b8;
  outline-offset:2px}

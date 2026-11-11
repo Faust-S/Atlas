@@ -153,3 +153,16 @@ test("Native Windows search remains clickable in a narrow viewport",()=>{
  assert.match(script,/rectangle_in_workspace\(found\.rectangle\(\),win32gui\.GetWindowRect\(d\.handle\)\)/);
  assert.match(css,/\.atlas-source-plan-find-panel\{position:absolute;right:0;bottom:calc\(100% \+ 7px\);/);
 });
+
+
+test("Installed search inspects recorded sources and dependencies without writing",()=>{
+ const stress=read("../desktop/tests/installed-atlas06-visual-scale.py");
+ const universal=read("../desktop/tests/installed-atlas06-universal.py");
+ assert.match(stress,/ATLAS06_VISUAL_SEARCH_SOURCE_CONTEXT_PASS/);
+ assert.match(stress,/ATLAS06_VISUAL_SEARCH_DEPENDENCY_CONTEXT_PASS/);
+ assert.match(stress,/Открыть каталог GitHub/);
+ assert.match(stress,/Все зависимости на схеме/);
+ assert.match(universal,/ATLAS06_UNIVERSAL_SEARCH_DEPENDENCY_CONTEXT_PASS/);
+ assert.match(universal,/Связи работы Открыть площадку/);
+ assert.match(universal,/assert d\.head\(\)==saved,"Inspecting ordinary work links changed native Store"/);
+});

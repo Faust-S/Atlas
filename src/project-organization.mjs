@@ -250,3 +250,50 @@ export function projectSourcePlanSearch(project,query,{limit=8}={}){
  const matches=results.slice(0,limit).map(({rank,order,...entry})=>entry);
  return {matches,total:results.length,hidden:results.length-matches.length};
 }
+
+
+// A read-only context for one recorded work. It uses the full plan, including
+// dependencies and source links hidden by the bounded map. An old reference
+// is not reported as a current GitHub directory.
+export function projectSourcePlanWorkContext(project,workId,{maxRelated=3}={}){
+ if(!project||!Array.isArray(project.items)||!Array.isArray(project.stages)||
+    !Array.isArray(project.sources)||!Array.isArray(project.dependencies))
+  throw Error("Проект не найден");
+ if(!Number.isInteger(maxRelated)||maxRelated<1||maxRelated>20)
+  throw Error("Некорректный предел связей");
+ const byId=new Map(project.items.map(work=>[work.id,work]));
+ const work=byId.get(workId);
+ if(!work)return null;
+ const stage=project.stages.find(s=>s.id===work.stageId);
+ const incoming=[],outgoing=[];
+ for(const edge of project.dependencies){
+  if(edge.to===work.id&&byId.has(edge.from))incoming.push(byId.get(edge.from));
+  if(edge.from===work.id&&byId.has(edge.to))outgoing.push(byId.get(edge.to));
+ }
+ const related=items=>items.slice(0,maxRelated).map(item=>({
+  id:item.id,title:item.title
+ }));
+ const linked=project.sources.find(source=>source.id===work.sourceId);
+ const repository=entryRepo(linked);
+ const status=!work.sourceId?null:!linked?"missing":
+  repository?treeStatus(linked):"unavailable";
+ const observation=linked?.summary?.structure;
+ const revisionCurrent=status==="current"&&shaValid(work.sourceRevision)&&
+  observation.commitSha.toLowerCase()===work.sourceRevision.toLowerCase();
+ const folderKnown=revisionCurrent&&rootName(work.sourcePath)&&
+  Array.isArray(observation.folders)&&observation.folders.includes(work.sourcePath);
+ const source=work.sourceId?{
+  id:work.sourceId,repository,branch:linked?selectedBranch(linked):null,
+  folder:work.sourcePath||null,status,
+  revisionCurrent:Boolean(revisionCurrent),
+  url:repository&&folderKnown?"https://github.com/"+repository+
+   "/tree/"+observation.commitSha+"/"+encodeURIComponent(work.sourcePath):null
+ }:null;
+ return {
+  id:work.id,title:work.title,
+  stage:stage?{id:stage.id,title:stage.name}:null,
+  source,
+  predecessorTotal:incoming.length,predecessors:related(incoming),
+  successorTotal:outgoing.length,successors:related(outgoing)
+ };
+}

@@ -205,6 +205,13 @@ def qualify_visual():
     find_control("Найти",types={"Button"},scroll=False).click_input()
     d.set_text("Найти работу или этап","Работа 5 / 1080")
     d.wait_text("Найдено: 1",25)
+    find_control("Связи работы Работа 5 / 1080",types={"Button"},scroll=False).click_input()
+    d.wait_text("Посмотреть источники",25)
+    d.wait_text("Открыть каталог GitHub",25)
+    d.wait_text("directory-23",25)
+    capture("search-linked-source-1024")
+    assert d.head()==saved,"Inspecting source links changed native Store"
+    print("ATLAS06_VISUAL_SEARCH_SOURCE_CONTEXT_PASS",flush=True)
     capture("search-hidden-work-1024")
     assert d.head()==saved,"Searching a hidden work changed native Store"
     found=find_control("Открыть работу Работа 5 / 1080",types={"Button"},scroll=False)
@@ -227,6 +234,17 @@ def qualify_visual():
     await_no_form()
     assert d.head()==saved
     print("ATLAS06_VISUAL_SEARCH_STAGE_PASS",flush=True)
+    find_control("Найти",types={"Button"}).click_input()
+    d.set_text("Найти работу или этап","Проверить")
+    d.wait_text("Найдено: 1",25)
+    find_control("Связи работы "+LONG_WORK,types={"Button"},scroll=False).click_input()
+    d.wait_text("Предшествующих работ: 5",25)
+    d.wait_text("Работа 0 / 4",25)
+    d.wait_text("Все зависимости на схеме",25)
+    capture("search-recorded-dependencies-1024")
+    assert d.head()==saved,"Inspecting dependencies changed native Store"
+    keyboard.send_keys("{ESC}")
+    print("ATLAS06_VISUAL_SEARCH_DEPENDENCY_CONTEXT_PASS",flush=True)
     print("ATLAS06_VISUAL_SEARCH_READONLY_PASS",flush=True)
 
     # The expansion button must be near the diagram heading, not after 200 rows.

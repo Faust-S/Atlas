@@ -404,3 +404,21 @@ test("Search results open above the trigger instead of below the Windows viewpor
  assert.match(css,/\.atlas-source-plan-find-panel\{position:absolute;right:0;bottom:calc\(100% \+ 7px\);/);
  assert.doesNotMatch(css,/\.atlas-source-plan-find-panel\{position:absolute;right:0;top:calc\(100% \+ 7px\);/);
 });
+
+
+test("Search context stays inside one dialog and uses existing editors and sources",()=>{
+ const visual=read("../desktop/src/ProjectVisuals.tsx");
+ const css=read("../desktop/src/style.css");
+ assert.match(visual,/projectSourcePlanWorkContext\(project,detailWorkId\)/);
+ assert.match(visual,/aria-label=\{"Связи работы "\+hit\.title\}/);
+ assert.match(visual,/aria-label="Связи выбранной работы"/);
+ assert.match(visual,/Открыть предшествующую работу/);
+ assert.match(visual,/Открыть зависящую работу/);
+ assert.match(visual,/Открыть каталог GitHub/);
+ assert.match(visual,/onClick=\{\(\)=>\{closeSearch\(\);onOpenSources\(\)\}\}/);
+ assert.match(visual,/onClick=\{\(\)=>\{closeSearch\(\);onOpenGraph\(\)\}\}/);
+ assert.match(visual,/onClick=\{\(\)=>openFound\(\{kind:"stage",id:detail\.stage\.id\}\)\}/);
+ assert.match(css,/\.atlas-source-plan-find-context\{display:grid/);
+ assert.doesNotMatch(visual.slice(visual.indexOf("export function ProjectSourcePlanMap")),
+  /localStorage|createItem\(|mutate\(|fetch\(/);
+});
