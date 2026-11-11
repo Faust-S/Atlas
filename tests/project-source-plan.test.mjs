@@ -694,7 +694,7 @@ test("A newly created work is revealed by its saved identity, with its stage and
  assert.match(main,/setRecentWorkId\(result\.workId\)/);
  assert.match(main,/revealWorkInTable\(result\.workId,!isDependencyChange\)/);
  assert.match(main,/const isDependencyChange=editor\.action\.startsWith\("dep-to:"\)/);
- assert.match(main,/setWorkReturnId\(id\)/);
+ assert.match(main,/setWorkReturnId\(focusRow\?id:null\)/);
  assert.match(main,/setWorkFilter\("all"\);setWorkTargetFilter\("all"\);setWorkObservationFilter\("all"\)/);
  assert.match(main,/setWorkDependencyFilter\("all"\);setWorkQuery\(""\);setWorkSort\("title"\);setWorkLimit\(200\)/);
  assert.match(main,/filteredWork\.findIndex\(\(item:any\)=>item\.id===workReturnId\)/);
@@ -730,7 +730,8 @@ test("An existing-work dependency explains CPM effects without writing data",()=
  const plan=read("../src/planning.mjs");
  assert.match(editor,/return \{state:connect\(snapshot,projectId,from,id\),workId:id\}/);
  assert.match(ui,/scheduleChangeSummary\(plan,scheduleProject\(updatedProject\)\)/);
- assert.match(ui,/setRecentWorkKind\(editor\.action\.startsWith\("dep-to:"\)\?"dependency":"created"\)/);
+ assert.match(ui,/const isDependencyChange=editor\.action\.startsWith\("dep-to:"\)/);
+ assert.match(ui,/setRecentWorkKind\(isDependencyChange\?"dependency":"created"\)/);
  assert.match(ui,/Изменение зависимостей работы/);
  assert.match(ui,/Связь внесена в черновик\. Сохраните изменения\./);
  assert.match(ui,/Расчётные сроки существующих работ не сдвинулись\./);
