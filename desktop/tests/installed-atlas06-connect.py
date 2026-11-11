@@ -341,7 +341,18 @@ def verify_organization_work(previous,original_project):
     # without another disclosure or automatically inventing a work.
     wait_text("Как связаны части проекта",35)
     wait_text("Работ по этому каталогу ещё нет.",35)
+    # Observe installed GUI controls, not an injected browser state.
+    choices=[control.window_text() for control in window().descendants(control_type="Button")
+             if control.window_text().startswith("Предложить работу по каталогу ")]
+    assert "Предложить работу по каталогу src" in choices,"Source folder not available"
+    if "Предложить работу по каталогу .github" in choices:
+        assert choices.index("Предложить работу по каталогу src") < choices.index(
+            "Предложить работу по каталогу .github"),"Setup folder shown before project content"
+    empty_plan_actions={"План-график","Зависимости работ","Связать работы"}
+    assert not [control for control in window().descendants(control_type="Button")
+                if control.window_text() in empty_plan_actions], "Unavailable plan controls clutter first view"
     screenshot("source-map-first-connection-no-work")
+    print("ATLAS06_CONNECT_CONTENT_CATALOG_FIRST_PASS",flush=True)
     print("ATLAS06_CONNECT_SOURCE_MAP_FIRST_VIEW_PASS",flush=True)
     assert head()==previous,"Viewing project parts changed native storage"
     click_scrolled_button("Предложить работу по каталогу src",main=True)

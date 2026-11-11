@@ -2,7 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {empty,createProject,createStage,createItem,editItem,attach,observe,connect,serialize,deserialize} from "../src/core.mjs";
-import {projectSourcePlanProjection,projectSourcePlanSearch} from "../src/project-organization.mjs";
+import {projectSourcePlanProjection,projectSourcePlanSearch,projectStructureGuide,
+ projectFolderDisplayOrder} from "../src/project-organization.mjs";
 
 const SHA="a".repeat(40),OLD="b".repeat(40),TREE="c".repeat(40);
 const read=p=>readFileSync(new URL(p,import.meta.url),"utf8");
@@ -627,4 +628,53 @@ test("Stale or unobserved catalogs offer an explicit refresh through the origina
  const from=visual.indexOf("export function ProjectSourcePlanMap");
  assert.doesNotMatch(visual.slice(from),/fetch\(|mutate\(|localStorage|createItem\(/);
  assert.equal(serialize(f.state),initial);
+});
+
+test("First connection shows content before support catalogs without changing observations",()=>{
+ const created=createProject(empty(),{name:"Any project",type:"engineering"});
+ const attached=attach(created.state,created.id,"github","example/site",{branch:"work/dev"});
+ const observed=observe(attached.state,created.id,attached.id,"ok",{
+  scope:"repository",repository:"example/site",defaultBranch:"work/dev",
+  branchHeads:{"work/dev":SHA},complete:true,readiness:"not_assessed",
+  structure:{status:"observed",branch:"work/dev",commitSha:SHA,treeSha:TREE,
+   folders:[".github","tests","docs","scripts","src","desktop","assets"],
+   files:["package.json"],totalFolders:7,totalFiles:1}
+ });
+ const before=serialize(observed);
+ const compact=projectSourcePlanProjection(observed,created.id,{maxFoldersPerSource:3});
+ assert.equal(compact.workTotal,0);
+ assert.deepEqual(compact.sources[0].folders.map(f=>f.name),["src","desktop","assets"]);
+ assert.equal(compact.sources[0].hiddenKnownFolders,4);
+ const full=projectSourcePlanProjection(observed,created.id,{maxFoldersPerSource:7});
+ const names=["src","desktop","assets","docs","tests",".github","scripts"];
+ assert.deepEqual(full.sources[0].folders.map(f=>f.name),names);
+ assert.deepEqual(projectStructureGuide(observed,created.id).sources[0].folders.map(f=>f.name),names);
+ assert.deepEqual(projectFolderDisplayOrder([".github","..","src","docs"]),["src","docs",".github"]);
+ assert.deepEqual(observed.projects[0].sources[0].summary.structure.folders,
+  [".github","tests","docs","scripts","src","desktop","assets"]);
+ assert.equal(serialize(observed),before);
+ const work=createItem(observed,created.id,{title:"Проверить CI"});
+ const linked=editItem(work.state,created.id,work.id,{sourceId:attached.id,
+  sourcePath:".github",sourceRevision:SHA});
+ const linkedBefore=serialize(linked);
+ const linkedMap=projectSourcePlanProjection(linked,created.id,{maxFoldersPerSource:1});
+ assert.equal(linkedMap.sources[0].folders[0].name,".github");
+ assert.equal(linkedMap.sources[0].folders[0].works[0].id,work.id);
+ assert.equal(serialize(linked),linkedBefore);
+});
+test("Empty plans hide unavailable controls, while existing stage plans can create a work",()=>{
+ const visual=read("../desktop/src/ProjectVisuals.tsx");
+ const map=visual.slice(visual.indexOf("export function ProjectSourcePlanMap"));
+ const guide=read("../desktop/src/ProjectOrganizationGuide.tsx");
+ const connect=read("../desktop/src/ProjectConnect.tsx");
+ assert.match(connect,/projectFolderDisplayOrder\(structure\?\.folders\)/);
+ assert.match(connect,/displayedFolders\.slice\(0,16\)/);
+ assert.match(guide,/onCreateWork=\{\(\)=>onEdit\("item"\)\}/);
+ assert.match(map,/\{\(projection\.workTotal>0\|\|projection\.stageTotal>0\)&&<div className="atlas-source-plan-find">/);
+ assert.match(map,/\{projection\.workTotal>0&&<button[^>]*\s+onClick=\{onOpenTimeline\}>План-график<\/button>\}/);
+ assert.match(map,/\{projection\.workTotal>0&&<button[^>]*\s+onClick=\{\(\)=>onOpenGraph\(\)\}>Зависимости работ<\/button>\}/);
+ assert.match(map,/projection\.workTotal===0&&projection\.sources\.length===0&&<button/);
+ assert.match(map,/projection\.workTotal>=2&&<button/);
+ assert.match(map,/Все каталоги в GitHub/);
+ assert.doesNotMatch(map,/disabled=\{!projection\.workTotal\}|disabled=\{projection\.workTotal<2\}/);
 });

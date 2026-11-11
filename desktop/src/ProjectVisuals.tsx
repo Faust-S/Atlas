@@ -254,7 +254,7 @@ export function PortfolioNetworkMap({snapshot,onOpenProject}:{
 // No component or dependency is created by opening the diagram.
 export function ProjectSourcePlanMap({projection,project,restoreSearch,onOpenWork,onEditStage,onSuggestFolder,
  onOpenTimeline,onOpenGraph,onOpenWorks,onOpenSources,onRefreshSource,onOpenLinkedSource,onOpenStages,
- onCreateStage,onAddDependency,
+ onCreateStage,onCreateWork,onAddDependency,
  expanded,hasMoreLinks,onToggleExpansion,busy=false}:{
  projection:any;project:any;restoreSearch:{workId:string;query:string}|null;
  onOpenWork:(id:string)=>void;onEditStage:(id:string)=>void;
@@ -263,7 +263,7 @@ export function ProjectSourcePlanMap({projection,project,restoreSearch,onOpenWor
  onOpenWorks:()=>void;onOpenSources:()=>void;onRefreshSource:(sourceId:string)=>void;
  onOpenStages:()=>void;busy?:boolean;
  onOpenLinkedSource:(workId:string,query:string)=>void;
- onCreateStage:()=>void;onAddDependency:()=>void;
+ onCreateStage:()=>void;onCreateWork:()=>void;onAddDependency:()=>void;
  expanded:boolean;hasMoreLinks:boolean;onToggleExpansion:()=>void;
 }){
  const [searchOpen,setSearchOpen]=useState(false);
@@ -309,7 +309,7 @@ export function ProjectSourcePlanMap({projection,project,restoreSearch,onOpenWor
     "Каталог, работа и этап показаны рядом, если связь уже есть в плане.":
     "Работы, этапы и зависимости показаны по сохранённому плану."}</p></div>
    <div className="button-row">
-    <div className="atlas-source-plan-find">
+    {(projection.workTotal>0||projection.stageTotal>0)&&<div className="atlas-source-plan-find">
      <button type="button" ref={triggerRef} className="action-button"
       aria-expanded={searchOpen} onClick={()=>setSearchOpen(open=>!open)}>Найти</button>
      {searchOpen&&<div className="atlas-source-plan-find-panel" role="search"
@@ -405,11 +405,11 @@ export function ProjectSourcePlanMap({projection,project,restoreSearch,onOpenWor
         Показаны первые {found.matches.length} результатов. Уточните название.</p>}
       </>:<p className="minor">Поиск по всем работам и этапам проекта.</p>}
      </div>}
-    </div>
-    <button type="button" className="action-button" disabled={!projection.workTotal}
-     onClick={onOpenTimeline}>План-график</button>
-    <button type="button" className="action-button" disabled={!projection.workTotal}
-     onClick={()=>onOpenGraph()}>Зависимости работ</button>
+    </div>}
+    {projection.workTotal>0&&<button type="button" className="action-button"
+     onClick={onOpenTimeline}>План-график</button>}
+    {projection.workTotal>0&&<button type="button" className="action-button"
+     onClick={()=>onOpenGraph()}>Зависимости работ</button>}
     {(hasMoreLinks||expanded)&&<button type="button" className="action-button"
      aria-expanded={expanded} onClick={onToggleExpansion}>
      {expanded?"Свернуть схему":"Показать больше связей"}</button>}
@@ -419,6 +419,9 @@ export function ProjectSourcePlanMap({projection,project,restoreSearch,onOpenWor
    <div className="atlas-source-plan-source-title">
     <strong>{source.repository}</strong>
     <small>{source.branch||"Ветка не указана"}</small>
+    {source.status==="current"&&<a className="text-link"
+     href={"https://github.com/"+source.repository+"/tree/"+source.commitSha}
+     target="_blank" rel="noopener noreferrer">Все каталоги в GitHub</a>}
    </div>
    {source.status==="current"?<>
     <div className="atlas-source-plan-legend" aria-hidden="true">
@@ -542,13 +545,14 @@ export function ProjectSourcePlanMap({projection,project,restoreSearch,onOpenWor
    {" "}<button type="button" className="text-link" onClick={onOpenSources}>
     Открыть все источники</button></p>}
   <div className="atlas-source-plan-actions">
+   {projection.workTotal===0&&projection.sources.length===0&&<button type="button"
+    className="action-button" onClick={onCreateWork}>Добавить работу</button>}
    <button type="button" className="action-button"
     onClick={onCreateStage}>Добавить этап</button>
-   <button type="button" className="action-button"
-    disabled={projection.workTotal<2}
-    onClick={onAddDependency}>Связать работы</button>
-   <span className="minor">Связей между работами в плане: {projection.dependencyTotal}.
-    Изменения появятся только после вашего подтверждения.</span>
+   {projection.workTotal>=2&&<button type="button" className="action-button"
+    onClick={onAddDependency}>Связать работы</button>}
+   {projection.workTotal>0&&<span className="minor">Связей между работами в плане: {projection.dependencyTotal}.
+    Изменения появятся только после вашего подтверждения.</span>}
   </div>
  </div>;
 }

@@ -33,6 +33,9 @@ test("Native GUI test requires a read-only public discovery and explicit native 
  assert.match(installed,/observation\["structure"\]\["commitSha"\]==observation\["branchHeads"\]\[BRANCH\]/);
  assert.match(installed,/assert second==first/);
  assert.match(installed,/ATLAS06_CONNECT_BRANCH_TREE_RESTART_PASS/);
+ assert.match(installed,/ATLAS06_CONNECT_CONTENT_CATALOG_FIRST_PASS/);
+ assert.match(installed,/choices\.index\("Предложить работу по каталогу src"\)/);
+ assert.match(installed,/empty_plan_actions/);
  assert.match(installed,/ATLAS06_CONNECT_LIVE_ROOT_REFRESH_SAVE_PASS/);
  assert.match(installed,/ATLAS06_CONNECT_LIVE_ROOT_REFRESH_RESTART_PASS/);
  assert.match(installed,/ATLAS06_USER_APPROVED_SOURCE_WORK_NATIVE_SAVE_PASS/);

@@ -24,6 +24,21 @@ const roleFor=name=>{
   return "Возможно, исходный код";
  return "Назначение ещё не установлено";
 };
+// Presentation order only. Confirmed work links take precedence over the
+// folder name; unknown folders stay accessible and source order is preserved.
+const folderDisplayRank=name=>{
+ const part=name.toLowerCase();
+ if(part.startsWith(".")||
+  ["ci","scripts","tools","build","dist","node_modules","vendor","coverage","tmp","out"].includes(part))return 3;
+ if(["test","tests","spec","specs","e2e","__tests__"].includes(part))return 2;
+ if(["docs","doc","documentation","manual","guides"].includes(part))return 1;
+ return 0;
+};
+export function projectFolderDisplayOrder(folders,linkedFolders=[]){
+ const linked=new Set(linkedFolders);
+ return (Array.isArray(folders)?folders:[]).filter(rootName).sort((a,b)=>
+  Number(linked.has(b))-Number(linked.has(a))||folderDisplayRank(a)-folderDisplayRank(b));
+}
 const entryRepo=source=>{
  if(source?.kind!=="github")return null;
  try{return repoName(source.locator)}catch{return null}
@@ -62,11 +77,8 @@ export function projectStructureGuide(snapshot,projectId,{maxFolders=24,maxSourc
  const sources=sourceList.slice(0,maxSources).map(source=>{
   const status=treeStatus(source),repo=entryRepo(source);
   const tree=status==="current"?source.summary.structure:null;
-  const names=tree&&Array.isArray(tree.folders)?tree.folders.filter(rootName):[];
-  if(linkedFirst){
-   const linked=new Set(folderCounts.get(source.id)?.keys()||[]);
-   names.sort((a,b)=>Number(linked.has(b))-Number(linked.has(a)));
-  }
+  const names=tree?projectFolderDisplayOrder(tree.folders,
+   folderCounts.get(source.id)?.keys()||[]):[];
   const folders=names.slice(0,maxFolders).map(name=>({
     name,role:roleFor(name),sourceId:source.id,commitSha:tree.commitSha,
     workCount:folderCounts.get(source.id)?.get(name)||0,

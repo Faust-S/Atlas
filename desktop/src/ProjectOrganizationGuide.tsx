@@ -67,6 +67,7 @@ export function ProjectOrganizationGuide({snapshot,projectId,restoreSearch,onEdi
     onOpenLinkedSource={onOpenLinkedSource}
     onOpenStages={onOpenStages}
     onCreateStage={()=>onEdit("stage")}
+    onCreateWork={()=>onEdit("item")}
     onAddDependency={()=>onEdit("dep")}/>
   </details>}
   {hasSources&&<details className="atlas-organization-details"

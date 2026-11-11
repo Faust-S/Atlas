@@ -1,6 +1,7 @@
 import React,{useEffect,useMemo,useRef,useState} from "react";
 import {inspectPublicProject} from "../../src/project-onboarding.mjs";
 import {repoName} from "../../src/github-public.mjs";
+import {projectFolderDisplayOrder} from "../../src/project-organization.mjs";
 
 // One progressive surface: URL -> read-only inspection -> selection -> Atlas
 // draft. This component never writes to GitHub or bypasses Atlas's native Save.
@@ -85,6 +86,7 @@ export function ProjectConnect({snapshot,onApply,onCancel,disabled=false}:{
  };
  const close=()=>{ongoing.current?.abort();onCancel()};
  const structure=preview?.kind==="repository"?preview.structure:null;
+ const displayedFolders=projectFolderDisplayOrder(structure?.folders);
  const ci=preview?.kind==="repository"?preview.summary.ci:null;
  const ciLabel=ci?.state==="observed"?
    ci.status==="completed"?ci.conclusion==="success"?"Проверка GitHub прошла":
@@ -164,7 +166,7 @@ export function ProjectConnect({snapshot,onApply,onCancel,disabled=false}:{
      <summary>Корневая структура · {structure.totalFolders} каталогов · {structure.totalFiles} файлов</summary>
      <div className="atlas-connect-root">
       <div><strong>Каталоги · {structure.totalFolders}</strong>
-       {structure.folders.slice(0,16).length?<ul>{structure.folders.slice(0,16).map((folder:string)=>
+       {displayedFolders.slice(0,16).length?<ul>{displayedFolders.slice(0,16).map((folder:string)=>
         <li key={folder}><span aria-hidden="true">▣ </span>{folder}</li>)}</ul>:
         <p className="minor">Каталогов на верхнем уровне нет.</p>}</div>
       <div><strong>Файлы · {structure.totalFiles}</strong>
