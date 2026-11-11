@@ -111,13 +111,14 @@ type WorkLinkPreview={predecessorTotal:number;pendingTotal:number;pendingTitles:
 function WorkDependencyHint({info}:{info?:WorkLinkPreview|null}){
  if(!info||(!info.predecessorTotal&&!info.successorTotal))return null;
  const more=info.pendingTotal-info.pendingTitles.length;
- return <div className="atlas-work-dependency-hint" role="note">
-  {info.pendingTotal>0?
-   <span className="atlas-work-dependency-pending">
-    Не отмечены выполненными: {info.pendingTitles.join(", ")}{more>0?" и ещё "+more:""}
-   </span>:
-   info.predecessorTotal>0?<span>Предшествующие отмечены выполненными: {info.predecessorTotal}</span>:null}
-  {info.successorTotal>0&&<span>От этой работы зависят: {info.successorTotal}</span>}
+ const first=info.pendingTotal>0?
+  "Не отмечены выполненными: "+info.pendingTitles.join(", ")+(more>0?" и ещё "+more:""):
+  info.predecessorTotal>0?"Предшествующие отмечены выполненными: "+info.predecessorTotal:"";
+ const later=info.successorTotal>0?"От этой работы зависят: "+info.successorTotal:"";
+ return <div className="atlas-work-dependency-hint" role="group"
+   aria-label={[first,later].filter(Boolean).join(". ")}>
+  {first&&<span className={info.pendingTotal>0?"atlas-work-dependency-pending":undefined}>{first}</span>}
+  {later&&<span>{later}</span>}
  </div>;
 }
 function EditorPanel({editor,onSubmit,onCancel,onDirtyChange,busy}:{

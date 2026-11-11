@@ -287,5 +287,6 @@ test("Installed source-free project shows recorded predecessor names before open
  assert.match(driver,/Reading predecessor hints on board changed native Store/);
  assert.match(main,/workDependencyOverview\(project,plan\)/);
  assert.match(main,/WorkDependencyHint info=\{workLinks\.get\(w\.id\)\}/);
+ assert.match(main,/role="group"[\s\S]*?aria-label=\{\[first,later\]\.filter\(Boolean\)\.join\("\. "\)\}/);
  assert.match(css,/\.atlas-work-dependency-hint\{display:grid/);
 });
