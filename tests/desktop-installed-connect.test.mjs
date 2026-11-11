@@ -202,3 +202,16 @@ test("Installed Windows Atlas returns from source to saved work and diagram",()=
  assert.match(driver,/assert d\.head\(\)==saved,"Returning to diagram from source changed native Store"/);
  assert.match(ui,/onClick=\{\(\)=>openEditor\("work:"\+sourceJumpContext!\.id\)\}/);
 });
+
+
+test("Installed Atlas restores the work search when returning from source",()=>{
+ const driver=read("../desktop/tests/installed-atlas06-visual-scale.py");
+ const main=read("../desktop/src/main.tsx");
+ const map=read("../desktop/src/ProjectVisuals.tsx");
+ assert.match(driver,/ATLAS06_VISUAL_SOURCE_SEARCH_RESTORED_PASS/);
+ assert.match(driver,/d\.wait_text\("Скрыть связи",25\)/);
+ assert.match(driver,/d\.wait_text\("Показать каталог в Atlas",25\)/);
+ assert.match(driver,/Restoring source search changed native Store/);
+ assert.match(main,/setMapSearchReturn\(tabId==="overview"&&tab==="sources"/);
+ assert.match(map,/priorityWorkId:detailWorkId/);
+});

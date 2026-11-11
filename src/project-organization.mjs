@@ -226,7 +226,7 @@ export function projectSourcePlanProjection(snapshot,projectId,{
 // available to open through its ordinary editor. This never writes to a plan.
 const searchLabel=value=>String(value??"").normalize("NFKC")
  .toLocaleLowerCase("ru-RU").replace(/\s+/g," ").trim();
-export function projectSourcePlanSearch(project,query,{limit=8}={}){
+export function projectSourcePlanSearch(project,query,{limit=8,priorityWorkId=null}={}){
  if(!project||!Array.isArray(project.items)||!Array.isArray(project.stages))
   throw Error("Проект не найден");
  if(!Number.isInteger(limit)||limit<1||limit>40)
@@ -246,7 +246,11 @@ export function projectSourcePlanSearch(project,query,{limit=8}={}){
  for(const work of project.items)add("work",work,
   stages.get(work.stageId)||"Без этапа");
  for(const stage of project.stages)add("stage",stage);
- results.sort((a,b)=>a.rank-b.rank||a.order-b.order);
+ results.sort((a,b)=>{
+  const aSelected=a.kind==="work"&&a.id===priorityWorkId;
+  const bSelected=b.kind==="work"&&b.id===priorityWorkId;
+  return Number(bSelected)-Number(aSelected)||a.rank-b.rank||a.order-b.order;
+ });
  const matches=results.slice(0,limit).map(({rank,order,...entry})=>entry);
  return {matches,total:results.length,hidden:results.length-matches.length};
 }

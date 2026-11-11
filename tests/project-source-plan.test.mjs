@@ -415,7 +415,7 @@ test("Search context stays inside one dialog and uses existing editors and sourc
  assert.match(visual,/Открыть предшествующую работу/);
  assert.match(visual,/Открыть зависящую работу/);
  assert.match(visual,/Открыть каталог GitHub/);
- assert.match(visual,/onClick=\{\(\)=>\{closeSearch\(\);onOpenLinkedSource\(detail\.id\)\}\}/);
+ assert.match(visual,/onClick=\{\(\)=>onOpenLinkedSource\(detail\.id,searchQuery\)\}/);
  assert.match(visual,/onClick=\{\(\)=>\{closeSearch\(\);onOpenGraph\(\)\}\}/);
  assert.match(visual,/onClick=\{\(\)=>\{if\(detail\.stage\)openFound\(\{kind:"stage",id:detail\.stage\.id\}\)\}\}/);
  assert.match(css,/\.atlas-source-plan-find-context\{display:grid/);
@@ -446,16 +446,18 @@ test("Searching a work opens the exact saved source and folder within Atlas",()=
  const visual=read("../desktop/src/ProjectVisuals.tsx");
  const css=read("../desktop/src/style.css");
  assert.match(main,/const \[sourceJump,setSourceJump\]=useState/);
+ assert.match(main,/const \[mapSearchReturn,setMapSearchReturn\]=useState/);
  assert.match(main,/projectSourcePlanWorkContext\(project,sourceJump\.workId\)/);
  assert.match(main,/onOpenLinkedSource=\{openLinkedSource\}/);
- assert.match(main,/const openLinkedSource=\(workId:string\)=>\{/);
- assert.match(main,/view\("sources"\);\s*setSourceJump\(\{projectId:project\.id,workId\}\)/);
+ assert.match(main,/const openLinkedSource=\(workId:string,query:string\)=>\{/);
+ assert.match(main,/view\("sources"\);\s*setSourceJump\(\{projectId:project\.id,workId,query\}\)/);
  assert.match(main,/target\.scrollIntoView\(\{behavior:"auto",block:"start"\}\)/);
  assert.match(main,/ref=\{selected\?sourceJumpRef:undefined\}/);
  assert.match(main,/aria-label="Каталог связанной работы"/);
  assert.match(main,/linkedSource\.url&&<a className="text-link"/);
  assert.match(main,/setSourceJump\(null\)/);
  assert.match(guide,/onOpenLinkedSource=\{onOpenLinkedSource\}/);
+ assert.match(guide,/restoreSearch=\{restoreSearch\}/);
  assert.match(visual,/Показать каталог в Atlas/);
  assert.match(css,/\.atlas-source-review-focused\{/);
  assert.doesNotMatch(main.slice(main.indexOf("const view=(tabId:Tab)=>"),main.indexOf("useEffect(()=>{",main.indexOf("const view=(tabId:Tab)=>"))),/mutate\(|commitWithReadback/);
@@ -497,4 +499,24 @@ test("Source labels distinguish saved structure from a fresh GitHub check",()=>{
  assert.doesNotMatch(main,/Каталог найден при последней сверке редакции исходников/);
  assert.doesNotMatch(visual,/Редакция исходников совпадает/);
  assert.match(driver,/d\.wait_text\("Каталог указан в сохранённой структуре исходников\.",25\)/);
+});
+
+
+test("Source navigation retains the matching query and selected work only for a return to overview",()=>{
+ const main=read("../desktop/src/main.tsx");
+ const guide=read("../desktop/src/ProjectOrganizationGuide.tsx");
+ const map=read("../desktop/src/ProjectVisuals.tsx");
+ assert.match(main,/setMapSearchReturn\(tabId==="overview"&&tab==="sources"/);
+ assert.match(main,/sourceJump\?\.projectId===project\?\.id\?/);
+ assert.match(main,/\\{workId:sourceJump\\.workId,query:sourceJump\\.query\\}:null/);
+ assert.match(main,/setSourceJump\(null\);setMapSearchReturn\(null\)/);
+ assert.match(main,/onOpenLinkedSource=\\{openLinkedSource\\}/);
+ assert.match(main,/restoreSearch=\\{mapSearchReturn\\}/);
+ assert.match(guide,/restoreSearch=\\{restoreSearch\\}/);
+ assert.match(map,/setDetailWorkId\(work\\.id\);setSearchOpen\(true\)/);
+ assert.match(map,/setSearchQuery\(valid\?previous:work\\.title\)/);
+ assert.match(map,/priorityWorkId:detailWorkId/);
+ assert.match(map,/onOpenLinkedSource\(detail\\.id,searchQuery\)/);
+ assert.doesNotMatch(map.slice(map.indexOf("export function ProjectSourcePlanMap")),
+  /localStorage|createItem\(|mutate\(|fetch\(/);
 });

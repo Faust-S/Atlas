@@ -218,7 +218,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const [reviewLimit,setReviewLimit]=useState(20);
  const [sourceLimit,setSourceLimit]=useState(15);
  const [sourceRowLimits,setSourceRowLimits]=useState<Record<string,number>>({});
- const [sourceJump,setSourceJump]=useState<{projectId:string;workId:string}|null>(null);
+ const [sourceJump,setSourceJump]=useState<{projectId:string;workId:string;query:string}|null>(null);
+ const [mapSearchReturn,setMapSearchReturn]=useState<{workId:string;query:string}|null>(null);
  const [recheckLimit,setRecheckLimit]=useState(25);
  const project=data.projects.find((p:any)=>p.id===active)||null;
  const sourceJumpContext=useMemo(()=>sourceJump&&project&&
@@ -455,7 +456,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   resetWorkspaceScroll();
   host?.onSelection?.({projectId:id,workId:null,revision:String(latestSnapshot.current.revision)});
   setActive(id);setTab("overview");setEditor(null);setForecastId(null);setConnectOpen(false);
-  setSourceJump(null);
+  setSourceJump(null);setMapSearchReturn(null);
   setShowProjectRelations(false);setRelationLimit(12);setRequirementJump(null);setChangeJump(null);
   if(!afterSubmit)setMessage("");
   setWorkFilter("all");setWorkTargetFilter("all");setWorkObservationFilter("all");setWorkHistoryLimits({});setWorkQuery("");setWorkSort("title");setWorkLimit(200);setRealityLimit(8);
@@ -811,13 +812,18 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const view=(tabId:Tab)=>{
   if(!requireClosedForm())return;
   resetWorkspaceScroll();
+  // Returning from a linked source restores the selected work's search
+  // context. Ordinary tab changes leave no retained search.
+  setMapSearchReturn(tabId==="overview"&&tab==="sources"&&
+   sourceJump?.projectId===project?.id?
+   {workId:sourceJump.workId,query:sourceJump.query}:null);
   setSourceJump(null);
   setTab(tabId);setEditor(null);setForecastId(null);
  };
- const openLinkedSource=(workId:string)=>{
+ const openLinkedSource=(workId:string,query:string)=>{
   if(!project||!requireClosedForm())return;
   view("sources");
-  setSourceJump({projectId:project.id,workId});
+  setSourceJump({projectId:project.id,workId,query});
  };
  useEffect(()=>{
   const key=(event:KeyboardEvent)=>{
@@ -1168,6 +1174,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      {(project.items.length>0||project.stages.length>0||project.type==="engineering"||
        project.sources.some((source:any)=>source.kind==="github"))&&
      <ProjectOrganizationGuide snapshot={data} projectId={project.id}
+      restoreSearch={mapSearchReturn}
       onEdit={openEditor}
       onRefresh={sourceId=>void syncPublic({projectId:project.id,sourceId})}
       onOpenSources={()=>view("sources")}

@@ -5,11 +5,12 @@ import {ProjectSourcePlanMap} from "./ProjectVisuals";
 // Saved GitHub observations enrich this view when available; existing work,
 // stage and dependency links remain usable in any project without GitHub.
 // Suggested roles are explanations to review, never new project entities.
-export function ProjectOrganizationGuide({snapshot,projectId,onEdit,onRefresh,onOpenProject,
+export function ProjectOrganizationGuide({snapshot,projectId,restoreSearch,onEdit,onRefresh,onOpenProject,
  onOpenSources,onOpenLinkedSource,onOpenWorks,onOpenStages,onAddRelation,onOpenTimeline,onOpenGraph,busy=false}:{
- snapshot:any;projectId:string;onEdit:(action:string)=>void;
+ snapshot:any;projectId:string;restoreSearch:{workId:string;query:string}|null;
+ onEdit:(action:string)=>void;
  onRefresh:(sourceId:string)=>void;onOpenProject:(id:string)=>void;
- onOpenSources:()=>void;onOpenLinkedSource:(workId:string)=>void;
+ onOpenSources:()=>void;onOpenLinkedSource:(workId:string,query:string)=>void;
  onOpenWorks:()=>void;onOpenStages:()=>void;onAddRelation:()=>void;
  onOpenTimeline:()=>void;onOpenGraph:()=>void;busy?:boolean;
 }){
@@ -48,7 +49,7 @@ export function ProjectOrganizationGuide({snapshot,projectId,onEdit,onRefresh,on
    <summary>{hasSources?"Схема проекта: каталоги, работы и этапы":
     "Схема проекта: работы и этапы"}</summary>
    <ProjectSourcePlanMap projection={projection} project={project}
-    expanded={moreLinks} hasMoreLinks={hasMoreLinks}
+    restoreSearch={restoreSearch} expanded={moreLinks} hasMoreLinks={hasMoreLinks}
     onToggleExpansion={()=>setMoreLinks(value=>!value)}
     onOpenWork={id=>onEdit("work:"+id)}
     onEditStage={id=>onEdit("stage-edit:"+id)}

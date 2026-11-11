@@ -242,15 +242,16 @@ export function PortfolioNetworkMap({snapshot,onOpenProject}:{
 // A navigable projection of saved GitHub observations and existing Atlas work.
 // The connectors illustrate only confirmed user-created work/stage assignments.
 // No component or dependency is created by opening the diagram.
-export function ProjectSourcePlanMap({projection,project,onOpenWork,onEditStage,onSuggestFolder,
+export function ProjectSourcePlanMap({projection,project,restoreSearch,onOpenWork,onEditStage,onSuggestFolder,
  onOpenTimeline,onOpenGraph,onOpenWorks,onOpenSources,onOpenLinkedSource,onOpenStages,
  onCreateStage,onAddDependency,
  expanded,hasMoreLinks,onToggleExpansion}:{
- projection:any;project:any;onOpenWork:(id:string)=>void;onEditStage:(id:string)=>void;
+ projection:any;project:any;restoreSearch:{workId:string;query:string}|null;
+ onOpenWork:(id:string)=>void;onEditStage:(id:string)=>void;
  onSuggestFolder:(sourceId:string,commitSha:string,folder:string)=>void;
  onOpenTimeline:()=>void;onOpenGraph:()=>void;
  onOpenWorks:()=>void;onOpenSources:()=>void;onOpenStages:()=>void;
- onOpenLinkedSource:(workId:string)=>void;
+ onOpenLinkedSource:(workId:string,query:string)=>void;
  onCreateStage:()=>void;onAddDependency:()=>void;
  expanded:boolean;hasMoreLinks:boolean;onToggleExpansion:()=>void;
 }){
@@ -262,9 +263,23 @@ export function ProjectSourcePlanMap({projection,project,onOpenWork,onEditStage,
  useEffect(()=>{
   setSearchOpen(false);setSearchQuery("");setDetailWorkId(null);
  },[projection.projectId]);
+ useEffect(()=>{
+  if(!restoreSearch?.workId)return;
+  const work=project?.items?.find((item:any)=>item.id===restoreSearch.workId);
+  if(!work)return;
+  const previous=restoreSearch.query.trim();
+  // A search can match many identical names. Pin the previously selected
+  // work ahead of the eight-item preview when returning from sources.
+  const valid=previous&&projectSourcePlanSearch(project,previous,{
+   limit:8,priorityWorkId:work.id
+  }).matches.some((hit:any)=>hit.kind==="work"&&hit.id===work.id);
+  setSearchQuery(valid?previous:work.title);
+  setDetailWorkId(work.id);setSearchOpen(true);
+ },[projection.projectId,restoreSearch?.workId,restoreSearch?.query]);
  useEffect(()=>{if(searchOpen)inputRef.current?.focus()},[searchOpen]);
- const found=useMemo(()=>projectSourcePlanSearch(project,searchQuery,{limit:8}),
-  [project,searchQuery]);
+ const found=useMemo(()=>projectSourcePlanSearch(project,searchQuery,{
+  limit:8,priorityWorkId:detailWorkId
+ }),[project,searchQuery,detailWorkId]);
  const detail=useMemo(()=>detailWorkId?
   projectSourcePlanWorkContext(project,detailWorkId):null,[project,detailWorkId]);
  const closeSearch=()=>{
@@ -358,7 +373,7 @@ export function ProjectSourcePlanMap({projection,project,onOpenWork,onEditStage,
             "Работа связана с прежней редакцией исходников"}</small>
            <div className="atlas-source-plan-find-links">
             <button type="button" className="text-link"
-             onClick={()=>{closeSearch();onOpenLinkedSource(detail.id)}}>
+             onClick={()=>onOpenLinkedSource(detail.id,searchQuery)}>
              Показать каталог в Atlas</button>
             {detail.source.url&&<a className="text-link"
              href={detail.source.url} target="_blank" rel="noopener noreferrer">

@@ -234,11 +234,15 @@ def qualify_visual():
     print("ATLAS06_VISUAL_SOURCE_TO_WORK_BACKLINK_PASS",flush=True)
     find_control("К схеме",types={"Button"},scroll=False).click_input()
     d.wait_text("Схема проекта: каталоги, работы и этапы",25)
-    assert d.head()==saved,"Returning to diagram from source changed native Store"
-    print("ATLAS06_VISUAL_SOURCE_TO_DIAGRAM_BACKLINK_PASS",flush=True)
-    find_control("Найти",types={"Button"},scroll=False).click_input()
-    d.set_text("Найти работу или этап","Работа 5 / 1080")
     d.wait_text("Найдено: 1",25)
+    d.wait_text("Скрыть связи",25)
+    d.wait_text("Показать каталог в Atlas",25)
+    restored=find_control("Открыть работу Работа 5 / 1080",types={"Button"},scroll=False)
+    assert rectangle_in_workspace(restored.rectangle(),win32gui.GetWindowRect(d.handle))
+    assert d.head()==saved,"Restoring source search changed native Store"
+    capture("restored-source-work-search-1024")
+    print("ATLAS06_VISUAL_SOURCE_SEARCH_RESTORED_PASS",flush=True)
+    print("ATLAS06_VISUAL_SOURCE_TO_DIAGRAM_BACKLINK_PASS",flush=True)
     capture("search-hidden-work-1024")
     assert d.head()==saved,"Returning from source folder changed native Store"
     found=find_control("Открыть работу Работа 5 / 1080",types={"Button"},scroll=False)

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {serialize} from "../src/core.mjs";
+import {serialize,empty,createProject,createItem} from "../src/core.mjs";
 import {projectSourcePlanProjection,projectSourcePlanSearch,projectSourcePlanWorkContext} from "../src/project-organization.mjs";
 import {atlas06VisualPortfolio,LONG_FOLDER,LONG_WORK,LONG_STAGE} from "./fixtures/atlas06-visual-portfolio.mjs";
 
@@ -166,4 +166,30 @@ test("Exact source target from the last source and a hidden folder remains read-
  assert.equal(linked.source.revisionCurrent,true);
  assert.match(linked.source.url,/\/directory-23$/);
  assert.equal(serialize(snapshot),before);
+});
+
+
+test("Returning to a work search pins the selected work among identical names",()=>{
+ const p=createProject(empty(),{name:"Repeated names",type:"other"});
+ let state=p.state;
+ const ids=[];
+ for(let i=0;i<16;i++){
+  const created=createItem(state,p.id,{title:"Проверить готовность"});
+  state=created.state;
+  ids.push(created.id);
+ }
+ const before=serialize(state),project=state.projects[0];
+ const normal=projectSourcePlanSearch(project,"ПРОВЕРИТЬ",{limit:8});
+ assert.equal(normal.total,16);
+ assert.equal(normal.matches.length,8);
+ assert.equal(normal.hidden,8);
+ assert.ok(!normal.matches.some(hit=>hit.id===ids[15]));
+ const focused=projectSourcePlanSearch(project,"ПРОВЕРИТЬ",{
+  limit:8,priorityWorkId:ids[15]
+ });
+ assert.equal(focused.total,16);
+ assert.equal(focused.matches[0].id,ids[15]);
+ assert.equal(focused.matches[0].kind,"work");
+ assert.equal(focused.hidden,8);
+ assert.equal(serialize(state),before);
 });
