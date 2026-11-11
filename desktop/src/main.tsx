@@ -808,12 +808,16 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   try{mutate(editItem(data,project.id,id,{state}),"Состояние работы изменено в черновике.")}
   catch(e){issue(e)}
  };
- const view=(tabId:Tab,sourceWorkId:string|null=null)=>{
+ const view=(tabId:Tab)=>{
   if(!requireClosedForm())return;
   resetWorkspaceScroll();
-  setSourceJump(tabId==="sources"&&sourceWorkId&&project?
-   {projectId:project.id,workId:sourceWorkId}:null);
+  setSourceJump(null);
   setTab(tabId);setEditor(null);setForecastId(null);
+ };
+ const openLinkedSource=(workId:string)=>{
+  if(!project||!requireClosedForm())return;
+  view("sources");
+  setSourceJump({projectId:project.id,workId});
  };
  useEffect(()=>{
   const key=(event:KeyboardEvent)=>{
@@ -1167,7 +1171,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       onEdit={openEditor}
       onRefresh={sourceId=>void syncPublic({projectId:project.id,sourceId})}
       onOpenSources={()=>view("sources")}
-      onOpenLinkedSource={workId=>view("sources",workId)}
+      onOpenLinkedSource={openLinkedSource}
       onOpenWorks={()=>view("work")}
       onOpenStages={()=>document.getElementById("atlas-project-stages")?.scrollIntoView({behavior:"smooth",block:"start"})}
       onOpenTimeline={()=>view("timeline")}

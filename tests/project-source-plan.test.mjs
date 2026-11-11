@@ -447,8 +447,9 @@ test("Searching a work opens the exact saved source and folder within Atlas",()=
  const css=read("../desktop/src/style.css");
  assert.match(main,/const \[sourceJump,setSourceJump\]=useState/);
  assert.match(main,/projectSourcePlanWorkContext\(project,sourceJump\.workId\)/);
- assert.match(main,/onOpenLinkedSource=\{workId=>view\("sources",workId\)\}/);
- assert.match(main,/setSourceJump\(tabId==="sources"&&sourceWorkId&&project\?/);
+ assert.match(main,/onOpenLinkedSource=\{openLinkedSource\}/);
+ assert.match(main,/const openLinkedSource=\(workId:string\)=>\{/);
+ assert.match(main,/view\("sources"\);\s*setSourceJump\(\{projectId:project\.id,workId\}\)/);
  assert.match(main,/target\.scrollIntoView\(\{behavior:"auto",block:"start"\}\)/);
  assert.match(main,/ref=\{selected\?sourceJumpRef:undefined\}/);
  assert.match(main,/aria-label="Каталог связанной работы"/);
@@ -457,7 +458,7 @@ test("Searching a work opens the exact saved source and folder within Atlas",()=
  assert.match(guide,/onOpenLinkedSource=\{onOpenLinkedSource\}/);
  assert.match(visual,/Показать каталог в Atlas/);
  assert.match(css,/\.atlas-source-review-focused\{/);
- assert.doesNotMatch(main.slice(main.indexOf("const view=(tabId:Tab,"),main.indexOf("useEffect(()=>{",main.indexOf("const view=(tabId:Tab,"))),/mutate\(|commitWithReadback/);
+ assert.doesNotMatch(main.slice(main.indexOf("const view=(tabId:Tab)=>"),main.indexOf("useEffect(()=>{",main.indexOf("const view=(tabId:Tab)=>"))),/mutate\(|commitWithReadback/);
 });
 test("Historical source and unavailable folder keep their provenance separate",()=>{
  const main=read("../desktop/src/main.tsx");
