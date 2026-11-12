@@ -89,7 +89,7 @@ export function scheduleChangeSummary(before,after,{limit=4}={}){
   throw new Error("Invalid schedule comparison limit");
  const previous=new Map(before.rows.map(row=>[row.id,row]));
  let movedTotal=0,delayedTotal=0,earlierTotal=0,criticalChangedTotal=0,deadlineMissedTotal=0;
- let deadlineChangedTotal=0,deadlineResolvedTotal=0,deadlineNewMissedTotal=0;
+ let deadlineChangedTotal=0,deadlineResolvedTotal=0,deadlineNewMissedTotal=0,deadlineRemovedTotal=0;
  const affected=[];
  for(const row of after.rows){
   const old=previous.get(row.id);
@@ -103,7 +103,12 @@ export function scheduleChangeSummary(before,after,{limit=4}={}){
   const previouslyMissed=Boolean(previousDueDate&&old.finishDate&&old.finishDate>previousDueDate);
   const missedDeadline=Boolean(dueDate&&row.finishDate&&row.finishDate>dueDate);
   if(dueDateChanged)deadlineChangedTotal++;
-  if(previouslyMissed&&!missedDeadline)deadlineResolvedTotal++;
+  // Removing a control date removes the basis for checking its compliance.
+  // It is not a successful correction of a missed deadline.
+  const deadlineRemoved=Boolean(previousDueDate&&!dueDate);
+  if(deadlineRemoved)deadlineRemovedTotal++;
+  const deadlineResolved=Boolean(previouslyMissed&&dueDate&&!missedDeadline);
+  if(deadlineResolved)deadlineResolvedTotal++;
   if(!previouslyMissed&&missedDeadline)deadlineNewMissedTotal++;
   const shiftDays=row.earlyFinish-old.earlyFinish;
   if(!shiftDays&&!dueDateChanged)continue;
@@ -117,7 +122,7 @@ export function scheduleChangeSummary(before,after,{limit=4}={}){
    previousFinishOffset:old.earlyFinish,finishOffset:row.earlyFinish,
    previousFinishDate:old.finishDate??null,finishDate:row.finishDate??null,
    previousDueDate,dueDate,dueDateChanged,missedDeadline,
-   deadlineResolved:previouslyMissed&&!missedDeadline,
+   deadlineResolved,deadlineRemoved,
    critical:Boolean(row.critical)
   });
  }
@@ -125,12 +130,13 @@ export function scheduleChangeSummary(before,after,{limit=4}={}){
  // preview; remaining moved works follow by the magnitude of their impact.
  affected.sort((a,b)=>Number(b.missedDeadline)-Number(a.missedDeadline)||
   Number(b.deadlineResolved)-Number(a.deadlineResolved)||
+  Number(b.deadlineRemoved)-Number(a.deadlineRemoved)||
   Number(b.dueDateChanged)-Number(a.dueDateChanged)||
   Number(b.shiftDays>0)-Number(a.shiftDays>0)||
   Math.abs(b.shiftDays)-Math.abs(a.shiftDays)||Number(b.critical)-Number(a.critical));
  return {durationBefore:before.durationDays,durationAfter:after.durationDays,
   movedTotal,delayedTotal,earlierTotal,criticalChangedTotal,deadlineMissedTotal,
-  deadlineChangedTotal,deadlineResolvedTotal,deadlineNewMissedTotal,
+  deadlineChangedTotal,deadlineResolvedTotal,deadlineNewMissedTotal,deadlineRemovedTotal,
   affectedTotal:affected.length,examples:affected.slice(0,limit)};
 }
 

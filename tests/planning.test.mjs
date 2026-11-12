@@ -208,3 +208,33 @@ test('without a project start, changing a control date reports the edit but neve
  assert.equal(effect.examples[0].finishDate,null);
  assert.equal(effect.examples[0].previousFinishDate,null);
 });
+
+test('removing a violated control date does not masquerade as an eliminated delay',()=>{
+ const baseline=project([['work',3]],[],'2026-11-10');
+ baseline.items[0].dueDate='2026-11-12';
+ const removed={...baseline,items:[{...baseline.items[0],dueDate:null}]};
+ const original=JSON.stringify(baseline);
+ const change=scheduleChangeSummary(scheduleProject(baseline),scheduleProject(removed));
+ assert.equal(change.movedTotal,0);
+ assert.equal(change.deadlineChangedTotal,1);
+ assert.equal(change.deadlineRemovedTotal,1);
+ assert.equal(change.deadlineResolvedTotal,0);
+ assert.equal(change.deadlineMissedTotal,0);
+ assert.equal(change.affectedTotal,1);
+ assert.equal(change.examples[0].previousDueDate,'2026-11-12');
+ assert.equal(change.examples[0].dueDate,null);
+ assert.equal(change.examples[0].deadlineRemoved,true);
+ assert.equal(change.examples[0].deadlineResolved,false);
+ assert.equal(change.examples[0].finishDate,'2026-11-13');
+ assert.equal(JSON.stringify(baseline),original);
+});
+test('editing a deadline rather than deleting it can genuinely resolve an overrun',()=>{
+ const baseline=project([['work',3]],[],'2026-11-10');
+ baseline.items[0].dueDate='2026-11-12';
+ const corrected={...baseline,items:[{...baseline.items[0],dueDate:'2026-11-15'}]};
+ const effect=scheduleChangeSummary(scheduleProject(baseline),scheduleProject(corrected));
+ assert.equal(effect.deadlineRemovedTotal,0);
+ assert.equal(effect.deadlineResolvedTotal,1);
+ assert.equal(effect.examples[0].deadlineRemoved,false);
+ assert.equal(effect.examples[0].deadlineResolved,true);
+});

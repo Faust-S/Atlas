@@ -1565,6 +1565,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
             " Контрольных сроков изменено: "+recentScheduleEffect.deadlineChangedTotal+".":""}
            {recentScheduleEffect.deadlineResolvedTotal>0?
             " Нарушений срока устранено: "+recentScheduleEffect.deadlineResolvedTotal+".":""}
+           {recentScheduleEffect.deadlineRemovedTotal>0?
+            " Контрольных сроков снято: "+recentScheduleEffect.deadlineRemovedTotal+
+            ". Соблюдение этих сроков больше не проверяется.":""}
            {recentScheduleEffect.deadlineMissedTotal>0?
             " Расчётный финиш позже контрольного срока. Затронуто работ: "+
             recentScheduleEffect.deadlineMissedTotal+".":""}
@@ -1589,6 +1592,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
              Контрольный срок: было {item.previousDueDate||"не задано"},
              стало {item.dueDate||"не задано"}.
              {item.deadlineResolved?" Нарушение срока устранено.":""}
+             {item.deadlineRemoved?" Срок снят. Соблюдение больше не проверяется.":""}
             </small>}
             {item.missedDeadline&&<small className="atlas-work-effect-deadline">
              Контрольный срок {item.dueDate} не выдержан. Проверьте план этой работы.

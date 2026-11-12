@@ -866,3 +866,14 @@ test("Changing only a control date explains deadline correction without claiming
  assert.match(ui,/recentScheduleEffect\.affectedTotal>recentScheduleEffect\.examples\.length/);
  assert.doesNotMatch(source,/setState\(|localStorage|commitWithReadback/);
 });
+
+test("Removing a control deadline is shown as unverified, not as a resolved missed deadline",()=>{
+ const model=read("../src/planning.mjs");
+ const ui=read("../desktop/src/main.tsx");
+ assert.match(model,/const deadlineRemoved=Boolean\(previousDueDate&&!dueDate\)/);
+ assert.match(model,/const deadlineResolved=Boolean\(previouslyMissed&&dueDate&&!missedDeadline\)/);
+ assert.match(model,/deadlineRemovedTotal,\s*affectedTotal/);
+ assert.match(ui,/recentScheduleEffect\.deadlineRemovedTotal>0/);
+ assert.match(ui,/Соблюдение этих сроков больше не проверяется/);
+ assert.match(ui,/item\.deadlineRemoved\?" Срок снят/);
+});

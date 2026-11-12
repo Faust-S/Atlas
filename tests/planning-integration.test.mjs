@@ -56,3 +56,17 @@ test('editing the deadline of a saved work updates its dated risk without rewrit
  assert.equal(serialize(original),beforeText,'Direct edit mutated the original project');
  assert.equal(deserialize(serialize(revised)).projects[0].items[0].dueDate,'2026-11-15');
 });
+
+test('clearing a missed work deadline persists its absence without falsely claiming completion',()=>{
+ const made=createProject(empty(),{name:'Removal is not correction'});
+ const item=createItem(made.state,made.id,{title:'Recorded work'});
+ const started=editProject(item.state,made.id,{startDate:'2026-11-10'});
+ const dated=editItem(started,made.id,item.id,{estimateDays:3,dueDate:'2026-11-12'});
+ const removed=editItem(dated,made.id,item.id,{dueDate:null});
+ const effect=scheduleChangeSummary(scheduleProject(dated.projects[0]),scheduleProject(removed.projects[0]));
+ assert.equal(effect.deadlineRemovedTotal,1);
+ assert.equal(effect.deadlineResolvedTotal,0);
+ assert.equal(effect.examples[0].deadlineRemoved,true);
+ assert.equal(deserialize(serialize(removed)).projects[0].items[0].dueDate,null);
+ assert.equal(dated.projects[0].items[0].dueDate,'2026-11-12');
+});
