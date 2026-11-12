@@ -207,6 +207,8 @@ export function editItem(s,pid,id,patch){return change(s,x=>{const item=project(
   if(sourceId&&!project(x,pid).sources.some(source=>source.id===sourceId))
    throw Error("Unknown source for work");
   item.sourceId=sourceId;
+  // A removed source must not leave an unusable folder or revision.
+  if(!sourceId){delete item.sourcePath;delete item.sourceRevision;}
  }
  if("sourcePath" in patch||"sourceRevision" in patch){
   if(!("sourcePath" in patch&&"sourceRevision" in patch)||

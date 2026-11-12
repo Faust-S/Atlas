@@ -316,9 +316,17 @@ export function editorSpec(project,action,snapshot=null){
   // other associations must survive an unrelated edit of the work.
   const additional=(item.targetIds||[]).slice(1).map(id=>
    (project.targets||[]).find(t=>t.id===id)?.title||id);
+  const source=project.sources.find(s=>s.id===item.sourceId);
+  const hints=[];
+  if(additional.length)hints.push("Работа связана с несколькими требованиями. Здесь изменяется только основная связь; остальные сохраняются: "+additional.join(", "));
+  if(item.sourceId)hints.push("Сейчас привязана к "+(source?.locator||"источнику")+
+   (item.sourcePath?" / "+item.sourcePath:"")+
+   ". Если убрать привязку, сама работа, сроки, этап и зависимости сохранятся.");
   return {title:"Работа: "+item.title,
-   ...(additional.length?{hint:"Работа связана с несколькими требованиями. Здесь изменяется только основная связь; остальные сохраняются: "+additional.join(", ")}:{}),
-   fields:[field("title","Название работы","text",item.title),choice("stageId","Этап",stageOptions(project),item.stageId||"",false),field("dueDate","Срок работы","date",item.dueDate||"",false),choice("state","Состояние",workOptions,item.state),choice("priority","Приоритет",[option("low","Низкий"),option("normal","Обычный"),option("high","Высокий"),option("critical","Критический")],item.priority),field("assignee","Ответственный","text",item.assignee,false),field("estimateDays","Плановая длительность, дней","number",String(item.estimateDays??1)),choice("resourceId","Плановый ресурс",resourceChoiceOptions(snapshot),item.resourceId||"",false),field("allocationPct","Доля ресурса, %","number",String(item.allocationPct??100)),choice("targetId",additional.length?"Основное ожидаемое требование":"Связать с ожидаемым результатом",optionalTargets(project),item.targetIds?.[0]||"",false)]};
+   ...(hints.length?{hint:hints.join(" ")}:{}),
+   fields:[field("title","Название работы","text",item.title),choice("stageId","Этап",stageOptions(project),item.stageId||"",false),field("dueDate","Срок работы","date",item.dueDate||"",false),choice("state","Состояние",workOptions,item.state),choice("priority","Приоритет",[option("low","Низкий"),option("normal","Обычный"),option("high","Высокий"),option("critical","Критический")],item.priority),field("assignee","Ответственный","text",item.assignee,false),field("estimateDays","Плановая длительность, дней","number",String(item.estimateDays??1)),choice("resourceId","Плановый ресурс",resourceChoiceOptions(snapshot),item.resourceId||"",false),field("allocationPct","Доля ресурса, %","number",String(item.allocationPct??100)),choice("targetId",additional.length?"Основное ожидаемое требование":"Связать с ожидаемым результатом",optionalTargets(project),item.targetIds?.[0]||"",false),
+   ...(item.sourceId?[choice("sourceLink","Связь с источником",[
+    option("keep","Оставить привязку"),option("remove","Убрать привязку")],"keep")]:[])]};
  }
  if(action==="risk")return {title:"Новый риск",fields:[field("text","Что может помешать?","textarea")]};
  if(action.startsWith("risk-edit:")){
@@ -506,9 +514,15 @@ export function applyEditor(snapshot,projectId,action,input){
   if(!item)throw Error("Работа не найдена");
   // The editor can change the first association but cannot express edits
   // to the remaining associations. Do not silently drop them on Save.
+  const sourceLink=get("sourceLink");
+  if(sourceLink&&!["keep","remove"].includes(sourceLink))
+   throw Error("Выберите действие с источником заново.");
+  if(sourceLink==="remove"&&!item.sourceId)
+   throw Error("Связь с источником уже отсутствует.");
   const selected=get("targetId"),rest=(item.targetIds||[]).slice(1);
   const targetIds=[...(selected?[selected]:[]),...rest.filter(link=>link!==selected)];
-  return {state:editItem(snapshot,projectId,id,{title:get("title"),stageId:get("stageId")||null,dueDate:get("dueDate")||null,state:get("state"),priority:get("priority"),assignee:get("assignee"),estimateDays:integer("estimateDays"),resourceId:get("resourceId"),allocationPct:percentage("allocationPct"),targetIds})};
+  return {state:editItem(snapshot,projectId,id,{title:get("title"),stageId:get("stageId")||null,dueDate:get("dueDate")||null,state:get("state"),priority:get("priority"),assignee:get("assignee"),estimateDays:integer("estimateDays"),resourceId:get("resourceId"),allocationPct:percentage("allocationPct"),targetIds,
+   ...(sourceLink==="remove"?{sourceId:null}:{})})};
  }
  if(action==="risk")return {state:createRisk(snapshot,projectId,get("text"))};
  if(action==="decision")return {state:createDecision(snapshot,projectId,get("text"))};

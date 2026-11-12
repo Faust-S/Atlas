@@ -152,6 +152,14 @@ jobs:
           python -m py_compile desktop/tests/installed-atlas07-existing-work-link.py
           python desktop/tests/installed-atlas07-existing-work-link.py
           if ($LASTEXITCODE -ne 0) { throw 'ATLAS07_INSTALLED_FOLDER_WORK_LINK_FAILED' }
+      - name: Verify removal of an incorrect source link in installed Atlas 0.7
+        if: github.ref_name == 'work/2026-11-12-atlas-0-7'
+        shell: pwsh
+        timeout-minutes: 5
+        run: |
+          python -m py_compile desktop/tests/installed-atlas07-unlink-work.py
+          python desktop/tests/installed-atlas07-unlink-work.py
+          if ($LASTEXITCODE -ne 0) { throw 'ATLAS07_INSTALLED_WORK_UNLINK_FAILED' }
       - name: Build Atlas 0.6 universal project archive without GitHub
         if: (github.ref_name == 'work/2026-11-10-atlas-0-6' || github.ref_name == 'release/0.6' || github.ref_name == 'work/2026-11-12-atlas-0-7')
         shell: pwsh

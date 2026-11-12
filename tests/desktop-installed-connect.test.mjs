@@ -666,3 +666,19 @@ test("Atlas 0.7 installed GUI binds an existing work to an observed source folde
  assert.match(visual,/source\.repository\+" \/ "\+folder\.name/);
  assert.match(guide,/onEdit\(folderLinkAction\(sourceId,commitSha,folder\)\)/);
 });
+
+
+test("Atlas 0.7 installed work editor can unlink a catalog without rewriting other work fields",()=>{
+ const driver=read("../desktop/tests/installed-atlas07-unlink-work.py");
+ const editor=read("../src/editor.mjs");
+ const core=read("../src/core.mjs");
+ assert.match(workflow,/Verify removal of an incorrect source link in installed Atlas 0\.7/);
+ assert.match(workflow,/installed-atlas07-unlink-work\.py/);
+ assert.match(workflow,/ATLAS07_INSTALLED_WORK_UNLINK_FAILED/);
+ assert.match(driver,/ATLAS07_INSTALLED_WORK_SOURCE_UNLINK_PASS/);
+ assert.match(driver,/assert d\.head\(\)==before/);
+ assert.match(driver,/assert updated==expected/);
+ assert.match(driver,/assert d\.saved_project\(after\)==updated/);
+ assert.match(editor,/choice\("sourceLink","Связь с источником"/);
+ assert.match(core,/delete item\.sourcePath;delete item\.sourceRevision/);
+});

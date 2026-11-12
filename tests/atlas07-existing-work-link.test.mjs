@@ -82,3 +82,52 @@ test("Source map exposes work linking only through the existing editor when work
  assert.ok(editor.includes('if(action.startsWith("folder-link:"))'));
  assert.ok(!ui.includes("commitWithReadback"));
 });
+
+
+test("Work editor can explicitly clear a wrong source binding without deleting the work or its plan",()=>{
+ const f=fixture(),before=serialize(f.state),original=f.state.projects[0];
+ const spec=editorSpec(original,"work:"+f.firstId,f.state);
+ const linkField=spec.fields.find(field=>field.name==="sourceLink");
+ assert.deepEqual(linkField.options.map(x=>x.value),["keep","remove"]);
+ assert.equal(linkField.value,"keep");
+ assert.match(spec.hint,/работа, сроки, этап и зависимости сохранятся/);
+ const form=new FormData();
+ for(const field of spec.fields)form.set(field.name,String(field.value??""));
+ form.set("sourceLink","remove");
+ const updated=applyEditor(f.state,f.pid,"work:"+f.firstId,form).state;
+ const expected=structuredClone(original);
+ const expectedWork=expected.items.find(item=>item.id===f.firstId);
+ expectedWork.sourceId=null;
+ delete expectedWork.sourcePath;delete expectedWork.sourceRevision;
+ assert.deepEqual(updated.projects[0],expected);
+ assert.equal(updated.revision,f.state.revision+1);
+ assert.equal(serialize(f.state),before);
+ assert.deepEqual(deserialize(serialize(updated)),updated);
+ const map=projectSourcePlanProjection(updated,f.pid);
+ assert.equal(map.sources[0].folders.find(folder=>folder.name==="docs").totalWorks,0);
+ assert.ok(map.otherWorks.some(item=>item.id===f.firstId));
+ const relink=new FormData();relink.set("workId",f.firstId);
+ const attached=applyEditor(updated,f.pid,folderLinkAction(f.sid,SHA,"src"),relink).state;
+ const result=attached.projects[0].items.find(item=>item.id===f.firstId);
+ assert.equal(result.sourcePath,"src");
+ assert.equal(result.sourceRevision,SHA);
+ assert.deepEqual(attached.projects[0].dependencies,original.dependencies);
+ assert.deepEqual(deserialize(serialize(attached)),attached);
+});
+test("Removing a work source link is explicit; invalid values and partial source coordinates fail",()=>{
+ const f=fixture();
+ const form=new FormData();
+ const spec=editorSpec(f.state.projects[0],"work:"+f.firstId,f.state);
+ for(const field of spec.fields)form.set(field.name,String(field.value??""));
+ const withoutRemoval=applyEditor(f.state,f.pid,"work:"+f.firstId,form).state;
+ assert.equal(withoutRemoval.projects[0].items.find(w=>w.id===f.firstId).sourcePath,"docs");
+ form.set("sourceLink","unexpected");
+ assert.throws(()=>applyEditor(f.state,f.pid,"work:"+f.firstId,form),/Выберите действие/);
+ const bare=editItem(f.state,f.pid,f.firstId,{sourceId:null});
+ const unlinked=bare.projects[0].items.find(w=>w.id===f.firstId);
+ assert.equal(unlinked.sourceId,null);
+ assert.equal(Object.hasOwn(unlinked,"sourcePath"),false);
+ assert.equal(Object.hasOwn(unlinked,"sourceRevision"),false);
+ assert.throws(()=>editItem(f.state,f.pid,f.firstId,{sourceId:null,sourcePath:"src",
+  sourceRevision:SHA}),/Invalid work source location/);
+});
