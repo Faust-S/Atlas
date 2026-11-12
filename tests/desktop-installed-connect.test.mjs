@@ -589,7 +589,8 @@ test('Installed Atlas opens overdue work from project overview without scrolling
  assert.match(driver,/types=\{"Button"\},scroll=False\)/);
  assert.match(driver,/Overdue-work entry is not visible on the initial 820x650 Windows screen/);
  assert.match(driver,/overview-overdue-work-first-screen-820/);
- assert.match(driver,/Overdue-work overview shortcut did not reveal the affected work/);
+ assert.match(driver,/Overdue-work overview shortcut did not focus the affected work/);
+ assert.match(driver,/one=find_control\("Открыть работу Работа 0 \/ 2",types=\{"Button"\},scroll=False\)/);
  assert.match(driver,/Overview overdue-work navigation changed the native Store/);
  assert.match(ui,/overdueWorkCount=\{overdueWorkFinishes\.size\} onOpenOverdueWorks=\{showOverdueWorks\}/);
  assert.match(guide,/onClick=\{onOpenOverdueWorks\}>Позже срока: \{overdueWorkCount\}/);

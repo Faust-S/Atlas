@@ -613,9 +613,9 @@ def qualify_visual():
     overview_overdue.click_input()
     d.wait_text("Работы проекта",25)
     d.wait_text("Показано 1 из 1 работ по фильтру",35)
-    one=find_control("Связи работы Работа 0 / 2",types={"Button"},scroll=False)
+    one=find_control("Открыть работу Работа 0 / 2",types={"Button"},scroll=False)
     assert rectangle_in_workspace(one.rectangle(),win32gui.GetWindowRect(d.handle)),(
-        "Overdue-work overview shortcut did not reveal the affected work")
+        "Overdue-work overview shortcut did not focus the affected work")
     assert d.head()==final_head and d.saved_project(final_head)==final,(
         "Overview overdue-work navigation changed the native Store")
     win32gui.MoveWindow(d.handle,original_bounds[0],original_bounds[1],

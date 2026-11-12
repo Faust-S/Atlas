@@ -977,6 +977,11 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   setWorkFilter("all");setWorkTargetFilter("all");setWorkObservationFilter("all");
   setWorkDependencyFilter("all");setWorkQuery("");setWorkDeadlineFilter("overdue");
   setWorkLimit(200);
+  // The filtered table can still start below a long summary on a 820x650
+  // screen. Reuse existing exact-row focus instead of creating a new scroll
+  // mechanism or requiring the user to manually locate the only late work.
+  setWorkReturnId(overdueWorkFinishes.size===1?
+   overdueWorkFinishes.keys().next().value??null:null);
  };
  const openLinkedSource=(workId:string,query:string)=>{
   if(!project||!requireClosedForm())return;
