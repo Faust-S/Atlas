@@ -76,3 +76,23 @@ test("Source folder search is present in existing plan search without adding a s
  assert.match(ui,/onLinkExistingWork\(folder\.sourceId,folder\.commitSha,folder\.folder\)/);
  assert.match(ui,/found\.total\+catalogHits\.total/);
 });
+
+
+test("Folder results in a new project create the first work rather than offering an invalid existing-work dialog",()=>{
+ const {state,projectId}=fixture();
+ const noWork=structuredClone(state);
+ noWork.projects[0].items=[];
+ noWork.projects[0].dependencies=[];
+ const emptyProject=noWork.projects[0];
+ const found=projectSourceFolderSearch(emptyProject,"project-0 directory-01");
+ assert.equal(found.total,1);
+ const path=found.matches[0];
+ const {folderWorkAction}=await import("../src/project-organization.mjs");
+ const action=folderWorkAction(path.sourceId,path.commitSha,path.folder);
+ const spec=editorSpec(emptyProject,action,noWork);
+ assert.match(spec.title,/Работа по каталогу/);
+ const ui=readFileSync(new URL("../desktop/src/ProjectVisuals.tsx",import.meta.url),"utf8");
+ assert.match(ui,/project\?\.items\?\.length>0\?/);
+ assert.match(ui,/Создать работу по найденному каталогу/);
+ assert.match(ui,/onSuggestFolder\(folder\.sourceId,folder\.commitSha,folder\.folder\)/);
+});

@@ -424,11 +424,17 @@ export function ProjectSourcePlanMap({projection,project,restoreSearch,onOpenWor
            {folder.repository+" / "+folder.folder}</strong>
           <small>{folder.role}</small>
          </div>
+         {project?.items?.length>0?
          <button type="button" className="text-link"
           aria-label={"Связать существующую работу с найденным каталогом "+folder.repository+" / "+folder.folder}
           disabled={busy}
           onClick={()=>{closeSearch();onLinkExistingWork(folder.sourceId,folder.commitSha,folder.folder)}}>
-          Связать работу</button>
+          Связать работу</button>:
+         <button type="button" className="text-link"
+          aria-label={"Создать работу по найденному каталогу "+folder.repository+" / "+folder.folder}
+          disabled={busy}
+          onClick={()=>{closeSearch();onSuggestFolder(folder.sourceId,folder.commitSha,folder.folder)}}>
+          Создать работу</button>}
         </div>)}
        </div>}
        {(found.hidden>0||catalogHits.hidden>0)&&<p className="minor">
