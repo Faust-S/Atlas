@@ -597,6 +597,32 @@ def qualify_visual():
     assert d.saved_project(final_head)==final
     print("ATLAS06_VISUAL_TABLE_WORK_DEADLINE_FILTER_PASS",flush=True)
 
+    # Overview opens exactly the overdue works on the first 820x650 screen.
+    # A saved project's work table may have a stale search and other filters,
+    # so the link must clear those before applying the existing date filter.
+    d.click_button("Обзор")
+    d.wait_text("Состав проекта",25)
+    original_bounds=win32gui.GetWindowRect(d.handle)
+    win32gui.MoveWindow(d.handle,0,0,820,650,True)
+    time.sleep(0.25)
+    overview_overdue=find_control("Показать работы позже контрольного срока",
+                                 types={"Button"},scroll=False)
+    assert rectangle_in_workspace(overview_overdue.rectangle(),win32gui.GetWindowRect(d.handle)),(
+        "Overdue-work entry is not visible on the initial 820x650 Windows screen")
+    capture("overview-overdue-work-first-screen-820")
+    overview_overdue.click_input()
+    d.wait_text("Работы проекта",25)
+    d.wait_text("Показано 1 из 1 работ по фильтру",35)
+    one=find_control("Связи работы Работа 0 / 2",types={"Button"},scroll=False)
+    assert rectangle_in_workspace(one.rectangle(),win32gui.GetWindowRect(d.handle)),(
+        "Overdue-work overview shortcut did not reveal the affected work")
+    assert d.head()==final_head and d.saved_project(final_head)==final,(
+        "Overview overdue-work navigation changed the native Store")
+    win32gui.MoveWindow(d.handle,original_bounds[0],original_bounds[1],
+                        original_bounds[2]-original_bounds[0],
+                        original_bounds[3]-original_bounds[1],True)
+    print("ATLAS06_VISUAL_OVERVIEW_OVERDUE_WORK_JUMP_PASS",flush=True)
+
     # A user can open the overdue work from a regular Gantt view, correct
     # its duration, see the new schedule, and explicitly save that correction.
     # This is not an impact-panel follow-up: a cold restart already cleared

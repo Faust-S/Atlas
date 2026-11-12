@@ -877,3 +877,28 @@ test("Removing a control deadline is shown as unverified, not as a resolved miss
  assert.match(ui,/Соблюдение этих сроков больше не проверяется/);
  assert.match(ui,/item\.deadlineRemoved\?" Срок снят/);
 });
+
+test('overview provides direct dated-overrun navigation through the existing work table, not a new state model',()=>{
+ const ui=read("../desktop/src/main.tsx");
+ const guide=read("../desktop/src/ProjectOrganizationGuide.tsx");
+ const css=read("../desktop/src/style.css");
+ const start=ui.indexOf("const showOverdueWorks=()=>{");
+ const end=ui.indexOf("const openLinkedSource=",start);
+ assert.ok(start>0&&end>start);
+ const action=ui.slice(start,end);
+ assert.match(action,/overdueWorkFinishes\.size/);
+ assert.match(action,/requireClosedForm\(\)/);
+ assert.match(action,/view\("work"\)/);
+ assert.match(action,/setWorkFilter\("all"\)/);
+ assert.match(action,/setWorkTargetFilter\("all"\)/);
+ assert.match(action,/setWorkObservationFilter\("all"\)/);
+ assert.match(action,/setWorkDependencyFilter\("all"\)/);
+ assert.match(action,/setWorkQuery\(""\)/);
+ assert.match(action,/setWorkDeadlineFilter\("overdue"\)/);
+ assert.match(ui,/overdueWorkCount=\{overdueWorkFinishes\.size\} onOpenOverdueWorks=\{showOverdueWorks\}/);
+ assert.match(guide,/overdueWorkCount>0&&<button type="button"/);
+ assert.match(guide,/onClick=\{onOpenOverdueWorks\}>Позже срока: \{overdueWorkCount\}/);
+ assert.match(guide,/aria-label="Показать работы позже контрольного срока"/);
+ assert.match(css,/\.atlas-project-organization h2 \.atlas-overdue-work-link/);
+ assert.doesNotMatch(action,/commitWithReadback|nativeInvoke|mutate\(|localStorage|fetch\(/);
+});

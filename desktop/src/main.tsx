@@ -969,6 +969,15 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   setWorkFilter("all");setWorkTargetFilter("all");setWorkObservationFilter("all");
   setWorkQuery("");setWorkDeadlineFilter("all");setWorkDependencyFilter("has_pending");setWorkLimit(200);
  };
+ const showOverdueWorks=()=>{
+  if(!project||!overdueWorkFinishes.size||!requireClosedForm())return;
+  // Both overview and table lead to the same dated CPM result; stale table
+  // queries and unrelated filters must not hide overdue work in large plans.
+  view("work");
+  setWorkFilter("all");setWorkTargetFilter("all");setWorkObservationFilter("all");
+  setWorkDependencyFilter("all");setWorkQuery("");setWorkDeadlineFilter("overdue");
+  setWorkLimit(200);
+ };
  const openLinkedSource=(workId:string,query:string)=>{
   if(!project||!requireClosedForm())return;
   view("sources");
@@ -1345,6 +1354,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       onOpenLinkedSource={openLinkedSource}
       onOpenWorks={()=>view("work")}
       pendingWorkCount={pendingWorkCount} onOpenPendingWorks={showPendingWorks}
+      overdueWorkCount={overdueWorkFinishes.size} onOpenOverdueWorks={showOverdueWorks}
       onOpenStages={()=>document.getElementById("atlas-project-stages")?.scrollIntoView({behavior:"smooth",block:"start"})}
       onOpenTimeline={()=>view("timeline")}
       onOpenGraph={openWorkGraph}
@@ -1632,12 +1642,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
         <button type="button" className="text-link" aria-label={workDeadlineFilter==="overdue"?
          "Показать все работы проекта":"Показать работы позже контрольного срока"}
          onClick={()=>{
-          const next=workDeadlineFilter==="overdue"?"all":"overdue";
-          setWorkDeadlineFilter(next);setWorkLimit(200);
-          if(next==="overdue"){
-           setWorkFilter("all");setWorkTargetFilter("all");setWorkObservationFilter("all");
-           setWorkDependencyFilter("all");setWorkQuery("");
-          }
+          if(workDeadlineFilter==="overdue"){
+           setWorkDeadlineFilter("all");setWorkLimit(200);
+          }else showOverdueWorks();
          }}>{workDeadlineFilter==="overdue"?"Показать все работы":
           "Позже контрольного срока: "+overdueWorkFinishes.size}</button>
        </div>}

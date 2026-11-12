@@ -7,12 +7,14 @@ import {ProjectSourcePlanMap} from "./ProjectVisuals";
 // Suggested roles are explanations to review, never new project entities.
 export function ProjectOrganizationGuide({snapshot,projectId,restoreSearch,onEdit,onRefresh,onOpenProject,
  onOpenSources,onOpenLinkedSource,onOpenWorks,onOpenPendingWorks,pendingWorkCount,
+ onOpenOverdueWorks,overdueWorkCount,
  onOpenStages,onAddRelation,onOpenTimeline,onOpenGraph,busy=false}:{
  snapshot:any;projectId:string;restoreSearch:{workId:string;query:string}|null;
  onEdit:(action:string)=>void;
  onRefresh:(sourceId:string)=>void;onOpenProject:(id:string)=>void;
  onOpenSources:()=>void;onOpenLinkedSource:(workId:string,query:string)=>void;
  onOpenWorks:()=>void;onOpenPendingWorks:()=>void;pendingWorkCount:number;
+ onOpenOverdueWorks:()=>void;overdueWorkCount:number;
  onOpenStages:()=>void;onAddRelation:()=>void;
  onOpenTimeline:()=>void;onOpenGraph:(workId?:string,query?:string)=>void;busy?:boolean;
 }){
@@ -37,7 +39,11 @@ export function ProjectOrganizationGuide({snapshot,projectId,restoreSearch,onEdi
    <h2>Состав проекта{pendingWorkCount>0&&<button type="button"
      className="text-link atlas-pending-work-link"
      aria-label="Показать работы с незавершёнными предшественниками"
-     onClick={onOpenPendingWorks}>Ждут других работ: {pendingWorkCount}</button>}</h2>
+     onClick={onOpenPendingWorks}>Ждут других работ: {pendingWorkCount}</button>}
+    {overdueWorkCount>0&&<button type="button"
+     className="text-link atlas-overdue-work-link"
+     aria-label="Показать работы позже контрольного срока"
+     onClick={onOpenOverdueWorks}>Позже срока: {overdueWorkCount}</button>}</h2>
    <p>{hasSources?
     "Здесь показаны найденные каталоги и связи, которые уже записаны в плане.":
     "Здесь показаны ваши работы, этапы и записанные зависимости."}</p>

@@ -578,3 +578,19 @@ test("Installed large-project qualification has enough runtime for both deadline
  assert.match(driver,/ATLAS06_VISUAL_DIRECT_DEADLINE_SAVE_RESTART_PASS/);
  assert.match(driver,/ATLAS06_VISUAL_DIRECT_GANTT_EDIT_SAVED_RESTART_PASS/);
 });
+
+test('Installed Atlas opens overdue work from project overview without scrolling or writes',()=>{
+ const driver=read("../desktop/tests/installed-atlas06-visual-scale.py");
+ const guide=read("../desktop/src/ProjectOrganizationGuide.tsx");
+ const ui=read("../desktop/src/main.tsx");
+ assert.match(driver,/ATLAS06_VISUAL_OVERVIEW_OVERDUE_WORK_JUMP_PASS/);
+ assert.match(driver,/win32gui\.MoveWindow\(d\.handle,0,0,820,650,True\)/);
+ assert.match(driver,/overview_overdue=find_control\("Показать работы позже контрольного срока"/);
+ assert.match(driver,/types=\{"Button"\},scroll=False\)/);
+ assert.match(driver,/Overdue-work entry is not visible on the initial 820x650 Windows screen/);
+ assert.match(driver,/overview-overdue-work-first-screen-820/);
+ assert.match(driver,/Overdue-work overview shortcut did not reveal the affected work/);
+ assert.match(driver,/Overview overdue-work navigation changed the native Store/);
+ assert.match(ui,/overdueWorkCount=\{overdueWorkFinishes\.size\} onOpenOverdueWorks=\{showOverdueWorks\}/);
+ assert.match(guide,/onClick=\{onOpenOverdueWorks\}>Позже срока: \{overdueWorkCount\}/);
+});
