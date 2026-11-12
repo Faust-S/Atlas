@@ -33,7 +33,7 @@ def qualify():
     v.find_control("Найти",types={"Button"},scroll=False).click_input()
     d.set_text("Найти работу или этап","project-0 directory-01")
     d.wait_text("Найдено: 1",20)
-    d.wait_text("Найденные каталоги исходников",20)
+    d.wait_text("atlas-visual-fixture/project-0 / directory-01",20)
     assert d.head()==before,"Search unexpectedly wrote to native Store"
     v.capture("atlas07-hidden-source-search")
     v.find_control(ENTRY,types={"Button"},scroll=False).click_input()

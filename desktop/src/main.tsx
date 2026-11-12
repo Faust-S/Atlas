@@ -1,4 +1,5 @@
 import React,{useEffect,useMemo,useRef,useState} from "react";
+import atlasPackage from "../package.json";
 import {invoke as nativeInvoke,isTauri} from "@tauri-apps/api/core";
 import {getCurrentWindow} from "@tauri-apps/api/window";
 import {empty,deserialize,serialize,editItem,removeStage,removeItem,disconnect,removeProject as dropProject} from "../../src/core.mjs";
@@ -33,6 +34,10 @@ import {sortWorkRows,filterWorkRowsByObservation} from "./work-sorting.mjs";
 import {createAtlasSavedRef} from "../../src/project-host-port.mjs";
 import {invokeAtlasHost,type AtlasEmbeddedHost} from "./embedded-host";
 
+// Show the same product version that was packaged in Tauri, without leaking
+// a previous release's branding into a development installation.
+const atlasVersionLabel=atlasPackage.version.split("-")[0]+
+ (atlasPackage.version.includes("-")?" (разработка)":"");
 type Atlas = any;
 type HistoryEntry = {generation:string;revision:number;projects:number};
 type ImportPreview = {snapshot:Atlas;originalRevision:number;expectedGeneration:string;startedWith:Atlas;summary:any;format:"json"|"iwxa"};
@@ -1096,7 +1101,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   window.addEventListener("keydown",key);return ()=>window.removeEventListener("keydown",key);
  });
  if(!ready)return <main className="entry">
-  <div className="entry-card"><img className="logo-symbol" src={logoUrl} alt="" aria-hidden="true" /><h1>IWXA Atlas <em>0.6.0-dev.1</em></h1>
+  <div className="entry-card"><img className="logo-symbol" src={logoUrl} alt="" aria-hidden="true" /><h1>IWXA Atlas <em>{atlasVersionLabel}</em></h1>
    <p>{recovery?"Найдена предыдущая исправная версия портфеля. Восстановление выполняется только по вашему решению.":"Самостоятельное локальное приложение для Windows. Данные принадлежат пользователю."}</p>
    {error&&<p role="alert" className="error">{error}</p>}
    {recovery&&<Action onClick={()=>void restore()} primary disabled={busy}>Восстановить сохранённую версию</Action>}
@@ -1106,7 +1111,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  </main>;
  return <div ref={rootRef} className={"app-shell"+(inspector?"":" no-inspector")+(editor?" editor-active":"")+(embedded?" atlas-embedded":"")+(connectOpen?" atlas-connect-focused":"")}>
   <aside className="sidebar">
-   <div className="brand"><img className="logo-symbol" src={logoUrl} alt="" aria-hidden="true" /><div><strong>Atlas</strong><small>IWXA · 0.6.0-dev.1</small></div></div>
+   <div className="brand"><img className="logo-symbol" src={logoUrl} alt="" aria-hidden="true" /><div><strong>Atlas</strong><small>IWXA · {atlasVersionLabel}</small></div></div>
    <nav className="main-nav" aria-label="Основная навигация">
     <button aria-label="Открыть портфель проектов" className={!active?"nav-current":""}
       onClick={()=>selectProject(null)}>▦ <span>Портфель проектов</span><b>{data.projects.length}</b></button>
@@ -2259,7 +2264,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      </div>
     </section>
    </div>}
-   <footer className="workspace-footer"><span>IWXA Atlas 0.6 · проекты хранятся на этом компьютере</span>
+   <footer className="workspace-footer"><span>IWXA Atlas {atlasVersionLabel} · проекты хранятся на этом компьютере</span>
     <span>Вы сами решаете, какие изменения сохранить и принять.</span></footer>
   </main>
   {inspector&&<aside className={"inspector"+(editor?" atlas-inspector-editing":"")}>

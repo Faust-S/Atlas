@@ -415,7 +415,7 @@ export function ProjectSourcePlanMap({projection,project,restoreSearch,onOpenWor
         </div>)}
        </div>
        {catalogHits.matches.length>0&&<div className="atlas-source-plan-find-results"
-        aria-label="Найденные каталоги исходников">
+        role="group" aria-label="Найденные каталоги исходников">
         {catalogHits.matches.map((folder:any)=><div className="atlas-source-plan-find-item"
          key={folder.sourceId+"/"+folder.folder}>
          <div className="atlas-source-plan-found-folder">
