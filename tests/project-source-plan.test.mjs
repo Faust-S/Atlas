@@ -259,7 +259,8 @@ test("The overview offers its existing plan diagram in non-engineering projects"
  const guide=read("../desktop/src/ProjectOrganizationGuide.tsx");
  const visual=read("../desktop/src/ProjectVisuals.tsx");
  const css=read("../desktop/src/style.css");
- assert.match(main,/project\.items\.length>0\|\|project\.stages\.length>0\|\|project\.type==="engineering"/);
+ assert.match(main,/\{tab==="overview"&&<>\s*<ProjectOrganizationGuide snapshot=\{data\}/);
+ assert.doesNotMatch(main,/project\.items\.length>0\|\|project\.stages\.length>0\|\|project\.type==="engineering"/);
  assert.match(guide,/showMap=hasSources\|\|projection\.workTotal>0/);
  assert.match(guide,/Схема проекта: работы и этапы/);
  assert.match(guide,/Здесь показаны ваши работы, этапы и записанные зависимости/);
@@ -321,7 +322,7 @@ test("Stage-only projects display the existing map and link to all saved stages"
  const main=read("../desktop/src/main.tsx");
  const guide=read("../desktop/src/ProjectOrganizationGuide.tsx");
  const visual=read("../desktop/src/ProjectVisuals.tsx");
- assert.match(main,/project\.items\.length>0\|\|project\.stages\.length>0/);
+ assert.match(main,/\{tab==="overview"&&<>\s*<ProjectOrganizationGuide snapshot=\{data\}/);
  assert.match(main,/id="atlas-project-stages"/);
  assert.match(guide,/projection\.stageTotal>0/);
  assert.match(guide,/maxUnassignedStages:4/);
