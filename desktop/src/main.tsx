@@ -851,8 +851,20 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    if(!plan.selected){setMessage("Нет источников для наблюдения.");return}
    const result=await reconcilePublicSources(data,{plan});
    if(latestSnapshot.current!==startedWith)throw Error("Портфель изменён во время обращения к источнику. Наблюдения не применены; повторите сверку.");
-   if(result.state!==data)mutate(result.state,"Публичные наблюдения обновлены в черновике. Сохраните результат на диск.");
-   setRefreshReport(result.report);
+   const report=result.report;
+   // Failed public reads change attempt/status in the draft; they are not
+   // successfully refreshed GitHub observations.
+   if(result.state!==data)mutate(result.state,report.failed>0?"":
+    "Публичные наблюдения обновлены в черновике. Сохраните результат на диск.");
+   if(report.failed>0){
+    setMessage("");
+    setError((report.rateLimited?
+     "GitHub временно ограничил запросы. ":
+     "Не удалось проверить все выбранные источники. ")+
+     "Обновлено: "+report.updated+"; ошибок: "+report.failed+
+     ". Ранее полученные сведения не заменены. Сохраните состояние попытки по необходимости.");
+   }
+   setRefreshReport(report);
   }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
  };
  const applyAmendment=(changeId:string)=>{

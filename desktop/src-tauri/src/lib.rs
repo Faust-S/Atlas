@@ -172,12 +172,23 @@ fn atomic_replace(temp: &Path, destination: &Path) -> Result<(), String> {
     }
     let src: Vec<u16> = temp.as_os_str().encode_wide().chain(Some(0)).collect();
     let dst: Vec<u16> = destination.as_os_str().encode_wide().chain(Some(0)).collect();
-    let result = unsafe {
-        ReplaceFileW(dst.as_ptr(), src.as_ptr(), std::ptr::null(), 0,
-            std::ptr::null_mut(), std::ptr::null_mut())
-    };
-    if result == 0 { return Err(err("Атомарная замена", std::io::Error::last_os_error())); }
-    Ok(())
+    // Windows indexing/AV may briefly open head.json without FILE_SHARE_DELETE.
+    // Keep the same fully-synced pending file and retry only sharing/lock
+    // violations. All other errors fail immediately; the old head remains
+    // authoritative and no second commit or alternative write is attempted.
+    for attempt in 0..40 {
+        let result = unsafe {
+            ReplaceFileW(dst.as_ptr(), src.as_ptr(), std::ptr::null(), 0,
+                std::ptr::null_mut(), std::ptr::null_mut())
+        };
+        if result != 0 { return Ok(()); }
+        let failure = std::io::Error::last_os_error();
+        if !matches!(failure.raw_os_error(), Some(32 | 33)) || attempt == 39 {
+            return Err(err("Атомарная замена", failure));
+        }
+        std::thread::sleep(std::time::Duration::from_millis(75));
+    }
+    unreachable!("bounded Windows head publication retries")
 }
 #[cfg(not(windows))]
 fn atomic_replace(temp: &Path, destination: &Path) -> Result<(), String> {
@@ -688,6 +699,55 @@ mod persistence_tests{
         assert_eq!(load_root(&root.0).unwrap().generation,second.generation);
         assert!(restore_root(&root.0).is_err()); // healthy state cannot be rolled back silently
     }
+    #[cfg(windows)]
+    #[test]
+    fn win32_transient_sharing_violation_keeps_atomic_commit_and_readback(){
+        use std::os::windows::fs::OpenOptionsExt;
+        use windows_sys::Win32::Storage::FileSystem::FILE_SHARE_READ;
+        let root=scratch();
+        let first=commit_root(&root.0,"none",snapshot(1,&["Original"])).unwrap();
+        let head=root.0.join("head.json");
+        // This reader permits other readers but not replacement/deletion.
+        let held=OpenOptions::new().read(true).share_mode(FILE_SHARE_READ)
+            .open(&head).expect("hold existing index without delete sharing");
+        let release=std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(350));
+            drop(held);
+        });
+        let result=commit_root(&root.0,&first.generation,snapshot(2,&["Updated"]));
+        release.join().expect("release temporary external reader");
+        let second=result.expect("bounded Windows sharing violation must resolve");
+        assert_ne!(second.generation,first.generation);
+        let opened=load_root(&root.0).unwrap();
+        assert_eq!(opened.generation,second.generation);
+        assert_eq!(opened.snapshot["projects"][0]["name"],"Updated");
+        assert_eq!(opened.snapshot["revision"],2);
+        assert_eq!(list_history_root(&root.0,&second.generation).unwrap().len(),1);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn win32_persistent_sharing_violation_preserves_original_head(){
+        use std::os::windows::fs::OpenOptionsExt;
+        use windows_sys::Win32::Storage::FileSystem::FILE_SHARE_READ;
+        let root=scratch();
+        let first=commit_root(&root.0,"none",snapshot(1,&["Before"])).unwrap();
+        let head=root.0.join("head.json");
+        let bytes_before=fs::read(&head).unwrap();
+        let held=OpenOptions::new().read(true).share_mode(FILE_SHARE_READ)
+            .open(&head).expect("hold existing index without delete sharing");
+        let failed=commit_root(&root.0,&first.generation,snapshot(2,&["After"]))
+            .expect_err("permanent lock must never permit a false save");
+        assert!(failed.contains("Атомарная замена"),"{failed}");
+        assert_eq!(fs::read(&head).unwrap(),bytes_before);
+        assert_eq!(load_root(&root.0).unwrap().generation,first.generation);
+        drop(held);
+        let second=commit_root(&root.0,&first.generation,snapshot(2,&["After"]))
+            .expect("releasing reader permits explicit retry");
+        assert_eq!(load_root(&root.0).unwrap().generation,second.generation);
+        assert_eq!(load_root(&root.0).unwrap().snapshot["projects"][0]["name"],"After");
+    }
+
     #[test]fn first_saved_portfolio_recovers_after_head_loss_or_damage(){
         let root=scratch();
         let saved=commit_root(&root.0,"none",snapshot(1,&["First project"])).unwrap();

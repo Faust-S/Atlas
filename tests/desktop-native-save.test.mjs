@@ -99,3 +99,16 @@ test('saved WorkRef refuses stale disk head, corrupt readback and recovery',asyn
  await assert.rejects(readSavedSnapshotForReference({...base,expectedGeneration:'none',
   invoke:async()=>{throw Error('Should never call native');}}),/Сначала сохраните/);
 });
+
+test('Windows atomic head publication retries only temporary file sharing, preserving generation and old head',()=>{
+ const rust=readFileSync(new URL('../desktop/src-tauri/src/lib.rs',import.meta.url),'utf8');
+ assert.match(rust,/for attempt in 0\.\.40/);
+ assert.match(rust,/matches!\(failure\.raw_os_error\(\), Some\(32 \| 33\)\)/);
+ assert.match(rust,/attempt == 39/);
+ assert.match(rust,/std::thread::sleep\(std::time::Duration::from_millis\(75\)\)/);
+ assert.match(rust,/win32_transient_sharing_violation_keeps_atomic_commit_and_readback/);
+ assert.match(rust,/win32_persistent_sharing_violation_preserves_original_head/);
+ assert.match(rust,/assert_eq!\(fs::read\(&head\)\.unwrap\(\),bytes_before\)/);
+ assert.match(rust,/let _guard=lock\(root\)\?/);
+ assert.match(rust,/publish\(&root,&root\.join\("head\.json"\),&manifest_bytes\)\?/);
+});

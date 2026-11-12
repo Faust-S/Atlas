@@ -515,3 +515,26 @@ test("Installed Windows opens and corrects an overdue Gantt work without impact-
  assert.match(driver,/d\.saved_project\(corrected_head\)==corrected/);
  assert.match(ui,/if\(scheduleFieldsChanged\|\|fromImpactList\)/);
 });
+
+test("Installed Atlas does not announce successful GitHub refresh when the public API rate-limits it",()=>{
+ const ui=read("../desktop/src/main.tsx");
+ const observer=read("../src/public-refresh.mjs");
+ const a=ui.indexOf("const syncPublic=async("),b=ui.indexOf("const applyAmendment=",a);
+ assert.ok(a>0&&b>a);
+ const handler=ui.slice(a,b);
+ assert.match(handler,/if\(result\.state!==data\)mutate\(result\.state,report\.failed>0\?""/);
+ assert.match(handler,/if\(report\.failed>0\)/);
+ assert.match(handler,/report\.rateLimited/);
+ assert.match(handler,/setMessage\(""\)/);
+ assert.match(handler,/setError\(/);
+ assert.match(handler,/Ранее полученные сведения не заменены/);
+ assert.match(observer,/report\.failed\+\+/);
+ assert.match(observer,/source\.status="error"/);
+});
+
+test("Installed Windows cleanup cannot hide the original failed-save evidence",()=>{
+ const driver=read("../desktop/tests/installed-atlas06-connect.py");
+ assert.match(driver,/win32gui\.PostMessage\(handle,win32con\.WM_CLOSE,0,0\)/);
+ assert.match(driver,/except subprocess\.TimeoutExpired:\s*# The test owns this installed process/);
+ assert.match(driver,/process\.kill\(\)/);
+});

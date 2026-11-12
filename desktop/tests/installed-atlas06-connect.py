@@ -201,7 +201,13 @@ def stop():
         try:process.wait(timeout=10)
         except subprocess.TimeoutExpired:
             win32gui.PostMessage(handle,win32con.WM_CLOSE,0,0)
-            process.wait(timeout=10)
+            try:process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                # The test owns this installed process. An unsaved draft may
+                # correctly refuse WM_CLOSE; do not mask the original failure
+                # or leave a native handle running on the CI worker.
+                process.kill()
+                process.wait(timeout=10)
     process=None
     handle=None
 
