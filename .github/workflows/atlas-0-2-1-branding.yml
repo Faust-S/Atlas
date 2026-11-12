@@ -135,7 +135,9 @@ jobs:
       - name: Qualify large Atlas 0.6 map in installed Windows GUI
         if: github.ref_name == 'work/2026-11-10-atlas-0-6'
         shell: pwsh
-        timeout-minutes: 8
+        # Full installed interaction includes 1,213 works, restart, two date edits.
+        # The previous 8-minute limit stopped the test after successful readbacks.
+        timeout-minutes: 12
         run: |
           python -m py_compile desktop/tests/installed-atlas06-visual-scale.py
           python desktop/tests/installed-atlas06-visual-scale.py

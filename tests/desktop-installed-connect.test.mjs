@@ -567,3 +567,14 @@ test("Installed first-use Gantt navigation tracks the actual user-facing chart h
  assert.match(workflow,/ATLAS06_GITHUB_FIRST_USE_NOT_ACCEPTED - inspect preceding installed UI and GitHub API logs/);
  assert.match(workflow,/steps\.atlas06_github_first_use\.outcome == 'failure'/);
 });
+
+test("Installed large-project qualification has enough runtime for both deadline edits and readbacks",()=>{
+ const step=workflow.match(/- name: Qualify large Atlas 0\.6 map in installed Windows GUI([\s\S]*?)- name: Build Atlas 0\.6 universal project archive/);
+ assert.ok(step,"Missing native visual qualification step");
+ const minutes=Number(step[1].match(/timeout-minutes:\s*(\d+)/)?.[1]||0);
+ assert.ok(minutes>=11&&minutes<=20,"Native portfolio qualification timeout is too short or unbounded");
+ assert.match(step[1],/installed-atlas06-visual-scale\.py/);
+ const driver=read("../desktop/tests/installed-atlas06-visual-scale.py");
+ assert.match(driver,/ATLAS06_VISUAL_DIRECT_DEADLINE_SAVE_RESTART_PASS/);
+ assert.match(driver,/ATLAS06_VISUAL_DIRECT_GANTT_EDIT_SAVED_RESTART_PASS/);
+});
