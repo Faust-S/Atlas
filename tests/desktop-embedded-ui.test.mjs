@@ -255,7 +255,8 @@ test("Project overview opens pending recorded work without retaining hidden tabl
  assert.match(guide,/pendingWorkCount>0&&<button type="button"/);
  assert.match(guide,/aria-label="Показать работы с незавершёнными предшественниками"/);
  assert.match(guide,/onClick=\{onOpenPendingWorks\}>Ждут других работ: \{pendingWorkCount\}/);
- assert.match(css,/\.atlas-project-organization h2 \.atlas-pending-work-link\{/);
+ assert.match(css,/\.atlas-project-organization h2 \.atlas-pending-work-link,/);
+ assert.match(css,/\.atlas-project-organization h2 \.atlas-overdue-work-link\{/);
  const from=main.indexOf("const showPendingWorks=()=>");
  const to=main.indexOf("const openLinkedSource=",from);
  assert.ok(from>0&&to>from);
