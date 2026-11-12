@@ -458,7 +458,7 @@ test("Installed Windows verifies a delayed existing work and opens its editor di
 test("Installed Windows corrects a shifted work and verifies the new plan after restart",()=>{
  const stress=read("../desktop/tests/installed-atlas06-visual-scale.py");
  assert.match(stress,/ATLAS06_VISUAL_AFFECTED_WORK_REPLANNED_PASS/);
- assert.match(stress,/d\.set_text\("Плановая длительность, дней","2"\)/);
+ assert.match(stress,/set_editor_text\("Плановая длительность, дней","2"\)/);
  assert.match(stress,/d\.wait_text\("Работа изменена в черновике\.",35\)/);
  assert.match(stress,/d\.wait_text\("Изменились расчётные сроки\. Затронуто работ: 2\.",35\)/);
  assert.match(stress,/changes\[0\]\["estimateDays"\]==2/);
@@ -551,8 +551,8 @@ test("Installed Windows witnesses a newly missed and then resolved deadline with
  assert.match(driver,/ATLAS06_VISUAL_DIRECT_DEADLINE_SAVE_RESTART_PASS/);
  assert.match(driver,/Deadline-only change unexpectedly saved native Store/);
  assert.match(driver,/Resolved deadline was saved without explicit user approval/);
- assert.match(driver,/d\.set_text\("Срок работы","11\/10\/2026"\)/);
- assert.match(driver,/d\.set_text\("Срок работы","11\/12\/2026"\)/);
+ assert.match(driver,/set_editor_text\("Срок работы","11\/10\/2026"\)/);
+ assert.match(driver,/set_editor_text\("Срок работы","11\/12\/2026"\)/);
  assert.match(driver,/assert resolved_work==\{\*\*missed_work,"dueDate":"2026-11-12"\}/);
  assert.match(driver,/assert d\.saved_project\(resolved_head\)==resolved/);
  assert.match(plan,/deadlineResolvedTotal/);
