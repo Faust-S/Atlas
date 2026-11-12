@@ -600,7 +600,11 @@ def qualify_visual():
     # Overview opens exactly the overdue works on the first 820x650 screen.
     # A saved project's work table may have a stale search and other filters,
     # so the link must clear those before applying the existing date filter.
-    d.click_button("Обзор")
+    # Navigation tabs may be above a long filtered table; a UIA "visible"
+    # control is not necessarily inside the physical Windows viewport.
+    overview_tab=find_control("Обзор",types={"Button"})
+    assert rectangle_in_workspace(overview_tab.rectangle(),win32gui.GetWindowRect(d.handle))
+    overview_tab.click_input()
     d.wait_text("Состав проекта",25)
     original_bounds=win32gui.GetWindowRect(d.handle)
     win32gui.MoveWindow(d.handle,0,0,820,650,True)

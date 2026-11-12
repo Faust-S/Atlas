@@ -616,3 +616,11 @@ test("Stable Atlas 0.6 release requires installed GUI before publishing",()=>{
  assert.match(workflow,/gh release create v0\.6\.0/);
  assert.match(workflow,/ATLAS06_STABLE_RELEASE_PUBLISHED/);
 });
+
+test("Installed overdue shortcut scrolls back to a physically reachable overview tab",()=>{
+ const test=read("../desktop/tests/installed-atlas06-visual-scale.py");
+ assert.match(test,/overview_tab=find_control\("Обзор",types=\{"Button"\}\)/);
+ assert.match(test,/rectangle_in_workspace\(overview_tab\.rectangle\(\),win32gui\.GetWindowRect\(d\.handle\)\)/);
+ assert.match(test,/overview_tab\.click_input\(\)/);
+ assert.match(test,/ATLAS06_VISUAL_OVERVIEW_OVERDUE_WORK_JUMP_PASS/);
+});
