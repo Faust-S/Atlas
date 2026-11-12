@@ -162,7 +162,12 @@ def set_text(name,value):
                              " (Edit/ComboBox found="+str(len(controls))+")")
     controls[0].click_input()
     keyboard.send_keys("^a")
-    keyboard.send_keys(value,with_spaces=True)
+    if value:
+        keyboard.send_keys(value,with_spaces=True)
+    else:
+        # Ctrl+A selects the old text; an empty send_keys() does not
+        # actually clear it. Use ordinary Backspace on the real input.
+        keyboard.send_keys("{BACKSPACE}")
     time.sleep(0.3)
 
 def wait_text(value,timeout=90):

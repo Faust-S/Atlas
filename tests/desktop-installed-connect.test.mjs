@@ -793,3 +793,18 @@ test("Installed work-table driver opens a truly visible filtered work, not a har
  assert.doesNotMatch(driver,/v\.find_control\("Открыть работу Работа 5 \/ 48"/);
  assert.match(driver,/find_control\("Сбросить фильтры работ",types=\{"Button"\},scroll=False\)/);
 });
+
+
+test("Native Windows text helper physically clears search fields when value is empty",()=>{
+ const driver=read("../desktop/tests/installed-atlas06-connect.py");
+ const start=driver.indexOf("def set_text(name,value):");
+ const end=driver.indexOf("\ndef wait_text(",start);
+ assert.ok(start>0&&end>start);
+ const body=driver.slice(start,end);
+ assert.match(body,/keyboard\.send_keys\("\^a"\)/);
+ assert.match(body,/if value:\s*\n\s*keyboard\.send_keys\(value,with_spaces=True\)/);
+ assert.match(body,/else:\s*\n(?:\s*#.*\n)*\s*keyboard\.send_keys\("\{BACKSPACE\}"\)/);
+ assert.doesNotMatch(body,/invoke\(|execute_script|set_edit_text/);
+ const portfolio=read("../desktop/tests/installed-atlas07-portfolio-search.py");
+ assert.match(portfolio,/d\.set_text\(SEARCH,""\)/);
+});
