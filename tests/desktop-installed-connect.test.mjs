@@ -691,6 +691,8 @@ test("Installed Atlas 0.7 searches the full work set and binds a distant work in
  assert.match(workflow,/ATLAS07_INSTALLED_WORK_SEARCH_FAILED/);
  assert.match(driver,/ATLAS07_INSTALLED_SEARCHED_WORK_LINK_PASS/);
  assert.match(driver,/keyboard\.send_keys\("5 \/ 1080",with_spaces=True\)/);
+ assert.match(driver,/project-5 \/ "\+FOLDER/);
+ assert.match(driver,/target\["sourceId"\]="visual-source-5"/);
  assert.match(driver,/d\.wait_text\("Найдено: 1",20\)/);
  assert.match(driver,/assert d\.saved_project\(after\)==updated/);
 });

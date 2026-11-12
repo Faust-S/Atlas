@@ -16,7 +16,10 @@ spec.loader.exec_module(v)
 d=v.d
 WORK_ID="visual-work-5-1079"
 FOLDER="directory-01"
-ENTRY="Связать существующую работу с каталогом atlas-visual-fixture/project-0 / "+FOLDER
+# The short source map is ranked by linked work count. After the prior unlink,
+# project-0 falls outside the first two visible sources; project-5 remains
+# visible and also holds the deliberately distant work in this test.
+ENTRY="Связать существующую работу с каталогом atlas-visual-fixture/project-5 / "+FOLDER
 
 def qualify():
     before=d.head()
@@ -28,6 +31,9 @@ def qualify():
     d.wait_text("Портфель проектов",45)
     v.select_project()
     d.wait_text("Схема проекта: каталоги, работы и этапы",35)
+    d.wait_text("atlas-visual-fixture/project-5",25)
+    # Use an actually displayed catalog, not a source that was pushed out
+    # of the compact view by the preceding unlink. No privileged map writes.
     v.find_control(ENTRY,types={"Button"}).click_input()
     d.window_title_contains("Форма: Связать работу с каталогом: "+FOLDER,25)
     assert d.head()==before,"Opening editor changed native Store"
@@ -50,7 +56,7 @@ def qualify():
     updated=d.saved_project(after)
     expected=copy.deepcopy(previous)
     target=next(w for w in expected["items"] if w["id"]==WORK_ID)
-    target["sourceId"]="visual-source-0"
+    target["sourceId"]="visual-source-5"
     target["sourcePath"]=FOLDER
     target["sourceRevision"]="a"*40
     assert updated==expected,"Searched work selection changed wrong work or unrelated fields"

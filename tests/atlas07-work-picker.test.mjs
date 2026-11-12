@@ -1,9 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
-import {serialize,deserialize} from "../src/core.mjs";
+import {serialize,deserialize,editItem} from "../src/core.mjs";
 import {editorSpec,applyEditor,filterWorkPickerOptions} from "../src/editor.mjs";
-import {folderLinkAction} from "../src/project-organization.mjs";
+import {folderLinkAction,projectSourcePlanProjection} from "../src/project-organization.mjs";
 import {atlas06VisualPortfolio} from "./fixtures/atlas06-visual-portfolio.mjs";
 
 const SHA="a".repeat(40);
@@ -86,4 +86,27 @@ test("The searchable work picker uses the existing form with bounded DOM options
  assert.match(ui,/name=\{f\.name\} aria-label=\{f\.label\}/);
  assert.match(ui,/Найти существующую работу/);
  assert.match(style,/\.atlas-work-picker-status/);
+});
+
+
+test("After unlinking, compact source ranking may hide a source; expansion preserves all",()=>{
+ const state=atlas06VisualPortfolio(),pid=state.projects[0].id;
+ const unlink=editItem(state,pid,"visual-work-0-0",{sourceId:null});
+ const small=projectSourcePlanProjection(unlink,pid,{
+  maxSources:2,maxFoldersPerSource:4,maxWorksPerFolder:3,maxOtherWorks:6,maxUnassignedStages:4
+ });
+ assert.equal(small.sources.length,2);
+ assert.equal(small.sources[0].sourceId,"visual-source-5");
+ assert.ok(small.sources.some(source=>source.sourceId==="visual-source-5"&&
+  source.folders.some(folder=>folder.name==="directory-01")));
+ assert.equal(small.sources.some(source=>source.sourceId==="visual-source-0"),false);
+ assert.ok(small.hiddenSources>0);
+ const expanded=projectSourcePlanProjection(unlink,pid,{
+  maxSources:8,maxFoldersPerSource:16,maxWorksPerFolder:8,maxOtherWorks:20,maxUnassignedStages:16
+ });
+ assert.ok(expanded.sources.some(source=>source.sourceId==="visual-source-0"&&
+  source.folders.some(folder=>folder.name==="directory-01")));
+ assert.equal(expanded.hiddenSources,0);
+ assert.equal(expanded.workTotal,1212);
+ assert.equal(expanded.sources[0].sourceId,"visual-source-5");
 });
