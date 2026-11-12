@@ -158,6 +158,7 @@ function EditorPanel({editor,onSubmit,onCancel,onDirtyChange,busy}:{
     event.currentTarget.requestSubmit();
    }
   }}>
+   <div className="atlas-editor-fields" role="region" aria-label="Поля редактора" tabIndex={0}>
    {editor.spec.fields.map((f,index)=>f.searchable?
     <div className="field atlas-work-picker" role="group" aria-label={f.label} key={f.name}>
      <label htmlFor="atlas-work-picker-query">Найти работу по названию</label>
@@ -196,6 +197,7 @@ function EditorPanel({editor,onSubmit,onCancel,onDirtyChange,busy}:{
        value={fields[f.name]??""} onChange={event=>updateFields({...fields,[f.name]:event.target.value})}/>
     }
    </label>)}
+   </div>
    <div className="form-footer"><Action onClick={onCancel}>Отмена</Action><button className="action-button primary" disabled={busy} type="submit" title="Ctrl+Enter">{editor.action.startsWith("folder-work:")?"Добавить работу":"Применить к черновику"}</button></div>
   </form>
  </section>
@@ -2260,7 +2262,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    <footer className="workspace-footer"><span>IWXA Atlas 0.6 · проекты хранятся на этом компьютере</span>
     <span>Вы сами решаете, какие изменения сохранить и принять.</span></footer>
   </main>
-  {inspector&&<aside className="inspector">
+  {inspector&&<aside className={"inspector"+(editor?" atlas-inspector-editing":"")}>
    {editor?<EditorPanel key={editor.action} editor={editor} onSubmit={submit}
     onCancel={cancelEditor} onDirtyChange={changed=>{editorDirtyRef.current=changed}} busy={busy}/>:
    <section><div className="section-heading"><h2>Инспектор</h2><button className="icon-button" aria-label="Скрыть инспектор" onClick={()=>setInspector(false)}>×</button></div>

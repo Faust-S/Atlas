@@ -85,3 +85,22 @@ test("review queue opens its associated forecast instead of leaving user to loca
  assert.match(ui,/Показать сценарий плана/);
  assert.match(ui,/canApply=\{\["approved","in_progress"\]\.includes\(c\.status\)\}/);
 });
+
+
+test("Long edit forms keep Save/Cancel fixed and fields independently scrollable in installed Windows",()=>{
+ const css=readFileSync(new URL("../desktop/src/style.css",import.meta.url),"utf8");
+ assert.match(ui,/className=\{"inspector"\+\(editor\?" atlas-inspector-editing":""\)\}/);
+ assert.match(ui,/<div className="atlas-editor-fields" role="region" aria-label="Поля редактора" tabIndex=\{0\}>/);
+ const start=ui.indexOf('<div className="atlas-editor-fields"');
+ const fields=ui.indexOf('{editor.spec.fields.map((f,index)=>',start);
+ const end=ui.indexOf('<div className="form-footer">',fields);
+ assert.ok(start>0&&fields>start&&end>fields);
+ assert.match(ui.slice(fields,end),/<\/div>/);
+ assert.match(css,/\.app-shell \.inspector\.atlas-inspector-editing\{\s*display:flex;flex-direction:column;overflow:hidden;padding-bottom:35px/);
+ assert.match(css,/\.editor-panel form\{display:flex;flex-direction:column;flex:1 1 auto;min-height:0/);
+ assert.match(css,/\.editor-panel \.atlas-editor-fields\{[\s\S]*?overflow-y:auto;overscroll-behavior:contain/);
+ assert.match(css,/\.editor-panel \.form-footer\{flex:0 0 auto;position:relative;bottom:auto;margin-top:0/);
+ // Do not lose the original explicit commit boundary or a form's dirty guard.
+ assert.match(ui,/onDirtyChange\(editor\.spec\.fields\.some\(f=>String\(f\.value\?\?""\)!==\(next\[f\.name\]\?\?""\)\)\)/);
+ assert.match(ui,/event\.currentTarget\.requestSubmit\(\)/);
+});
