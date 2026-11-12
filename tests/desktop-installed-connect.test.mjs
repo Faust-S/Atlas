@@ -624,3 +624,9 @@ test("Installed overdue shortcut scrolls back to a physically reachable overview
  assert.match(test,/overview_tab\.click_input\(\)/);
  assert.match(test,/ATLAS06_VISUAL_OVERVIEW_OVERDUE_WORK_JUMP_PASS/);
 });
+
+test("Installed overdue-work route restores physically reachable timeline navigation",()=>{
+ const d=read("../desktop/tests/installed-atlas06-visual-scale.py");
+ assert.match(d,/find_control\("График",types=\{"Button"\}\)\.click_input\(\)/);
+ assert.match(d,/ATLAS06_VISUAL_DIRECT_GANTT_EDIT_REPLANNED_PASS/);
+});

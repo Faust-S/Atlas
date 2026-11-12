@@ -629,9 +629,9 @@ def qualify_visual():
 
     # A user can open the overdue work from a regular Gantt view, correct
     # its duration, see the new schedule, and explicitly save that correction.
-    # This is not an impact-panel follow-up: a cold restart already cleared
-    # the recent-work state before we opened Gantt above.
-    d.click_button("График")
+    # After focus scrolling, the tab bar may be above the physical viewport.
+    # Reach the tab first, then click its native accessibility control.
+    find_control("График",types={"Button"}).click_input()
     late_checkbox=d.window().child_window(
         title="Только работы позже контрольного срока",control_type="CheckBox")
     assert late_checkbox.exists(timeout=15) and late_checkbox.is_enabled()
