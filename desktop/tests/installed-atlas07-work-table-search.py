@@ -5,6 +5,7 @@ Runs after installed hidden-source qualification on the same saved portfolio.
 import importlib.util
 import sys
 from pathlib import Path
+import win32gui
 
 sys.stdout.reconfigure(encoding="utf-8",errors="replace")
 spec=importlib.util.spec_from_file_location(
@@ -37,9 +38,26 @@ def qualify():
     d.wait_text("Быстрые действия с фильтрами работ",20)
     v.capture("atlas07-work-table-source-folder-search")
     assert d.head()==before,"Folder search changed native Store"
-    work=v.find_control("Открыть работу Работа 5 / 48",types={"Button"})
+    # The 44 rows are sorted by title and can retain a deep scroll position
+    # from previous real GUI scenarios. Open a *physically visible* matching
+    # work, rather than assuming a particular title is on screen.
+    expected_titles={w["title"] for w in matches}
+    bounds=win32gui.GetWindowRect(d.handle)
+    visible=[]
+    for control in d.window().descendants(control_type="Button"):
+        name=str(control.window_text() or "")
+        if not name.startswith("Открыть работу "):
+            continue
+        title=name[len("Открыть работу "):]
+        if (title in expected_titles and control.is_visible() and
+            control.is_enabled() and
+            v.rectangle_in_workspace(control.rectangle(),bounds)):
+            visible.append((control,title))
+    assert visible,"No matching work can be opened from the filtered viewport"
+    work,title=min(visible,key=lambda pair:pair[0].rectangle().top)
+    print("ATLAS07_WORK_TABLE_VISIBLE_WORK "+title,flush=True)
     work.click_input()
-    d.window_title_contains("Форма: Работа: Работа 5 / 48",25)
+    d.window_title_contains("Форма: Работа: "+title,25)
     assert d.head()==before,"Opening searched work changed native Store"
     v.capture("atlas07-work-table-search-open-work")
     from pywinauto import keyboard

@@ -779,3 +779,17 @@ test("Installed portfolio search finds a project from its saved work and source 
  assert.match(script,/d\.saved_project\(before\)==expected/);
  assert.match(ui,/aria-label="Найти проект по работе, этапу или источнику"/);
 });
+
+
+test("Installed work-table driver opens a truly visible filtered work, not a hard-coded offscreen title",()=>{
+ const driver=read("../desktop/tests/installed-atlas07-work-table-search.py");
+ assert.match(driver,/expected_titles=\{w\["title"\] for w in matches\}/);
+ assert.match(driver,/d\.window\(\)\.descendants\(control_type="Button"\)/);
+ assert.match(driver,/title in expected_titles and control\.is_visible\(\)/);
+ assert.match(driver,/v\.rectangle_in_workspace\(control\.rectangle\(\),bounds\)/);
+ assert.match(driver,/work,title=min\(visible,key=lambda pair:pair\[0\]\.rectangle\(\)\.top\)/);
+ assert.match(driver,/ATLAS07_WORK_TABLE_VISIBLE_WORK/);
+ assert.match(driver,/d\.window_title_contains\("Форма: Работа: "\+title,25\)/);
+ assert.doesNotMatch(driver,/v\.find_control\("Открыть работу Работа 5 \/ 48"/);
+ assert.match(driver,/find_control\("Сбросить фильтры работ",types=\{"Button"\},scroll=False\)/);
+});
