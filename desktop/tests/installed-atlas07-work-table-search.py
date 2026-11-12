@@ -25,8 +25,15 @@ def qualify():
     d.set_text("Найти работу","Этап работ 48")
     d.wait_text("Показано 22 из 22 работ по фильтру",35)
     assert d.head()==before,"Stage search changed native Store"
+    # A preceding accepted scenario moved one work from directory-23
+    # to directory-01. Count the actual saved source/path bindings
+    # instead of relying on a stale count from the original fixture.
+    matches=[w for w in expected["items"]
+             if w.get("sourceId")=="visual-source-5"
+             and w.get("sourcePath")=="directory-23"]
+    assert len(matches)==44,"Prior native catalog transfer was not preserved"
     d.set_text("Найти работу","project-5 directory-23")
-    d.wait_text("Показано 45 из 45 работ по фильтру",35)
+    d.wait_text(f"Показано {len(matches)} из {len(matches)} работ по фильтру",35)
     v.capture("atlas07-work-table-source-folder-search")
     assert d.head()==before,"Folder search changed native Store"
     work=v.find_control("Открыть работу Работа 5 / 48",types={"Button"})
