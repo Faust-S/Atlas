@@ -598,16 +598,16 @@ test('Installed Atlas opens overdue work from project overview without scrolling
  assert.match(guide,/onClick=\{onOpenOverdueWorks\}>Позже срока: \{overdueWorkCount\}/);
 });
 
-test("Stable Atlas 0.6 release requires installed GUI before publishing",()=>{
+test("Atlas 0.7 keeps the accepted 0.6 release gate and checks its own manifests",()=>{
  const product=JSON.parse(read("../desktop/installer/atlas.json"));
  const tauri=JSON.parse(read("../desktop/src-tauri/tauri.conf.json"));
  const manifest=JSON.parse(read("../desktop/package.json"));
  const lock=JSON.parse(read("../desktop/package-lock.json"));
- assert.equal(product.version,"0.6.0");
- assert.equal(tauri.version,"0.6.0");
- assert.equal(manifest.version,"0.6.0");
- assert.equal(lock.version,"0.6.0");
- assert.equal(lock.packages[""].version,"0.6.0");
+ assert.equal(product.version,"0.7.0-dev.1");
+ assert.equal(tauri.version,"0.7.0-dev.1");
+ assert.equal(manifest.version,"0.7.0-dev.1");
+ assert.equal(lock.version,"0.7.0-dev.1");
+ assert.equal(lock.packages[""].version,"0.7.0-dev.1");
  assert.match(workflow,/release\/0\.6/);
  assert.match(workflow,/Require successful live GitHub first-use on Atlas 0\.6/);
  assert.match(workflow,/Qualify large Atlas 0\.6 map in installed Windows GUI/);
@@ -629,4 +629,13 @@ test("Installed overdue-work route restores physically reachable timeline naviga
  const d=read("../desktop/tests/installed-atlas06-visual-scale.py");
  assert.match(d,/find_control\("График",types=\{"Button"\}\)\.click_input\(\)/);
  assert.match(d,/ATLAS06_VISUAL_DIRECT_GANTT_EDIT_REPLANNED_PASS/);
+});
+
+test("Atlas 0.7 development inherits the qualified original Setup Core route",()=>{
+ const workflow=read("../.github/workflows/atlas-0-2-1-branding.yml");
+ const setup=read("../desktop/installer/build-setup-core.ps1");
+ assert.match(workflow,/work\/2026-11-12-atlas-0-7/);
+ assert.match(workflow,/Qualify ordinary project without GitHub on installed Atlas 0\.6/);
+ assert.match(setup,/IWXA-Atlas-0\.7\.0-dev\.1-Setup\.exe/);
+ assert.match(workflow,/gh release create v0\.6\.0/);
 });

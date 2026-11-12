@@ -10,6 +10,7 @@ on:
       - work/2026-11-09-atlas-0-5
       - work/2026-11-10-atlas-0-6
       - release/0.6
+      - work/2026-11-12-atlas-0-7
   workflow_dispatch:
 
 permissions:
@@ -81,14 +82,14 @@ jobs:
         shell: pwsh
         run: |
           npm ci --no-audit --no-fund
-          if ($env:GITHUB_REF_NAME -in @('work/2026-11-09-atlas-0-5','work/2026-11-10-atlas-0-6','release/0.6')) {
+          if ($env:GITHUB_REF_NAME -in @('work/2026-11-09-atlas-0-5','work/2026-11-10-atlas-0-6','release/0.6','work/2026-11-12-atlas-0-7')) {
             npm run desktop:build -- --no-bundle
           } else {
             npm run desktop:build
           }
           if ($LASTEXITCODE -ne 0) { throw 'ATLAS_NATIVE_BUILD_FAILED' }
       - name: Checkout original pinned IWXA Setup Core
-        if: github.ref_name == 'work/2026-11-09-atlas-0-5' || (github.ref_name == 'work/2026-11-10-atlas-0-6' || github.ref_name == 'release/0.6')
+        if: github.ref_name == 'work/2026-11-09-atlas-0-5' || (github.ref_name == 'work/2026-11-10-atlas-0-6' || github.ref_name == 'release/0.6' || github.ref_name == 'work/2026-11-12-atlas-0-7')
         uses: actions/checkout@v4
         with:
           repository: Faust-S/Center
@@ -96,7 +97,7 @@ jobs:
           path: setup-core-source
           persist-credentials: false
       - name: Package and install Atlas with IWXA Setup Core
-        if: github.ref_name == 'work/2026-11-09-atlas-0-5' || (github.ref_name == 'work/2026-11-10-atlas-0-6' || github.ref_name == 'release/0.6')
+        if: github.ref_name == 'work/2026-11-09-atlas-0-5' || (github.ref_name == 'work/2026-11-10-atlas-0-6' || github.ref_name == 'release/0.6' || github.ref_name == 'work/2026-11-12-atlas-0-7')
         shell: pwsh
         timeout-minutes: 8
         run: ./desktop/installer/build-setup-core.ps1 -InstallForQualification
@@ -104,7 +105,7 @@ jobs:
         shell: pwsh
         run: cargo test --release --locked --manifest-path desktop/src-tauri/Cargo.toml --lib
       - name: Native Atlas R5 120-project persistence and 20 incremental revisions
-        if: github.ref_name == 'work/2026-11-04-atlas-0-3' || github.ref_name == 'work/2026-11-08-atlas-0-4' || github.ref_name == 'release/0.4' || github.ref_name == 'work/2026-11-09-atlas-0-5' || (github.ref_name == 'work/2026-11-10-atlas-0-6' || github.ref_name == 'release/0.6')
+        if: github.ref_name == 'work/2026-11-04-atlas-0-3' || github.ref_name == 'work/2026-11-08-atlas-0-4' || github.ref_name == 'release/0.4' || github.ref_name == 'work/2026-11-09-atlas-0-5' || (github.ref_name == 'work/2026-11-10-atlas-0-6' || github.ref_name == 'release/0.6' || github.ref_name == 'work/2026-11-12-atlas-0-7')
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -115,7 +116,7 @@ jobs:
           cargo test --release --locked --manifest-path desktop/src-tauri/Cargo.toml --lib persistence_tests::native_r5_scale_and_incremental_readback -- --exact --nocapture
       - name: Verify first-use connection on installed Atlas 0.6 Windows
         id: atlas06_github_first_use
-        if: (github.ref_name == 'work/2026-11-10-atlas-0-6' || github.ref_name == 'release/0.6')
+        if: (github.ref_name == 'work/2026-11-10-atlas-0-6' || github.ref_name == 'release/0.6' || github.ref_name == 'work/2026-11-12-atlas-0-7')
         continue-on-error: true
         shell: pwsh
         timeout-minutes: 9
@@ -125,7 +126,7 @@ jobs:
           python desktop/tests/installed-atlas06-connect.py
           if ($LASTEXITCODE -ne 0) { throw 'ATLAS06_INSTALLED_CONNECT_FAILED' }
       - name: Build Atlas 0.6 synthetic visual stress archive
-        if: (github.ref_name == 'work/2026-11-10-atlas-0-6' || github.ref_name == 'release/0.6')
+        if: (github.ref_name == 'work/2026-11-10-atlas-0-6' || github.ref_name == 'release/0.6' || github.ref_name == 'work/2026-11-12-atlas-0-7')
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -134,7 +135,7 @@ jobs:
           if ($LASTEXITCODE -ne 0 -or !(Test-Path -LiteralPath $archive)) { throw 'ATLAS06_VISUAL_FIXTURE_FAILED' }
           "ATLAS06_VISUAL_IWXA=$archive" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Qualify large Atlas 0.6 map in installed Windows GUI
-        if: (github.ref_name == 'work/2026-11-10-atlas-0-6' || github.ref_name == 'release/0.6')
+        if: (github.ref_name == 'work/2026-11-10-atlas-0-6' || github.ref_name == 'release/0.6' || github.ref_name == 'work/2026-11-12-atlas-0-7')
         shell: pwsh
         # Full installed interaction includes 1,213 works, restart, two date edits.
         # The previous 8-minute limit stopped the test after successful readbacks.
@@ -144,7 +145,7 @@ jobs:
           python desktop/tests/installed-atlas06-visual-scale.py
           if ($LASTEXITCODE -ne 0) { throw 'ATLAS06_INSTALLED_VISUAL_SCALE_FAILED' }
       - name: Build Atlas 0.6 universal project archive without GitHub
-        if: (github.ref_name == 'work/2026-11-10-atlas-0-6' || github.ref_name == 'release/0.6')
+        if: (github.ref_name == 'work/2026-11-10-atlas-0-6' || github.ref_name == 'release/0.6' || github.ref_name == 'work/2026-11-12-atlas-0-7')
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -153,7 +154,7 @@ jobs:
           if ($LASTEXITCODE -ne 0 -or !(Test-Path -LiteralPath $archive)) { throw 'ATLAS06_UNIVERSAL_FIXTURE_FAILED' }
           "ATLAS06_UNIVERSAL_IWXA=$archive" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       - name: Qualify ordinary project without GitHub on installed Atlas 0.6
-        if: (github.ref_name == 'work/2026-11-10-atlas-0-6' || github.ref_name == 'release/0.6')
+        if: (github.ref_name == 'work/2026-11-10-atlas-0-6' || github.ref_name == 'release/0.6' || github.ref_name == 'work/2026-11-12-atlas-0-7')
         shell: pwsh
         timeout-minutes: 7
         run: |
@@ -161,7 +162,7 @@ jobs:
           python desktop/tests/installed-atlas06-universal.py
           if ($LASTEXITCODE -ne 0) { throw 'ATLAS06_UNIVERSAL_NATIVE_FAILED' }
       - name: Install legacy NSIS candidate, verify executable and icon
-        if: github.ref_name != 'work/2026-11-09-atlas-0-5' && (github.ref_name != 'work/2026-11-10-atlas-0-6' && github.ref_name != 'release/0.6')
+        if: github.ref_name != 'work/2026-11-09-atlas-0-5' && (github.ref_name != 'work/2026-11-10-atlas-0-6' && github.ref_name != 'release/0.6' && github.ref_name != 'work/2026-11-12-atlas-0-7')
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -185,7 +186,7 @@ jobs:
           "ATLAS_INSTALLED_EXE=$exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           Write-Output 'ATLAS_INSTALLED_ICON_PASS'
       - name: Regression installed GUI save and restart
-        if: github.ref_name != 'work/2026-11-08-atlas-0-4' && github.ref_name != 'release/0.4' && github.ref_name != 'work/2026-11-09-atlas-0-5' && (github.ref_name != 'work/2026-11-10-atlas-0-6' && github.ref_name != 'release/0.6')
+        if: github.ref_name != 'work/2026-11-08-atlas-0-4' && github.ref_name != 'release/0.4' && github.ref_name != 'work/2026-11-09-atlas-0-5' && (github.ref_name != 'work/2026-11-10-atlas-0-6' && github.ref_name != 'release/0.6' && github.ref_name != 'work/2026-11-12-atlas-0-7')
         shell: pwsh
         timeout-minutes: 5
         run: ./desktop/tests/installed-windows-keyboard.ps1
@@ -305,7 +306,7 @@ jobs:
       # Run offline Windows scenarios even when first-use UI or GitHub API fails.
       # The dedicated first-use gate still fails the job after collecting evidence.
       - name: Require successful live GitHub first-use on Atlas 0.6
-        if: (github.ref_name == 'work/2026-11-10-atlas-0-6' || github.ref_name == 'release/0.6') && steps.atlas06_github_first_use.outcome == 'failure'
+        if: (github.ref_name == 'work/2026-11-10-atlas-0-6' || github.ref_name == 'release/0.6' || github.ref_name == 'work/2026-11-12-atlas-0-7') && steps.atlas06_github_first_use.outcome == 'failure'
         shell: pwsh
         run: throw 'ATLAS06_GITHUB_FIRST_USE_NOT_ACCEPTED - inspect preceding installed UI and GitHub API logs'
       - name: Retain installed GUI screenshot evidence on success or failure
@@ -328,6 +329,8 @@ jobs:
             artifacts/IWXA-Atlas-0.6.0-dev.1-Setup.exe.sha256
             artifacts/IWXA-Atlas-0.6.0-Setup.exe
             artifacts/IWXA-Atlas-0.6.0-Setup.exe.sha256
+            artifacts/IWXA-Atlas-0.7.0-dev.1-Setup.exe
+            artifacts/IWXA-Atlas-0.7.0-dev.1-Setup.exe.sha256
           if-no-files-found: error
           retention-days: 7
 

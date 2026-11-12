@@ -3,7 +3,7 @@
   "id": "iwxa.atlas",
   "display_name": "IWXA Atlas",
   "publisher": "IWXA",
-  "version": "0.6.0",
+  "version": "0.7.0-dev.1",
   "architecture": "windows-x64",
   "install_dir": "IWXA Atlas",
   "entrypoint": "iwxa-atlas-desktop.exe",
