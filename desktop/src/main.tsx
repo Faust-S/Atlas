@@ -1718,9 +1718,13 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
        <option value="title">По названию</option><option value="dueDate">По сроку</option>
        <option value="priority">По приоритету</option><option value="estimateDays">По длительности</option>
        <option value="state">По состоянию</option>
-      </select></label>
-      {workFiltersActive&&<button type="button" className="action-button atlas-work-reset-filters"
-       aria-label="Сбросить фильтры работ" onClick={clearWorkFilters}>Сбросить фильтры</button>}</div>
+      </select></label></div>
+     {workFiltersActive&&<div className="atlas-work-filter-shortcut"
+      role="group" aria-label="Быстрые действия с фильтрами работ">
+      <small>Показано {Math.min(filteredWork.length,workLimit)} из {filteredWork.length} работ</small>
+      <button type="button" className="action-button atlas-work-reset-filters"
+       aria-label="Сбросить фильтры работ" onClick={clearWorkFilters}>Сбросить фильтры</button>
+     </div>}
      <p className="minor atlas-work-evidence-summary" role="status">
       <output className="atlas-work-filter-count" aria-live="polite"
        aria-label={"Показано "+Math.min(filteredWork.length,workLimit)+" из "+filteredWork.length+" работ по фильтру"}>

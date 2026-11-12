@@ -34,6 +34,7 @@ def qualify():
     assert len(matches)==44,"Prior native catalog transfer was not preserved"
     d.set_text("Найти работу","project-5 directory-23")
     d.wait_text(f"Показано {len(matches)} из {len(matches)} работ по фильтру",35)
+    d.wait_text("Быстрые действия с фильтрами работ",20)
     v.capture("atlas07-work-table-source-folder-search")
     assert d.head()==before,"Folder search changed native Store"
     work=v.find_control("Открыть работу Работа 5 / 48",types={"Button"})
@@ -46,9 +47,12 @@ def qualify():
     v.await_no_form()
     assert d.head()==before
     assert d.saved_project(before)==expected
+    # Work view returns to the selected row, so the shortcut must remain
+    # visible while the earlier filter controls are far above the viewport.
+    d.wait_text("Быстрые действия с фильтрами работ",20)
     # A long-lived work table can accumulate filters. One explicit click
     # restores all work rows, even when a deadline-only filter was active.
-    reset=v.find_control("Сбросить фильтры работ",types={"Button"})
+    reset=v.find_control("Сбросить фильтры работ",types={"Button"},scroll=False)
     reset.click_input()
     d.wait_text("Показано 200 из 1213 работ по фильтру",35)
     assert d.head()==before and d.saved_project(before)==expected

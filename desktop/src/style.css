@@ -856,3 +856,22 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
  .atlas-source-plan-assignment{grid-template-columns:minmax(0,1fr) 12px minmax(90px,40%)}
  .atlas-source-plan-folder{margin-bottom:4px}
 }
+
+
+/* Atlas 0.7: A filtered list may contain hundreds of compact work cards.
+   Keep the one-click reset reachable after opening a deep work and returning
+   to the same scroll position. Stay below the existing sticky command bar. */
+.atlas-work-filter-shortcut{
+ position:sticky;top:75px;z-index:7;
+ display:flex;align-items:center;justify-content:space-between;gap:10px;
+ padding:7px 10px;margin:0 0 12px;border:1px solid #bad0ee;
+ border-radius:9px;background:#f6faff;
+ box-shadow:0 3px 9px #6d8db024;
+}
+.atlas-work-filter-shortcut small{color:#3f6289;font-size:12px;font-weight:600}
+.atlas-work-filter-shortcut .atlas-work-reset-filters{
+ flex:0 0 auto;min-height:34px;font-size:12px;padding:5px 10px;
+}
+@container atlas-work-surface (max-width:500px){
+ .atlas-work-filter-shortcut{flex-wrap:wrap;top:76px}
+}

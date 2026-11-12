@@ -61,3 +61,19 @@ test("A single action resets all table filters, including hidden overdue filter,
  assert.match(ui,/aria-label="Сбросить фильтры работ" onClick=\{clearWorkFilters\}/);
  assert.match(ui,/workDeadlineFilter!=="all"\|\|!!workQuery\.trim\(\)/);
 });
+
+
+test("Filtered large work lists keep one reset action available while scrolling deep cards",()=>{
+ const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ const css=readFileSync(new URL("../desktop/src/style.css",import.meta.url),"utf8");
+ const open=ui.indexOf('{workFiltersActive&&<div className="atlas-work-filter-shortcut"');
+ const count=ui.indexOf('<p className="minor atlas-work-evidence-summary"',open);
+ const table=ui.indexOf('<div className="table-scroll atlas-work-table-scroll"',count);
+ assert.ok(open>0&&count>open&&table>count);
+ assert.equal(ui.match(/aria-label="Сбросить фильтры работ"/g)?.length,1);
+ assert.match(ui.slice(open,count),/onClick=\{clearWorkFilters\}/);
+ assert.match(ui.slice(open,count),/role="group" aria-label="Быстрые действия с фильтрами работ"/);
+ assert.match(css,/\.atlas-work-filter-shortcut\{[\s\S]*?position:sticky;top:75px;z-index:7/);
+ assert.match(css,/\.atlas-work-filter-shortcut \.atlas-work-reset-filters/);
+ assert.match(ui,/const clearWorkFilters=\(\)=>/);
+});
