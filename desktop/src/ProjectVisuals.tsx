@@ -445,7 +445,7 @@ export function ProjectSourcePlanMap({projection,project,restoreSearch,onOpenWor
       <a className="text-link" href={folder.url} target="_blank"
        rel="noopener noreferrer">Открыть в GitHub</a>
       {project?.items?.length>0&&<button type="button" className="text-link"
-       aria-label={"Связать существующую работу с каталогом "+folder.name}
+       aria-label={"Связать существующую работу с каталогом "+source.repository+" / "+folder.name}
        disabled={busy}
        onClick={()=>onLinkExistingWork(source.sourceId,folder.commitSha,folder.name)}>
        Связать работу</button>}

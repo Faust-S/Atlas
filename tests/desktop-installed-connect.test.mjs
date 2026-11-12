@@ -650,3 +650,18 @@ test("Installed Atlas 0.7 reaches source view from a nonengineering project with
  assert.match(driver,/d\.wait_text\("Источники проекта",25\)/);
  assert.match(guide,/!recordedSources&&<button type="button"/);
 });
+
+test("Atlas 0.7 installed GUI binds an existing work to an observed source folder with native readback",()=>{
+ const driver=read("../desktop/tests/installed-atlas07-existing-work-link.py");
+ const guide=read("../desktop/src/ProjectOrganizationGuide.tsx");
+ const visual=read("../desktop/src/ProjectVisuals.tsx");
+ assert.match(workflow,/Verify link of existing work to observed catalog in installed Atlas 0\.7/);
+ assert.match(workflow,/installed-atlas07-existing-work-link\.py/);
+ assert.match(workflow,/ATLAS07_INSTALLED_FOLDER_WORK_LINK_FAILED/);
+ assert.match(driver,/ATLAS07_INSTALLED_EXISTING_WORK_FOLDER_LINK_PASS/);
+ assert.match(driver,/Связать существующую работу с каталогом atlas-visual-fixture\/project-0 \/ directory-01/);
+ assert.match(driver,/assert d\.saved_project\(after\)==updated/);
+ assert.match(driver,/assert d\.head\(\)==before/);
+ assert.match(visual,/source\.repository\+" \/ "\+folder\.name/);
+ assert.match(guide,/onEdit\(folderLinkAction\(sourceId,commitSha,folder\)\)/);
+});
