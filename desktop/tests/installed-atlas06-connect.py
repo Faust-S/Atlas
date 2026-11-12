@@ -71,8 +71,14 @@ def window():
     return Desktop(backend="uia").window(handle=handle)
 
 def visible_texts():
-    return [str(element.window_text()) for element in window().descendants()
-            if element.window_text()]
+    # WebView2 can expose a short-lived UIA element with control_type=None
+    # during large-table repaint. pywinauto.descendants() tries to construct
+    # a typed wrapper for it and raises KeyError(None). Enumerating the raw
+    # UIA element infos keeps all actual names without wrapping that node.
+    # Never treat the temporary malformed element as a product failure or
+    # claim the requested text was present before observing its real name.
+    root=window().wrapper_object().element_info
+    return [str(info.name) for info in root.descendants() if info.name]
 
 def wait_button(name,timeout=35):
     until=time.monotonic()+timeout

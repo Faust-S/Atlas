@@ -748,3 +748,19 @@ test("Native Atlas 0.7 searches works in a 1212-work project by stage and source
  assert.match(driver,/ATLAS07_INSTALLED_WORK_TABLE_CONTEXT_SEARCH_PASS/);
  assert.match(driver,/assert d\.saved_project\(before\)==expected/);
 });
+
+
+test("Installed Windows text observation tolerates transient untyped WebView2 UIA elements",()=>{
+ const driver=read("../desktop/tests/installed-atlas06-connect.py");
+ const start=driver.indexOf("def visible_texts():");
+ const end=driver.indexOf("\ndef wait_button(",start);
+ assert.ok(start>0&&end>start,"Expected native text reader");
+ const reader=driver.slice(start,end);
+ assert.match(reader,/root=window\(\)\.wrapper_object\(\)\.element_info/);
+ assert.match(reader,/root\.descendants\(\)/);
+ assert.match(reader,/info\.name/);
+ assert.doesNotMatch(reader,/window\(\)\.descendants\(\)/);
+ // UIA names remain observed through real Windows accessibility data;
+ // no fake responses, hidden DOM, or fabricated Store reads are introduced.
+ assert.doesNotMatch(reader,/execute_script|invoke\(|response\s*=|mock/i);
+});
