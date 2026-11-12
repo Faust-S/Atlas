@@ -155,3 +155,56 @@ test('work-table deadline risk is grounded in a real dated CPM finish only',()=>
  assert.deepEqual(scheduleProject(withoutStart).rows.filter(r=>r.dueDate&&r.finishDate&&r.finishDate>r.dueDate),[]);
  assert.equal(JSON.stringify(dated),before);
 });
+
+test('changing only a control date reports a resolved violation without inventing a schedule shift',()=>{
+ const original=project([['work',3]],[],'2026-11-10');
+ original.items[0].dueDate='2026-11-12';
+ const revised={...original,items:[{...original.items[0],dueDate:'2026-11-15'}]};
+ const oldText=JSON.stringify(original),newText=JSON.stringify(revised);
+ const before=scheduleProject(original),after=scheduleProject(revised);
+ const effect=scheduleChangeSummary(before,after);
+ assert.equal(effect.durationBefore,3);
+ assert.equal(effect.durationAfter,3);
+ assert.equal(effect.movedTotal,0);
+ assert.equal(effect.deadlineChangedTotal,1);
+ assert.equal(effect.deadlineResolvedTotal,1);
+ assert.equal(effect.deadlineNewMissedTotal,0);
+ assert.equal(effect.deadlineMissedTotal,0);
+ assert.equal(effect.affectedTotal,1);
+ assert.deepEqual(effect.examples.map(x=>x.id),['work']);
+ assert.equal(effect.examples[0].shiftDays,0);
+ assert.equal(effect.examples[0].previousDueDate,'2026-11-12');
+ assert.equal(effect.examples[0].dueDate,'2026-11-15');
+ assert.equal(effect.examples[0].dueDateChanged,true);
+ assert.equal(effect.examples[0].deadlineResolved,true);
+ assert.equal(effect.examples[0].missedDeadline,false);
+ assert.equal(effect.examples[0].finishDate,'2026-11-13');
+ assert.equal(JSON.stringify(original),oldText);
+ assert.equal(JSON.stringify(revised),newText);
+});
+test('tightening a control date reveals a newly missed deadline, even without changing CPM',()=>{
+ const baseline=project([['work',3]],[],'2026-11-10');
+ baseline.items[0].dueDate='2026-11-15';
+ const strict={...baseline,items:[{...baseline.items[0],dueDate:'2026-11-12'}]};
+ const effect=scheduleChangeSummary(scheduleProject(baseline),scheduleProject(strict));
+ assert.equal(effect.movedTotal,0);
+ assert.equal(effect.deadlineChangedTotal,1);
+ assert.equal(effect.deadlineResolvedTotal,0);
+ assert.equal(effect.deadlineNewMissedTotal,1);
+ assert.equal(effect.deadlineMissedTotal,1);
+ assert.equal(effect.affectedTotal,1);
+ assert.equal(effect.examples[0].missedDeadline,true);
+});
+test('without a project start, changing a control date reports the edit but never a fictional violation',()=>{
+ const projectWithoutStart=project([['work',3]],[],null);
+ projectWithoutStart.items[0].dueDate='2026-11-12';
+ const later={...projectWithoutStart,items:[{...projectWithoutStart.items[0],dueDate:'2026-11-15'}]};
+ const effect=scheduleChangeSummary(scheduleProject(projectWithoutStart),scheduleProject(later));
+ assert.equal(effect.movedTotal,0);
+ assert.equal(effect.deadlineChangedTotal,1);
+ assert.equal(effect.deadlineMissedTotal,0);
+ assert.equal(effect.deadlineResolvedTotal,0);
+ assert.equal(effect.deadlineNewMissedTotal,0);
+ assert.equal(effect.examples[0].finishDate,null);
+ assert.equal(effect.examples[0].previousFinishDate,null);
+});

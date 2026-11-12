@@ -850,3 +850,19 @@ test("A direct work duration or deadline change recalculates without leaving the
  assert.match(route,/revealWorkInTable\(correctedId,false\)/);
  assert.doesNotMatch(route,/commitWithReadback\(|nativeInvoke\(|localStorage|fetch\(/);
 });
+
+test("Changing only a control date explains deadline correction without claiming a shifted CPM plan",()=>{
+ const source=read("../src/planning.mjs");
+ const ui=read("../desktop/src/main.tsx");
+ assert.match(source,/deadlineChangedTotal,deadlineResolvedTotal,deadlineNewMissedTotal/);
+ assert.match(source,/if\(!shiftDays&&!dueDateChanged\)continue/);
+ assert.match(source,/affectedTotal:affected\.length/);
+ assert.match(ui,/recentScheduleEffect\.deadlineChangedTotal>0/);
+ assert.match(ui,/recentScheduleEffect\.deadlineResolvedTotal>0/);
+ assert.match(ui,/Нарушений срока устранено:/);
+ assert.match(ui,/Без сдвига графика\./);
+ assert.match(ui,/item\.dueDateChanged&&<small className="atlas-work-effect-deadline">/);
+ assert.match(ui,/Контрольный срок: было \{item\.previousDueDate\|\|"не задано"\}/);
+ assert.match(ui,/recentScheduleEffect\.affectedTotal>recentScheduleEffect\.examples\.length/);
+ assert.doesNotMatch(source,/setState\(|localStorage|commitWithReadback/);
+});

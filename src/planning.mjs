@@ -89,34 +89,49 @@ export function scheduleChangeSummary(before,after,{limit=4}={}){
   throw new Error("Invalid schedule comparison limit");
  const previous=new Map(before.rows.map(row=>[row.id,row]));
  let movedTotal=0,delayedTotal=0,earlierTotal=0,criticalChangedTotal=0,deadlineMissedTotal=0;
+ let deadlineChangedTotal=0,deadlineResolvedTotal=0,deadlineNewMissedTotal=0;
  const affected=[];
  for(const row of after.rows){
   const old=previous.get(row.id);
   if(!old)continue;
   if(Boolean(old.critical)!==Boolean(row.critical))criticalChangedTotal++;
+  const previousDueDate=old.dueDate??null,dueDate=row.dueDate??null;
+  const dueDateChanged=previousDueDate!==dueDate;
+  // A deadline can be changed without shifting the CPM finish. Keep that
+  // correction in the impact preview and compare calendar facts only when
+  // a real project start permits a dated finish.
+  const previouslyMissed=Boolean(previousDueDate&&old.finishDate&&old.finishDate>previousDueDate);
+  const missedDeadline=Boolean(dueDate&&row.finishDate&&row.finishDate>dueDate);
+  if(dueDateChanged)deadlineChangedTotal++;
+  if(previouslyMissed&&!missedDeadline)deadlineResolvedTotal++;
+  if(!previouslyMissed&&missedDeadline)deadlineNewMissedTotal++;
   const shiftDays=row.earlyFinish-old.earlyFinish;
-  if(!shiftDays)continue;
-  movedTotal++;
-  if(shiftDays>0)delayedTotal++;else earlierTotal++;
-  // A due date is meaningful only when the project has a calendar start.
-  // Report an existing deadline violation without attributing its cause.
-  const missedDeadline=Boolean(row.dueDate&&row.finishDate&&row.finishDate>row.dueDate);
+  if(!shiftDays&&!dueDateChanged)continue;
+  if(shiftDays){
+   movedTotal++;
+   if(shiftDays>0)delayedTotal++;else earlierTotal++;
+  }
   if(missedDeadline)deadlineMissedTotal++;
   affected.push({
    id:row.id,title:row.title,shiftDays,
    previousFinishOffset:old.earlyFinish,finishOffset:row.earlyFinish,
    previousFinishDate:old.finishDate??null,finishDate:row.finishDate??null,
-   dueDate:row.dueDate??null,missedDeadline,
+   previousDueDate,dueDate,dueDateChanged,missedDeadline,
+   deadlineResolved:previouslyMissed&&!missedDeadline,
    critical:Boolean(row.critical)
   });
  }
- // Show missed control dates first: a short preview must not hide an actionable deadline.
- // Among equally urgent items, keep delayed work and larger shifts first.
+ // Keep missed deadlines and corrected deadlines visible in a limited
+ // preview; remaining moved works follow by the magnitude of their impact.
  affected.sort((a,b)=>Number(b.missedDeadline)-Number(a.missedDeadline)||
+  Number(b.deadlineResolved)-Number(a.deadlineResolved)||
+  Number(b.dueDateChanged)-Number(a.dueDateChanged)||
   Number(b.shiftDays>0)-Number(a.shiftDays>0)||
   Math.abs(b.shiftDays)-Math.abs(a.shiftDays)||Number(b.critical)-Number(a.critical));
  return {durationBefore:before.durationDays,durationAfter:after.durationDays,
-  movedTotal,delayedTotal,earlierTotal,criticalChangedTotal,deadlineMissedTotal,examples:affected.slice(0,limit)};
+  movedTotal,delayedTotal,earlierTotal,criticalChangedTotal,deadlineMissedTotal,
+  deadlineChangedTotal,deadlineResolvedTotal,deadlineNewMissedTotal,
+  affectedTotal:affected.length,examples:affected.slice(0,limit)};
 }
 
 /**

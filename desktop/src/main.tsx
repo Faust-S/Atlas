@@ -1561,6 +1561,10 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
            "Расчётные сроки существующих работ не сдвинулись."}
            {recentScheduleEffect.criticalChangedTotal>0?
             " Критический путь изменился. Затронуто работ: "+recentScheduleEffect.criticalChangedTotal+".":""}
+           {recentScheduleEffect.deadlineChangedTotal>0?
+            " Контрольных сроков изменено: "+recentScheduleEffect.deadlineChangedTotal+".":""}
+           {recentScheduleEffect.deadlineResolvedTotal>0?
+            " Нарушений срока устранено: "+recentScheduleEffect.deadlineResolvedTotal+".":""}
            {recentScheduleEffect.deadlineMissedTotal>0?
             " Расчётный финиш позже контрольного срока. Затронуто работ: "+
             recentScheduleEffect.deadlineMissedTotal+".":""}
@@ -1570,19 +1574,29 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
             {index===0?<strong>{item.title}</strong>:<button type="button" className="text-link"
              aria-label={"Изменить затронутую работу "+item.title}
              onClick={()=>openEditor("work:"+item.id)}>{item.title}</button>}
-            <small>Расчётное окончание: {item.previousFinishDate&&item.finishDate?
-             "было "+item.previousFinishDate+", стало "+item.finishDate:
-             "было через "+item.previousFinishOffset+" дн., стало через "+
-             item.finishOffset+" дн. от начала проекта"}.
+            <small>{item.shiftDays!==0?<>
+             Расчётное окончание: {item.previousFinishDate&&item.finishDate?
+              "было "+item.previousFinishDate+", стало "+item.finishDate:
+              "было через "+item.previousFinishOffset+" дн., стало через "+
+              item.finishOffset+" дн. от начала проекта"}.
              {" "}Сдвиг {item.shiftDays>0?"+":""}{item.shiftDays} дн.
+            </>:<>
+             Расчётное окончание: {item.finishDate||
+              "через "+item.finishOffset+" дн. от начала проекта"}. Без сдвига графика.
+            </>}
              {item.critical?" На критическом пути.":""}</small>
+            {item.dueDateChanged&&<small className="atlas-work-effect-deadline">
+             Контрольный срок: было {item.previousDueDate||"не задано"},
+             стало {item.dueDate||"не задано"}.
+             {item.deadlineResolved?" Нарушение срока устранено.":""}
+            </small>}
             {item.missedDeadline&&<small className="atlas-work-effect-deadline">
              Контрольный срок {item.dueDate} не выдержан. Проверьте план этой работы.
             </small>}
            </li>)}
           </ul>}
-          {recentScheduleEffect.movedTotal>recentScheduleEffect.examples.length&&
-           <p className="minor">Ещё {recentScheduleEffect.movedTotal-
+          {recentScheduleEffect.affectedTotal>recentScheduleEffect.examples.length&&
+           <p className="minor">Ещё {recentScheduleEffect.affectedTotal-
             recentScheduleEffect.examples.length} работ в полном графике.</p>}
          </div>}
         <p className="minor">Оценка: {recentWork.estimateDays??1} календарных дней.

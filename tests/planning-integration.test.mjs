@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {empty,createProject,createItem,editItem,connect,editProject,serialize,deserialize} from '../src/core.mjs';
-import {scheduleProject} from '../src/planning.mjs';
+import {scheduleProject,scheduleChangeSummary} from '../src/planning.mjs';
 test('full Atlas project → scheduled work → saved/reopened plan',()=>{
   const p=createProject(empty(),{name:'Office move',type:'business'}),a=createItem(p.state,p.id,{title:'Design'});
   const b=createItem(a.state,p.id,{title:'Move'}),c=connect(b.state,p.id,a.id,b.id);
@@ -47,6 +47,12 @@ test('editing the deadline of a saved work updates its dated risk without rewrit
  const after=scheduleProject(revised.projects[0]);
  assert.equal(after.rows[0].finishDate,'2026-11-13');
  assert.ok(after.rows[0].finishDate<=after.rows[0].dueDate);
+ const delta=scheduleChangeSummary(before,after);
+ assert.equal(delta.movedTotal,0);
+ assert.equal(delta.deadlineChangedTotal,1);
+ assert.equal(delta.deadlineResolvedTotal,1);
+ assert.equal(delta.examples[0].shiftDays,0);
+ assert.equal(delta.examples[0].dueDate,'2026-11-15');
  assert.equal(serialize(original),beforeText,'Direct edit mutated the original project');
  assert.equal(deserialize(serialize(revised)).projects[0].items[0].dueDate,'2026-11-15');
 });
