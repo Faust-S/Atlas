@@ -31,8 +31,7 @@ def qualify():
     v.find_control(WORK_TITLE,types={"Button"}).click_input()
     d.window_title_contains("Форма: Работа: "+WORK_TITLE,25)
     assert d.head()==before,"Opening the work editor wrote to Store"
-    picker=d.window().child_window(title="Связь с источником",control_type="ComboBox")
-    assert picker.exists(timeout=15) and picker.is_enabled()
+    picker=v.editor_field("Связь с источником",types=("ComboBox",))
     picker.click_input()
     keyboard.send_keys("{HOME}{DOWN}{ENTER}")
     assert d.head()==before,"Choosing removal wrote to Store"

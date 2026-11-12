@@ -91,6 +91,57 @@ def find_control(name,types=None,scroll=True):
     capture("control-not-visible")
     raise AssertionError("Synthetic visual control not physically reachable: "+name[:90])
 
+def editor_field(name,types=("Edit","Spinner","ComboBox")):
+    """Reach a field through the *real* independently scrollable editor.
+    UIA may exclude clipped input controls until the user physically scrolls.
+    Do not use test-only IPC, DOM hooks, or an off-screen click.
+    """
+    bounds=win32gui.GetWindowRect(d.handle)
+    width=bounds[2]-bounds[0]
+    height=bounds[3]-bounds[1]
+    assert width>=760 and height>=490,"Native window is smaller than the qualified layout"
+    # A compact inspector occupies the rightmost 400 px; the center of its
+    # field region remains above its permanently visible confirmation bar.
+    x=bounds[2]-46
+    y=bounds[1]+min(410,max(215,height//2))
+    def physical(element):
+        rect=element.rectangle()
+        return (rect.left>=bounds[2]-435 and rect.right<=bounds[2]-12 and
+                rect.top>=bounds[1]+110 and rect.bottom<=bounds[3]-90)
+    def locate():
+        found=[]
+        for element in d.window().descendants():
+            if (element.window_text()==name and element.is_enabled() and
+                element.element_info.control_type in types):
+                found.append(element)
+                if element.is_visible() and physical(element):
+                    return element
+        return None
+    d.activate()
+    current=locate()
+    if current:return current
+    # Start at the beginning of the field region, then scroll through its
+    # actual contents. The first/last fields may have been clipped by UIA.
+    mouse.scroll(coords=(x,y),wheel_dist=18)
+    time.sleep(0.25)
+    for attempt in range(18):
+        current=locate()
+        if current:
+            print("ATLAS07_EDITOR_FIELD_SCROLL_PASS "+name+" steps="+str(attempt),flush=True)
+            return current
+        mouse.scroll(coords=(x,y),wheel_dist=-2)
+        time.sleep(0.2)
+    capture("editor-field-not-reachable")
+    raise AssertionError("Native editor field not physically reachable: "+name)
+
+def set_editor_text(name,value):
+    element=editor_field(name)
+    element.click_input()
+    keyboard.send_keys("^a")
+    keyboard.send_keys(value,with_spaces=True)
+    time.sleep(0.3)
+
+
 def open_file_menu():
     end=time.monotonic()+20
     while time.monotonic()<end:
@@ -519,7 +570,7 @@ def qualify_visual():
     d.window_title_contains("Форма: Работа: Работа 0 / 2",25)
     assert d.head()==linked_head,"Opening affected work editor modified storage"
     print("ATLAS06_VISUAL_AFFECTED_WORK_DIRECT_EDITOR_PASS",flush=True)
-    d.set_text("Плановая длительность, дней","2")
+    set_editor_text("Плановая длительность, дней","2")
     apply=find_control("Применить к черновику",types={"Button"})
     apply.click_input()
     await_no_form()
@@ -642,7 +693,7 @@ def qualify_visual():
     late.click_input()
     d.window_title_contains("Форма: Работа: Работа 0 / 2",25)
     assert d.head()==final_head,"Opening Gantt work for correction changed native Store"
-    d.set_text("Плановая длительность, дней","0")
+    set_editor_text("Плановая длительность, дней","0")
     find_control("Применить к черновику",types={"Button"}).click_input()
     await_no_form()
     d.wait_text("Работа изменена в черновике.",35)
@@ -685,7 +736,7 @@ def qualify_visual():
             in ("Edit","ComboBox","Spinner","Group","Custom")
             or "Срок работы" in str(element.window_text()))
     ][:35]),flush=True)
-    d.set_text("Срок работы","11/10/2026")
+    set_editor_text("Срок работы","11/10/2026")
     find_control("Применить к черновику",types={"Button"}).click_input()
     await_no_form()
     assert d.head()==corrected_head,"Deadline-only change unexpectedly saved native Store"
@@ -716,7 +767,7 @@ def qualify_visual():
     open_again=find_control("Открыть работу Работа 0 / 2",types={"Button"})
     open_again.click_input()
     d.window_title_contains("Форма: Работа: Работа 0 / 2",25)
-    d.set_text("Срок работы","11/12/2026")
+    set_editor_text("Срок работы","11/12/2026")
     find_control("Применить к черновику",types={"Button"}).click_input()
     await_no_form()
     assert d.head()==missed_head,"Resolved deadline was saved without explicit user approval"

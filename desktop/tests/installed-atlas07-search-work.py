@@ -31,14 +31,12 @@ def qualify():
     v.find_control(ENTRY,types={"Button"}).click_input()
     d.window_title_contains("Форма: Связать работу с каталогом: "+FOLDER,25)
     assert d.head()==before,"Opening editor changed native Store"
-    search=d.window().child_window(title="Найти существующую работу",control_type="Edit")
-    assert search.exists(timeout=15) and search.is_enabled()
+    search=v.editor_field("Найти существующую работу",types=("Edit",))
     search.click_input()
     keyboard.send_keys("5 / 1080",with_spaces=True)
     d.wait_text("Найдено: 1",20)
     assert d.head()==before,"Searching changed native Store"
-    picker=d.window().child_window(title="Существующая работа",control_type="ComboBox")
-    assert picker.exists(timeout=10) and picker.is_enabled()
+    picker=v.editor_field("Существующая работа",types=("ComboBox",))
     picker.click_input()
     keyboard.send_keys("{HOME}{DOWN}{ENTER}")
     v.capture("atlas07-search-work-selected")

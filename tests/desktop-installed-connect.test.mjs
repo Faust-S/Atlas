@@ -694,3 +694,20 @@ test("Installed Atlas 0.7 searches the full work set and binds a distant work in
  assert.match(driver,/d\.wait_text\("Найдено: 1",20\)/);
  assert.match(driver,/assert d\.saved_project\(after\)==updated/);
 });
+
+
+test("Compact installed editor scrolls its native field region before physical input",()=>{
+ const scale=read("../desktop/tests/installed-atlas06-visual-scale.py");
+ const unlink=read("../desktop/tests/installed-atlas07-unlink-work.py");
+ const search=read("../desktop/tests/installed-atlas07-search-work.py");
+ assert.match(scale,/def editor_field\(name,types=\("Edit","Spinner","ComboBox"\)\):/);
+ assert.match(scale,/def set_editor_text\(name,value\):/);
+ assert.match(scale,/ATLAS07_EDITOR_FIELD_SCROLL_PASS/);
+ assert.match(scale,/mouse\.scroll\(coords=\(x,y\),wheel_dist=-2\)/);
+ assert.match(scale,/set_editor_text\("Плановая длительность, дней","2"\)/);
+ assert.match(scale,/set_editor_text\("Плановая длительность, дней","0"\)/);
+ assert.match(scale,/set_editor_text\("Срок работы","11\/10\/2026"\)/);
+ assert.match(unlink,/v\.editor_field\("Связь с источником",types=\("ComboBox",\)\)/);
+ assert.match(search,/v\.editor_field\("Найти существующую работу",types=\("Edit",\)\)/);
+ assert.match(search,/v\.editor_field\("Существующая работа",types=\("ComboBox",\)\)/);
+});
