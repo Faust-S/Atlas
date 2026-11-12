@@ -1349,8 +1349,6 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      </details>
     </nav>
     {tab==="overview"&&<>
-     {(project.items.length>0||project.stages.length>0||project.type==="engineering"||
-       project.sources.some((source:any)=>source.kind==="github"))&&
      <ProjectOrganizationGuide snapshot={data} projectId={project.id}
       restoreSearch={mapSearchReturn}
       onEdit={openEditor}
@@ -1365,7 +1363,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       onOpenGraph={openWorkGraph}
       onOpenProject={id=>selectProject(id)}
       onAddRelation={()=>openEditor("portfolio-link")}
-      busy={busy}/>}
+      busy={busy}/>
      <div className="metric-grid"><Metric value={project.targets?.length||0} label="Ожидаемых результатов"/><Metric value={impact?.attention??0} label="Требуют внимания"/>
       <Metric value={project.items.length} label="Работ"/><Metric value={projected?.deadlineSlipDays??"?"} label="Дней риска срока"/></div>
      {nextStep&&<section className="surface atlas-next-step" aria-label="Следующий шаг проекта">

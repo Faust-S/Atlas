@@ -47,7 +47,7 @@ export function ProjectOrganizationGuide({snapshot,projectId,restoreSearch,onEdi
    <p>{hasSources?
     "Здесь показаны найденные каталоги и связи, которые уже записаны в плане.":
     "Здесь показаны ваши работы, этапы и записанные зависимости."}</p>
-  </div>{!recordedSources&&project?.type==="engineering"&&<button type="button"
+  </div>{!recordedSources&&<button type="button"
    className="action-button" onClick={onOpenSources}>Подключить источник</button>}</div>
   {!hasSources&&recordedSources>0&&<p className="minor">
    Структура подключённых источников пока не показана. Работы и этапы остаются доступными.

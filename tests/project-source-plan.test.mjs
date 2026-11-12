@@ -904,3 +904,16 @@ test('overview provides direct dated-overrun navigation through the existing wor
  assert.match(css,/\.atlas-project-organization h2 \.atlas-overdue-work-link/);
  assert.doesNotMatch(action,/commitWithReadback|nativeInvoke|mutate\(|localStorage|fetch\(/);
 });
+
+test("Atlas 0.7 offers optional source connection in every new project without introducing records",()=>{
+ const ui=read("../desktop/src/main.tsx");
+ const guide=read("../desktop/src/ProjectOrganizationGuide.tsx");
+ const section=ui.slice(ui.indexOf('{tab==="overview"&&<>'),ui.indexOf('<div className="metric-grid">',ui.indexOf('{tab==="overview"&&<>')));
+ assert.match(section,/<ProjectOrganizationGuide snapshot=\{data\}/);
+ assert.doesNotMatch(section,/project\.type==="engineering"\|\|/);
+ assert.match(guide,/!recordedSources&&<button type="button"/);
+ assert.match(guide,/onClick=\{onOpenSources\}>Подключить источник/);
+ assert.doesNotMatch(guide,/!recordedSources&&project\?\.type==="engineering"/);
+ assert.match(guide,/!showMap&&<p className="minor">Добавьте этап или работу/);
+ assert.doesNotMatch(section,/mutate\(|commitWithReadback\(|nativeInvoke\(/);
+});

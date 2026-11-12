@@ -639,3 +639,14 @@ test("Atlas 0.7 development inherits the qualified original Setup Core route",()
  assert.match(setup,/IWXA-Atlas-0\.7\.0-dev\.1-Setup\.exe/);
  assert.match(workflow,/gh release create v0\.6\.0/);
 });
+
+test("Installed Atlas 0.7 reaches source view from a nonengineering project without writing",()=>{
+ const driver=read("../desktop/tests/installed-atlas06-universal.py");
+ const guide=read("../desktop/src/ProjectOrganizationGuide.tsx");
+ assert.match(driver,/ATLAS07_UNIVERSAL_SOURCE_ENTRY_PASS/);
+ assert.match(driver,/connect=v\.find_control\("Подключить источник",types=\{"Button"\},scroll=False\)/);
+ assert.match(driver,/Source-free project does not expose a reachable source connector/);
+ assert.match(driver,/Opening source connection for an ordinary project changed native Store/);
+ assert.match(driver,/d\.wait_text\("Источники проекта",25\)/);
+ assert.match(guide,/!recordedSources&&<button type="button"/);
+});

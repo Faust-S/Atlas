@@ -100,6 +100,21 @@ def qualify():
     v.capture("universal-project-1024")
     print("ATLAS06_UNIVERSAL_NO_GITHUB_MAP_PASS",flush=True)
 
+    # In 0.7, a project without software sources can still reach the
+    # existing source screen directly from its overview. Viewing the
+    # connection route cannot create or save an unrequested source.
+    connect=v.find_control("Подключить источник",types={"Button"},scroll=False)
+    assert v.rectangle_in_workspace(connect.rectangle(),win32gui.GetWindowRect(d.handle)),(
+        "Source-free project does not expose a reachable source connector")
+    v.capture("universal-connect-source-entry")
+    connect.click_input()
+    d.wait_text("Источники проекта",25)
+    assert d.head()==saved and d.saved_project(saved)==expected,(
+        "Opening source connection for an ordinary project changed native Store")
+    v.find_control("Обзор",types={"Button"}).click_input()
+    d.wait_text("Схема проекта: работы и этапы",25)
+    print("ATLAS07_UNIVERSAL_SOURCE_ENTRY_PASS",flush=True)
+
     # Search also works in an ordinary project with no GitHub source.
     v.find_control("Найти",types={"Button"},scroll=False).click_input()
     d.set_text("Найти работу или этап","Подвести итоги")
