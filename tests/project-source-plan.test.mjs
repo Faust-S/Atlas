@@ -671,7 +671,7 @@ test("Empty plans hide unavailable controls, while existing stage plans can crea
  assert.match(connect,/projectFolderDisplayOrder\(structure\?\.folders\)/);
  assert.match(connect,/displayedFolders\.slice\(0,16\)/);
  assert.match(guide,/onCreateWork=\{\(\)=>onEdit\("item"\)\}/);
- assert.match(map,/\{\(projection\.workTotal>0\|\|projection\.stageTotal>0\)&&<div className="atlas-source-plan-find">/);
+ assert.match(map,/\{\(projection\.workTotal>0\|\|projection\.stageTotal>0\|\|projection\.sourceCount>0\)&&<div className="atlas-source-plan-find">/);
  assert.match(map,/\{projection\.workTotal>0&&<button[^>]*\s+onClick=\{onOpenTimeline\}>План-график<\/button>\}/);
  assert.match(map,/\{projection\.workTotal>0&&<button[^>]*\s+onClick=\{\(\)=>onOpenGraph\(\)\}>Зависимости работ<\/button>\}/);
  assert.match(map,/projection\.workTotal===0&&projection\.sources\.length===0&&<button/);
