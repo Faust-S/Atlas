@@ -7,15 +7,17 @@ const installed=read("../desktop/tests/installed-atlas06-connect.py");
 const ui=read("../desktop/src/ProjectConnect.tsx");
 const desktop=read("../desktop/src/main.tsx");
 const style=read("../desktop/src/style.css");
-test("Atlas 0.6 installed Windows gate uses original pinned Setup Core and the dev build",()=>{
+test("Atlas 0.6 installed Windows gate uses the pinned original Setup Core",()=>{
  assert.match(workflow,/work\/2026-11-10-atlas-0-6/);
  assert.match(workflow,/npm run desktop:build -- --no-bundle/);
  assert.match(workflow,/Checkout original pinned IWXA Setup Core/);
  assert.match(workflow,/ref: 0ef7544e2a6fd5fab5994f7f25abbb960063908c/);
  assert.match(workflow,/desktop\/installer\/build-setup-core\.ps1 -InstallForQualification/);
  assert.match(workflow,/installed-atlas06-connect\.py/);
- assert.match(workflow,/IWXA-Atlas-0\.6\.0-dev\.1-Setup\.exe/);
- assert.doesNotMatch(workflow,/gh release create v0\.6\.0/);
+ assert.match(workflow,/IWXA-Atlas-0\.6\.0-Setup\.exe/);
+ assert.match(workflow,/github\.ref_name == 'release\/0\.6'/);
+ assert.match(workflow,/gh release create v0\.6\.0/);
+ assert.match(workflow,/ATLAS06_RELEASE_CHECKSUM_MISMATCH/);
 });
 test("Native GUI test requires a read-only public discovery and explicit native Save",()=>{
  assert.match(installed,/click_button\("Подключить проект"\)/);
@@ -594,4 +596,23 @@ test('Installed Atlas opens overdue work from project overview without scrolling
  assert.match(driver,/Overview overdue-work navigation changed the native Store/);
  assert.match(ui,/overdueWorkCount=\{overdueWorkFinishes\.size\} onOpenOverdueWorks=\{showOverdueWorks\}/);
  assert.match(guide,/onClick=\{onOpenOverdueWorks\}>Позже срока: \{overdueWorkCount\}/);
+});
+
+test("Stable Atlas 0.6 release requires installed GUI before publishing",()=>{
+ const product=JSON.parse(read("../desktop/installer/atlas.json"));
+ const tauri=JSON.parse(read("../desktop/src-tauri/tauri.conf.json"));
+ const manifest=JSON.parse(read("../desktop/package.json"));
+ const lock=JSON.parse(read("../desktop/package-lock.json"));
+ assert.equal(product.version,"0.6.0");
+ assert.equal(tauri.version,"0.6.0");
+ assert.equal(manifest.version,"0.6.0");
+ assert.equal(lock.version,"0.6.0");
+ assert.equal(lock.packages[""].version,"0.6.0");
+ assert.match(workflow,/release\/0\.6/);
+ assert.match(workflow,/Require successful live GitHub first-use on Atlas 0\.6/);
+ assert.match(workflow,/Qualify large Atlas 0\.6 map in installed Windows GUI/);
+ assert.match(workflow,/Qualify ordinary project without GitHub on installed Atlas 0\.6/);
+ assert.match(workflow,/Publish accepted Atlas 0\.6\.0 stable release/);
+ assert.match(workflow,/gh release create v0\.6\.0/);
+ assert.match(workflow,/ATLAS06_STABLE_RELEASE_PUBLISHED/);
 });
