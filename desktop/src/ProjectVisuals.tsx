@@ -321,7 +321,7 @@ export function ProjectSourcePlanMap({projection,project,restoreSearch,onOpenWor
     "Каталог, работа и этап показаны рядом, если связь уже есть в плане.":
     "Работы, этапы и зависимости показаны по сохранённому плану."}</p></div>
    <div className="button-row">
-    {(projection.workTotal>0||projection.stageTotal>0)&&<div className="atlas-source-plan-find">
+    {(projection.workTotal>0||projection.stageTotal>0||projection.sourceCount>0)&&<div className="atlas-source-plan-find">
      <button type="button" ref={triggerRef} className="action-button"
       aria-expanded={searchOpen} onClick={()=>setSearchOpen(open=>!open)}>Найти</button>
      {searchOpen&&<div className="atlas-source-plan-find-panel" role="search"

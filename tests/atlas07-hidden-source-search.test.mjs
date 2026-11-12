@@ -92,6 +92,7 @@ test("Folder results in a new project create the first work rather than offering
  assert.match(spec.title,/Работа по каталогу/);
  const ui=readFileSync(new URL("../desktop/src/ProjectVisuals.tsx",import.meta.url),"utf8");
  assert.match(ui,/project\?\.items\?\.length>0\?/);
+ assert.match(ui,/projection\.workTotal>0\|\|projection\.stageTotal>0\|\|projection\.sourceCount>0/);
  assert.match(ui,/Создать работу по найденному каталогу/);
  assert.match(ui,/onSuggestFolder\(folder\.sourceId,folder\.commitSha,folder\.folder\)/);
 });
