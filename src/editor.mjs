@@ -25,6 +25,38 @@ const workOptions=[option("todo","Запланирована"),option("in_progre
 const changeOptions=[option("proposed","Предложено"),option("approved","Утверждено"),option("in_progress","В работе"),option("implemented","Реализовано (заявлено)"),option("deferred","Отложено"),option("rejected","Отклонено")];
 const targetOptions=p=>(p.targets||[]).map(t=>option(t.id,t.title));
 const workItems=p=>p.items.map(t=>option(t.id,t.title));
+// Search across all works, including those outside the bounded diagram.
+// Stage and ordinal distinguish identical work titles without exposing IDs.
+const linkedWorkOptions=p=>{
+ const stages=new Map(p.stages.map(stage=>[stage.id,stage.name]));
+ const labels=p.items.map(work=>work.title+" · "+
+  (stages.get(work.stageId)||"Без этапа"));
+ const repeated=new Map();
+ for(const label of labels)repeated.set(label,(repeated.get(label)||0)+1);
+ return [option("","Выберите работу"),...p.items.map((work,i)=>
+  option(work.id,labels[i]+(repeated.get(labels[i])>1?" · №"+(i+1):"")))];
+};
+const normalizedWorkText=value=>String(value??"").normalize("NFKC")
+ .toLocaleLowerCase("ru-RU").replace(/ё/g,"е").replace(/\s+/g," ").trim();
+// Only a bounded subset is rendered in the GUI; a previously selected work
+// stays present even when the user changes their search text.
+export function filterWorkPickerOptions(options,query,selectedId="",limit=12){
+ if(!Array.isArray(options)||!Number.isInteger(limit)||limit<1||limit>40)
+  throw Error("Некорректный поиск работ");
+ const tokens=normalizedWorkText(query).split(" ").filter(Boolean);
+ const ranked=options.filter(row=>row.value!=="").map((row,index)=>{
+  const label=normalizedWorkText(row.label);
+  return {row,index,label,rank:!tokens.length?2:
+   label===tokens.join(" ")?0:label.startsWith(tokens[0])?1:2};
+ }).filter(row=>tokens.every(token=>row.label.includes(token)));
+ ranked.sort((a,b)=>a.rank-b.rank||a.index-b.index);
+ const visible=ranked.slice(0,limit).map(entry=>entry.row);
+ const selected=selectedId?options.find(row=>row.value===selectedId):null;
+ if(selected&&!visible.some(row=>row.value===selectedId))visible.push(selected);
+ const blank=options.find(row=>row.value==="")||option("","Выберите работу");
+ return {options:[blank,...visible],total:ranked.length,
+  shown:Math.min(limit,ranked.length),hidden:Math.max(0,ranked.length-limit)};
+}
 const stageOptions=p=>[option("","Без этапа"),...p.stages.map(t=>option(t.id,t.name))];
 const optionalTargets=p=>[option("","Весь проект"),...targetOptions(p)];
 const sourceOptions=p=>{
@@ -181,8 +213,8 @@ export function editorSpec(project,action,snapshot=null){
    hint:"Каталог найден в "+folder.repository+" на выбранной редакции исходников. "+
     "Выберите существующую работу и подтвердите связь. Прежняя привязка будет заменена. "+
     "Изменение останется в черновике до сохранения.",
-   fields:[choice("workId","Существующая работа",[
-    option("","Выберите работу"),...workItems(project)],"")]};
+   fields:[{...choice("workId","Существующая работа",linkedWorkOptions(project),""),
+    searchable:true}]};
  }
  if(action==="item"||action.startsWith("item-target:")||action.startsWith("folder-work:")){
   const targetId=action.startsWith("item-target:")?action.slice("item-target:".length):"";

@@ -3,7 +3,7 @@ import {invoke as nativeInvoke,isTauri} from "@tauri-apps/api/core";
 import {getCurrentWindow} from "@tauri-apps/api/window";
 import {empty,deserialize,serialize,editItem,removeStage,removeItem,disconnect,removeProject as dropProject} from "../../src/core.mjs";
 import {removePortfolioLink} from "../../src/portfolio.mjs";
-import {editorSpec,applyEditor,editorSelectionFields,PROJECT_TYPE_LABELS} from "../../src/editor.mjs";
+import {editorSpec,applyEditor,editorSelectionFields,filterWorkPickerOptions,PROJECT_TYPE_LABELS} from "../../src/editor.mjs";
 import {compareProject,decideChange} from "../../src/trace.mjs";
 import {projectImpact,projectNextStep} from "../../src/impact.mjs";
 import {buildPortfolioCommand,filterPortfolioCommand} from "../../src/portfolio-command.mjs";
@@ -133,8 +133,15 @@ function EditorPanel({editor,onSubmit,onCancel,onDirtyChange,busy}:{
  onCancel:()=>void;onDirtyChange:(changed:boolean)=>void;busy:boolean
 }){
  const [fields,setFields]=useState<Record<string,string>>({});
+ const [workQuery,setWorkQuery]=useState("");
+ const searchableField=editor.spec.fields.find((f:any)=>f.searchable);
+ const workResults=useMemo(()=>searchableField?
+  filterWorkPickerOptions(searchableField.options||[],workQuery,
+   fields[searchableField.name]??""):null,
+  [searchableField,workQuery,fields]);
  useEffect(()=>{
   setFields(Object.fromEntries(editor.spec.fields.map(f=>[f.name,String(f.value??"")])));
+  setWorkQuery("");
   onDirtyChange(false);
  },[editor.action,editor.spec]);
  const updateFields=(next:Record<string,string>)=>{
@@ -151,7 +158,28 @@ function EditorPanel({editor,onSubmit,onCancel,onDirtyChange,busy}:{
     event.currentTarget.requestSubmit();
    }
   }}>
-   {editor.spec.fields.map((f,index)=><label className="field" key={f.name}>{f.label}
+   {editor.spec.fields.map((f,index)=>f.searchable?
+    <div className="field atlas-work-picker" role="group" aria-label={f.label} key={f.name}>
+     <label htmlFor="atlas-work-picker-query">Найти работу по названию</label>
+     <input id="atlas-work-picker-query" type="search"
+      aria-label="Найти существующую работу" placeholder="Название или этап"
+      autoFocus={index===0} value={workQuery}
+      onChange={event=>setWorkQuery(event.target.value)}/>
+     <label htmlFor="atlas-work-picker-select">{f.label}</label>
+     <select id="atlas-work-picker-select" name={f.name} aria-label={f.label}
+      required={f.required!==false} value={fields[f.name]??""}
+      onChange={event=>updateFields(editorSelectionFields(editor.spec,fields,f.name,event.target.value))}>
+      {(workResults?.options||[]).map(o=><option key={o.value} value={o.value}>{o.label}</option>)}
+     </select>
+     <small className="atlas-work-picker-status" role="status">
+      {workQuery.trim()?
+       (workResults?.total?("Найдено: "+workResults.total+
+        ". Показано: "+workResults.shown+"."):"Совпадений нет. Уточните название."):
+       ("Показаны первые "+(workResults?.shown||0)+" из "+(workResults?.total||0)+" работ.")}
+      {(workResults?.hidden||0)>0?" Уточните поиск для выбора остальных.":""}
+     </small>
+    </div>:
+    <label className="field" key={f.name}>{f.label}
     {f.type==="select"?
       <select name={f.name} aria-label={f.label} autoFocus={index===0} required={f.required!==false}
        value={fields[f.name]??""}

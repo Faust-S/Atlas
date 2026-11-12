@@ -682,3 +682,15 @@ test("Atlas 0.7 installed work editor can unlink a catalog without rewriting oth
  assert.match(editor,/choice\("sourceLink","Связь с источником"/);
  assert.match(core,/delete item\.sourcePath;delete item\.sourceRevision/);
 });
+
+
+test("Installed Atlas 0.7 searches the full work set and binds a distant work in real GUI",()=>{
+ const driver=read("../desktop/tests/installed-atlas07-search-work.py");
+ assert.match(workflow,/Search and link a distant work in installed Atlas 0\.7/);
+ assert.match(workflow,/installed-atlas07-search-work\.py/);
+ assert.match(workflow,/ATLAS07_INSTALLED_WORK_SEARCH_FAILED/);
+ assert.match(driver,/ATLAS07_INSTALLED_SEARCHED_WORK_LINK_PASS/);
+ assert.match(driver,/keyboard\.send_keys\("5 \/ 1080",with_spaces=True\)/);
+ assert.match(driver,/d\.wait_text\("Найдено: 1",20\)/);
+ assert.match(driver,/assert d\.saved_project\(after\)==updated/);
+});
