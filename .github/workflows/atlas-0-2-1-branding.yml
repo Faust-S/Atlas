@@ -299,12 +299,12 @@ jobs:
         shell: pwsh
         timeout-minutes: 7
         run: ./desktop/tests/installed-center-e2e.ps1
-      # Offline Windows scenarios remain executable after a public API quota error.
-      # The first-use gate stays unaccepted and fails this job at the end.
+      # Run offline Windows scenarios even when first-use UI or GitHub API fails.
+      # The dedicated first-use gate still fails the job after collecting evidence.
       - name: Require successful live GitHub first-use on Atlas 0.6
         if: github.ref_name == 'work/2026-11-10-atlas-0-6' && steps.atlas06_github_first_use.outcome == 'failure'
         shell: pwsh
-        run: throw 'ATLAS06_GITHUB_FIRST_USE_NOT_ACCEPTED - inspect live API failure'
+        run: throw 'ATLAS06_GITHUB_FIRST_USE_NOT_ACCEPTED - inspect preceding installed UI and GitHub API logs'
       - name: Retain installed GUI screenshot evidence on success or failure
         if: always()
         uses: actions/upload-artifact@v4

@@ -442,7 +442,7 @@ def verify_organization_work(previous,original_project):
     assert head()==current,"Viewing source plan map changed native storage"
     click_scrolled_button("План-график",main=True)
     window_title_contains("Atlas — График",35)
-    wait_text("План-график CPM",35)
+    wait_text("График работ",35)
     assert head()==current,"Opening existing Gantt changed native storage"
     screenshot("source-plan-to-gantt")
     print("ATLAS06_SOURCE_PLAN_MAP_TO_GANTT_PASS",flush=True)

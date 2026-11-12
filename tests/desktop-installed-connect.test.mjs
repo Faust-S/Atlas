@@ -556,3 +556,14 @@ test("Installed Windows witnesses a newly missed and then resolved deadline with
  assert.match(plan,/deadlineResolvedTotal/);
  assert.match(ui,/Нарушений срока устранено:/);
 });
+
+test("Installed first-use Gantt navigation tracks the actual user-facing chart heading",()=>{
+ const chart=read("../desktop/src/ProjectVisuals.tsx");
+ const expected=chart.match(/<h2>(График работ)<\/h2>/);
+ assert.ok(expected,"Expected user-facing graph heading missing");
+ assert.ok(installed.includes('wait_text("'+expected[1]+'",35)'),
+  "Installed first-use test expects an outdated graph heading");
+ assert.doesNotMatch(installed,/wait_text\("План-график CPM"/);
+ assert.match(workflow,/ATLAS06_GITHUB_FIRST_USE_NOT_ACCEPTED - inspect preceding installed UI and GitHub API logs/);
+ assert.match(workflow,/steps\.atlas06_github_first_use\.outcome == 'failure'/);
+});
