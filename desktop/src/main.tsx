@@ -23,7 +23,7 @@ import {githubPortfolioCatalog,createProjectFromGitHubCatalog,githubPortfolioOve
 import {ProjectGantt,ProjectDependencyDiagram,PortfolioNetworkMap} from "./ProjectVisuals";
 import {ProjectConnect} from "./ProjectConnect";
 import {ProjectOrganizationGuide} from "./ProjectOrganizationGuide";
-import {projectSourcePlanWorkContext} from "../../src/project-organization.mjs";
+import {projectSourcePlanWorkContext,projectWorkTableSearch} from "../../src/project-organization.mjs";
 import {repoName} from "../../src/github-public.mjs";
 import {applyPublicProjectPreview} from "../../src/project-onboarding.mjs";
 import {prepareImportedSnapshot} from "./import-snapshot.mjs";
@@ -430,13 +430,11 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   [data,search,portfolioStatus]);
  const filteredWork=useMemo(()=>{
   if(!project)return [];
-  const query=workQuery.trim().toLocaleLowerCase("ru-RU");
-  const matching=project.items.filter((item:any)=>
+  const textMatches=projectWorkTableSearch(project,workQuery);
+  const matching=textMatches.filter((item:any)=>
    (workFilter==="all"||item.state===workFilter)&&
    (workTargetFilter==="all"||(item.targetIds||[]).includes(workTargetFilter))&&
-   (workDeadlineFilter==="all"||overdueWorkFinishes.has(item.id))&&
-   (!query||item.title.toLocaleLowerCase("ru-RU").includes(query)||
-    String(item.assignee||"").toLocaleLowerCase("ru-RU").includes(query)));
+   (workDeadlineFilter==="all"||overdueWorkFinishes.has(item.id)));
   return sortWorkRows(filterWorkRowsByDependencies(
     filterWorkRowsByObservation(matching,findingsByWork,workObservationFilter),workLinks,workDependencyFilter),workSort);
  },[project,workFilter,workQuery,workSort,workTargetFilter,workObservationFilter,workDependencyFilter,workDeadlineFilter,overdueWorkFinishes,workLinks,findingsByWork]);
@@ -1706,7 +1704,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       <option value="no_pending">Нет незавершённых</option>
      </select></label>
       <label>Найти работу <input type="search" value={workQuery} aria-label="Найти работу"
-       placeholder="Название или ответственный" onChange={e=>{setWorkQuery(e.target.value);setWorkLimit(200)}}/></label>
+       placeholder="Название, этап, каталог или ответственный" onChange={e=>{setWorkQuery(e.target.value);setWorkLimit(200)}}/></label>
       <label>Сортировка <select aria-label="Сортировка работ" value={workSort} onChange={e=>{setWorkSort(e.target.value);setWorkLimit(200)}}>
        <option value="title">По названию</option><option value="dueDate">По сроку</option>
        <option value="priority">По приоритету</option><option value="estimateDays">По длительности</option>

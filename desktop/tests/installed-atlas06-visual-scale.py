@@ -155,6 +155,29 @@ def open_file_menu():
     capture("file-menu-missing")
     raise AssertionError("Installed file-menu summary not accessible")
 
+def open_archive_for_import():
+    # An empty portfolio already has a first-start "Open .iwxa" button.
+    # Opening the file menu as well produces two equally named UIA buttons.
+    # Prefer the visible first-start route; existing portfolios use the menu.
+    if saved_head_or_none() is None:
+        bounds=win32gui.GetWindowRect(d.handle)
+        matches=[item for item in d.window().descendants(control_type="Button")
+                 if item.window_text()=="Открыть архив .iwxa" and
+                 item.is_visible() and item.is_enabled()]
+        physical=[item for item in matches if
+                  item.rectangle().left>=bounds[0]+230 and
+                  item.rectangle().right<=bounds[2]-8 and
+                  item.rectangle().top>=bounds[1]+105 and
+                  item.rectangle().bottom<=bounds[3]-38]
+        if len(physical)==1:
+            d.activate()
+            physical[0].click_input()
+            print("ATLAS07_FIRST_START_IWXA_IMPORT_ENTRY_PASS",flush=True)
+            return
+    open_file_menu()
+    d.click_button("Открыть архив .iwxa")
+
+
 def choose_archive():
     assert ARCHIVE.is_file() and ARCHIVE.suffix.lower()==".iwxa"
     end=time.monotonic()+35
@@ -231,8 +254,7 @@ def qualify_visual():
     assert before is None or len(before["projects"])==1, ("Expected an empty profile or one preceding project")
     d.launch()
     d.wait_text("Портфель проектов",45)
-    open_file_menu()
-    d.click_button("Открыть архив .iwxa")
+    open_archive_for_import()
     choose_archive()
     d.wait_text("Заменить портфель в черновике",45)
     assert saved_head_or_none()==before,"Opening IWXA preview modified native data"

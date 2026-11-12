@@ -727,3 +727,24 @@ test("Installed Atlas 0.7 finds a catalog omitted from the compact project diagr
  assert.match(driver,/work\["sourceId"\]="visual-source-0"/);
  assert.match(visual,/onLinkExistingWork\(folder\.sourceId,folder\.commitSha,folder\.folder\)/);
 });
+
+
+test("Native large-project import works from either an existing portfolio or the first-start screen",()=>{
+ const driver=read("../desktop/tests/installed-atlas06-visual-scale.py");
+ const ui=read("../desktop/src/main.tsx");
+ assert.match(driver,/def open_archive_for_import\(\):/);
+ assert.match(driver,/saved_head_or_none\(\) is None/);
+ assert.match(driver,/ATLAS07_FIRST_START_IWXA_IMPORT_ENTRY_PASS/);
+ assert.match(driver,/open_archive_for_import\(\)\n    choose_archive\(\)/);
+ assert.match(driver,/open_file_menu\(\)\n    d\.click_button\("Открыть архив \.iwxa"\)/);
+ assert.match(ui,/Открыть архив \.iwxa/);
+});
+test("Native Atlas 0.7 searches works in a 1212-work project by stage and source folder",()=>{
+ const driver=read("../desktop/tests/installed-atlas07-work-table-search.py");
+ assert.match(workflow,/Find distant works by stage and folder in installed Atlas 0\.7/);
+ assert.match(workflow,/installed-atlas07-work-table-search\.py/);
+ assert.match(driver,/d\.set_text\("Найти работу","Этап работ 48"\)/);
+ assert.match(driver,/d\.set_text\("Найти работу","project-5 directory-23"\)/);
+ assert.match(driver,/ATLAS07_INSTALLED_WORK_TABLE_CONTEXT_SEARCH_PASS/);
+ assert.match(driver,/assert d\.saved_project\(before\)==expected/);
+});

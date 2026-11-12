@@ -283,6 +283,23 @@ export function projectSourceFolderSearch(project,query,{limit=8}={}){
  return {matches,total:candidates.length,hidden:candidates.length-matches.length,
   incompleteSources};
 }
+// Read-only work-table search across saved names, assignments and source links.
+// A stage or folder can contain hundreds of works; search must not depend
+// on the limited diagram or infer new links from directory names.
+export function projectWorkTableSearch(project,query){
+ if(!project||!Array.isArray(project.items)||!Array.isArray(project.stages)||
+    !Array.isArray(project.sources))throw Error("Проект не найден");
+ const tokens=searchLabel(query).split(" ").filter(Boolean);
+ if(!tokens.length)return project.items;
+ const stages=new Map(project.stages.map(stage=>[stage.id,stage.name]));
+ const sources=new Map(project.sources.map(source=>[source.id,source.locator]));
+ return project.items.filter(work=>{
+  const searchable=searchLabel([work.title,work.assignee||"",
+   stages.get(work.stageId)||"",work.sourcePath||"",
+   sources.get(work.sourceId)||""].join(" "));
+  return tokens.every(token=>searchable.includes(token));
+ });
+}
 export function projectSourcePlanSearch(project,query,{limit=8,priorityWorkId=""}={}){
  if(!project||!Array.isArray(project.items)||!Array.isArray(project.stages))
   throw Error("Проект не найден");
