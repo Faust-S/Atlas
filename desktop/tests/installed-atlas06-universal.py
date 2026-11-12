@@ -183,8 +183,12 @@ def qualify():
 
     # The same work must be reachable from the board without a source.
     # Only actual Windows-visible controls are clicked.
+    # The board button lives inside the opened <details> menu. Scrolling
+    # between expanding that menu and pressing its item can dismiss it in
+    # WebView2. Check physical reachability without another scroll event.
     v.find_control("Другие разделы").click_input()
-    v.find_control("Доска",types={"Button"}).click_input()
+    v.capture("universal-board-menu-open")
+    v.find_control("Доска",types={"Button"},scroll=False).click_input()
     # WebView2 UIA may expose JSX text fragments separately even when the
     # complete sentence is clearly visible in the installed Windows window.
     d.wait_text("Не отмечены выполненными:",25)

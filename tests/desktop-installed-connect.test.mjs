@@ -253,7 +253,8 @@ test("Installed ordinary project opens board card dependencies and restores its 
  const driver=read("../desktop/tests/installed-atlas06-universal.py");
  const main=read("../desktop/src/main.tsx");
  assert.match(driver,/v\.find_control\("Другие разделы"\)\.click_input\(\)/);
- assert.match(driver,/v\.find_control\("Доска",types=\{"Button"\}\)\.click_input\(\)/);
+ assert.match(driver,/v\.find_control\("Доска",types=\{"Button"\},scroll=False\)\.click_input\(\)/);
+ assert.match(driver,/v\.capture\("universal-board-menu-open"\)/);
  assert.match(driver,/board_work=v\.find_control\("Связи работы Открыть площадку",types=\{"Button"\}\)/);
  assert.match(driver,/board_back=v\.find_control\("К работе на доске",types=\{"Button"\},scroll=False\)/);
  assert.match(driver,/The selected board card was not restored in the Windows viewport/);
