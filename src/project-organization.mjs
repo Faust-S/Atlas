@@ -289,15 +289,21 @@ export function projectSourceFolderSearch(project,query,{limit=8}={}){
 export function projectWorkTableSearch(project,query){
  if(!project||!Array.isArray(project.items)||!Array.isArray(project.stages)||
     !Array.isArray(project.sources))throw Error("Проект не найден");
- const tokens=searchLabel(query).split(" ").filter(Boolean);
- if(!tokens.length)return project.items;
+ const needle=searchLabel(query);
+ if(!needle)return project.items;
+ const tokens=needle.split(" ").filter(Boolean);
  const stages=new Map(project.stages.map(stage=>[stage.id,stage.name]));
  const sources=new Map(project.sources.map(source=>[source.id,source.locator]));
  return project.items.filter(work=>{
-  const searchable=searchLabel([work.title,work.assignee||"",
-   stages.get(work.stageId)||"",work.sourcePath||"",
-   sources.get(work.sourceId)||""].join(" "));
-  return tokens.every(token=>searchable.includes(token));
+  const repository=sources.get(work.sourceId)||"";
+  const folder=work.sourcePath||"";
+  const fields=[work.title,work.assignee||"",stages.get(work.stageId)||"",
+   folder,repository].map(searchLabel);
+  if(fields.some(value=>value.includes(needle)))return true;
+  // A user can type "project-5 directory-23", but words from a work
+  // title must never accidentally complete an unrelated stage name.
+  const sourceContext=searchLabel(repository+" "+folder);
+  return tokens.length>1&&tokens.every(token=>sourceContext.includes(token));
  });
 }
 export function projectSourcePlanSearch(project,query,{limit=8,priorityWorkId=""}={}){
