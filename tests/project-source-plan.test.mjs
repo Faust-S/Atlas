@@ -813,7 +813,7 @@ test("Affected work deadlines are visible only when the calculated finish can be
  const source=read("../src/planning.mjs"),ui=read("../desktop/src/main.tsx");
  const css=read("../desktop/src/style.css");
  assert.match(source,/dueDate:item\.dueDate\?\?null/);
- assert.match(source,/row\.dueDate&&row\.finishDate&&row\.finishDate>row\.dueDate/);
+ assert.match(source,/const missedDeadline=Boolean\(dueDate&&row\.finishDate&&row\.finishDate>dueDate\)/);
  assert.match(source,/deadlineMissedTotal/);
  assert.match(ui,/recentScheduleEffect\.deadlineMissedTotal>0/);
  assert.match(ui,/Расчётный финиш позже контрольного срока\. Затронуто работ:/);
