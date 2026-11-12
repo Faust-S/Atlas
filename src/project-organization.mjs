@@ -246,8 +246,10 @@ const searchLabel=value=>String(value??"").normalize("NFKC")
  .toLocaleLowerCase("ru-RU").replace(/ё/g,"е").replace(/\s+/g," ").trim();
 
 // Find currently observed GitHub directories across *all* connected sources,
-// including those omitted from the bounded diagram. An old, unavailable, or
-// partially identified source never offers a writable binding from search.
+// including those omitted from the bounded diagram. A partial observation
+// still proves its explicitly listed folders at the verified revision,
+// but absence from that list cannot prove a directory does not exist.
+// Stale or unavailable observations never offer writable links.
 export function projectSourceFolderSearch(project,query,{limit=8}={}){
  if(!project||!Array.isArray(project.sources))
   throw Error("Проект не найден");
@@ -256,13 +258,17 @@ export function projectSourceFolderSearch(project,query,{limit=8}={}){
  const tokens=searchLabel(query).split(" ").filter(Boolean);
  if(!tokens.length)return {matches:[],total:0,hidden:0};
  const candidates=[];
- let order=0;
+ let order=0,incompleteSources=0;
  for(const source of project.sources){
   const repository=entryRepo(source);
   if(!repository||treeStatus(source)!=="current"||
      !Array.isArray(source.summary?.structure?.folders))continue;
-  const commitSha=source.summary.structure.commitSha;
-  for(const folder of source.summary.structure.folders){
+  const structure=source.summary.structure;
+  const commitSha=structure.commitSha;
+  if(structure.truncated||structure.limited||
+     (Number.isInteger(structure.totalFolders)&&
+      structure.totalFolders>structure.folders.length))incompleteSources++;
+  for(const folder of structure.folders){
    if(!rootName(folder))continue;
    const label=searchLabel(repository+" / "+folder);
    if(!tokens.every(token=>label.includes(token)))continue;
@@ -274,7 +280,8 @@ export function projectSourceFolderSearch(project,query,{limit=8}={}){
  }
  candidates.sort((a,b)=>a.rank-b.rank||a.order-b.order);
  const matches=candidates.slice(0,limit).map(({rank,order,...item})=>item);
- return {matches,total:candidates.length,hidden:candidates.length-matches.length};
+ return {matches,total:candidates.length,hidden:candidates.length-matches.length,
+  incompleteSources};
 }
 export function projectSourcePlanSearch(project,query,{limit=8,priorityWorkId=""}={}){
  if(!project||!Array.isArray(project.items)||!Array.isArray(project.stages))

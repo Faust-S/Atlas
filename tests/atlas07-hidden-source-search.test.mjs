@@ -96,3 +96,28 @@ test("Folder results in a new project create the first work rather than offering
  assert.match(ui,/Создать работу по найденному каталогу/);
  assert.match(ui,/onSuggestFolder\(folder\.sourceId,folder\.commitSha,folder\.folder\)/);
 });
+
+
+test("Partial catalog observations stay useful without claiming that unseen folders do not exist",()=>{
+ const {state,projectId}=fixture();
+ for(const mode of ["truncated","limited","totalFolders"]){
+  const copy=structuredClone(state);
+  const source=copy.projects[0].sources.find(s=>s.id==="visual-source-0");
+  if(mode==="totalFolders")
+   source.summary.structure.totalFolders=source.summary.structure.folders.length+10;
+  else source.summary.structure[mode]=true;
+  const result=projectSourceFolderSearch(copy.projects[0],"project-0 directory-01");
+  assert.equal(result.incompleteSources,1);
+  assert.equal(result.total,1);
+  assert.equal(result.matches[0].sourceId,source.id);
+  // An explicitly observed known directory at the right SHA remains linkable.
+  assert.doesNotThrow(()=>selectedSourceFolder(copy,projectId,
+   folderLinkAction(source.id,SHA,"directory-01")));
+  // Unknown directories must not appear just because observation was partial.
+  assert.equal(projectSourceFolderSearch(copy.projects[0],"project-0 absent-directory").total,0);
+ }
+ const ui=readFileSync(new URL("../desktop/src/ProjectVisuals.tsx",import.meta.url),"utf8");
+ assert.match(ui,/catalogHits\.incompleteSources/);
+ assert.match(ui,/Поиск показывает только полученные сведения/);
+ assert.match(ui,/Сверить источники/);
+});

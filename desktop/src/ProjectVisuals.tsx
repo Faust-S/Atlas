@@ -439,6 +439,12 @@ export function ProjectSourcePlanMap({projection,project,restoreSearch,onOpenWor
        </div>}
        {(found.hidden>0||catalogHits.hidden>0)&&<p className="minor">
         Показаны первые результаты. Уточните название, чтобы найти остальные.</p>}
+       {(catalogHits.incompleteSources||0)>0&&<p className="minor" role="note">
+        По {catalogHits.incompleteSources} источникам известны не все каталоги.
+        Поиск показывает только полученные сведения.
+        {" "}<button type="button" className="text-link"
+          onClick={()=>{closeSearch();onOpenSources()}}>Сверить источники</button>
+       </p>}
       </>:<p className="minor">Поиск по всем работам, этапам и актуальным каталогам проекта.</p>}
      </div>}
     </div>}
