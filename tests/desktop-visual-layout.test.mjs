@@ -202,3 +202,17 @@ test('the project plan has plain-language navigation without exposing algorithm 
  assert.doesNotMatch(home,/>CPM по календарным дням/);
  assert.match(installed,/d\.wait_text\("График работ",35\)/);
 });
+
+test('the installed project Gantt explains paused plans and portfolio shifts without algorithm jargon',()=>{
+ const chart=readFileSync(new URL('../desktop/src/ProjectVisuals.tsx',import.meta.url),'utf8');
+ const main=readFileSync(new URL('../desktop/src/main.tsx',import.meta.url),'utf8');
+ assert.match(chart,/Развёрнутый график работ/);
+ assert.match(chart,/Пока проект приостановлен или отменён/);
+ assert.match(chart,/Из-за связей с другими проектами расчётное начало сдвинулось/);
+ assert.match(chart,/Для переноса работ нужно отдельно изменить план/);
+ assert.doesNotMatch(chart,/Развёрнутый график CPM/);
+ assert.doesNotMatch(chart,/календарный план CPM/);
+ assert.doesNotMatch(chart,/исходный CPM от планового старта/);
+ assert.match(main,/Удалить связь между работами\? Atlas пересчитает график/);
+ assert.match(main,/Изменение останется в черновике до сохранения/);
+});

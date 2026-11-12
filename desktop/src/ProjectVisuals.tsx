@@ -55,7 +55,7 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
   {view.deadline&&<span className="atlas-gantt-deadline" aria-hidden="true" title={'Контрольный срок: '+view.deadline.label} style={{left:view.deadline.positionPct+'%'}}/>}
  </>;
  return <section className={'surface atlas-gantt-panel'+(expanded?' is-expanded':'')} role={expanded?'dialog':undefined}
-  aria-label={expanded?'Развёрнутый график CPM':undefined} aria-modal={expanded?'true':undefined}>
+  aria-label={expanded?'Развёрнутый график работ':undefined} aria-modal={expanded?'true':undefined}>
   <div className="section-heading"><div><h2>График работ</h2>
    <p>Даты рассчитаны по связям работ. Отметка о выполнении не означает, что результат принят.</p></div>
    <div className="button-row"><span className="status-chip">{schedule.rows.length} работ · {schedule.durationDays} дн.</span>
@@ -87,7 +87,7 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
   </div>
   {(projectStatus==='paused'||projectStatus==='cancelled')&&<p className="atlas-schedule-warning" role="status">
    {projectStatus==='cancelled'?'Проект отменён':'Проект приостановлен'}.
-   Диаграмма ниже показывает исходный календарный план CPM для анализа, а не действующую дату поставки.
+   Ниже показан первоначальный план работ. Пока проект приостановлен или отменён, эти даты нельзя считать действующими сроками выполнения.
    Возобновление или корректировка плана требует отдельного решения человека.
   </p>}
   {projectStatus!=='paused'&&projectStatus!=='cancelled'&&unavailableOrigins.length>0&&
@@ -103,7 +103,7 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
      {unavailableOrigins.length>5&&<small>И ещё {unavailableOrigins.length-5} причин в портфеле</small>}
     </div>
    </div>}
-  {(shiftDays!=null&&shiftDays>0)&&<p className="atlas-schedule-warning">Начало с учётом межпроектных зависимостей сдвинуто на +{shiftDays} дн.: {portfolioStart||'нет расчётной даты'}. Шкала ниже показывает исходный CPM от планового старта и не переписывает даты автоматически.</p>}
+  {(shiftDays!=null&&shiftDays>0)&&<p className="atlas-schedule-warning">Из-за связей с другими проектами расчётное начало сдвинулось на +{shiftDays} дн.: {portfolioStart||'нет расчётной даты'}. График ниже по-прежнему показывает даты от запланированного начала. Для переноса работ нужно отдельно изменить план.</p>}
   {!projectStart&&<p className="minor">Начальная дата не задана: на оси показаны относительные дни, не календарные даты.</p>}
   <div className="atlas-gantt-key" aria-label="Условные обозначения"><span><i className="key-normal"/>Плановая работа</span>
    <span><i className="key-critical"/>Критический путь</span><span><i className="key-done"/>Заявлено выполнение</span>

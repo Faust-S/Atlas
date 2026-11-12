@@ -884,7 +884,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  };
  const removeDependency=(from:string,to:string)=>{
   if(!project||!requireClosedForm()||busyRef.current)return;
-  if(!confirmAction("Удалить направленную связь работ? CPM будет пересчитан."))return;
+  if(!confirmAction("Удалить связь между работами? Atlas пересчитает график. Изменение останется в черновике до сохранения."))return;
   try{mutate(disconnect(data,project.id,from,to),"Зависимость удалена. Сохраните изменение.");}catch(e){issue(e)}
  };
  const removeEmptyStage=(id:string)=>{
