@@ -1,5 +1,5 @@
 import React,{useEffect,useState} from "react";
-import {projectStructureGuide,projectSourcePlanProjection,folderWorkAction} from "../../src/project-organization.mjs";
+import {projectStructureGuide,projectSourcePlanProjection,folderWorkAction,folderLinkAction} from "../../src/project-organization.mjs";
 import {ProjectSourcePlanMap} from "./ProjectVisuals";
 
 // Saved GitHub observations enrich this view when available; existing work,
@@ -67,6 +67,8 @@ export function ProjectOrganizationGuide({snapshot,projectId,restoreSearch,onEdi
     onEditStage={id=>onEdit("stage-edit:"+id)}
     onSuggestFolder={(sourceId,commitSha,folder)=>
      onEdit(folderWorkAction(sourceId,commitSha,folder))}
+    onLinkExistingWork={(sourceId,commitSha,folder)=>
+     onEdit(folderLinkAction(sourceId,commitSha,folder))}
     onOpenTimeline={onOpenTimeline} onOpenGraph={onOpenGraph}
     onOpenWorks={onOpenWorks} onOpenSources={onOpenSources}
     onRefreshSource={onRefresh} busy={busy}

@@ -261,13 +261,14 @@ export function PortfolioNetworkMap({snapshot,onOpenProject}:{
 // A navigable projection of saved GitHub observations and existing Atlas work.
 // The connectors illustrate only confirmed user-created work/stage assignments.
 // No component or dependency is created by opening the diagram.
-export function ProjectSourcePlanMap({projection,project,restoreSearch,onOpenWork,onEditStage,onSuggestFolder,
+export function ProjectSourcePlanMap({projection,project,restoreSearch,onOpenWork,onEditStage,onSuggestFolder,onLinkExistingWork,
  onOpenTimeline,onOpenGraph,onOpenWorks,onOpenSources,onRefreshSource,onOpenLinkedSource,onOpenStages,
  onCreateStage,onCreateWork,onAddDependency,
  expanded,hasMoreLinks,onToggleExpansion,busy=false}:{
  projection:any;project:any;restoreSearch:{workId:string;query:string}|null;
  onOpenWork:(id:string)=>void;onEditStage:(id:string)=>void;
  onSuggestFolder:(sourceId:string,commitSha:string,folder:string)=>void;
+ onLinkExistingWork:(sourceId:string,commitSha:string,folder:string)=>void;
  onOpenTimeline:()=>void;onOpenGraph:(workId?:string,query?:string)=>void;
  onOpenWorks:()=>void;onOpenSources:()=>void;onRefreshSource:(sourceId:string)=>void;
  onOpenStages:()=>void;busy?:boolean;
@@ -443,6 +444,11 @@ export function ProjectSourcePlanMap({projection,project,restoreSearch,onOpenWor
       <small>{folder.role}</small>
       <a className="text-link" href={folder.url} target="_blank"
        rel="noopener noreferrer">Открыть в GitHub</a>
+      {project?.items?.length>0&&<button type="button" className="text-link"
+       aria-label={"Связать существующую работу с каталогом "+folder.name}
+       disabled={busy}
+       onClick={()=>onLinkExistingWork(source.sourceId,folder.commitSha,folder.name)}>
+       Связать работу</button>}
      </div>
      <span className="atlas-source-plan-arrow" aria-hidden="true">→</span>
      <div className="atlas-source-plan-works">

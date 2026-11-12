@@ -174,6 +174,16 @@ export function editorSpec(project,action,snapshot=null){
    field("dueDate","Срок этапа","date",stage.dueDate||"",false)]};
  }
  if(action==="stage")return {title:"Новый этап",fields:[field("name","Название этапа")]};
+ if(action.startsWith("folder-link:")){
+  const folder=selectedSourceFolder(snapshot,project.id,action);
+  if(!project.items.length)throw Error("Сначала добавьте работу в проект.");
+  return {title:"Связать работу с каталогом: "+folder.folder,
+   hint:"Каталог найден в "+folder.repository+" на выбранной редакции исходников. "+
+    "Выберите существующую работу и подтвердите связь. Прежняя привязка будет заменена. "+
+    "Изменение останется в черновике до сохранения.",
+   fields:[choice("workId","Существующая работа",[
+    option("","Выберите работу"),...workItems(project)],"")]};
+ }
  if(action==="item"||action.startsWith("item-target:")||action.startsWith("folder-work:")){
   const targetId=action.startsWith("item-target:")?action.slice("item-target:".length):"";
   const target=(project.targets||[]).find(t=>t.id===targetId);
@@ -398,6 +408,18 @@ export function applyEditor(snapshot,projectId,action,input){
  if(action.startsWith("risk-edit:"))return {state:editRisk(snapshot,projectId,action.slice(10),{
   title:get("title"),status:get("status")
  })};
+ if(action.startsWith("folder-link:")){
+  const folder=selectedSourceFolder(snapshot,projectId,action);
+  const id=get("workId");
+  const selected=p.items.find(item=>item.id===id);
+  if(!selected)throw Error("Выберите существующую работу для связи с каталогом.");
+  if(selected.sourceId===folder.sourceId&&selected.sourcePath===folder.folder&&
+     selected.sourceRevision===folder.commitSha)
+   throw Error("Эта работа уже связана с выбранным каталогом.");
+  return {state:editItem(snapshot,projectId,id,{
+   sourceId:folder.sourceId,sourcePath:folder.folder,sourceRevision:folder.commitSha
+  })};
+ }
  if(action==="item"||action.startsWith("item-target:")||action.startsWith("folder-work:")){
   const origin=action.startsWith("folder-work:")?
    selectedSourceFolder(snapshot,projectId,action):null;

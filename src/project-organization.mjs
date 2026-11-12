@@ -121,11 +121,17 @@ export function folderWorkAction(sourceId,commitSha,folder){
  return "folder-work:"+encodeURIComponent(sourceId)+":"+
   commitSha.toLowerCase()+":"+encodeURIComponent(folder);
 }
+// One verified folder reference, two explicit actions: create or link work.
+export function folderLinkAction(sourceId,commitSha,folder){
+ return "folder-link:"+folderWorkAction(sourceId,commitSha,folder).slice("folder-work:".length);
+}
 export function selectedSourceFolder(snapshot,projectId,action){
  validate(snapshot);
- if(typeof action!=="string"||!action.startsWith("folder-work:"))
-  throw Error("Неизвестное действие по исходникам");
- const parts=action.slice("folder-work:".length).split(":");
+ const prefix=typeof action==="string"&&action.startsWith("folder-work:")?
+  "folder-work:":typeof action==="string"&&action.startsWith("folder-link:")?
+  "folder-link:":null;
+ if(!prefix)throw Error("Неизвестное действие по исходникам");
+ const parts=action.slice(prefix.length).split(":");
  if(parts.length!==3)throw Error("Некорректная ссылка на каталог");
  let sourceId,folder;
  try{sourceId=decodeURIComponent(parts[0]);folder=decodeURIComponent(parts[2])}
