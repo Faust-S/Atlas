@@ -52,7 +52,7 @@ struct OpenResult {
     restored_from_backup: bool,
     needs_confirmation: bool,
 }
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct WriteResult {
     generation: String,
