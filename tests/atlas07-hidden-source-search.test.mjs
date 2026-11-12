@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {editItem,serialize,deserialize} from "../src/core.mjs";
 import {projectSourcePlanProjection,projectSourceFolderSearch,folderLinkAction,
- selectedSourceFolder} from "../src/project-organization.mjs";
+ folderWorkAction,selectedSourceFolder} from "../src/project-organization.mjs";
 import {editorSpec,applyEditor} from "../src/editor.mjs";
 import {atlas06VisualPortfolio} from "./fixtures/atlas06-visual-portfolio.mjs";
 
@@ -87,7 +87,6 @@ test("Folder results in a new project create the first work rather than offering
  const found=projectSourceFolderSearch(emptyProject,"project-0 directory-01");
  assert.equal(found.total,1);
  const path=found.matches[0];
- const {folderWorkAction}=await import("../src/project-organization.mjs");
  const action=folderWorkAction(path.sourceId,path.commitSha,path.folder);
  const spec=editorSpec(emptyProject,action,noWork);
  assert.match(spec.title,/Работа по каталогу/);
