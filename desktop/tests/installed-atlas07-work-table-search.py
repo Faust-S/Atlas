@@ -39,6 +39,13 @@ def qualify():
     v.await_no_form()
     assert d.head()==before
     assert d.saved_project(before)==expected
+    # A long-lived work table can accumulate filters. One explicit click
+    # restores all work rows, even when a deadline-only filter was active.
+    reset=v.find_control("Сбросить фильтры работ",types={"Button"})
+    reset.click_input()
+    d.wait_text("Показано 200 из 1213 работ по фильтру",35)
+    assert d.head()==before and d.saved_project(before)==expected
+    print("ATLAS07_INSTALLED_WORK_TABLE_FILTER_RESET_PASS",flush=True)
     print("ATLAS07_INSTALLED_WORK_TABLE_CONTEXT_SEARCH_PASS",flush=True)
 
 if __name__=="__main__":

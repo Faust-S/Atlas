@@ -428,6 +428,15 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    portfolioStatus==="finished"&&["completed","cancelled"].includes(p.status))&&
   (p.name.toLowerCase().includes(search.toLowerCase())||p.goal?.toLowerCase().includes(search.toLowerCase()))),
   [data,search,portfolioStatus]);
+ const workFiltersActive=workFilter!=="all"||workTargetFilter!=="all"||
+  workObservationFilter!=="all"||workDependencyFilter!=="all"||
+  workDeadlineFilter!=="all"||!!workQuery.trim();
+ const clearWorkFilters=()=>{
+  setWorkFilter("all");setWorkTargetFilter("all");
+  setWorkObservationFilter("all");setWorkDependencyFilter("all");
+  setWorkDeadlineFilter("all");setWorkQuery("");
+  setWorkReturnId(null);setWorkLimit(200);
+ };
  const filteredWork=useMemo(()=>{
   if(!project)return [];
   const textMatches=projectWorkTableSearch(project,workQuery);
@@ -1709,7 +1718,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
        <option value="title">По названию</option><option value="dueDate">По сроку</option>
        <option value="priority">По приоритету</option><option value="estimateDays">По длительности</option>
        <option value="state">По состоянию</option>
-      </select></label></div>
+      </select></label>
+      {workFiltersActive&&<button type="button" className="action-button atlas-work-reset-filters"
+       aria-label="Сбросить фильтры работ" onClick={clearWorkFilters}>Сбросить фильтры</button>}</div>
      <p className="minor atlas-work-evidence-summary" role="status">
       <output className="atlas-work-filter-count" aria-live="polite"
        aria-label={"Показано "+Math.min(filteredWork.length,workLimit)+" из "+filteredWork.length+" работ по фильтру"}>

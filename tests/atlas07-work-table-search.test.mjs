@@ -46,3 +46,18 @@ test("Existing Atlas work table applies all structured filters and search on the
  assert.match(ui,/sortWorkRows\(/);
  assert.match(ui,/Название, этап, каталог или ответственный/);
 });
+
+
+test("A single action resets all table filters, including hidden overdue filter, without changing work sorting",()=>{
+ const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ const start=ui.indexOf('const clearWorkFilters=()=>');
+ const reset=ui.slice(start,start+365);
+ for(const setter of ["setWorkFilter","setWorkTargetFilter","setWorkObservationFilter",
+  "setWorkDependencyFilter","setWorkDeadlineFilter"])
+  assert.ok(reset.includes(setter+'("all")'),"Missing filter reset: "+setter);
+ assert.match(reset,/setWorkQuery\(""\)/);
+ assert.match(reset,/setWorkReturnId\(null\);setWorkLimit\(200\)/);
+ assert.doesNotMatch(reset,/setWorkSort/);
+ assert.match(ui,/aria-label="Сбросить фильтры работ" onClick=\{clearWorkFilters\}/);
+ assert.match(ui,/workDeadlineFilter!=="all"\|\|!!workQuery\.trim\(\)/);
+});
