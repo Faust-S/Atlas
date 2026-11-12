@@ -56,8 +56,8 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
  </>;
  return <section className={'surface atlas-gantt-panel'+(expanded?' is-expanded':'')} role={expanded?'dialog':undefined}
   aria-label={expanded?'Развёрнутый график CPM':undefined} aria-modal={expanded?'true':undefined}>
-  <div className="section-heading"><div><h2>План-график CPM</h2>
-   <p>Расчётная длительность и критический путь по календарным дням. Состояния работ — заявления, а не фактическая приёмка.</p></div>
+  <div className="section-heading"><div><h2>График работ</h2>
+   <p>Даты рассчитаны по связям работ. Отметка о выполнении не означает, что результат принят.</p></div>
    <div className="button-row"><span className="status-chip">{schedule.rows.length} работ · {schedule.durationDays} дн.</span>
     <button type="button" className="action-button" onClick={()=>{setExpanded(false);onEditDates()}}>Плановые даты</button>
     <button type="button" className="action-button" aria-expanded={expanded}

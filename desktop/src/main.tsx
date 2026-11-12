@@ -1499,7 +1499,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       </div>
      </section>}
      <section className="surface"><div className="section-heading"><div><h2>Сроки и зависимости</h2>
-      <p>CPM по календарным дням, без автоматического распределения ресурсов.</p></div>
+      <p>Сроки рассчитаны по связям работ. Занятость исполнителей здесь не учитывается.</p></div>
       <Action onClick={()=>openEditor("dates")}>Изменить даты</Action></div>
       <div className="summary-line"><span>Начало: {readable(project.startDate)}</span><span>Контрольный срок: {readable(project.dueDate)}</span>
        <span>Прогноз финиша: {projectedFinishLabel(projected)}</span><span>Критический путь: {plan?.durationDays??0} дн.</span></div>

@@ -539,3 +539,20 @@ test("Installed Windows cleanup cannot hide the original failed-save evidence",(
  assert.match(driver,/except subprocess\.TimeoutExpired:\s*# The test owns this installed process/);
  assert.match(driver,/process\.kill\(\)/);
 });
+
+test("Installed Windows witnesses a newly missed and then resolved deadline without CPM shift",()=>{
+ const driver=read("../desktop/tests/installed-atlas06-visual-scale.py");
+ const plan=read("../src/planning.mjs");
+ const ui=read("../desktop/src/main.tsx");
+ assert.match(driver,/ATLAS06_VISUAL_DIRECT_DEADLINE_MISSED_PREVIEW_PASS/);
+ assert.match(driver,/ATLAS06_VISUAL_DIRECT_DEADLINE_RESOLVED_PREVIEW_PASS/);
+ assert.match(driver,/ATLAS06_VISUAL_DIRECT_DEADLINE_SAVE_RESTART_PASS/);
+ assert.match(driver,/Deadline-only change unexpectedly saved native Store/);
+ assert.match(driver,/Resolved deadline was saved without explicit user approval/);
+ assert.match(driver,/d\.set_text\("Срок работы","11\/10\/2026"\)/);
+ assert.match(driver,/d\.set_text\("Срок работы","11\/12\/2026"\)/);
+ assert.match(driver,/assert resolved_work==\{\*\*missed_work,"dueDate":"2026-11-12"\}/);
+ assert.match(driver,/assert d\.saved_project\(resolved_head\)==resolved/);
+ assert.match(plan,/deadlineResolvedTotal/);
+ assert.match(ui,/Нарушений срока устранено:/);
+});

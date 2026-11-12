@@ -552,7 +552,7 @@ def qualify_visual():
     # read-only; no synthetic native state or implicit Save.
     select_project()
     d.click_button("График")
-    d.wait_text("План-график CPM",35)
+    d.wait_text("График работ",35)
     deadline_filter=d.window().child_window(
         title="Только работы позже контрольного срока",control_type="CheckBox")
     assert deadline_filter.exists(timeout=15) and deadline_filter.is_enabled()
@@ -634,6 +634,80 @@ def qualify_visual():
     assert d.head()==corrected_head
     assert d.saved_project(corrected_head)==corrected
     print("ATLAS06_VISUAL_DIRECT_GANTT_EDIT_SAVED_RESTART_PASS",flush=True)
+
+    # A deadline-only edit must explain its changed control date even though
+    # the CPM finish does not move. Use the installed work editor and retain
+    # all original dependencies, stages, source references and duration.
+    select_project()
+    d.click_button("Таблица")
+    d.set_text("Найти работу","Работа 0 / 2")
+    open_work=find_control("Открыть работу Работа 0 / 2",types={"Button"})
+    open_work.click_input()
+    d.window_title_contains("Форма: Работа: Работа 0 / 2",25)
+    capture("direct-deadline-editor-before-typing")
+    # Date controls can expose separate month/day/year accessibility nodes.
+    # Log only the synthetic form's control types so a failed physical entry
+    # can be diagnosed without guessing a submitted calendar value.
+    print("ATLAS06_DATE_EDITOR_UIA "+repr([
+        (element.element_info.control_type,str(element.window_text())[:70])
+        for element in d.window().descendants()
+        if element.is_visible() and (element.element_info.control_type
+            in ("Edit","ComboBox","Spinner","Group","Custom")
+            or "Срок работы" in str(element.window_text()))
+    ][:35]),flush=True)
+    d.set_text("Срок работы","11/10/2026")
+    find_control("Применить к черновику",types={"Button"}).click_input()
+    await_no_form()
+    assert d.head()==corrected_head,"Deadline-only change unexpectedly saved native Store"
+    d.wait_text("Контрольных сроков изменено: 1.",35)
+    d.wait_text("Расчётные сроки существующих работ не сдвинулись.",35)
+    d.wait_text("Расчётный финиш позже контрольного срока. Затронуто работ: 1.",35)
+    capture("direct-deadline-new-miss-preview")
+    print("ATLAS06_VISUAL_DIRECT_DEADLINE_MISSED_PREVIEW_PASS",flush=True)
+    d.click_button("Сохранить")
+    missed_head=await_saved(corrected_head)
+    missed=d.saved_project(missed_head)
+    prev_work=next(item for item in corrected["items"] if item["id"]=="visual-work-0-1")
+    missed_work=next(item for item in missed["items"] if item["id"]=="visual-work-0-1")
+    assert missed_work=={**prev_work,"dueDate":"2026-11-10"}
+    assert missed["dependencies"]==corrected["dependencies"]
+    assert missed["stages"]==corrected["stages"] and missed["sources"]==corrected["sources"]
+    d.stop()
+    d.launch()
+    d.wait_text("Портфель проектов",45)
+    assert d.head()==missed_head
+    assert d.saved_project(missed_head)==missed
+
+    # Correct that date without changing a work duration or link. Only the
+    # recorded control date should change, and the warning must disappear.
+    select_project()
+    d.click_button("Таблица")
+    d.set_text("Найти работу","Работа 0 / 2")
+    open_again=find_control("Открыть работу Работа 0 / 2",types={"Button"})
+    open_again.click_input()
+    d.window_title_contains("Форма: Работа: Работа 0 / 2",25)
+    d.set_text("Срок работы","11/12/2026")
+    find_control("Применить к черновику",types={"Button"}).click_input()
+    await_no_form()
+    assert d.head()==missed_head,"Resolved deadline was saved without explicit user approval"
+    d.wait_text("Контрольных сроков изменено: 1.",35)
+    d.wait_text("Нарушений срока устранено: 1.",35)
+    d.wait_text("Без сдвига графика.",35)
+    capture("direct-deadline-resolved-preview")
+    print("ATLAS06_VISUAL_DIRECT_DEADLINE_RESOLVED_PREVIEW_PASS",flush=True)
+    d.click_button("Сохранить")
+    resolved_head=await_saved(missed_head)
+    resolved=d.saved_project(resolved_head)
+    resolved_work=next(item for item in resolved["items"] if item["id"]=="visual-work-0-1")
+    assert resolved_work=={**missed_work,"dueDate":"2026-11-12"}
+    assert resolved["dependencies"]==missed["dependencies"]
+    assert resolved["stages"]==missed["stages"] and resolved["sources"]==missed["sources"]
+    d.stop()
+    d.launch()
+    d.wait_text("Портфель проектов",45)
+    assert d.head()==resolved_head
+    assert d.saved_project(resolved_head)==resolved
+    print("ATLAS06_VISUAL_DIRECT_DEADLINE_SAVE_RESTART_PASS",flush=True)
 
 if __name__=="__main__":
     try:

@@ -190,3 +190,15 @@ test('Gantt exposes dated work deadline overruns and can filter to the real affe
  assert.ok(ui.includes('(!deadlineOnly||r.missedDeadline)'));
  assert.ok(ui.includes('Расчётный финиш позже срока {row.dueDate}'));
 });
+
+test('the project plan has plain-language navigation without exposing algorithm jargon',()=>{
+ const chart=readFileSync(new URL('../desktop/src/ProjectVisuals.tsx',import.meta.url),'utf8');
+ const home=readFileSync(new URL('../desktop/src/main.tsx',import.meta.url),'utf8');
+ const installed=readFileSync(new URL('../desktop/tests/installed-atlas06-visual-scale.py',import.meta.url),'utf8');
+ assert.match(chart,/<h2>График работ<\/h2>/);
+ assert.match(chart,/Даты рассчитаны по связям работ/);
+ assert.match(home,/Сроки рассчитаны по связям работ/);
+ assert.doesNotMatch(chart,/<h2>План-график CPM<\/h2>/);
+ assert.doesNotMatch(home,/>CPM по календарным дням/);
+ assert.match(installed,/d\.wait_text\("График работ",35\)/);
+});
