@@ -96,7 +96,8 @@ test('desktop workbench actually mounts existing Gantt/DAG and preserves real ed
  assert.match(entry,/onOpenWork=\{id=>openEditor\("work:"\+id\)\}/);
  assert.match(component,/onEditDates:\(\)=>void/);
  assert.match(component,/projectStatus==='paused'\|\|projectStatus==='cancelled'/);
- assert.match(component,/исходный календарный план CPM/);
+ assert.match(component,/Пока проект приостановлен или отменён, эти даты нельзя считать действующими сроками выполнения/);
+ assert.doesNotMatch(component,/исходный календарный план CPM/);
  assert.match(entry,/projectStatus=\{project.status\}/);
  assert.match(entry,/unavailableOrigins=\{projected\?\.unavailableOrigins\|\|\[\]\}/);
  assert.match(entry,/onOpenProject=\{id=>selectProject\(id\)\}/);
