@@ -764,3 +764,18 @@ test("Installed Windows text observation tolerates transient untyped WebView2 UI
  // no fake responses, hidden DOM, or fabricated Store reads are introduced.
  assert.doesNotMatch(reader,/execute_script|invoke\(|response\s*=|mock/i);
 });
+
+
+test("Installed portfolio search finds a project from its saved work and source without writes",()=>{
+ const script=read("../desktop/tests/installed-atlas07-portfolio-search.py");
+ const ui=read("../desktop/src/main.tsx");
+ assert.match(workflow,/Find project by a work or source in installed Atlas 0\.7/);
+ assert.match(workflow,/installed-atlas07-portfolio-search\.py/);
+ assert.match(workflow,/ATLAS07_INSTALLED_PORTFOLIO_SEARCH_FAILED/);
+ assert.match(script,/ATLAS07_INSTALLED_PORTFOLIO_CONTENT_SEARCH_PASS/);
+ assert.match(script,/d\.set_text\(SEARCH,"Работа 5 \/ 1080"\)/);
+ assert.match(script,/d\.set_text\(SEARCH,"Этап работ 48"\)/);
+ assert.match(script,/d\.set_text\(SEARCH,"project-5 directory-23"\)/);
+ assert.match(script,/d\.saved_project\(before\)==expected/);
+ assert.match(ui,/aria-label="Найти проект по работе, этапу или источнику"/);
+});

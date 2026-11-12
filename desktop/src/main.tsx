@@ -8,6 +8,7 @@ import {editorSpec,applyEditor,editorSelectionFields,filterWorkPickerOptions,PRO
 import {compareProject,decideChange} from "../../src/trace.mjs";
 import {projectImpact,projectNextStep} from "../../src/impact.mjs";
 import {buildPortfolioCommand,filterPortfolioCommand} from "../../src/portfolio-command.mjs";
+import {buildPortfolioSearchIndex,filterPortfolioSearch} from "../../src/portfolio-search.mjs";
 import {realityOverview,workObservationIndex} from "../../src/reality-overview.mjs";
 import {responseState} from "../../src/response.mjs";
 import {scheduleProject,scheduleChangeSummary,workDependencyOverview,filterWorkRowsByDependencies} from "../../src/planning.mjs";
@@ -423,11 +424,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   setChangeJump(null);
  },[changeJump,ready,active,tab,project]);
  const projected=active?dates.byId.get(active):null;
- const filtered=useMemo(()=>data.projects.filter((p:any)=>
-  (portfolioStatus==="all"||portfolioStatus==="active"&&["active","planned","paused"].includes(p.status)||
-   portfolioStatus==="finished"&&["completed","cancelled"].includes(p.status))&&
-  (p.name.toLowerCase().includes(search.toLowerCase())||p.goal?.toLowerCase().includes(search.toLowerCase()))),
-  [data,search,portfolioStatus]);
+ const portfolioSearchIndex=useMemo(()=>buildPortfolioSearchIndex(data.projects),[data.projects]);
+ const filtered=useMemo(()=>filterPortfolioSearch(portfolioSearchIndex,{
+  query:search,status:portfolioStatus}),[portfolioSearchIndex,search,portfolioStatus]);
  const workFiltersActive=workFilter!=="all"||workTargetFilter!=="all"||
   workObservationFilter!=="all"||workDependencyFilter!=="all"||
   workDeadlineFilter!=="all"||!!workQuery.trim();
@@ -1139,7 +1138,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   </aside>
   <main className="workspace">
    <header className="commandbar">
-    <label className="search"><span>⌕</span><input id="atlas-search" placeholder="Найти проект · Ctrl+K"
+    <label className="search"><span>⌕</span><input id="atlas-search" aria-label="Найти проект по работе, этапу или источнику"
+      placeholder="Проект, работа или источник"
       value={search} onChange={e=>{setSearch(e.target.value);setPortfolioLimit(150);setSidebarLimit(120)}}/><kbd>Ctrl K</kbd></label>
     <div className="toolbar-actions">
      <Badge tone={editor||dirty?"warning":persisted?"good":"neutral"}>{editor?"Форма не применена":dirty?"Не сохранено":persisted?"Сохранено":"Новый портфель"}</Badge>
