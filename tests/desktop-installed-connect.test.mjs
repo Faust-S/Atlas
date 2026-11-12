@@ -713,3 +713,17 @@ test("Compact installed editor scrolls its native field region before physical i
  assert.match(search,/v\.editor_field\("Найти существующую работу",types=\("Edit",\)\)/);
  assert.match(search,/v\.editor_field\("Существующая работа",types=\("ComboBox",\)\)/);
 });
+
+
+test("Installed Atlas 0.7 finds a catalog omitted from the compact project diagram and saves the work link",()=>{
+ const driver=read("../desktop/tests/installed-atlas07-hidden-source-search.py");
+ const visual=read("../desktop/src/ProjectVisuals.tsx");
+ assert.match(workflow,/Find hidden source folder in installed Atlas 0\.7/);
+ assert.match(workflow,/installed-atlas07-hidden-source-search\.py/);
+ assert.match(workflow,/ATLAS07_INSTALLED_HIDDEN_SOURCE_SEARCH_FAILED/);
+ assert.match(driver,/ATLAS07_INSTALLED_HIDDEN_SOURCE_SEARCH_PASS/);
+ assert.match(driver,/d\.set_text\("Найти работу или этап","project-0 directory-01"\)/);
+ assert.match(driver,/assert d\.saved_project\(after\)==updated/);
+ assert.match(driver,/work\["sourceId"\]="visual-source-0"/);
+ assert.match(visual,/onLinkExistingWork\(folder\.sourceId,folder\.commitSha,folder\.folder\)/);
+});

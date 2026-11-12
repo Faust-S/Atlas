@@ -1,7 +1,7 @@
 import React,{useEffect,useMemo,useRef,useState} from 'react';
 import {dependencyDiagram,ganttViewport,ganttFocusOffset} from './visual-layout.mjs';
 import {portfolioNetwork} from '../../src/portfolio.mjs';
-import {projectSourcePlanSearch,projectSourcePlanWorkContext} from '../../src/project-organization.mjs';
+import {projectSourcePlanSearch,projectSourcePlanWorkContext,projectSourceFolderSearch} from '../../src/project-organization.mjs';
 
 type CPM={durationDays:number;rows:Array<{id:string;title:string;earlyStart:number;earlyFinish:number;durationDays:number;critical:boolean;state:string;predecessors:string[];blockedBy:string[];floatDays:number;dueDate?:string|null;finishDate?:string|null}>};
 type Mode='fit'|'30'|'90';
@@ -301,6 +301,8 @@ export function ProjectSourcePlanMap({projection,project,restoreSearch,onOpenWor
  const found=useMemo(()=>projectSourcePlanSearch(project,searchQuery,{
   limit:8,priorityWorkId:detailWorkId||""
  }),[project,searchQuery,detailWorkId]);
+ const catalogHits=useMemo(()=>projectSourceFolderSearch(project,searchQuery,{limit:8}),
+  [project,searchQuery]);
  const detail=useMemo(()=>detailWorkId?
   projectSourcePlanWorkContext(project,detailWorkId):null,[project,detailWorkId]);
  const closeSearch=()=>{
@@ -329,16 +331,17 @@ export function ProjectSourcePlanMap({projection,project,restoreSearch,onOpenWor
         triggerRef.current?.focus();
        }
       }}>
-      <label>Работа или этап
+      <label>Работа, этап или каталог
        <input ref={inputRef} type="search" aria-label="Найти работу или этап"
-        placeholder="Название или фрагмент" value={searchQuery}
+        aria-description="Также ищет каталоги исходников"
+        placeholder="Название, этап или каталог" value={searchQuery}
         onChange={event=>{
          setSearchQuery(event.target.value);setDetailWorkId(null);
         }}/>
       </label>
       {searchQuery.trim()?<>
-       <p className="minor" role="status">{found.total?
-        "Найдено: "+found.total:"Совпадений нет"}</p>
+       <p className="minor" role="status">{found.total+catalogHits.total?
+        "Найдено: "+(found.total+catalogHits.total):"Совпадений нет"}</p>
        <div className="atlas-source-plan-find-results">
         {found.matches.map((hit:any)=><div className="atlas-source-plan-find-item"
          key={hit.kind+":"+hit.id}>
@@ -411,9 +414,26 @@ export function ProjectSourcePlanMap({projection,project,restoreSearch,onOpenWor
          </div>}
         </div>)}
        </div>
-       {found.hidden>0&&<p className="minor">
-        Показаны первые {found.matches.length} результатов. Уточните название.</p>}
-      </>:<p className="minor">Поиск по всем работам и этапам проекта.</p>}
+       {catalogHits.matches.length>0&&<div className="atlas-source-plan-find-results"
+        aria-label="Найденные каталоги исходников">
+        {catalogHits.matches.map((folder:any)=><div className="atlas-source-plan-find-item"
+         key={folder.sourceId+"/"+folder.folder}>
+         <div className="atlas-source-plan-found-folder">
+          <small>Каталог</small>
+          <strong title={folder.repository+" / "+folder.folder}>
+           {folder.repository+" / "+folder.folder}</strong>
+          <small>{folder.role}</small>
+         </div>
+         <button type="button" className="text-link"
+          aria-label={"Связать существующую работу с найденным каталогом "+folder.repository+" / "+folder.folder}
+          disabled={busy}
+          onClick={()=>{closeSearch();onLinkExistingWork(folder.sourceId,folder.commitSha,folder.folder)}}>
+          Связать работу</button>
+        </div>)}
+       </div>}
+       {(found.hidden>0||catalogHits.hidden>0)&&<p className="minor">
+        Показаны первые результаты. Уточните название, чтобы найти остальные.</p>}
+      </>:<p className="minor">Поиск по всем работам, этапам и актуальным каталогам проекта.</p>}
      </div>}
     </div>}
     {projection.workTotal>0&&<button type="button" className="action-button"

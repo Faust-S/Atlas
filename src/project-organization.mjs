@@ -243,7 +243,39 @@ export function projectSourcePlanProjection(snapshot,projectId,{
 // projection may omit a work or a stage, but the existing record is still
 // available to open through its ordinary editor. This never writes to a plan.
 const searchLabel=value=>String(value??"").normalize("NFKC")
- .toLocaleLowerCase("ru-RU").replace(/\s+/g," ").trim();
+ .toLocaleLowerCase("ru-RU").replace(/ё/g,"е").replace(/\s+/g," ").trim();
+
+// Find currently observed GitHub directories across *all* connected sources,
+// including those omitted from the bounded diagram. An old, unavailable, or
+// partially identified source never offers a writable binding from search.
+export function projectSourceFolderSearch(project,query,{limit=8}={}){
+ if(!project||!Array.isArray(project.sources))
+  throw Error("Проект не найден");
+ if(!Number.isInteger(limit)||limit<1||limit>40)
+  throw Error("Некорректный предел поиска каталогов");
+ const tokens=searchLabel(query).split(" ").filter(Boolean);
+ if(!tokens.length)return {matches:[],total:0,hidden:0};
+ const candidates=[];
+ let order=0;
+ for(const source of project.sources){
+  const repository=entryRepo(source);
+  if(!repository||treeStatus(source)!=="current"||
+     !Array.isArray(source.summary?.structure?.folders))continue;
+  const commitSha=source.summary.structure.commitSha;
+  for(const folder of source.summary.structure.folders){
+   if(!rootName(folder))continue;
+   const label=searchLabel(repository+" / "+folder);
+   if(!tokens.every(token=>label.includes(token)))continue;
+   const name=searchLabel(folder),full=tokens.join(" ");
+   candidates.push({sourceId:source.id,repository,branch:selectedBranch(source),
+    commitSha,folder,role:roleFor(folder),
+    rank:name===full?0:name.startsWith(full)?1:2,order:order++});
+  }
+ }
+ candidates.sort((a,b)=>a.rank-b.rank||a.order-b.order);
+ const matches=candidates.slice(0,limit).map(({rank,order,...item})=>item);
+ return {matches,total:candidates.length,hidden:candidates.length-matches.length};
+}
 export function projectSourcePlanSearch(project,query,{limit=8,priorityWorkId=""}={}){
  if(!project||!Array.isArray(project.items)||!Array.isArray(project.stages))
   throw Error("Проект не найден");
