@@ -937,3 +937,22 @@ test("Schedule impact list preserves critical-only changes and makes them readab
  const start=ui.indexOf("const showAffectedWorks="),end=ui.indexOf("const filteredWork=",start);
  assert.doesNotMatch(ui.slice(start,end),/mutate\(|commitWithReadback\(|nativeInvoke\(|fetch\(/);
 });
+
+test("Overdue work explains dated delay and limiting predecessor from canonical CPM",()=>{
+ const main=read("../desktop/src/main.tsx");
+ const planning=read("../src/planning.mjs");
+ const css=read("../desktop/src/style.css");
+ assert.match(planning,/export function scheduleDeadlineExplanations\(plan,\{limit=2\}=\{\}\)/);
+ assert.match(planning,/prior\.earlyFinish===row\.earlyStart/);
+ assert.match(planning,/daysLate:\(finish-due\)\/86400000/);
+ assert.match(main,/scheduleDeadlineExplanations\(plan\|\|\{rows:\[\]\}\)/);
+ assert.match(main,/aria-label=\{"Почему нарушается срок работы "\+w\.title\}/);
+ assert.match(main,/Отставание от контрольного срока: \{deadlineRiskDetails\.get\(w\.id\)!\.daysLate\} дн\./);
+ assert.match(main,/aria-label=\{"Открыть работу, определяющую срок "\+driver\.title\}/);
+ assert.match(main,/aria-label=\{"Исправить план работы "\+w\.title\}/);
+ assert.match(main,/onClick=\{\(\)=>openEditor\("work:"\+driver\.id\)\}/);
+ assert.match(css,/\.atlas-work-deadline-context\{/);
+ const work=main.slice(main.indexOf('className="atlas-work-deadline-context"'),
+  main.indexOf('<td data-label="Действия"'));
+ assert.doesNotMatch(work,/mutate\(|commitWithReadback\(|nativeInvoke\(|fetch\(/);
+});

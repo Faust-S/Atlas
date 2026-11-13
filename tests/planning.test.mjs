@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { scheduleProject,scheduleChangeSummary } from '../src/planning.mjs';
+import { scheduleProject,scheduleChangeSummary,scheduleDeadlineExplanations } from '../src/planning.mjs';
 import toposort from '../src/vendor/toposort.mjs';
 const project=(items,dependencies=[],startDate='2026-11-01')=>({items:items.map(([id,estimateDays=1,state='todo'])=>({id,title:id,estimateDays,state})),dependencies:dependencies.map(([from,to])=>({from,to})),startDate});
 test('upstream topological core orders dependencies including isolated items',()=>{const order=toposort.array(['a','b','c','d'],[['a','b'],['b','c']]);assert(order.indexOf('a')<order.indexOf('b'));assert(order.indexOf('b')<order.indexOf('c'));assert(order.includes('d'));});
@@ -320,4 +320,37 @@ test('adding a longer independent work changes the original critical path withou
  assert.equal(result.examples[0].criticalChanged,true);
  assert.equal(result.examples[0].critical,false);
  assert.equal(result.examples.some(x=>x.id==='new'),false);
+});
+
+test('dated schedule explains exact calendar lateness and limiting predecessor work',()=>{
+ const p=project([['a',2],['b',2],['target',3]],[['a','target'],['b','target']],'2026-11-10');
+ p.items.find(item=>item.id==='target').dueDate='2026-11-13';
+ const schedule=scheduleProject(p),original=JSON.stringify(schedule);
+ const risks=scheduleDeadlineExplanations(schedule);
+ assert.equal(risks.size,1);
+ const risk=risks.get('target');
+ assert.equal(risk.finishDate,'2026-11-15');
+ assert.equal(risk.daysLate,2);
+ assert.equal(risk.durationDays,3);
+ assert.equal(risk.driverTotal,2);
+ assert.deepEqual(risk.drivers.map(x=>x.id),['a','b']);
+ assert.equal(risk.critical,true);
+ const limited=scheduleDeadlineExplanations(schedule,{limit:1}).get('target');
+ assert.equal(limited.drivers.length,1);
+ assert.equal(limited.hiddenDrivers,1);
+ assert.equal(JSON.stringify(schedule),original);
+});
+test('deadline explanation counts leap-day lateness in UTC and ignores undated projects',()=>{
+ const p=project([['late',3]],[],'2028-02-28');
+ p.items[0].dueDate='2028-02-29';
+ const schedule=scheduleProject(p),risk=scheduleDeadlineExplanations(schedule).get('late');
+ assert.equal(risk.finishDate,'2028-03-02');
+ assert.equal(risk.daysLate,2);
+ assert.equal(risk.driverTotal,0);
+ const undated={...p,startDate:null};
+ assert.equal(scheduleDeadlineExplanations(scheduleProject(undated)).size,0);
+ const onTime={...p,items:[{...p.items[0],dueDate:'2028-03-02'}]};
+ assert.equal(scheduleDeadlineExplanations(scheduleProject(onTime)).size,0);
+ assert.throws(()=>scheduleDeadlineExplanations(null),/Invalid deadline schedule/);
+ assert.throws(()=>scheduleDeadlineExplanations(schedule,{limit:0}),/Invalid deadline explanation limit/);
 });

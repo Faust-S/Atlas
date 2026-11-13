@@ -11,7 +11,7 @@ import {buildPortfolioCommand,filterPortfolioCommand} from "../../src/portfolio-
 import {buildPortfolioSearchIndex,filterPortfolioSearch,portfolioSearchReason,portfolioSearchWorkTarget} from "../../src/portfolio-search.mjs";
 import {realityOverview,workObservationIndex} from "../../src/reality-overview.mjs";
 import {responseState} from "../../src/response.mjs";
-import {scheduleProject,scheduleChangeSummary,workDependencyOverview,filterWorkRowsByDependencies} from "../../src/planning.mjs";
+import {scheduleProject,scheduleChangeSummary,scheduleDeadlineExplanations,workDependencyOverview,filterWorkRowsByDependencies} from "../../src/planning.mjs";
 import {portfolioSchedule,projectedFinishLabel} from "../../src/portfolio-schedule.mjs";
 import {portfolioResources} from "../../src/portfolio-resources.mjs";
 import {planReviewQueue,planReviewAction,planProposalAction} from "../../src/plan-review.mjs";
@@ -333,6 +333,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const overdueWorkFinishes=useMemo(()=>new Map<string,string>(
   (plan?.rows||[]).filter((row:any)=>row.dueDate&&row.finishDate&&row.finishDate>row.dueDate)
    .map((row:any)=>[String(row.id),String(row.finishDate)] as [string,string])),[plan]);
+ const deadlineRiskDetails=useMemo(()=>scheduleDeadlineExplanations(plan||{rows:[]}),[plan]);
  const recentPlanRow=recentWork&&plan?plan.rows.find((row:any)=>row.id===recentWork.id):null;
  const planBeforeRecent=recentWork&&recentPlanBefore&&
   recentPlanBefore.workId===recentWork.id&&recentPlanBefore.revision===data.revision?
@@ -1891,6 +1892,26 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
         {overdueWorkFinishes.has(w.id)&&<small className="atlas-work-overdue-label">
          Расчётное окончание: {overdueWorkFinishes.get(w.id)}. Позже указанного срока.
         </small>}
+        {deadlineRiskDetails.has(w.id)&&<div className="atlas-work-deadline-context"
+         role="group" aria-label={"Почему нарушается срок работы "+w.title}>
+         <small>Отставание от контрольного срока: {deadlineRiskDetails.get(w.id)!.daysLate} дн.
+          {" "}Оценка длительности: {deadlineRiskDetails.get(w.id)!.durationDays} дн.</small>
+         {deadlineRiskDetails.get(w.id)!.critical&&<small>Работа на критическом пути проекта.</small>}
+         {deadlineRiskDetails.get(w.id)!.drivers.length>0?
+          <div className="atlas-work-deadline-drivers">
+           <small>Начало определяют предшествующие работы:</small>
+           {deadlineRiskDetails.get(w.id)!.drivers.map((driver:any)=>
+            <button key={driver.id} type="button" className="text-link"
+             aria-label={"Открыть работу, определяющую срок "+driver.title}
+             onClick={()=>openEditor("work:"+driver.id)}>{driver.title}</button>)}
+           {deadlineRiskDetails.get(w.id)!.hiddenDrivers>0&&
+            <small>Ещё {deadlineRiskDetails.get(w.id)!.hiddenDrivers} в схеме зависимостей.</small>}
+          </div>:
+          <small>Предшествующих работ нет. Проверьте длительность и контрольный срок.</small>}
+         <button type="button" className="text-link"
+          aria-label={"Исправить план работы "+w.title}
+          onClick={()=>openEditor("work:"+w.id)}>Изменить срок или длительность</button>
+        </div>}
        </td>
        <td data-label="Действия" className="atlas-work-table-actions">
         <Action ariaLabel={!(w.targetIds||[]).length&&project.targets?.length

@@ -938,3 +938,13 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .atlas-work-impact-actions{align-items:center;gap:8px;margin:8px 0 3px}
 .atlas-work-impact-actions .action-button{min-height:32px;font-size:12px;white-space:normal}
 .atlas-work-impact-actions small{font-size:11px;color:#536b86;overflow-wrap:anywhere}
+
+/* Explain a dated CPM overrun where the user already sees that work's due date.
+   Buttons stay inline and keyboard-accessible even in narrow work cards. */
+.atlas-work-deadline-context{display:grid;gap:4px;margin-top:6px;padding:7px 9px;
+ border-left:2px solid #b98140;background:#fff9f1;border-radius:5px;min-width:0}
+.atlas-work-deadline-context small{font-size:11px;line-height:1.4;overflow-wrap:anywhere;color:#735331}
+.atlas-work-deadline-context>.text-link,.atlas-work-deadline-drivers>.text-link{
+ display:block;text-align:left;width:fit-content;max-width:100%;
+ white-space:normal;overflow-wrap:anywhere;font-size:12px}
+.atlas-work-deadline-drivers{display:grid;gap:3px;min-width:0}

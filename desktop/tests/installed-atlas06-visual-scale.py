@@ -615,15 +615,16 @@ def qualify_visual():
     print("ATLAS06_VISUAL_AFFECTED_WORK_REPLANNED_PASS",flush=True)
     # The impact projection must offer *every* affected work in the real
     # work table; the preview's four-row limit is not a work limit.
-    # Changing the project completion can remove many unchanged-finish
-    # works from the critical path. Count the real computed affected rows,
-    # not just the two rows whose finish date was shifted.
+    # This edit moves exactly two existing works in the saved fixture.
+    # A separate native scenario above independently validates critical-only
+    # changes with no own finish shift. Do not invent extra changed works.
     import re
     impact_counts={int(hit.group(1)) for name in d.visible_texts()
                    if (hit:=re.fullmatch(r"Показать все затронутые работы: (\d+)",name))}
     assert len(impact_counts)==1,impact_counts
     affected_count=impact_counts.pop()
-    assert affected_count>2,"Critical-only work changes were omitted"
+    assert affected_count==2,("Unexpected affected work count for the saved "
+                             "two-work duration correction",affected_count)
     affected=find_control("Показать все затронутые работы: "+str(affected_count),
                           types={"Button"},scroll=True)
     affected.click_input()
@@ -653,6 +654,33 @@ def qualify_visual():
     assert d.head()==final_head
     assert d.saved_project(final_head)==final
     print("ATLAS06_VISUAL_AFFECTED_WORK_LINK_RESTART_PASS",flush=True)
+    # In the installed compact work table, the calculated deadline risk
+    # must explain the exact amount and the predecessor that determines
+    # the start. Opening either work is read-only until an explicit Save.
+    win32gui.MoveWindow(d.handle,0,0,820,650,True)
+    select_project()
+    d.click_button("Таблица")
+    d.set_text("Найти работу","Работа 0 / 2")
+    d.wait_text("Отставание от контрольного срока: 2 дн.",25)
+    driver=find_control("Открыть работу, определяющую срок Работа 0 / 1",
+                        types={"Button"},scroll=True)
+    driver.click_input()
+    d.window_title_contains("Форма: Работа: Работа 0 / 1",25)
+    assert d.head()==final_head
+    keyboard.send_keys("{ESC}")
+    await_no_form()
+    fix=find_control("Исправить план работы Работа 0 / 2",
+                     types={"Button"},scroll=True)
+    assert rectangle_in_workspace(fix.rectangle(),win32gui.GetWindowRect(d.handle))
+    capture("atlas07-work-deadline-explanation-820")
+    fix.click_input()
+    d.window_title_contains("Форма: Работа: Работа 0 / 2",25)
+    assert d.head()==final_head,"Risk explanation changed native Store"
+    keyboard.send_keys("{ESC}")
+    await_no_form()
+    assert d.saved_project(final_head)==final
+    win32gui.MoveWindow(d.handle,0,0,1024,710,True)
+    print("ATLAS07_WORK_DEADLINE_EXPLANATION_PASS",flush=True)
 
     # The existing Gantt can now show the single work whose calculated
     # finish passes its own control date. Filtering and opening it are

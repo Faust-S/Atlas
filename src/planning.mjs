@@ -78,6 +78,42 @@ export function scheduleProject(p) {
 
 
 /**
+ * Explain dated schedule overruns using the existing CPM rows. The limiting
+ * predecessors have the same calculated finish as this work's earliest start.
+ * This is a read-only estimate, not an assertion of actual execution delay.
+ */
+export function scheduleDeadlineExplanations(plan,{limit=2}={}){
+ if(!plan||!Array.isArray(plan.rows))throw new Error('Invalid deadline schedule');
+ if(!Number.isInteger(limit)||limit<1||limit>5)
+  throw new Error('Invalid deadline explanation limit');
+ const byId=new Map(plan.rows.map(row=>[row.id,row]));
+ const asUtcDay=value=>{
+  if(typeof value!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(value))return null;
+  const time=new Date(value+'T00:00:00Z').getTime();
+  return Number.isFinite(time)&&new Date(time).toISOString().slice(0,10)===value?time:null;
+ };
+ const details=new Map();
+ for(const row of plan.rows){
+  if(!row?.id||!row.dueDate||!row.finishDate)continue;
+  const due=asUtcDay(row.dueDate),finish=asUtcDay(row.finishDate);
+  if(due===null||finish===null||finish<=due)continue;
+  const limiting=(Array.isArray(row.predecessors)?row.predecessors:[])
+   .map(id=>byId.get(id)).filter(prior=>prior&&prior.earlyFinish===row.earlyStart);
+  details.set(row.id,{
+   daysLate:(finish-due)/86400000,finishDate:row.finishDate,dueDate:row.dueDate,
+   durationDays:row.durationDays,critical:Boolean(row.critical),
+   driverTotal:limiting.length,
+   drivers:limiting.slice(0,limit).map(prior=>({
+    id:prior.id,title:prior.title,recordedDone:prior.state==='done'
+   })),
+   hiddenDrivers:Math.max(0,limiting.length-limit)
+  });
+ }
+ return details;
+}
+
+
+/**
  * Compare two existing CPM calculations. No project entities are written.
  * New work is not counted as a shifted previously existing work.
  */
