@@ -78,3 +78,15 @@ test("Filtered large work lists keep one reset action available while scrolling 
  assert.match(css,/\.atlas-work-filter-shortcut \.atlas-work-reset-filters/);
  assert.match(ui,/const clearWorkFilters=\(\)=>/);
 });
+
+test("Enter reveals the sole searched work using the existing focus and paging route",()=>{
+ const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ assert.match(ui,/title=\{filteredWork\.length===1&&workQuery\.trim\(\)\?"Enter: перейти к найденной работе":undefined\}/);
+ assert.match(ui,/onKeyDown=\{e=>\{\s*if\(e\.key==="Enter"&&workQuery\.trim\(\)&&filteredWork\.length===1\)\{/);
+ assert.match(ui,/e\.preventDefault\(\);setWorkReturnId\(filteredWork\[0\]\.id\)/);
+ assert.match(ui,/workQuery\.trim\(\)&&filteredWork\.length===1&&<small>Enter: перейти к найденной работе<\/small>/);
+ assert.match(ui,/if\(index>=workLimit\)\{setWorkLimit\(index\+1\);return;\}/);
+ assert.match(ui,/control\.scrollIntoView\(\{block:"center",behavior:"auto"\}\)/);
+ const segment=ui.slice(ui.indexOf('<label>Найти работу <input'),ui.indexOf('<label>Сортировка <select'));
+ assert.doesNotMatch(segment,/mutate\(|commitWithReadback\(|nativeInvoke\(|localStorage/);
+});

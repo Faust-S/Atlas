@@ -75,6 +75,26 @@ def qualify():
     d.wait_text("Показано 200 из 1213 работ по фильтру",35)
     assert d.head()==before and d.saved_project(before)==expected
     print("ATLAS07_INSTALLED_WORK_TABLE_FILTER_RESET_PASS",flush=True)
+    # Native keyboard navigation: the exact work is outside the first
+    # viewport, but Enter on a unique search must reveal its real row.
+    v.select_project()
+    v.find_control("Таблица",types={"Button"}).click_input()
+    d.set_text("Найти работу","Работа 5 / 1080")
+    d.wait_text("Показано 1 из 1 работ по фильтру",25)
+    from pywinauto import keyboard
+    keyboard.send_keys("{ENTER}")
+    exact=v.find_control("Открыть работу Работа 5 / 1080",
+                         types={"Button"},scroll=False)
+    assert v.rectangle_in_workspace(exact.rectangle(),win32gui.GetWindowRect(d.handle)),(
+        "Enter did not focus the single deep work row")
+    v.capture("atlas07-single-work-enter-direct-820")
+    assert d.head()==before and d.saved_project(before)==expected
+    exact.click_input()
+    d.window_title_contains("Форма: Работа: Работа 5 / 1080",25)
+    assert d.head()==before,"Opening work through Enter changed native Store"
+    keyboard.send_keys("{ESC}")
+    v.await_no_form()
+    print("ATLAS07_WORK_TABLE_ENTER_JUMP_PASS",flush=True)
     print("ATLAS07_INSTALLED_WORK_TABLE_CONTEXT_SEARCH_PASS",flush=True)
 
 if __name__=="__main__":

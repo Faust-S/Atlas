@@ -1813,7 +1813,14 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       <option value="no_pending">Нет незавершённых</option>
      </select></label>
       <label>Найти работу <input type="search" value={workQuery} aria-label="Найти работу"
-       placeholder="Название, этап, каталог или ответственный" onChange={e=>{setWorkQuery(e.target.value);setWorkLimit(200)}}/></label>
+       placeholder="Название, этап, каталог или ответственный"
+       title={filteredWork.length===1&&workQuery.trim()?"Enter: перейти к найденной работе":undefined}
+       onChange={e=>{setWorkQuery(e.target.value);setWorkLimit(200)}}
+       onKeyDown={e=>{
+        if(e.key==="Enter"&&workQuery.trim()&&filteredWork.length===1){
+         e.preventDefault();setWorkReturnId(filteredWork[0].id);
+        }
+       }}/></label>
       <label>Сортировка <select aria-label="Сортировка работ" value={workSort} onChange={e=>{setWorkSort(e.target.value);setWorkLimit(200)}}>
        <option value="title">По названию</option><option value="dueDate">По сроку</option>
        <option value="priority">По приоритету</option><option value="estimateDays">По длительности</option>
@@ -1823,6 +1830,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      {workFiltersActive&&<div className="atlas-work-filter-shortcut"
       role="group" aria-label="Быстрые действия с фильтрами работ">
       <small>Показано {Math.min(filteredWork.length,workLimit)} из {filteredWork.length} работ</small>
+      {workQuery.trim()&&filteredWork.length===1&&<small>Enter: перейти к найденной работе</small>}
       <button type="button" className="action-button atlas-work-reset-filters"
        aria-label="Сбросить фильтры работ" onClick={clearWorkFilters}>Сбросить фильтры</button>
      </div>}
