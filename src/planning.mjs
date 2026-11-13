@@ -94,7 +94,9 @@ export function scheduleChangeSummary(before,after,{limit=4}={}){
  for(const row of after.rows){
   const old=previous.get(row.id);
   if(!old)continue;
-  if(Boolean(old.critical)!==Boolean(row.critical))criticalChangedTotal++;
+  const previousCritical=Boolean(old.critical),critical=Boolean(row.critical);
+  const criticalChanged=previousCritical!==critical;
+  if(criticalChanged)criticalChangedTotal++;
   const previousDueDate=old.dueDate??null,dueDate=row.dueDate??null;
   const dueDateChanged=previousDueDate!==dueDate;
   // A deadline can be changed without shifting the CPM finish. Keep that
@@ -111,7 +113,9 @@ export function scheduleChangeSummary(before,after,{limit=4}={}){
   if(deadlineResolved)deadlineResolvedTotal++;
   if(!previouslyMissed&&missedDeadline)deadlineNewMissedTotal++;
   const shiftDays=row.earlyFinish-old.earlyFinish;
-  if(!shiftDays&&!dueDateChanged)continue;
+  // A work can enter or leave the critical path without its own finish
+  // moving. The work list must not silently omit that decision-relevant fact.
+  if(!shiftDays&&!dueDateChanged&&!criticalChanged)continue;
   if(shiftDays){
    movedTotal++;
    if(shiftDays>0)delayedTotal++;else earlierTotal++;
@@ -123,17 +127,20 @@ export function scheduleChangeSummary(before,after,{limit=4}={}){
    previousFinishDate:old.finishDate??null,finishDate:row.finishDate??null,
    previousDueDate,dueDate,dueDateChanged,missedDeadline,
    deadlineResolved,deadlineRemoved,
-   critical:Boolean(row.critical)
+   previousCritical,critical,criticalChanged,newCritical:criticalChanged&&critical
   });
  }
  // Keep missed deadlines and corrected deadlines visible in a limited
  // preview; remaining moved works follow by the magnitude of their impact.
  affected.sort((a,b)=>Number(b.missedDeadline)-Number(a.missedDeadline)||
+  Number(b.newCritical)-Number(a.newCritical)||
   Number(b.deadlineResolved)-Number(a.deadlineResolved)||
   Number(b.deadlineRemoved)-Number(a.deadlineRemoved)||
   Number(b.dueDateChanged)-Number(a.dueDateChanged)||
   Number(b.shiftDays>0)-Number(a.shiftDays>0)||
-  Math.abs(b.shiftDays)-Math.abs(a.shiftDays)||Number(b.critical)-Number(a.critical));
+  Math.abs(b.shiftDays)-Math.abs(a.shiftDays)||
+  Number(b.criticalChanged)-Number(a.criticalChanged)||
+  Number(b.critical)-Number(a.critical));
  return {durationBefore:before.durationDays,durationAfter:after.durationDays,
   movedTotal,delayedTotal,earlierTotal,criticalChangedTotal,deadlineMissedTotal,
   deadlineChangedTotal,deadlineResolvedTotal,deadlineNewMissedTotal,deadlineRemovedTotal,

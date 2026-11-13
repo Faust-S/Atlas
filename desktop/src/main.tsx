@@ -1722,7 +1722,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
             <button type="button" className="action-button"
              aria-label="Вернуться ко всем работам после изменения плана"
              onClick={clearWorkFilters}>Все работы проекта</button>}
-           {workImpactActive&&<small role="status">Показаны работы с изменившимся расчётным окончанием или контрольным сроком.</small>}
+           {workImpactActive&&<small role="status">Показаны работы с изменением расчётного окончания, контрольного срока или критического пути.</small>}
           </div>}
           {recentScheduleEffect.examples.length>0&&<ul className="atlas-work-effect-list">
            {recentScheduleEffect.examples.map((item,index)=><li key={item.id}>
@@ -1739,7 +1739,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
              Расчётное окончание: {item.finishDate||
               "через "+item.finishOffset+" дн. от начала проекта"}. Без сдвига графика.
             </>}
-             {item.critical?" На критическом пути.":""}</small>
+             {item.criticalChanged?(item.critical?
+              " Теперь на критическом пути.":" Больше не на критическом пути."):
+              item.critical?" На критическом пути.":""}</small>
             {item.dueDateChanged&&<small className="atlas-work-effect-deadline">
              Контрольный срок: было {item.previousDueDate||"не задано"},
              стало {item.dueDate||"не задано"}.

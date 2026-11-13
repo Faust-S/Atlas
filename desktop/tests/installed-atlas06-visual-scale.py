@@ -544,6 +544,17 @@ def qualify_visual():
     assert d.head()==changed,"Choosing a predecessor silently saved native storage"
     d.wait_text("Связь внесена в черновик.",35)
     d.wait_text("Расчётные сроки существующих работ не сдвинулись.",35)
+    d.wait_text("Теперь на критическом пути.",35)
+    critical_only=find_control("Показать все затронутые работы: 1",
+                               types={"Button"},scroll=True)
+    critical_only.click_input()
+    d.wait_text("Показано 1 из 1 работ по фильтру",25)
+    assert d.head()==changed,"Critical-path inspection saved without approval"
+    show_all_critical=find_control("Вернуться ко всем работам после изменения плана",
+                                   types={"Button"},scroll=True)
+    show_all_critical.click_input()
+    d.wait_text("Показано 200 из 1213 работ по фильтру",25)
+    print("ATLAS07_VISUAL_CRITICAL_ONLY_AFFECTED_WORK_PASS",flush=True)
     d.wait_text("Продолжительность плана: было",35)
     print("ATLAS06_VISUAL_EXISTING_WORK_DEPENDENCY_EFFECT_PASS",flush=True)
     print("ATLAS06_VISUAL_EXISTING_WORK_PREDECESSOR_FORM_PASS",flush=True)
@@ -604,10 +615,19 @@ def qualify_visual():
     print("ATLAS06_VISUAL_AFFECTED_WORK_REPLANNED_PASS",flush=True)
     # The impact projection must offer *every* affected work in the real
     # work table; the preview's four-row limit is not a work limit.
-    affected=find_control("Показать все затронутые работы: 2",
+    # Changing the project completion can remove many unchanged-finish
+    # works from the critical path. Count the real computed affected rows,
+    # not just the two rows whose finish date was shifted.
+    import re
+    impact_counts={int(hit.group(1)) for name in d.visible_texts()
+                   if (hit:=re.fullmatch(r"Показать все затронутые работы: (\d+)",name))}
+    assert len(impact_counts)==1,impact_counts
+    affected_count=impact_counts.pop()
+    assert affected_count>2,"Critical-only work changes were omitted"
+    affected=find_control("Показать все затронутые работы: "+str(affected_count),
                           types={"Button"},scroll=True)
     affected.click_input()
-    d.wait_text("Показано 2 из 2 работ по фильтру",25)
+    d.wait_text(f"Показано {min(200,affected_count)} из {affected_count} работ по фильтру",25)
     assert d.head()==linked_head,"Impact inspection wrote without Save"
     capture("all-affected-works-filtered")
     show_all=find_control("Вернуться ко всем работам после изменения плана",

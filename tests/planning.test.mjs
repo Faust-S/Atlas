@@ -35,8 +35,10 @@ test('comparison reports shifted existing work but excludes newly created work',
  assert.equal(changed.movedTotal,2);
  assert.equal(changed.delayedTotal,2);
  assert.equal(changed.earlierTotal,0);
- assert.deepEqual(new Set(changed.examples.map(x=>x.id)),new Set(['b','c']));
- assert.deepEqual(changed.examples.map(x=>x.shiftDays),[3,3]);
+ assert.deepEqual(new Set(changed.affectedIds),new Set(['a','b','c']));
+ assert.deepEqual(changed.examples.map(x=>x.shiftDays),[0,3,3]);
+ assert.equal(changed.examples[0].newCritical,true);
+ assert.equal(changed.criticalChangedTotal,1);
  assert.equal(JSON.stringify(before),oldText);
  assert.equal(JSON.stringify(after),newText);
  const newItem=project([['a',3],['b',2],['c',2],['d',1],['e',9]],[['b','c']]);
@@ -110,13 +112,18 @@ test('affected work exposes a missed control date without changing planned value
  const oldText=JSON.stringify(original),newText=JSON.stringify(changed);
  const delta=scheduleChangeSummary(before,after);
  assert.equal(delta.movedTotal,2);
- assert.equal(delta.deadlineMissedTotal,1);
+ assert.equal(delta.deadlineMissedTotal,2);
+ assert.deepEqual(new Set(delta.affectedIds),new Set(['a','b','c','d']));
  const missed=delta.examples.find(x=>x.id==='b');
  assert.equal(missed.dueDate,'2026-11-04');
  assert.equal(missed.finishDate,'2026-11-05');
  assert.equal(missed.missedDeadline,true);
  assert.equal(delta.examples.find(x=>x.id==='c').missedDeadline,false);
- assert.equal(delta.examples.some(x=>x.id==='d'),false);
+ const earlierCritical=delta.examples.find(x=>x.id==='d');
+ assert.ok(earlierCritical,"Previously critical work must remain reviewable");
+ assert.equal(earlierCritical.shiftDays,0);
+ assert.equal(earlierCritical.criticalChanged,true);
+ assert.equal(earlierCritical.critical,false);
  assert.equal(JSON.stringify(original),oldText);
  assert.equal(JSON.stringify(changed),newText);
  const undated=project([['a',2],['b',2],['c',1]],[['b','c']],null);
@@ -260,4 +267,57 @@ test('all affected work IDs survive a bounded impact preview without duplicate o
  assert.equal(new Set(result.affectedIds).size,result.affectedIds.length);
  assert.equal(JSON.stringify(original),beforeText);
  assert.equal(JSON.stringify(updated),afterText);
+});
+
+test('a work entering the critical path is actionable even when its finish does not move',()=>{
+ const baseline=project([['steady',5],['longer',6]],[],null);
+ const changed=project([['steady',5],['longer',5]],[],null);
+ const before=scheduleProject(baseline),after=scheduleProject(changed);
+ const beforeSnapshot=JSON.stringify(before),afterSnapshot=JSON.stringify(after);
+ const delta=scheduleChangeSummary(before,after,{limit:1});
+ assert.equal(delta.movedTotal,1);
+ assert.equal(delta.criticalChangedTotal,1);
+ assert.equal(delta.affectedTotal,2);
+ assert.deepEqual(new Set(delta.affectedIds),new Set(['steady','longer']));
+ assert.equal(delta.examples[0].id,'steady',
+  'A newly critical work must be visible before a merely shortened work');
+ assert.equal(delta.examples[0].shiftDays,0);
+ assert.equal(delta.examples[0].criticalChanged,true);
+ assert.equal(delta.examples[0].previousCritical,false);
+ assert.equal(delta.examples[0].newCritical,true);
+ assert.equal(delta.examples[0].critical,true);
+ assert.equal(JSON.stringify(before),beforeSnapshot);
+ assert.equal(JSON.stringify(after),afterSnapshot);
+});
+
+test('a work leaving the critical path remains visible without a finish-date shift',()=>{
+ const baseline=project([['steady',5],['peer',5]],[],null);
+ const changed=project([['steady',5],['peer',6]],[],null);
+ const delta=scheduleChangeSummary(scheduleProject(baseline),scheduleProject(changed));
+ const steady=delta.examples.find(x=>x.id==='steady');
+ assert.equal(delta.criticalChangedTotal,1);
+ assert.equal(delta.movedTotal,1);
+ assert.equal(delta.affectedTotal,2);
+ assert.ok(steady);
+ assert.equal(steady.shiftDays,0);
+ assert.equal(steady.criticalChanged,true);
+ assert.equal(steady.previousCritical,true);
+ assert.equal(steady.critical,false);
+ assert.equal(steady.newCritical,false);
+});
+
+test('adding a longer independent work changes the original critical path without moving it',()=>{
+ const original=project([['existing',5]],[],null);
+ const extended=project([['existing',5],['new',8]],[],null);
+ const result=scheduleChangeSummary(scheduleProject(original),scheduleProject(extended));
+ assert.equal(result.durationBefore,5);
+ assert.equal(result.durationAfter,8);
+ assert.equal(result.movedTotal,0);
+ assert.equal(result.criticalChangedTotal,1);
+ assert.equal(result.affectedTotal,1);
+ assert.deepEqual(result.affectedIds,['existing']);
+ assert.equal(result.examples[0].shiftDays,0);
+ assert.equal(result.examples[0].criticalChanged,true);
+ assert.equal(result.examples[0].critical,false);
+ assert.equal(result.examples.some(x=>x.id==='new'),false);
 });

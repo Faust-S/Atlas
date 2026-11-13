@@ -753,7 +753,9 @@ test("An existing-work dependency explains CPM effects without writing data",()=
  assert.match(ui,/onClick=\{\(\)=>openEditor\("work:"\+item\.id\)\}/);
  assert.match(ui,/item\.previousFinishDate&&item\.finishDate/);
  assert.match(ui,/item\.previousFinishOffset/);
- assert.match(ui,/item\.critical\?" На критическом пути\."/);
+ assert.match(ui,/item\.criticalChanged\?\(item\.critical\?/);
+ assert.match(ui,/Теперь на критическом пути\./);
+ assert.match(ui,/Больше не на критическом пути\./);
  assert.match(plan,/export function scheduleChangeSummary\(/);
  const from=plan.indexOf("export function scheduleChangeSummary(");
  const to=plan.indexOf("export function workDependencyOverview(");
@@ -919,4 +921,18 @@ test("Atlas 0.7 offers optional source connection in every new project without i
  assert.doesNotMatch(guide,/!recordedSources&&project\?\.type==="engineering"/);
  assert.match(guide,/!showMap&&<p className="minor">Добавьте этап или работу/);
  assert.doesNotMatch(section,/mutate\(|commitWithReadback\(|nativeInvoke\(/);
+});
+
+test("Schedule impact list preserves critical-only changes and makes them readable",()=>{
+ const ui=read("../desktop/src/main.tsx");
+ const calc=read("../src/planning.mjs");
+ assert.match(calc,/if\(!shiftDays&&!dueDateChanged&&!criticalChanged\)continue/);
+ assert.match(calc,/newCritical:criticalChanged&&critical/);
+ assert.match(calc,/Number\(b\.newCritical\)-Number\(a\.newCritical\)/);
+ assert.match(ui,/item\.criticalChanged\?\(item\.critical\?/);
+ assert.match(ui,/Теперь на критическом пути\./);
+ assert.match(ui,/Больше не на критическом пути\./);
+ assert.match(ui,/контрольного срока или критического пути/);
+ const start=ui.indexOf("const showAffectedWorks="),end=ui.indexOf("const filteredWork=",start);
+ assert.doesNotMatch(ui.slice(start,end),/mutate\(|commitWithReadback\(|nativeInvoke\(|fetch\(/);
 });
