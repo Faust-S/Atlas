@@ -278,7 +278,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const [reviewLimit,setReviewLimit]=useState(20);
  const [sourceLimit,setSourceLimit]=useState(15);
  const [sourceRowLimits,setSourceRowLimits]=useState<Record<string,number>>({});
- const [sourceJump,setSourceJump]=useState<{projectId:string;workId:string;query:string;origin:"overview"|"work"}|null>(null);
+ const [sourceJump,setSourceJump]=useState<{projectId:string;workId:string;query:string;origin:"overview"|"work"|"graph";graphOrigin:"overview"|"work"|"board"|null}|null>(null);
  const [mapSearchReturn,setMapSearchReturn]=useState<{workId:string;query:string}|null>(null);
  const [graphJump,setGraphJump]=useState<{projectId:string;workId:string;query:string;origin:"overview"|"work"|"board"}|null>(null);
  const [workReturnId,setWorkReturnId]=useState<string|null>(null);
@@ -1037,10 +1037,12 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   setWorkReturnId(overdueWorkFinishes.size===1?
    overdueWorkFinishes.keys().next().value??null:null);
  };
- const openLinkedSource=(workId:string,query:string,origin:"overview"|"work"="overview")=>{
+ const openLinkedSource=(workId:string,query:string,origin:"overview"|"work"|"graph"="overview")=>{
   if(!project||!requireClosedForm())return;
+  // Preserve the diagram's original return target before switching tabs.
+  const graphOrigin=origin==="graph"?graphJump?.origin||"overview":null;
   view("sources");
-  setSourceJump({projectId:project.id,workId,query,origin});
+  setSourceJump({projectId:project.id,workId,query,origin,graphOrigin});
  };
  const returnToLinkedWork=()=>{
   if(!project||sourceJump?.origin!=="work"||!requireClosedForm())return;
@@ -1054,6 +1056,10 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   view("graph");
   const work=workId&&project.items.find((item:any)=>item.id===workId);
   setGraphJump(work?{projectId:project.id,workId:work.id,query:query||"",origin}:null);
+ };
+ const returnToLinkedGraph=()=>{
+  if(!project||sourceJump?.origin!=="graph")return;
+  openWorkGraph(sourceJump.workId,sourceJump.query,sourceJump.graphOrigin||"overview");
  };
  const returnFromWorkGraph=()=>{
   if(graphJump?.origin==="work"){
@@ -1911,9 +1917,14 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     {tab==="graph"&&<section className="surface"><div className="section-heading">
       <div><h2>Зависимости работ</h2><p>Посмотрите, какие работы должны завершиться раньше и какие зависят от них. Красные линии отмечают критический путь.</p></div>
       <Action onClick={()=>openEditor("dep")}>＋ Зависимость</Action></div>
-      {graphFocusWork&&<div className="button-row">
+      {graphFocusWork&&<div className="button-row atlas-graph-focus-actions"
+       role="group" aria-label="Выбранная работа на схеме связей">
        <p className="minor" style={{overflowWrap:"anywhere"}}>Связи работы: <strong>{graphFocusWork.title}</strong></p>
        <Action onClick={returnFromWorkGraph}>{graphJump?.origin==="work"?"К работе в таблице":graphJump?.origin==="board"?"К работе на доске":"К найденной работе"}</Action>
+       {graphFocusWork.sourceId&&<button type="button" className="text-link atlas-graph-focus-source"
+        aria-label={"Показать источник для связей работы "+graphFocusWork.title}
+        onClick={()=>openLinkedSource(graphFocusWork.id,graphJump?.query||"","graph")}>
+        К источнику работы</button>}
       </div>}
       {plan&&<ProjectDependencyDiagram key={project.id} schedule={plan}
        focusWorkId={graphFocusWork?.id||null} onOpenWork={id=>openEditor("work:"+id)}/>}
@@ -2041,6 +2052,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
        {sourceJump?.origin==="work"&&<button type="button" className="text-link"
         aria-label={"Вернуться к работе "+sourceJumpContext.title}
         onClick={returnToLinkedWork}>К работе</button>}
+       {sourceJump?.origin==="graph"&&<button type="button" className="text-link"
+        aria-label={"Вернуться к связям работы "+sourceJumpContext.title}
+        onClick={returnToLinkedGraph}>К связям работы</button>}
        <button type="button" className="text-link"
         onClick={()=>view("overview")}>К схеме</button>
        <button type="button" className="text-link" onClick={()=>setSourceJump(null)}>
@@ -2081,6 +2095,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
          {sourceJump?.origin==="work"&&<button type="button" className="text-link"
           aria-label={"Вернуться к работе "+sourceJumpContext!.title}
           onClick={returnToLinkedWork}>К работе</button>}
+         {sourceJump?.origin==="graph"&&<button type="button" className="text-link"
+          aria-label={"Вернуться к связям работы "+sourceJumpContext!.title}
+          onClick={returnToLinkedGraph}>К связям работы</button>}
          <button type="button" className="text-link" onClick={()=>view("overview")}>
           К схеме</button>
          <button type="button" className="text-link" onClick={()=>setSourceJump(null)}>

@@ -206,3 +206,20 @@ test("A saved work source opens in Atlas and returns to exactly the filtered wor
  assert.match(css,/\.atlas-work-source-link\{/);
  assert.equal(serialize(snapshot),original);
 });
+
+test("A focused work diagram opens its saved source and restores the exact diagram",()=>{
+ const snapshot=fixture(),original=serialize(snapshot),work=snapshot.projects[0].items
+  .find(item=>item.id==="visual-work-5-1079");
+ assert.ok(work?.sourceId);
+ const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ const css=readFileSync(new URL("../desktop/src/style.css",import.meta.url),"utf8");
+ assert.match(ui,/graphFocusWork\.sourceId&&<button type="button" className="text-link atlas-graph-focus-source"/);
+ assert.match(ui,/onClick=\{\(\)=>openLinkedSource\(graphFocusWork\.id,graphJump\?\.query\|\|"","graph"\)\}/);
+ assert.match(ui,/const graphOrigin=origin==="graph"\?graphJump\?\.origin\|\|"overview":null;/);
+ assert.match(ui,/const returnToLinkedGraph=\(\)=>\{/);
+ assert.match(ui,/openWorkGraph\(sourceJump\.workId,sourceJump\.query,sourceJump\.graphOrigin\|\|"overview"\)/);
+ assert.match(ui,/aria-label=\{"Вернуться к связям работы "\+sourceJumpContext!?\.title\}/);
+ assert.match(ui,/focusWorkId=\{graphFocusWork\?\.id\|\|null\}/);
+ assert.match(css,/\.atlas-graph-focus-source\{/);
+ assert.equal(serialize(snapshot),original);
+});

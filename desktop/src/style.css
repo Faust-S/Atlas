@@ -927,3 +927,8 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
  display:block;text-align:left;width:fit-content;max-width:100%;
  margin:3px 0 0;font-size:12px;white-space:normal;
 }
+
+/* The focused dependency and its source stay actionable on small laptops. */
+.atlas-graph-focus-actions{gap:8px;align-items:center;min-width:0}
+.atlas-graph-focus-actions .minor{min-width:0;max-width:100%;margin:0 6px 0 0}
+.atlas-graph-focus-source{min-height:32px;max-width:100%;font-size:12px;white-space:normal}

@@ -93,6 +93,33 @@ def qualify():
                             types={"Button"},scroll=False)
     assert v.rectangle_in_workspace(restored.rectangle(),win32gui.GetWindowRect(d.handle))
     assert d.head()==before and d.saved_project(before)==expected
+    # Continue through the native dependency view, then inspect the same
+    # saved source and return to the focused diagram and original table row.
+    graph=v.find_control("Связи работы Работа 5 / 1080",
+                         types={"Button"},scroll=True)
+    graph.click_input()
+    d.wait_text("Зависимости работ",25)
+    source_from_graph=v.find_control(
+        "Показать источник для связей работы Работа 5 / 1080",
+        types={"Button"},scroll=False)
+    assert v.rectangle_in_workspace(source_from_graph.rectangle(),
+                                    win32gui.GetWindowRect(d.handle))
+    source_from_graph.click_input()
+    d.wait_text("Связь работы с каталогом",25)
+    return_to_graph=v.find_control(
+        "Вернуться к связям работы Работа 5 / 1080",
+        types={"Button"},scroll=True)
+    assert v.rectangle_in_workspace(return_to_graph.rectangle(),
+                                    win32gui.GetWindowRect(d.handle))
+    return_to_graph.click_input()
+    d.wait_text("Зависимости работ",25)
+    v.capture("atlas07-graph-source-roundtrip-820")
+    back_to_work=v.find_control("К работе в таблице",types={"Button"},scroll=False)
+    assert v.rectangle_in_workspace(back_to_work.rectangle(),
+                                    win32gui.GetWindowRect(d.handle))
+    back_to_work.click_input()
+    d.wait_text("Открыть работу Работа 5 / 1080",25)
+    assert d.head()==before and d.saved_project(before)==expected
     d.click_button("Открыть портфель проектов")
     d.wait_text("Найдено проектов: 1",25)
     quick=v.find_control("Открыть найденный проект Контрольный большой проект",
