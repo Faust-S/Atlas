@@ -430,7 +430,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  // Explain matches only when there is a query. Cache alongside the
  // existing portfolio projection so unrelated panel state is cheap.
  const portfolioReasons=useMemo(()=>new Map<string,string>(
-  search.trim()?filtered.map((p:any)=>[p.id,portfolioSearchReason(p,search)]):[]
+  search.trim()?filtered.map((p:any):[string,string]=>
+   [p.id,portfolioSearchReason(p,search)]):[]
  ),[filtered,search]);
  // A single accessible name and a single visible text node. Separate
  // expressions for the caption and count can create separate WebView2 UIA
@@ -1196,7 +1197,16 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
          setSearch("");setPortfolioLimit(150);setSidebarLimit(120);
          document.getElementById("atlas-search")?.focus();
         }}>Показать все проекты</button>}
-      </div></div>
+      </div>
+      {search.trim()&&filtered.length===1&&<div className="atlas-portfolio-quick-hit"
+       role="group" aria-label="Найденный проект">
+       <strong title={filtered[0].name}>{filtered[0].name}</strong>
+       {portfolioReasons.get(filtered[0].id)&&<small
+        title={portfolioReasons.get(filtered[0].id)}>{portfolioReasons.get(filtered[0].id)}</small>}
+       <button type="button" className="text-link"
+        aria-label={"Открыть найденный проект "+filtered[0].name}
+        onClick={()=>selectProject(filtered[0].id)}>Открыть проект</button>
+      </div>}</div>
       <div className="button-row">
        <Action onClick={startConnection}>Подключить проект</Action>
        <Action onClick={()=>openEditor("new")} primary title="Ctrl+N">＋ Новый проект</Action>

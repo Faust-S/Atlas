@@ -118,3 +118,20 @@ test("The portfolio table identifies why each project matched without a new stor
  assert.match(css,/\.atlas-portfolio-match-reason\{/);
  assert.match(css,/text-overflow:ellipsis/);
 });
+
+
+test("One matching project offers an above-fold explanation and a direct opening action",()=>{
+ const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ const css=readFileSync(new URL("../desktop/src/style.css",import.meta.url),"utf8");
+ const where=ui.indexOf('className="atlas-portfolio-quick-hit"');
+ const row=ui.indexOf('className="atlas-portfolio-match-reason"');
+ const first=ui.slice(where,where+780);
+ assert.ok(where>0&&row>where);
+ assert.match(ui,/filtered\.map\(\(p:any\):\[string,string\]=>/);
+ assert.match(first,/role="group" aria-label="Найденный проект"/);
+ assert.match(first,/portfolioReasons\.get\(filtered\[0\]\.id\)/);
+ assert.match(first,/aria-label=\{"Открыть найденный проект "\+filtered\[0\]\.name\}/);
+ assert.match(first,/onClick=\{\(\)=>selectProject\(filtered\[0\]\.id\)\}/);
+ assert.match(css,/\.atlas-portfolio-quick-hit\{/);
+ assert.match(css,/max-width:240px;overflow:hidden;text-overflow:ellipsis/);
+});

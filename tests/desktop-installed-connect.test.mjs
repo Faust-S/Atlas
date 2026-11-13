@@ -850,3 +850,17 @@ test("Installed portfolio search reset is physically visible on a 820x650 Window
  assert.match(driver,/reset\.click_input\(\)/);
  assert.match(driver,/win32gui\.MoveWindow\(d\.handle,0,0,1024,768,True\)/);
 });
+
+
+test("Installed Atlas 0.7 opens one matched project from the top of a 820x650 portfolio",()=>{
+ const driver=read("../desktop/tests/installed-atlas07-portfolio-search.py");
+ assert.match(driver,/d\.wait_text\("Работа: Работа 5 \/ 1080",20\)/);
+ assert.match(driver,/d\.wait_text\("Этап: Этап работ 48",20\)/);
+ assert.match(driver,/d\.wait_text\("Каталог: atlas-visual-fixture\/project-5 \/ directory-23",20\)/);
+ assert.match(driver,/d\.wait_text\("Работа: Работа 5 \/ 1080",25\)/);
+ assert.match(driver,/v\.find_control\("Открыть найденный проект Контрольный большой проект",/);
+ assert.match(driver,/v\.rectangle_in_workspace\(quick\.rectangle\(\),win32gui\.GetWindowRect\(d\.handle\)\)/);
+ assert.match(driver,/v\.capture\("atlas07-portfolio-quick-open-820"\)/);
+ assert.match(driver,/quick\.click_input\(\)/);
+ assert.match(driver,/assert d\.head\(\)==before and d\.saved_project\(before\)==expected/);
+});

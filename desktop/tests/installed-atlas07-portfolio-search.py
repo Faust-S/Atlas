@@ -27,11 +27,14 @@ def qualify():
     d.wait_text("Проекты и последствия",35)
     d.set_text(SEARCH,"Работа 5 / 1080")
     d.wait_text("Найдено проектов: 1",35)
+    d.wait_text("Работа: Работа 5 / 1080",20)
     assert d.head()==before and d.saved_project(before)==expected
     d.set_text(SEARCH,"Этап работ 48")
     d.wait_text("Найдено проектов: 1",35)
+    d.wait_text("Этап: Этап работ 48",20)
     d.set_text(SEARCH,"project-5 directory-23")
     d.wait_text("Найдено проектов: 1",35)
+    d.wait_text("Каталог: atlas-visual-fixture/project-5 / directory-23",20)
     v.capture("atlas07-portfolio-search-source")
     d.set_text(SEARCH,"такого проекта нет")
     d.wait_text("Найдено проектов: 0",35)
@@ -52,7 +55,17 @@ def qualify():
     # already cleared field, without relying on it for the reset action.
     d.set_text(SEARCH,"")
     d.wait_text("В списке проектов: 1",35)
-    v.select_project()
+    # One result offers a direct, physical navigation near the search
+    # counter even on a small notebook, without scrolling the portfolio.
+    d.set_text(SEARCH,"Работа 5 / 1080")
+    d.wait_text("Работа: Работа 5 / 1080",25)
+    win32gui.MoveWindow(d.handle,0,0,820,650,True)
+    time.sleep(0.3)
+    quick=v.find_control("Открыть найденный проект Контрольный большой проект",
+                         types={"Button"},scroll=False)
+    assert v.rectangle_in_workspace(quick.rectangle(),win32gui.GetWindowRect(d.handle))
+    v.capture("atlas07-portfolio-quick-open-820")
+    quick.click_input()
     d.window_title_contains("Контрольный большой проект",25)
     assert d.head()==before and d.saved_project(before)==expected
     print("ATLAS07_INSTALLED_PORTFOLIO_CONTENT_SEARCH_PASS",flush=True)

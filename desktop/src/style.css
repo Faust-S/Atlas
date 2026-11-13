@@ -897,3 +897,17 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
  display:block;max-width:260px;overflow:hidden;text-overflow:ellipsis;
  white-space:nowrap;color:#245c96!important;font-weight:600;
 }
+
+/* One matching project remains actionable without scrolling to the table. */
+.atlas-portfolio-quick-hit{
+ display:flex;align-items:center;flex-wrap:wrap;column-gap:11px;row-gap:3px;
+ margin:6px 0 0;padding:4px 0 0;
+}
+.atlas-portfolio-quick-hit strong,
+.atlas-portfolio-quick-hit small{
+ display:block;max-width:240px;overflow:hidden;text-overflow:ellipsis;
+ white-space:nowrap;font-size:12px;
+}
+.atlas-portfolio-quick-hit strong{font-weight:650}
+.atlas-portfolio-quick-hit small{color:#365e8c}
+.atlas-portfolio-quick-hit .text-link{min-height:30px;font-size:12px}
