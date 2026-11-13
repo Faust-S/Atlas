@@ -875,3 +875,10 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 @container atlas-work-surface (max-width:500px){
  .atlas-work-filter-shortcut{flex-wrap:wrap;top:76px}
 }
+
+/* Atlas 0.7: search feedback is visible at the top, not hidden below a long
+   portfolio attention section. Keeps the original title and tools in place. */
+.atlas-portfolio-find-count{
+ display:inline-block;color:#2b5d9c!important;font-weight:650!important;
+ margin:3px 0 0!important;font-size:12px!important;
+}

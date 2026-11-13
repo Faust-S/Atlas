@@ -62,3 +62,15 @@ test("The existing portfolio search field indexes project contents for navigatio
  assert.match(ui,/Найти проект по работе, этапу или источнику/);
  assert.match(ui,/Показано \{Math\.min\(filtered\.length,portfolioLimit\)\} из \{filtered\.length\} проектов/);
 });
+
+
+test("Portfolio search gives immediate, accessible feedback above the long attention queue",()=>{
+ const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ const css=readFileSync(new URL("../desktop/src/style.css",import.meta.url),"utf8");
+ const location=ui.indexOf('className="atlas-portfolio-find-count" role="status" aria-live="polite"');
+ const portfolioTitle=ui.indexOf('<h1>Портфель проектов</h1>');
+ const queue=ui.indexOf('<section className="surface atlas-portfolio-command"');
+ assert.ok(portfolioTitle>0&&location>portfolioTitle&&queue>location);
+ assert.match(ui.slice(location,location+220),/search\.trim\(\)\?"Найдено проектов: ":"В списке проектов: "\}\{filtered\.length\}/);
+ assert.match(css,/\.atlas-portfolio-find-count\{/);
+});

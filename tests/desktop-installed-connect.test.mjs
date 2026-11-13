@@ -808,3 +808,13 @@ test("Native Windows text helper physically clears search fields when value is e
  const portfolio=read("../desktop/tests/installed-atlas07-portfolio-search.py");
  assert.match(portfolio,/d\.set_text\(SEARCH,""\)/);
 });
+
+
+test("Installed portfolio search validates top-of-view result counts without scrolling to the project table",()=>{
+ const driver=read("../desktop/tests/installed-atlas07-portfolio-search.py");
+ assert.equal((driver.match(/d\.wait_text\("Найдено проектов: 1",35\)/g)||[]).length,3);
+ assert.match(driver,/d\.wait_text\("Найдено проектов: 0",35\)/);
+ assert.match(driver,/d\.wait_text\("В списке проектов: 1",35\)/);
+ assert.doesNotMatch(driver,/d\.wait_text\("Показано 1 из 1 проектов по текущему поиску"/);
+ assert.match(driver,/d\.saved_project\(before\)==expected/);
+});

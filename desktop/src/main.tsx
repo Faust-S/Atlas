@@ -1177,7 +1177,10 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    {message&&<div className="alert notice" role="status">{message}<button onClick={()=>setMessage("")} aria-label="Закрыть сообщение">×</button></div>}
    {!project?<>
     <div className="page-heading"><div><small>Ваше рабочее пространство</small><h1>Портфель проектов</h1>
-      <p>Что должно быть, что известно и какие решения влияют на планы.</p></div>
+      <p>Что должно быть, что известно и какие решения влияют на планы.</p>
+      <p className="atlas-portfolio-find-count" role="status" aria-live="polite">
+       {search.trim()?"Найдено проектов: ":"В списке проектов: "}{filtered.length}
+      </p></div>
       <div className="button-row">
        <Action onClick={startConnection}>Подключить проект</Action>
        <Action onClick={()=>openEditor("new")} primary title="Ctrl+N">＋ Новый проект</Action>

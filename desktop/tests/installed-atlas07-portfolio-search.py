@@ -24,18 +24,18 @@ def qualify():
     d.click_button("Открыть портфель проектов")
     d.wait_text("Проекты и последствия",35)
     d.set_text(SEARCH,"Работа 5 / 1080")
-    d.wait_text("Показано 1 из 1 проектов по текущему поиску",35)
+    d.wait_text("Найдено проектов: 1",35)
     assert d.head()==before and d.saved_project(before)==expected
     d.set_text(SEARCH,"Этап работ 48")
-    d.wait_text("Показано 1 из 1 проектов по текущему поиску",35)
+    d.wait_text("Найдено проектов: 1",35)
     d.set_text(SEARCH,"project-5 directory-23")
-    d.wait_text("Показано 1 из 1 проектов по текущему поиску",35)
+    d.wait_text("Найдено проектов: 1",35)
     v.capture("atlas07-portfolio-search-source")
     d.set_text(SEARCH,"такого проекта нет")
-    d.wait_text("По запросу проекты не найдены",35)
+    d.wait_text("Найдено проектов: 0",35)
     assert d.head()==before,"Portfolio search wrote to native Store"
     d.set_text(SEARCH,"")
-    d.wait_text("Показано 1 из 1 проектов по текущему поиску",35)
+    d.wait_text("В списке проектов: 1",35)
     v.select_project()
     d.window_title_contains("Контрольный большой проект",25)
     assert d.head()==before and d.saved_project(before)==expected
