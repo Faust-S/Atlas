@@ -667,9 +667,28 @@ def qualify_visual():
                      types={"Button"},scroll=True)
     assert rectangle_in_workspace(fix.rectangle(),win32gui.GetWindowRect(d.handle)),(
         "Deadline correction is not physically reachable in the installed UI")
-    # The compact Windows card wraps "дн." onto another visual/UIA
-    # line. Verify the grounded amount, then the actual clickable links.
-    d.wait_text("Отставание от контрольного срока: 2",25)
+    # In compact WebView2 the visible small-text label can wrap into
+    # multiple UIA text nodes. Check normalized observed Windows labels,
+    # not a single unwrapped text node. This retains the concrete 2-day
+    # assertion and does not access DOM or application internals.
+    target="Отставаниеотконтрольногосрока:2дн."
+    risk_seen=False
+    risk_labels=[]
+    deadline=time.monotonic()+15
+    while time.monotonic()<deadline:
+        risk_labels=d.visible_texts()
+        parts=["".join(label.split()) for label in risk_labels]
+        if any(target in part for part in parts) or target in "".join(parts):
+            risk_seen=True
+            break
+        time.sleep(0.25)
+    if not risk_seen:
+        relevant=[name for name in risk_labels
+                  if "Отставание" in name or "контрольного срока" in name]
+        print("ATLAS07_DEADLINE_UIA_DIAGNOSTIC "+repr(relevant[:12]),flush=True)
+        capture("atlas07-deadline-label-uia-mismatch")
+        raise AssertionError("Windows UIA did not expose the observed two-day risk")
+    print("ATLAS07_DEADLINE_UIA_VALUE_2_DAYS_PASS",flush=True)
     driver=find_control("Открыть работу, определяющую срок Работа 0 / 1",
                         types={"Button"},scroll=True)
     assert rectangle_in_workspace(driver.rectangle(),win32gui.GetWindowRect(d.handle)),(
