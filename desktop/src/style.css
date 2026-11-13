@@ -911,3 +911,13 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .atlas-portfolio-quick-hit strong{font-weight:650}
 .atlas-portfolio-quick-hit small{color:#365e8c}
 .atlas-portfolio-quick-hit .text-link{min-height:30px;font-size:12px}
+
+/* Two or more hits stay reachable near the search field. Show at most three
+   short rows; the full table still holds every result and its explanation. */
+.atlas-portfolio-quick-list{
+ display:grid;gap:2px;max-width:100%;margin-top:4px;
+}
+.atlas-portfolio-quick-list .atlas-portfolio-quick-hit{
+ margin:0;padding:2px 0;
+}
+.atlas-portfolio-more{font-size:12px;color:#52647c}

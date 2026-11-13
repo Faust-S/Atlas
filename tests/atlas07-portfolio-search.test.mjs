@@ -4,7 +4,7 @@ import {readFileSync} from "node:fs";
 import {serialize} from "../src/core.mjs";
 import {atlas06VisualPortfolio} from "./fixtures/atlas06-visual-portfolio.mjs";
 import {atlas06UniversalPortfolio} from "./fixtures/atlas06-universal-portfolio.mjs";
-import {buildPortfolioSearchIndex,filterPortfolioSearch,portfolioSearchReason} from "../src/portfolio-search.mjs";
+import {buildPortfolioSearchIndex,filterPortfolioSearch,portfolioSearchReason,portfolioSearchWorkTarget} from "../src/portfolio-search.mjs";
 
 function fixture(){
  const visual=atlas06VisualPortfolio();
@@ -146,4 +146,44 @@ test("Showing all projects removes any previously selected status restriction",(
  assert.deepEqual(search(idx,"","active"),["Городская встреча без исходников"]);
  const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
  assert.match(ui,/setSearch\(""\);setPortfolioStatus\("all"\)/);
+});
+
+test("Only one work-title match allows a direct work jump from the portfolio",()=>{
+ const snapshot=fixture(),original=serialize(snapshot),large=snapshot.projects[0];
+ assert.deepEqual(portfolioSearchWorkTarget(large,"Работа 5 / 1080"),
+  {id:"visual-work-5-1079",title:"Работа 5 / 1080"});
+ assert.equal(portfolioSearchWorkTarget(large,"Работа 5 /"),null);
+ assert.equal(portfolioSearchWorkTarget(large,"Этап работ 48"),null);
+ assert.equal(portfolioSearchWorkTarget(large,"atlas-visual-fixture/project-5"),null);
+ assert.equal(portfolioSearchWorkTarget(large,""),null);
+ assert.equal(portfolioSearchWorkTarget(null,"Работа"),null);
+ const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ assert.match(ui,/portfolioSearchWorkTarget\(filtered\[0\],search\)/);
+ assert.match(ui,/aria-label=\{"Перейти к найденной работе "\+portfolioQuickWork\.title\}/);
+ assert.match(ui,/openProjectTab\(filtered\[0\]\.id,"work"\)/);
+ assert.match(ui,/setWorkQuery\(portfolioQuickWork\.title\)/);
+ assert.match(ui,/setWorkReturnId\(portfolioQuickWork\.id\)/);
+ assert.equal(serialize(snapshot),original);
+});
+
+test("Several portfolio matches offer the first three direct links above the long table",()=>{
+ const snapshot=fixture(),original=serialize(snapshot);
+ snapshot.projects[1].name="Контрольный второй проект";
+ const index=buildPortfolioSearchIndex(snapshot.projects);
+ assert.deepEqual(search(index,"Контрольный"),
+  ["Контрольный большой проект","Контрольный второй проект"]);
+ const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ const css=readFileSync(new URL("../desktop/src/style.css",import.meta.url),"utf8");
+ const first=ui.indexOf('className="atlas-portfolio-quick-list"');
+ const table=ui.indexOf('className="atlas-portfolio-match-reason"');
+ assert.ok(first>0&&table>first);
+ const excerpt=ui.slice(first,first+1000);
+ assert.match(ui,/filtered\.length>1&&<div className="atlas-portfolio-quick-list"/);
+ assert.match(excerpt,/role="group" aria-label="Быстрый переход к найденным проектам"/);
+ assert.match(excerpt,/filtered\.slice\(0,3\)\.map\(\(p:any,index:number\)=>/);
+ assert.match(excerpt,/onClick=\{\(\)=>selectProject\(p\.id\)\}/);
+ assert.match(excerpt,/filtered\.length>3&&<small className="atlas-portfolio-more"/);
+ assert.match(css,/\.atlas-portfolio-quick-list\{/);
+ assert.equal(serialize(snapshot),original.replace("Городская встреча без исходников",
+  "Контрольный второй проект"));
 });

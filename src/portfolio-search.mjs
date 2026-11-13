@@ -62,3 +62,20 @@ export function portfolioSearchReason(project,query){
  }
  return "";
 }
+
+
+// A direct link is safe only for one unambiguous work title. A stage,
+// assignee or source match must continue to open the project as a whole.
+export function portfolioSearchWorkTarget(project,query){
+ const needle=fold(query);
+ if(!needle||!project)return null;
+ let selected=null;
+ for(const work of project.items||[]){
+  if(!fold(work.title).includes(needle))continue;
+  if(selected)return null;
+  selected=work;
+ }
+ if(!selected||portfolioSearchReason(project,query)!=="Работа: "+selected.title)
+  return null;
+ return {id:selected.id,title:selected.title};
+}

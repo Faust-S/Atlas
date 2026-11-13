@@ -8,7 +8,7 @@ import {editorSpec,applyEditor,editorSelectionFields,filterWorkPickerOptions,PRO
 import {compareProject,decideChange} from "../../src/trace.mjs";
 import {projectImpact,projectNextStep} from "../../src/impact.mjs";
 import {buildPortfolioCommand,filterPortfolioCommand} from "../../src/portfolio-command.mjs";
-import {buildPortfolioSearchIndex,filterPortfolioSearch,portfolioSearchReason} from "../../src/portfolio-search.mjs";
+import {buildPortfolioSearchIndex,filterPortfolioSearch,portfolioSearchReason,portfolioSearchWorkTarget} from "../../src/portfolio-search.mjs";
 import {realityOverview,workObservationIndex} from "../../src/reality-overview.mjs";
 import {responseState} from "../../src/response.mjs";
 import {scheduleProject,scheduleChangeSummary,workDependencyOverview,filterWorkRowsByDependencies} from "../../src/planning.mjs";
@@ -433,6 +433,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   search.trim()?filtered.map((p:any):[string,string]=>
    [p.id,portfolioSearchReason(p,search)]):[]
  ),[filtered,search]);
+ const portfolioQuickWork=useMemo(()=>
+  search.trim()&&filtered.length===1?portfolioSearchWorkTarget(filtered[0],search):null,
+  [filtered,search]);
  // A single accessible name and a single visible text node. Separate
  // expressions for the caption and count can create separate WebView2 UIA
  // text elements despite looking like one sentence on screen.
@@ -1206,6 +1209,28 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
        <button type="button" className="text-link"
         aria-label={"Открыть найденный проект "+filtered[0].name}
         onClick={()=>selectProject(filtered[0].id)}>Открыть проект</button>
+       {portfolioQuickWork&&<button type="button" className="text-link"
+        aria-label={"Перейти к найденной работе "+portfolioQuickWork.title}
+        onClick={()=>{
+         if(!requireClosedForm())return;
+         openProjectTab(filtered[0].id,"work");
+         setWorkQuery(portfolioQuickWork.title);
+         setWorkReturnId(portfolioQuickWork.id);
+        }}>К работе</button>}
+      </div>}
+      {search.trim()&&filtered.length>1&&<div className="atlas-portfolio-quick-list"
+       role="group" aria-label="Быстрый переход к найденным проектам">
+       {filtered.slice(0,3).map((p:any,index:number)=><div key={p.id} className="atlas-portfolio-quick-hit">
+        <strong title={p.name}>{p.name}</strong>
+        {portfolioReasons.get(p.id)&&<small
+         title={portfolioReasons.get(p.id)}>{portfolioReasons.get(p.id)}</small>}
+        <button type="button" className="text-link"
+         aria-label={"Открыть найденный проект "+p.name+" (результат "+(index+1)+")"}
+         onClick={()=>selectProject(p.id)}>Открыть проект</button>
+       </div>)}
+       {filtered.length>3&&<small className="atlas-portfolio-more">
+        Ещё {filtered.length-3} проектов в списке ниже
+       </small>}
       </div>}</div>
       <div className="button-row">
        <Action onClick={startConnection}>Подключить проект</Action>

@@ -61,6 +61,23 @@ def qualify():
     d.wait_text("Работа: Работа 5 / 1080",25)
     win32gui.MoveWindow(d.handle,0,0,820,650,True)
     time.sleep(0.3)
+    # A unique matching work can be reached directly without scrolling
+    # through the 1213-row project table. Observe its real UIA control and
+    # confirm that search/navigation did not write to native Store.
+    work_quick=v.find_control("Перейти к найденной работе Работа 5 / 1080",
+                              types={"Button"},scroll=False)
+    assert v.rectangle_in_workspace(work_quick.rectangle(),win32gui.GetWindowRect(d.handle))
+    work_quick.click_input()
+    d.window_title_contains("Контрольный большой проект",25)
+    d.wait_text("Открыть работу Работа 5 / 1080",25)
+    time.sleep(0.4)
+    work_button=v.find_control("Открыть работу Работа 5 / 1080",
+                               types={"Button"},scroll=False)
+    assert v.rectangle_in_workspace(work_button.rectangle(),win32gui.GetWindowRect(d.handle))
+    assert d.head()==before and d.saved_project(before)==expected
+    v.capture("atlas07-portfolio-direct-work-820")
+    d.click_button("Открыть портфель проектов")
+    d.wait_text("Найдено проектов: 1",25)
     quick=v.find_control("Открыть найденный проект Контрольный большой проект",
                          types={"Button"},scroll=False)
     assert v.rectangle_in_workspace(quick.rectangle(),win32gui.GetWindowRect(d.handle))
