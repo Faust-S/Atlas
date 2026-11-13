@@ -3,7 +3,9 @@ Uses real Windows UIA, no hidden API, direct Store mutation, or browser driver.
 Runs after installed hidden-source qualification on the same saved portfolio.
 """
 import importlib.util
+import re
 import sys
+import time
 from pathlib import Path
 import win32gui
 
@@ -106,17 +108,40 @@ def qualify():
     win32gui.MoveWindow(d.handle,0,0,820,650,True)
     v.select_project()
     v.find_control("Таблица",types={"Button"}).click_input()
-    import re
-    deadline_names=d.visible_texts()
-    counts={int(match.group(1)) for name in deadline_names
-            if (match:=re.fullmatch(r"Показать работы на критическом пути: (\d+)",name))}
-    assert len(counts)==1,("Critical-path action/count not available",counts)
-    critical_count=counts.pop()
+    d.wait_text("Работы проекта",35)
+    # The compact WebView2 table paints asynchronously after switching
+    # tabs. Observe an actual enabled Windows Button rather than taking
+    # one immediate, occasionally stale snapshot of all UIA text names.
+    # Chromium may expose its visible caption or the richer aria-label.
+    critical_options=[]
+    until=time.monotonic()+35
+    while time.monotonic()<until:
+        critical_options=[]
+        for control in d.window().descendants(control_type="Button"):
+            label=str(control.window_text() or "").strip()
+            match=re.fullmatch(
+                r"(?:Показать работы на критическом пути|Критический путь):\s*(\d+)",
+                label)
+            if match and control.is_visible() and control.is_enabled():
+                critical_options.append((control,int(match.group(1)),label))
+        if critical_options:
+            break
+        time.sleep(0.25)
+    observed_counts={count for _,count,_ in critical_options}
+    if len(observed_counts)!=1:
+        observed_names=[label for label in d.visible_texts()
+                        if "критич" in label.lower() or "путь" in label.lower()]
+        print("ATLAS07_CRITICAL_UIA_DIAGNOSTIC "+repr(observed_names[:20]),flush=True)
+        v.capture("atlas07-critical-filter-accessibility-mismatch")
+        raise AssertionError(("Critical-path action/count not available",
+                              observed_counts))
+    critical_count=observed_counts.pop()
     assert 0<critical_count<=len(expected["items"]),critical_count
-    show_critical=v.find_control(
-        "Показать работы на критическом пути: "+str(critical_count),
-        types={"Button"},scroll=True)
+    control_name=next(label for _,count,label in critical_options
+                      if count==critical_count)
+    show_critical=v.find_control(control_name,types={"Button"},scroll=True)
     assert v.rectangle_in_workspace(show_critical.rectangle(),win32gui.GetWindowRect(d.handle))
+    print("ATLAS07_CRITICAL_FILTER_UIA_COUNT "+str(critical_count),flush=True)
     show_critical.click_input()
     d.wait_text(f"Показано {min(200,critical_count)} из {critical_count} работ по фильтру",30)
     critical_work=v.find_control("Открыть работу Работа 0 / 1",
