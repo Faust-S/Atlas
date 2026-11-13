@@ -1,9 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
-import {serialize,deserialize} from "../src/core.mjs";
+import {serialize,deserialize,editItem} from "../src/core.mjs";
 import {projectWorkTableSearch} from "../src/project-organization.mjs";
-import {scheduleProject} from "../src/planning.mjs";
+import {scheduleProject,scheduleDeadlineExplanations,scheduleChangeSummary} from "../src/planning.mjs";
+import {editorSpec,applyEditor} from "../src/editor.mjs";
+import {deadlineFocusRows} from "../desktop/src/work-sorting.mjs";
+import {buildIwxaPortfolio,readIwxaPortfolio} from "../desktop/src/iwxa-portfolio.mjs";
 import {atlas06VisualPortfolio} from "./fixtures/atlas06-visual-portfolio.mjs";
 
 const getIds=(project,query)=>projectWorkTableSearch(project,query).map(work=>work.id);
@@ -217,4 +220,45 @@ test("overview gives direct edit of scheduled overruns, followed by explicit pla
  assert.match(ui,/onClick=\{\(\)=>void save\(\)\}>Сохранить пересчитанный план/);
  assert.match(ui,/setRecentWorkKind\("adjusted"\)/);
  assert.match(ui,/revealWorkInTable\(correctedId,false\)/);
+});
+
+test("large project: overview late-work editor, canonical replanning and IWXA reopen",async()=>{
+ const original=atlas06VisualPortfolio(),originalText=serialize(original);
+ const project=original.projects[0],workId="visual-work-5-0";
+ const row=scheduleProject(project).rows.find(item=>item.id===workId);
+ assert.ok(row?.finishDate&&row.predecessors.length>0);
+ const shift=(date,days)=>new Date(Date.parse(date+"T00:00:00Z")+days*86400000)
+  .toISOString().slice(0,10);
+ const due=shift(row.finishDate,-1),correctedDue=shift(row.finishDate,3);
+ const dated=editItem(original,project.id,workId,{dueDate:due});
+ const datedText=serialize(dated),datedProject=dated.projects[0];
+ const beforeSchedule=scheduleProject(datedProject);
+ const deadlineDetails=scheduleDeadlineExplanations(beforeSchedule);
+ const highlighted=deadlineFocusRows(datedProject.items,deadlineDetails);
+ assert.equal(highlighted[0].id,workId);
+ assert.equal(highlighted[0].daysLate,1);
+ assert.equal(highlighted[0].dueDate,due);
+ assert.ok(highlighted[0].driver,"The directly editable overdue work has a recorded limiting predecessor");
+ assert.ok(row.predecessors.includes(highlighted[0].driver.id));
+ // Use the very same editorSpec/applyEditor path as the desktop form.
+ const action="work:"+highlighted[0].id;
+ const spec=editorSpec(datedProject,action,dated);
+ const fields=Object.fromEntries(spec.fields.map(field=>[field.name,String(field.value??"")]));
+ fields.dueDate=correctedDue;
+ const applied=applyEditor(dated,project.id,action,{get:key=>fields[key]??""});
+ const afterSchedule=scheduleProject(applied.state.projects[0]);
+ const delta=scheduleChangeSummary(beforeSchedule,afterSchedule);
+ assert.equal(delta.movedTotal,0,"Changing the control date does not change the CPM dependencies");
+ assert.equal(delta.deadlineChangedTotal,1);
+ assert.equal(delta.deadlineResolvedTotal,1);
+ assert.equal(deadlineFocusRows(applied.state.projects[0].items,
+  scheduleDeadlineExplanations(afterSchedule)).some(item=>item.id===workId),false);
+ assert.equal(serialize(dated),datedText,"Editing the draft did not silently save its predecessor");
+ assert.equal(serialize(original),originalText,"Initial 1212-work snapshot remains unchanged");
+ const archive=await buildIwxaPortfolio(applied.state,{now:"2026-11-13T19:00:00.000Z"});
+ const recovered=await readIwxaPortfolio(archive);
+ assert.equal(serialize(recovered.snapshot),serialize(applied.state));
+ assert.equal(recovered.snapshot.projects[0].items.find(item=>item.id===workId).dueDate,correctedDue);
+ assert.equal(scheduleDeadlineExplanations(scheduleProject(recovered.snapshot.projects[0]))
+  .has(workId),false);
 });
