@@ -602,6 +602,20 @@ def qualify_visual():
     d.wait_text("Расчётный финиш позже контрольного срока. Затронуто работ: 1.",35)
     capture("affected-work-duration-updated-feedback")
     print("ATLAS06_VISUAL_AFFECTED_WORK_REPLANNED_PASS",flush=True)
+    # The impact projection must offer *every* affected work in the real
+    # work table; the preview's four-row limit is not a work limit.
+    affected=find_control("Показать все затронутые работы: 2",
+                          types={"Button"},scroll=True)
+    affected.click_input()
+    d.wait_text("Показано 2 из 2 работ по фильтру",25)
+    assert d.head()==linked_head,"Impact inspection wrote without Save"
+    capture("all-affected-works-filtered")
+    show_all=find_control("Вернуться ко всем работам после изменения плана",
+                          types={"Button"},scroll=True)
+    show_all.click_input()
+    d.wait_text("Показано 200 из 1213 работ по фильтру",25)
+    assert d.head()==linked_head
+    print("ATLAS07_VISUAL_ALL_AFFECTED_WORKS_FILTER_PASS",flush=True)
     d.click_button("Сохранить")
     final_head=await_saved(linked_head)
     final=d.saved_project(final_head)

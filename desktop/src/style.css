@@ -932,3 +932,9 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .atlas-graph-focus-actions{gap:8px;align-items:center;min-width:0}
 .atlas-graph-focus-actions .minor{min-width:0;max-width:100%;margin:0 6px 0 0}
 .atlas-graph-focus-source{min-height:32px;max-width:100%;font-size:12px;white-space:normal}
+
+/* The real schedule comparison drives a temporary filtered work table,
+   rather than showing only the first four affected examples. */
+.atlas-work-impact-actions{align-items:center;gap:8px;margin:8px 0 3px}
+.atlas-work-impact-actions .action-button{min-height:32px;font-size:12px;white-space:normal}
+.atlas-work-impact-actions small{font-size:11px;color:#536b86;overflow-wrap:anywhere}

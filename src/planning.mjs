@@ -137,7 +137,8 @@ export function scheduleChangeSummary(before,after,{limit=4}={}){
  return {durationBefore:before.durationDays,durationAfter:after.durationDays,
   movedTotal,delayedTotal,earlierTotal,criticalChangedTotal,deadlineMissedTotal,
   deadlineChangedTotal,deadlineResolvedTotal,deadlineNewMissedTotal,deadlineRemovedTotal,
-  affectedTotal:affected.length,examples:affected.slice(0,limit)};
+  affectedTotal:affected.length,affectedIds:affected.map(item=>item.id),
+  examples:affected.slice(0,limit)};
 }
 
 /**

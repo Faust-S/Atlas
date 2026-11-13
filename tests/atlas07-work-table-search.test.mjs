@@ -48,16 +48,17 @@ test("Existing Atlas work table applies all structured filters and search on the
 });
 
 
-test("A single action resets all table filters, including hidden overdue filter, without changing work sorting",()=>{
+test("A single action clears all work filters without disturbing manually selected sorting",()=>{
  const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
  const start=ui.indexOf('const clearWorkFilters=()=>');
- const reset=ui.slice(start,start+365);
+ const reset=ui.slice(start,ui.indexOf("const showAffectedWorks=",start));
  for(const setter of ["setWorkFilter","setWorkTargetFilter","setWorkObservationFilter",
   "setWorkDependencyFilter","setWorkDeadlineFilter"])
   assert.ok(reset.includes(setter+'("all")'),"Missing filter reset: "+setter);
- assert.match(reset,/setWorkQuery\(""\)/);
+ assert.match(reset,/setWorkQuery\(""\);setWorkImpactOnly\(false\)/);
  assert.match(reset,/setWorkReturnId\(null\);setWorkLimit\(200\)/);
- assert.doesNotMatch(reset,/setWorkSort/);
+ assert.match(reset,/if\(workSort==="impact"\)setWorkSort\("title"\)/);
+ assert.doesNotMatch(reset,/setWorkSort\("dueDate"\)|setWorkSort\("state"\)/);
  assert.match(ui,/aria-label="Сбросить фильтры работ" onClick=\{clearWorkFilters\}/);
  assert.match(ui,/workDeadlineFilter!=="all"\|\|!!workQuery\.trim\(\)/);
 });

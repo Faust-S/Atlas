@@ -238,3 +238,26 @@ test('editing a deadline rather than deleting it can genuinely resolve an overru
  assert.equal(effect.examples[0].deadlineRemoved,false);
  assert.equal(effect.examples[0].deadlineResolved,true);
 });
+
+test('all affected work IDs survive a bounded impact preview without duplicate or added works',()=>{
+ const original={durationDays:12,rows:Array.from({length:10},(_,i)=>({
+  id:'work-'+i,title:'Работа '+i,earlyFinish:i+1,finishDate:null,dueDate:null,critical:i===0
+ }))};
+ const updated={durationDays:17,rows:original.rows.map((row,i)=>({
+  ...row,earlyFinish:row.earlyFinish+(i<7?5:0),
+  dueDate:i===8?'2026-12-01':null
+ }))};
+ const beforeText=JSON.stringify(original),afterText=JSON.stringify(updated);
+ const result=scheduleChangeSummary(original,updated,{limit:2});
+ assert.equal(result.movedTotal,7);
+ assert.equal(result.affectedTotal,8);
+ assert.equal(result.examples.length,2);
+ assert.equal(result.affectedIds.length,8);
+ assert.deepEqual(result.affectedIds.slice(0,2),result.examples.map(row=>row.id));
+ assert.deepEqual(new Set(result.affectedIds),new Set([
+  'work-0','work-1','work-2','work-3','work-4','work-5','work-6','work-8'
+ ]));
+ assert.equal(new Set(result.affectedIds).size,result.affectedIds.length);
+ assert.equal(JSON.stringify(original),beforeText);
+ assert.equal(JSON.stringify(updated),afterText);
+});

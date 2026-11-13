@@ -256,6 +256,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const [workDependencyFilter,setWorkDependencyFilter]=useState("all");
  const [workDeadlineFilter,setWorkDeadlineFilter]=useState("all");
  const [workObservationFilter,setWorkObservationFilter]=useState("all");
+ const [workImpactOnly,setWorkImpactOnly]=useState(false);
  const [workHistoryLimits,setWorkHistoryLimits]=useState<Record<string,number>>({});
  const [workSort,setWorkSort]=useState("title");
  const [portfolioLimit,setPortfolioLimit]=useState(150);
@@ -339,6 +340,10 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const recentScheduleEffect=recentWork&&recentPlanBefore&&
   recentPlanBefore.workId===recentWork.id&&recentPlanBefore.revision===data.revision?
   recentPlanBefore.change:null;
+ const impactedWorkOrder=useMemo(()=>new Map<string,number>(
+  (recentScheduleEffect?.affectedIds||[]).map((id:string,index:number):[string,number]=>[id,index])
+ ),[recentScheduleEffect]);
+ const workImpactActive=workImpactOnly&&impactedWorkOrder.size>0;
  const workLinks=useMemo(()=>project&&plan?workDependencyOverview(project,plan):new Map(),[project,plan]);
  const pendingWorkCount=useMemo(()=>Array.from(workLinks.values())
   .filter((entry:any)=>entry.pendingTotal>0).length,[workLinks]);
@@ -442,23 +447,36 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const portfolioFindSummary=(search.trim()?"Найдено проектов: ":"В списке проектов: ")+filtered.length;
  const workFiltersActive=workFilter!=="all"||workTargetFilter!=="all"||
   workObservationFilter!=="all"||workDependencyFilter!=="all"||
-  workDeadlineFilter!=="all"||!!workQuery.trim();
+  workDeadlineFilter!=="all"||!!workQuery.trim()||workImpactActive;
  const clearWorkFilters=()=>{
   setWorkFilter("all");setWorkTargetFilter("all");
   setWorkObservationFilter("all");setWorkDependencyFilter("all");
-  setWorkDeadlineFilter("all");setWorkQuery("");
+  setWorkDeadlineFilter("all");setWorkQuery("");setWorkImpactOnly(false);
+  if(workSort==="impact")setWorkSort("title");
   setWorkReturnId(null);setWorkLimit(200);
+ };
+ const showAffectedWorks=()=>{
+  if(!recentScheduleEffect?.affectedIds.length||!requireClosedForm())return;
+  setWorkFilter("all");setWorkTargetFilter("all");
+  setWorkObservationFilter("all");setWorkDependencyFilter("all");
+  setWorkDeadlineFilter("all");setWorkQuery("");setWorkImpactOnly(true);
+  setWorkSort("impact");setWorkReturnId(null);setWorkLimit(200);
  };
  const filteredWork=useMemo(()=>{
   if(!project)return [];
   const textMatches=projectWorkTableSearch(project,workQuery);
   const matching=textMatches.filter((item:any)=>
+   (!workImpactActive||impactedWorkOrder.has(item.id))&&
    (workFilter==="all"||item.state===workFilter)&&
    (workTargetFilter==="all"||(item.targetIds||[]).includes(workTargetFilter))&&
    (workDeadlineFilter==="all"||overdueWorkFinishes.has(item.id)));
-  return sortWorkRows(filterWorkRowsByDependencies(
-    filterWorkRowsByObservation(matching,findingsByWork,workObservationFilter),workLinks,workDependencyFilter),workSort);
- },[project,workFilter,workQuery,workSort,workTargetFilter,workObservationFilter,workDependencyFilter,workDeadlineFilter,overdueWorkFinishes,workLinks,findingsByWork]);
+  const rows=filterWorkRowsByDependencies(
+    filterWorkRowsByObservation(matching,findingsByWork,workObservationFilter),workLinks,workDependencyFilter);
+  if(workSort==="impact"&&workImpactActive)
+   return rows.sort((a:any,b:any)=>(impactedWorkOrder.get(a.id)??Infinity)-
+    (impactedWorkOrder.get(b.id)??Infinity));
+  return sortWorkRows(rows,workSort==="impact"?"title":workSort);
+ },[project,workFilter,workQuery,workSort,workTargetFilter,workObservationFilter,workDependencyFilter,workDeadlineFilter,overdueWorkFinishes,workLinks,findingsByWork,workImpactActive,impactedWorkOrder]);
  useEffect(()=>{
   if(tab!=="work"||!ready||!workReturnId||!project)return;
   const index=filteredWork.findIndex((item:any)=>item.id===workReturnId);
@@ -592,7 +610,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   host?.onSelection?.({projectId:id,workId:null,revision:String(latestSnapshot.current.revision)});
   setActive(id);setTab("overview");setEditor(null);setForecastId(null);setConnectOpen(false);
   setSourceJump(null);setMapSearchReturn(null);setGraphJump(null);setWorkReturnId(null);
-  setRecentWorkId(null);setRecentPlanBefore(null);
+  setRecentWorkId(null);setRecentPlanBefore(null);setWorkImpactOnly(false);
   setShowProjectRelations(false);setRelationLimit(12);setRequirementJump(null);setChangeJump(null);
   if(!afterSubmit)setMessage("");
   setWorkDependencyFilter("all");setWorkDeadlineFilter("all");setWorkFilter("all");setWorkTargetFilter("all");setWorkObservationFilter("all");setWorkHistoryLimits({});setWorkQuery("");setWorkSort("title");setWorkLimit(200);setRealityLimit(8);
@@ -656,7 +674,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   setMapSearchReturn(null);
   setWorkFilter("all");setWorkTargetFilter("all");setWorkObservationFilter("all");
   setWorkDependencyFilter("all");setWorkDeadlineFilter("all");setWorkQuery("");setWorkSort("title");setWorkLimit(200);
-  setWorkReturnId(focusRow?id:null);
+  setWorkImpactOnly(false);setWorkReturnId(focusRow?id:null);
  };
  const submit=(event:React.FormEvent<HTMLFormElement>)=>{
   event.preventDefault();
@@ -691,7 +709,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      (previousWork.dueDate??null)!==(correctedWork.dueDate??null));
     const fromImpactList=recentScheduleEffect&&
      (recentWorkKind==="dependency"||recentWorkKind==="adjusted")&&
-     recentScheduleEffect.examples.some(item=>item.id===correctedId);
+     recentScheduleEffect.affectedIds.includes(correctedId);
     if(scheduleFieldsChanged||fromImpactList){
      const change=plan&&updatedProject?scheduleChangeSummary(plan,scheduleProject(updatedProject)):null;
      setRecentPlanBefore({workId:correctedId,revision:result.state.revision,
@@ -1011,7 +1029,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    graphJump.projectId===project?.id?
    {workId:graphJump.workId,query:graphJump.query}:null);
   setSourceJump(null);
-  if(tabId!=="work")setRecentWorkId(null);
+  if(tabId!=="work"){setRecentWorkId(null);setWorkImpactOnly(false);if(workSort==="impact")setWorkSort("title")}
   if(tabId!=="graph")setGraphJump(null);
   setTab(tabId);setEditor(null);setForecastId(null);
  };
@@ -1697,6 +1715,15 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
             " Расчётный финиш позже контрольного срока. Затронуто работ: "+
             recentScheduleEffect.deadlineMissedTotal+".":""}
           </p>
+          {recentScheduleEffect.affectedTotal>0&&<div className="button-row atlas-work-impact-actions">
+           {!workImpactActive?<button type="button" className="action-button"
+            aria-label={"Показать все затронутые работы: "+recentScheduleEffect.affectedTotal}
+            onClick={showAffectedWorks}>Все затронутые работы ({recentScheduleEffect.affectedTotal})</button>:
+            <button type="button" className="action-button"
+             aria-label="Вернуться ко всем работам после изменения плана"
+             onClick={clearWorkFilters}>Все работы проекта</button>}
+           {workImpactActive&&<small role="status">Показаны работы с изменившимся расчётным окончанием или контрольным сроком.</small>}
+          </div>}
           {recentScheduleEffect.examples.length>0&&<ul className="atlas-work-effect-list">
            {recentScheduleEffect.examples.map((item,index)=><li key={item.id}>
             {index===0?<strong>{item.title}</strong>:<button type="button" className="text-link"
@@ -1725,8 +1752,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
            </li>)}
           </ul>}
           {recentScheduleEffect.affectedTotal>recentScheduleEffect.examples.length&&
-           <p className="minor">Ещё {recentScheduleEffect.affectedTotal-
-            recentScheduleEffect.examples.length} работ в полном графике.</p>}
+           <p className="minor">В примерах показано {recentScheduleEffect.examples.length} из
+            {recentScheduleEffect.affectedTotal} затронутых работ.</p>}
          </div>}
         <p className="minor">Оценка: {recentWork.estimateDays??1} календарных дней.
          {recentWork.dueDate?" Контрольный срок: "+recentWork.dueDate+".":""}</p>
@@ -1788,6 +1815,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
        <option value="title">По названию</option><option value="dueDate">По сроку</option>
        <option value="priority">По приоритету</option><option value="estimateDays">По длительности</option>
        <option value="state">По состоянию</option>
+       {workImpactActive&&<option value="impact">По последствиям</option>}
       </select></label></div>
      {workFiltersActive&&<div className="atlas-work-filter-shortcut"
       role="group" aria-label="Быстрые действия с фильтрами работ">

@@ -799,7 +799,7 @@ test("Correcting a work named in the impact list recalculates the schedule befor
  assert.match(ui,/else if\(editor\.action\.startsWith\("work:"\)\)/);
  assert.match(ui,/const scheduleFieldsChanged=previousWork&&correctedWork/);
  assert.match(ui,/const fromImpactList=recentScheduleEffect&&/);
- assert.match(ui,/recentScheduleEffect\.examples\.some\(item=>item\.id===correctedId\)/);
+ assert.match(ui,/recentScheduleEffect\.affectedIds\.includes\(correctedId\)/);
  assert.match(ui,/const correctedId=editor\.action\.slice\(5\)/);
  assert.match(ui,/scheduleChangeSummary\(plan,scheduleProject\(updatedProject\)\)/);
  assert.match(ui,/setRecentWorkKind\("adjusted"\)/);
