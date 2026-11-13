@@ -289,7 +289,7 @@ test("overview critical link opens focused relations and removal reports impact 
  assert.match(guide,/onClick=\{\(\)=>onEdit\("work:"\+criticalFocus\.workId\)\}/);
  assert.match(guide,/onClick=\{\(\)=>onOpenGraph\(criticalFocus\.workId\)\}/);
  assert.match(main,/aria-label="Управление связями выбранной работы"/);
- assert.match(main,/removeDependency\(graphFocusPredecessors\[0\]\.id,graphFocusWork\.id\)/);
+ assert.match(main,/removeDependency\(graphSelectedPredecessor\.id,graphFocusWork\.id\)/);
  assert.match(css,/\.atlas-graph-focus-relations\{display:flex/);
  const section=main.slice(main.indexOf("const removeDependency=(from:string,to:string)=>"),
   main.indexOf("const removeEmptyStage="));
@@ -304,7 +304,9 @@ test("focused graph shows a read-only forecast before any critical dependency re
  const main=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
  const css=readFileSync(new URL("../desktop/src/style.css",import.meta.url),"utf8");
  assert.match(main,/const graphRemovalPreview=useMemo\(\(\)=>\{/);
- assert.match(main,/forecastDependencyRemoval\(project,plan,predecessor\.id,graphFocusWork\.id\)/);
+ assert.match(main,/forecastDependencyRemoval\(project,plan,graphSelectedPredecessor\.id,graphFocusWork\.id\)/);
+ assert.match(main,/setGraphPreviewFrom\(prior\.id\)/);
+ assert.match(main,/Если убрать связь с \{graphSelectedPredecessor\.title\}/);
  assert.match(main,/aria-label="Последствия удаления выбранной связи до подтверждения"/);
  assert.match(main,/graphRemovalPreview\.deltaDays===0/);
  assert.match(main,/Изменений по работам: \{graphRemovalPreview\.affectedWorks\}/);
@@ -313,4 +315,17 @@ test("focused graph shows a read-only forecast before any critical dependency re
  const focus=main.slice(main.indexOf('aria-label="Управление связями выбранной работы"'),
   main.indexOf('{graphFocusWork.sourceId&&<button'));
  assert.doesNotMatch(focus,/mutate\(|commitWithReadback\(|nativeInvoke\(|fetch\(/);
+});
+
+test("selection must precede removal for every alternate critical predecessor",()=>{
+ const main=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ const graph=main.slice(main.indexOf('aria-label="Управление связями выбранной работы"'),
+  main.indexOf('{graphFocusWork.sourceId&&<button'));
+ assert.match(graph,/aria-label=\{"Убрать связь с предшественником: "\+graphSelectedPredecessor\.title\}/);
+ assert.match(graph,/onClick=\{\(\)=>removeDependency\(graphSelectedPredecessor\.id,graphFocusWork\.id\)\}/);
+ assert.match(graph,/graphFocusPredecessors\.filter\(\(prior:any\)=>prior\.id!==graphSelectedPredecessor\.id\)/);
+ assert.match(graph,/aria-label=\{"Проверить последствия удаления связи с "\+prior\.title\}/);
+ assert.match(graph,/onClick=\{\(\)=>setGraphPreviewFrom\(prior\.id\)\}/);
+ assert.doesNotMatch(graph,/removeDependency\(prior\.id,graphFocusWork\.id\)/);
+ assert.match(main,/useEffect\(\(\)=>setGraphPreviewFrom\(null\),\[project\?\.id,graphFocusWork\?\.id\]\)/);
 });

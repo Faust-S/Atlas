@@ -87,6 +87,8 @@ export function ProjectOrganizationGuide({snapshot,projectId,restoreSearch,onEdi
     <strong>Что влияет на общий срок</strong>
     <span title={criticalFocus.workTitle}>{criticalFocus.workTitle}</span>
     <small>Начинается после: {criticalFocus.predecessorTitle}.
+     {criticalFocus.driverCount>1?
+      " Других равнозначных предшественников: "+(criticalFocus.driverCount-1)+".":""}
      {" "}План: {criticalFocus.durationDays} календарных дн.
      {criticalFocus.estimatedFinish?" · Расчётное окончание "+criticalFocus.estimatedFinish:""}.</small>
    </div>

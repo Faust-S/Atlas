@@ -283,6 +283,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const [sourceJump,setSourceJump]=useState<{projectId:string;workId:string;query:string;origin:"overview"|"work"|"graph";graphOrigin:"overview"|"work"|"board"|null}|null>(null);
  const [mapSearchReturn,setMapSearchReturn]=useState<{workId:string;query:string}|null>(null);
  const [graphJump,setGraphJump]=useState<{projectId:string;workId:string;query:string;origin:"overview"|"work"|"board"}|null>(null);
+ const [graphPreviewFrom,setGraphPreviewFrom]=useState<string|null>(null);
  const [workReturnId,setWorkReturnId]=useState<string|null>(null);
  const [recentWorkId,setRecentWorkId]=useState<string|null>(null);
  const [recentWorkKind,setRecentWorkKind]=useState<"created"|"dependency"|"adjusted">("created");
@@ -340,11 +341,13 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    .sort((a:any,b:any)=>(finishes.get(b.id)??0)-(finishes.get(a.id)??0)||
     String(a.title).localeCompare(String(b.title),"ru"));
  },[project,graphFocusWork,plan]);
+ const graphSelectedPredecessor=graphFocusPredecessors.find((w:any)=>
+  w.id===graphPreviewFrom)||graphFocusPredecessors[0]||null;
+ useEffect(()=>setGraphPreviewFrom(null),[project?.id,graphFocusWork?.id]);
  const graphRemovalPreview=useMemo(()=>{
-  if(!project||!plan||!graphFocusWork||!graphFocusPredecessors.length)return null;
-  const predecessor=graphFocusPredecessors[0];
-  return forecastDependencyRemoval(project,plan,predecessor.id,graphFocusWork.id);
- },[project,plan,graphFocusWork,graphFocusPredecessors]);
+  if(!project||!plan||!graphFocusWork||!graphSelectedPredecessor)return null;
+  return forecastDependencyRemoval(project,plan,graphSelectedPredecessor.id,graphFocusWork.id);
+ },[project,plan,graphFocusWork,graphSelectedPredecessor]);
  // The table and Gantt share the canonical project schedule. Keep an indexed
  // view for large projects rather than scanning 1,200+ CPM rows per work card.
  const overdueWorkFinishes=useMemo(()=>new Map<string,string>(
@@ -2062,12 +2065,13 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
         {graphFocusPredecessors.length>0&&<>
          <span className="minor">Предшественников: {graphFocusPredecessors.length}</span>
          <button type="button" className="text-link atlas-graph-unlink"
-          aria-label={"Убрать связь с предшественником: "+graphFocusPredecessors[0].title}
-          onClick={()=>removeDependency(graphFocusPredecessors[0].id,graphFocusWork.id)}>
-          Убрать связь: {graphFocusPredecessors[0].title}</button>
+          aria-label={"Убрать связь с предшественником: "+graphSelectedPredecessor.title}
+          onClick={()=>removeDependency(graphSelectedPredecessor.id,graphFocusWork.id)}>
+          Убрать связь: {graphSelectedPredecessor.title}</button>
          {graphRemovalPreview&&<p className="atlas-graph-link-preview"
           role="status" aria-label="Последствия удаления выбранной связи до подтверждения">
-          Если убрать эту связь, расчётная продолжительность проекта{" "}
+          Если убрать связь с {graphSelectedPredecessor.title},
+          расчётная продолжительность проекта{" "}
           {graphRemovalPreview.deltaDays===0?
            "не изменится: "+graphRemovalPreview.beforeDays+" дн.":
            "изменится с "+graphRemovalPreview.beforeDays+" до "+
@@ -2080,11 +2084,12 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
          </p>}
          {graphFocusPredecessors.length>1&&<details className="atlas-graph-other-links">
           <summary>Другие связи ({graphFocusPredecessors.length-1})</summary>
-          {graphFocusPredecessors.slice(1).map((prior:any)=>
+          {graphFocusPredecessors.filter((prior:any)=>prior.id!==graphSelectedPredecessor.id)
+           .map((prior:any)=>
            <button key={prior.id} type="button" className="text-link"
-            aria-label={"Убрать связь с предшественником: "+prior.title}
-            onClick={()=>removeDependency(prior.id,graphFocusWork.id)}>
-            Убрать связь: {prior.title}</button>)}
+            aria-label={"Проверить последствия удаления связи с "+prior.title}
+            onClick={()=>setGraphPreviewFrom(prior.id)}>
+            Проверить связь: {prior.title}</button>)}
          </details>}
         </>}
        </div>
