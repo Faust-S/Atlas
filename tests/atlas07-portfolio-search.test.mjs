@@ -4,7 +4,7 @@ import {readFileSync} from "node:fs";
 import {serialize} from "../src/core.mjs";
 import {atlas06VisualPortfolio} from "./fixtures/atlas06-visual-portfolio.mjs";
 import {atlas06UniversalPortfolio} from "./fixtures/atlas06-universal-portfolio.mjs";
-import {buildPortfolioSearchIndex,filterPortfolioSearch} from "../src/portfolio-search.mjs";
+import {buildPortfolioSearchIndex,filterPortfolioSearch,portfolioSearchReason} from "../src/portfolio-search.mjs";
 
 function fixture(){
  const visual=atlas06VisualPortfolio();
@@ -96,7 +96,6 @@ test("Portfolio search provides a direct clear action and restores input focus",
 test("Portfolio search explains whether a result came from work, stage, source or folder",()=>{
  const snapshot=fixture(),original=serialize(snapshot);
  const large=snapshot.projects[0],ordinary=snapshot.projects[1];
- const {portfolioSearchReason}=await import("../src/portfolio-search.mjs");
  assert.equal(portfolioSearchReason(large,"Работа 5 / 1080"),"Работа: Работа 5 / 1080");
  assert.equal(portfolioSearchReason(large,"Этап работ 48"),"Этап: Этап работ 48");
  assert.equal(portfolioSearchReason(large,"atlas-visual-fixture/project-5"),
