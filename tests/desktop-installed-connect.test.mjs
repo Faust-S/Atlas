@@ -838,3 +838,13 @@ test("Installed portfolio search resets from no results through a physically acc
  assert.match(driver,/d\.wait_text\("В списке проектов: 1",35\)/);
  assert.match(driver,/assert d\.head\(\)==before/);
 });
+
+
+test("Installed portfolio search reset is physically visible on a 820x650 Windows laptop",()=>{
+ const driver=read("../desktop/tests/installed-atlas07-portfolio-search.py");
+ assert.match(driver,/win32gui\.MoveWindow\(d\.handle,0,0,820,650,True\)/);
+ assert.match(driver,/v\.capture\("atlas07-portfolio-search-no-results-820"\)/);
+ assert.match(driver,/v\.rectangle_in_workspace\(reset\.rectangle\(\),win32gui\.GetWindowRect\(d\.handle\)\)/);
+ assert.match(driver,/reset\.click_input\(\)/);
+ assert.match(driver,/win32gui\.MoveWindow\(d\.handle,0,0,1024,768,True\)/);
+});

@@ -4,6 +4,8 @@ no browser automation, Store mutation or test-only application endpoints.
 """
 import importlib.util
 import sys
+import time
+import win32gui
 from pathlib import Path
 
 sys.stdout.reconfigure(encoding="utf-8",errors="replace")
@@ -34,9 +36,18 @@ def qualify():
     d.set_text(SEARCH,"такого проекта нет")
     d.wait_text("Найдено проектов: 0",35)
     assert d.head()==before,"Portfolio search wrote to native Store"
-    v.capture("atlas07-portfolio-search-no-results")
-    v.find_control("Очистить поиск проектов",types={"Button"},scroll=False).click_input()
+    # The compact laptop window is a required real user layout. Neither
+    # the counter nor its reset action should need auto-scrolling.
+    win32gui.MoveWindow(d.handle,0,0,820,650,True)
+    time.sleep(0.5)
+    d.wait_text("Найдено проектов: 0",15)
+    v.capture("atlas07-portfolio-search-no-results-820")
+    reset=v.find_control("Очистить поиск проектов",types={"Button"},scroll=False)
+    assert v.rectangle_in_workspace(reset.rectangle(),win32gui.GetWindowRect(d.handle))
+    reset.click_input()
     d.wait_text("В списке проектов: 1",35)
+    win32gui.MoveWindow(d.handle,0,0,1024,768,True)
+    time.sleep(0.3)
     # Also verify the conventional Ctrl+A / Backspace input path on an
     # already cleared field, without relying on it for the reset action.
     d.set_text(SEARCH,"")
