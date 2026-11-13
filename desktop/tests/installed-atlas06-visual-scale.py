@@ -965,6 +965,56 @@ def qualify_visual():
     assert d.saved_project(resolved_head)==resolved
     print("ATLAS06_VISUAL_DIRECT_DEADLINE_SAVE_RESTART_PASS",flush=True)
 
+    # Final native route on the actual persisted 1213-work project: start
+    # in the overview, focus a real critical dependency, compare without
+    # saving, explicitly remove one link, save and cold-restart.
+    # The long critical-work name is intentionally retained as a stress case.
+    select_project()
+    d.wait_text("Состав проекта",30)
+    win32gui.MoveWindow(d.handle,0,0,820,650,True)
+    critical_link=find_control(
+        "Изменить связи критической работы: "+LONG_WORK,
+        types={"Button"},scroll=True)
+    assert rectangle_in_workspace(critical_link.rectangle(),win32gui.GetWindowRect(d.handle)),(
+        "Critical dependency link is not physically clickable at 820x650")
+    assert d.head()==resolved_head and d.saved_project(resolved_head)==resolved,(
+        "Reading critical path from overview changed native Store")
+    critical_link.click_input()
+    d.wait_text("Зависимости работ",35)
+    d.wait_text("Предшественников: 5",35)
+    capture("atlas07-critical-removal-forecast-820")
+    assert d.head()==resolved_head and d.saved_project(resolved_head)==resolved,(
+        "Hypothetical removal forecast silently saved or changed the plan")
+    unlink=find_control("Убрать связь с предшественником: Работа 0 / 12",
+                        types={"Button"},scroll=True)
+    assert rectangle_in_workspace(unlink.rectangle(),win32gui.GetWindowRect(d.handle)),(
+        "Critical predecessor action is offscreen in installed Windows Atlas")
+    unlink.click_input()
+    # The existing product confirmation is a real WebView2 dialog.
+    keyboard.send_keys("{ENTER}")
+    d.wait_text("Связь удалена из черновика.",35)
+    d.wait_text("Расчётные сроки существующих работ не сдвинулись.",35)
+    assert d.head()==resolved_head and d.saved_project(resolved_head)==resolved,(
+        "Removing critical dependency in draft wrote native Store before Save")
+    capture("atlas07-critical-removal-replanned-820")
+    # Use the same explicit Save/readback and cold restart as other routes.
+    d.click_button("Сохранить")
+    dependency_head=await_saved(resolved_head)
+    revised=d.saved_project(dependency_head)
+    expected=json.loads(json.dumps(resolved))
+    expected["dependencies"]=[
+        edge for edge in expected["dependencies"]
+        if not (edge["from"]=="visual-work-0-11" and edge["to"]=="visual-work-5-0")
+    ]
+    assert len(expected["dependencies"])==len(resolved["dependencies"])-1
+    assert revised==expected,"Native edit changed something beyond the confirmed dependency"
+    d.stop()
+    d.launch()
+    d.wait_text("Портфель проектов",45)
+    assert d.head()==dependency_head
+    assert d.saved_project(dependency_head)==revised
+    print("ATLAS07_CRITICAL_LINK_PREVIEW_DRAFT_SAVE_RESTART_PASS",flush=True)
+
 if __name__=="__main__":
     try:
         qualify_visual()
