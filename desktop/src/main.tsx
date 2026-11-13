@@ -1062,8 +1062,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   // The filtered table can still start below a long summary on a 820x650
   // screen. Reuse existing exact-row focus instead of creating a new scroll
   // mechanism or requiring the user to manually locate the only late work.
-  setWorkReturnId(overdueWorkFinishes.size===1?
-   overdueWorkFinishes.keys().next().value??null:null);
+  setWorkReturnId(overdueWorkFinishes.keys().next().value??null);
  };
  const showCriticalWorks=()=>{
   if(!project||!criticalWorkIds.size||!requireClosedForm())return;
@@ -1075,8 +1074,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   setWorkQuery("");setWorkImpactOnly(false);setWorkCriticalOnly(true);
   if(workSort==="impact")setWorkSort("title");
   setWorkLimit(200);
-  setWorkReturnId(criticalWorkIds.size===1?
-   criticalWorkIds.values().next().value??null:null);
+  setWorkReturnId(criticalWorkIds.values().next().value??null);
  };
  const openLinkedSource=(workId:string,query:string,origin:"overview"|"work"|"graph"="overview")=>{
   if(!project||!requireClosedForm())return;
@@ -1511,6 +1509,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       onOpenWorks={()=>view("work")}
       pendingWorkCount={pendingWorkCount} onOpenPendingWorks={showPendingWorks}
       overdueWorkCount={overdueWorkFinishes.size} onOpenOverdueWorks={showOverdueWorks}
+      criticalWorkCount={criticalWorkIds.size} onOpenCriticalWorks={showCriticalWorks}
       onOpenStages={()=>document.getElementById("atlas-project-stages")?.scrollIntoView({behavior:"smooth",block:"start"})}
       onOpenTimeline={()=>view("timeline")}
       onOpenGraph={openWorkGraph}

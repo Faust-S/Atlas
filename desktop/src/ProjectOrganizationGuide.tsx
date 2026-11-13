@@ -7,7 +7,7 @@ import {ProjectSourcePlanMap} from "./ProjectVisuals";
 // Suggested roles are explanations to review, never new project entities.
 export function ProjectOrganizationGuide({snapshot,projectId,restoreSearch,onEdit,onRefresh,onOpenProject,
  onOpenSources,onOpenLinkedSource,onOpenWorks,onOpenPendingWorks,pendingWorkCount,
- onOpenOverdueWorks,overdueWorkCount,
+ onOpenOverdueWorks,overdueWorkCount,onOpenCriticalWorks,criticalWorkCount,
  onOpenStages,onAddRelation,onOpenTimeline,onOpenGraph,busy=false}:{
  snapshot:any;projectId:string;restoreSearch:{workId:string;query:string}|null;
  onEdit:(action:string)=>void;
@@ -15,6 +15,7 @@ export function ProjectOrganizationGuide({snapshot,projectId,restoreSearch,onEdi
  onOpenSources:()=>void;onOpenLinkedSource:(workId:string,query:string)=>void;
  onOpenWorks:()=>void;onOpenPendingWorks:()=>void;pendingWorkCount:number;
  onOpenOverdueWorks:()=>void;overdueWorkCount:number;
+ onOpenCriticalWorks:()=>void;criticalWorkCount:number;
  onOpenStages:()=>void;onAddRelation:()=>void;
  onOpenTimeline:()=>void;onOpenGraph:(workId?:string,query?:string)=>void;busy?:boolean;
 }){
@@ -43,7 +44,11 @@ export function ProjectOrganizationGuide({snapshot,projectId,restoreSearch,onEdi
     {overdueWorkCount>0&&<button type="button"
      className="text-link atlas-overdue-work-link"
      aria-label="Показать работы позже контрольного срока"
-     onClick={onOpenOverdueWorks}>Позже срока: {overdueWorkCount}</button>}</h2>
+     onClick={onOpenOverdueWorks}>Позже срока: {overdueWorkCount}</button>}
+    {criticalWorkCount>0&&<button type="button"
+     className="text-link atlas-critical-work-link"
+     aria-label={"Показать работы на критическом пути: "+criticalWorkCount}
+     onClick={onOpenCriticalWorks}>Критические работы: {criticalWorkCount}</button>}</h2>
    <p>{hasSources?
     "Здесь показаны найденные каталоги и связи, которые уже записаны в плане.":
     "Здесь показаны ваши работы, этапы и записанные зависимости."}</p>

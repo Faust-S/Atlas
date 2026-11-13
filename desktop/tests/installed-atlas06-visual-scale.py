@@ -775,6 +775,45 @@ def qualify_visual():
     original_bounds=win32gui.GetWindowRect(d.handle)
     win32gui.MoveWindow(d.handle,0,0,820,650,True)
     time.sleep(0.25)
+    # At 820 x 650 the overview must expose its canonical CPM shortcut,
+    # independent of GitHub and without first entering the table filters.
+    critical_options=[]
+    until=time.monotonic()+15
+    while time.monotonic()<until:
+        critical_options=[control for control in d.window().descendants(control_type="Button")
+             if str(control.window_text() or "").startswith("Показать работы на критическом пути: ")
+             and control.is_visible() and control.is_enabled()]
+        if len(critical_options)==1:
+            break
+        time.sleep(0.25)
+    assert len(critical_options)==1,"Overview critical-path action not accessible"
+    overview_critical=critical_options[0]
+    critical_count=int(overview_critical.window_text().rsplit(": ",1)[1])
+    assert 0<critical_count<=len(final["items"]),critical_count
+    assert rectangle_in_workspace(overview_critical.rectangle(),win32gui.GetWindowRect(d.handle)),(
+        "Critical-path overview shortcut is not physically visible at 820x650")
+    capture("overview-critical-work-first-screen-820")
+    overview_critical.click_input()
+    d.wait_text("Работы проекта",25)
+    d.wait_text(f"Показано {min(200,critical_count)} из {critical_count} работ по фильтру",35)
+    focused=[control for control in d.window().descendants(control_type="Button")
+             if str(control.window_text() or "").startswith("Открыть работу ")
+             and control.is_visible() and control.is_enabled()
+             and rectangle_in_workspace(control.rectangle(),win32gui.GetWindowRect(d.handle))]
+    assert focused,"Overview critical-path action did not reveal a real work at 820x650"
+    critical_work=focused[0]
+    critical_title=critical_work.window_text().removeprefix("Открыть работу ")
+    capture("overview-critical-work-filtered-820")
+    assert d.head()==final_head and d.saved_project(final_head)==final,(
+        "Overview critical-path projection modified native Store")
+    critical_work.click_input()
+    d.window_title_contains("Форма: Работа: "+critical_title,25)
+    assert d.head()==final_head,"Opening critical work from overview saved project"
+    keyboard.send_keys("{ESC}")
+    await_no_form()
+    overview_tab=find_control("Обзор",types={"Button"})
+    overview_tab.click_input()
+    d.wait_text("Состав проекта",25)
     overview_overdue=find_control("Показать работы позже контрольного срока",
                                  types={"Button"},scroll=False)
     assert rectangle_in_workspace(overview_overdue.rectangle(),win32gui.GetWindowRect(d.handle)),(

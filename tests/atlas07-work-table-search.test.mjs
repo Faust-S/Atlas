@@ -161,3 +161,33 @@ test("Filtered work lists offer an immediate keyboard-accessible jump to the fir
  assert.match(ui,/control\.scrollIntoView\(\{block:"center",behavior:"auto"\}\)/);
  assert.doesNotMatch(section,/mutate\(|commitWithReadback\(|nativeInvoke\(|fetch\(/);
 });
+
+test("Overview opens canonical critical and overdue work without hidden table search or writes",()=>{
+ const snapshot=atlas06VisualPortfolio(),original=serialize(snapshot);
+ const project=snapshot.projects[0],plan=scheduleProject(project);
+ assert.equal(plan.criticalIds.length,plan.rows.filter(row=>row.critical).length);
+ assert.ok(plan.criticalIds.length>200,"Critical path remains useful in the large offline project");
+ const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ const guide=readFileSync(new URL("../desktop/src/ProjectOrganizationGuide.tsx",import.meta.url),"utf8");
+ const css=readFileSync(new URL("../desktop/src/style.css",import.meta.url),"utf8");
+ assert.ok(ui.includes("criticalWorkCount={criticalWorkIds.size} onOpenCriticalWorks={showCriticalWorks}"));
+ assert.ok(ui.includes("overdueWorkCount={overdueWorkFinishes.size} onOpenOverdueWorks={showOverdueWorks}"));
+ assert.ok(guide.includes("onOpenCriticalWorks:()=>void;criticalWorkCount:number;"));
+ assert.ok(guide.includes("criticalWorkCount>0&&<button type=\"button\""));
+ assert.ok(guide.includes('aria-label={"Показать работы на критическом пути: "+criticalWorkCount}'));
+ assert.ok(guide.includes("onClick={onOpenCriticalWorks}>Критические работы: {criticalWorkCount}</button>"));
+ assert.match(css,/\.atlas-project-organization h2 \.atlas-critical-work-link:focus-visible/);
+ const overdue=ui.slice(ui.indexOf("const showOverdueWorks=()=>"),ui.indexOf("const showCriticalWorks=()=>"));
+ const critical=ui.slice(ui.indexOf("const showCriticalWorks=()=>"),ui.indexOf("const openLinkedSource="));
+ for(const body of [overdue,critical]){
+  assert.match(body,/view\("work"\)/);
+  assert.match(body,/setWorkQuery\(""\)/);
+  assert.match(body,/setWorkLimit\(200\)/);
+  assert.match(body,/setWorkFilter\("all"\)/);
+  assert.match(body,/setWorkTargetFilter\("all"\)/);
+  assert.doesNotMatch(body,/mutate\(|commitWithReadback\(|nativeInvoke\(|fetch\(/);
+ }
+ assert.ok(overdue.includes("setWorkReturnId(overdueWorkFinishes.keys().next().value??null)"));
+ assert.ok(critical.includes("setWorkReturnId(criticalWorkIds.values().next().value??null)"));
+ assert.equal(serialize(snapshot),original);
+});
