@@ -31,7 +31,7 @@ import {prepareImportedSnapshot} from "./import-snapshot.mjs";
 import {buildIwxaPortfolio,readIwxaPortfolio,toBase64,fromBase64} from "./iwxa-portfolio.mjs";
 import {commitWithReadback,readSavedSnapshotForReference} from "./native-save.mjs";
 import {projectHistoryRows} from "./history-view.mjs";
-import {sortWorkRows,filterWorkRowsByObservation} from "./work-sorting.mjs";
+import {sortWorkRows,firstSortedMatchingWorkId,filterWorkRowsByObservation} from "./work-sorting.mjs";
 import {createAtlasSavedRef} from "../../src/project-host-port.mjs";
 import {invokeAtlasHost,type AtlasEmbeddedHost} from "./embedded-host";
 
@@ -1059,10 +1059,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   setWorkImpactOnly(false);setWorkCriticalOnly(false);
   if(workSort==="impact")setWorkSort("title");
   setWorkLimit(200);
-  // The filtered table can still start below a long summary on a 820x650
-  // screen. Reuse existing exact-row focus instead of creating a new scroll
-  // mechanism or requiring the user to manually locate the only late work.
-  setWorkReturnId(overdueWorkFinishes.keys().next().value??null);
+  // Focus the first row in the table's sort order, not a distant CPM row.
+  setWorkReturnId(firstSortedMatchingWorkId(project.items,overdueWorkFinishes,
+   workSort==="impact"?"title":workSort));
  };
  const showCriticalWorks=()=>{
   if(!project||!criticalWorkIds.size||!requireClosedForm())return;
@@ -1074,7 +1073,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   setWorkQuery("");setWorkImpactOnly(false);setWorkCriticalOnly(true);
   if(workSort==="impact")setWorkSort("title");
   setWorkLimit(200);
-  setWorkReturnId(criticalWorkIds.values().next().value??null);
+  setWorkReturnId(firstSortedMatchingWorkId(project.items,criticalWorkIds,
+   workSort==="impact"?"title":workSort));
  };
  const openLinkedSource=(workId:string,query:string,origin:"overview"|"work"|"graph"="overview")=>{
   if(!project||!requireClosedForm())return;
@@ -1867,6 +1867,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       {filteredWork.length>0&&<button type="button" className="text-link atlas-work-jump-results"
        aria-label="Перейти к первой найденной работе"
        onClick={()=>setWorkReturnId(filteredWork[0].id)}>К работам</button>}
+      <button type="button" className="text-link atlas-work-return-overview"
+       aria-label="Вернуться к обзору проекта"
+       onClick={()=>view("overview")}>К обзору</button>
       <button type="button" className="action-button atlas-work-reset-filters"
        aria-label="Сбросить фильтры работ" onClick={clearWorkFilters}>Сбросить фильтры</button>
      </div>}

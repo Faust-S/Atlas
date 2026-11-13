@@ -20,6 +20,15 @@ export function sortWorkRows(items,kind="title"){
 }
 
 
+/** Pick the first displayed work, not the first CPM enumeration ID.
+ * Both overview shortcuts reuse the table sort to avoid expanding a 200-row
+ * page to reach a deep scheduled item. This is a read-only projection.
+ */
+export function firstSortedMatchingWorkId(items,matches,kind="title"){
+ if(!(matches instanceof Set||matches instanceof Map))throw Error("Expected matched work IDs");
+ return sortWorkRows(items.filter(item=>matches.has(item.id)),kind)[0]?.id??null;
+}
+
 /** Pure work-list filter, based only on explicitly originating observations.
  * Neither completion nor a manual finding grants independent acceptance.
  */

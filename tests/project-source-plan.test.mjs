@@ -901,7 +901,7 @@ test('overview provides direct dated-overrun navigation through the existing wor
  assert.match(action,/setWorkDependencyFilter\("all"\)/);
  assert.match(action,/setWorkQuery\(""\)/);
  assert.match(action,/setWorkDeadlineFilter\("overdue"\)/);
- assert.match(action,/setWorkReturnId\(overdueWorkFinishes\.keys\(\)\.next\(\)\.value\?\?null\)/);
+ assert.match(action,/setWorkReturnId\(firstSortedMatchingWorkId\(project\.items,overdueWorkFinishes,/);
  assert.doesNotMatch(action,/overdueWorkFinishes\.size===1\?/);
  assert.match(ui,/overdueWorkCount=\{overdueWorkFinishes\.size\} onOpenOverdueWorks=\{showOverdueWorks\}/);
  assert.match(guide,/overdueWorkCount>0&&<button type="button"/);

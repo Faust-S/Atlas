@@ -187,7 +187,12 @@ test("Overview opens canonical critical and overdue work without hidden table se
   assert.match(body,/setWorkTargetFilter\("all"\)/);
   assert.doesNotMatch(body,/mutate\(|commitWithReadback\(|nativeInvoke\(|fetch\(/);
  }
- assert.ok(overdue.includes("setWorkReturnId(overdueWorkFinishes.keys().next().value??null)"));
- assert.ok(critical.includes("setWorkReturnId(criticalWorkIds.values().next().value??null)"));
+ assert.ok(overdue.includes("setWorkReturnId(firstSortedMatchingWorkId(project.items,overdueWorkFinishes,"));
+ assert.ok(critical.includes("setWorkReturnId(firstSortedMatchingWorkId(project.items,criticalWorkIds,"));
+ assert.match(overdue,/workSort==="impact"\?"title":workSort/);
+ assert.match(critical,/workSort==="impact"\?"title":workSort/);
+ assert.match(ui,/aria-label="Вернуться к обзору проекта"/);
+ assert.match(ui,/onClick=\{\(\)=>view\("overview"\)\}>К обзору<\/button>/);
+ assert.match(css,/\.atlas-work-filter-shortcut \.atlas-work-return-overview\{/);
  assert.equal(serialize(snapshot),original);
 });

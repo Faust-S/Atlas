@@ -811,11 +811,13 @@ def qualify_visual():
     assert d.head()==final_head,"Opening critical work from overview saved project"
     keyboard.send_keys("{ESC}")
     await_no_form()
-    # With the focused deep work still in view, the tab strip can sit
-    # behind the sticky top bar at 820 x 650. Use the always-visible
-    # project entry in the native sidebar to return to the overview.
-    # This is a normal user navigation route, not a test-only shortcut.
-    select_project()
+    # A focused deep work can leave the tab strip outside the viewport.
+    # The sticky work toolbar must expose a real return action at 820x650.
+    overview_back=find_control("Вернуться к обзору проекта",
+                               types={"Button"},scroll=False)
+    assert rectangle_in_workspace(overview_back.rectangle(),win32gui.GetWindowRect(d.handle)),(
+        "Work-list return to overview is not physically visible at 820x650")
+    overview_back.click_input()
     d.wait_text("Состав проекта",25)
     assert d.head()==final_head and d.saved_project(final_head)==final,(
         "Returning to overview from critical work modified native Store")
