@@ -1194,7 +1194,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
        {search.trim()&&<button type="button" className="text-link atlas-portfolio-clear"
         aria-label="Очистить поиск проектов"
         onClick={()=>{
-         setSearch("");setPortfolioLimit(150);setSidebarLimit(120);
+         setSearch("");setPortfolioStatus("all");setPortfolioLimit(150);setSidebarLimit(120);
          document.getElementById("atlas-search")?.focus();
         }}>Показать все проекты</button>}
       </div>

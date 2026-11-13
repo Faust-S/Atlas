@@ -86,7 +86,7 @@ test("Portfolio search provides a direct clear action and restores input focus",
  assert.ok(start>0);
  assert.match(code,/search\.trim\(\)&&<button type="button"/);
  assert.match(code,/aria-label="Очистить поиск проектов"/);
- assert.match(code,/setSearch\(""\);setPortfolioLimit\(150\);setSidebarLimit\(120\)/);
+ assert.match(code,/setSearch\(""\);setPortfolioStatus\("all"\);setPortfolioLimit\(150\);setSidebarLimit\(120\)/);
  assert.match(code,/document\.getElementById\("atlas-search"\)\?\.focus\(\)/);
  assert.match(css,/\.atlas-portfolio-search-feedback\{/);
  assert.match(css,/\.atlas-portfolio-clear\{/);
@@ -134,4 +134,16 @@ test("One matching project offers an above-fold explanation and a direct opening
  assert.match(first,/onClick=\{\(\)=>selectProject\(filtered\[0\]\.id\)\}/);
  assert.match(css,/\.atlas-portfolio-quick-hit\{/);
  assert.match(css,/max-width:240px;overflow:hidden;text-overflow:ellipsis/);
+});
+
+
+test("Showing all projects removes any previously selected status restriction",()=>{
+ const snapshot=fixture();
+ snapshot.projects[0].status="completed";
+ const idx=buildPortfolioSearchIndex(snapshot.projects);
+ assert.deepEqual(search(idx,"","all"),
+  ["Контрольный большой проект","Городская встреча без исходников"]);
+ assert.deepEqual(search(idx,"","active"),["Городская встреча без исходников"]);
+ const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ assert.match(ui,/setSearch\(""\);setPortfolioStatus\("all"\)/);
 });
