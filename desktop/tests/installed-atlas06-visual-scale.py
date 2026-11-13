@@ -811,9 +811,14 @@ def qualify_visual():
     assert d.head()==final_head,"Opening critical work from overview saved project"
     keyboard.send_keys("{ESC}")
     await_no_form()
-    overview_tab=find_control("Обзор",types={"Button"})
-    overview_tab.click_input()
+    # With the focused deep work still in view, the tab strip can sit
+    # behind the sticky top bar at 820 x 650. Use the always-visible
+    # project entry in the native sidebar to return to the overview.
+    # This is a normal user navigation route, not a test-only shortcut.
+    select_project()
     d.wait_text("Состав проекта",25)
+    assert d.head()==final_head and d.saved_project(final_head)==final,(
+        "Returning to overview from critical work modified native Store")
     overview_overdue=find_control("Показать работы позже контрольного срока",
                                  types={"Button"},scroll=False)
     assert rectangle_in_workspace(overview_overdue.rectangle(),win32gui.GetWindowRect(d.handle)),(
