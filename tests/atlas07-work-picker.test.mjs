@@ -110,3 +110,28 @@ test("After unlinking, compact source ranking may hide a source; expansion prese
  assert.equal(expanded.workTotal,1212);
  assert.equal(expanded.sources[0].sourceId,"visual-source-5");
 });
+
+test("critical graph predecessor picker searches all remaining work and requires explicit selection",()=>{
+ const state=atlas06VisualPortfolio(),project=state.projects[0],original=serialize(state);
+ const targetId="visual-work-5-0",action="dep-to:"+targetId;
+ const spec=editorSpec(project,action,state),field=spec.fields[0];
+ assert.equal(field.name,"from");
+ assert.equal(field.searchable,true);
+ assert.equal(field.value,"","An unopened editor must not silently choose a predecessor");
+ assert.equal(field.options[0].value,"");
+ const all=filterWorkPickerOptions(field.options,"");
+ assert.ok(all.total>1000,"The graph editor handles a real large project");
+ assert.equal(all.shown,12);
+ const found=filterWorkPickerOptions(field.options,"5 / 1080");
+ assert.equal(found.total,1);
+ assert.equal(found.options[1].value,"visual-work-5-1079");
+ assert.throws(()=>applyEditor(state,project.id,action,{get:()=>""}),/больше недоступна/);
+ assert.equal(serialize(state),original);
+ const linked=applyEditor(state,project.id,action,{
+  get:key=>key==="from"?"visual-work-5-1079":""
+ });
+ assert.equal(linked.workId,targetId);
+ assert.ok(linked.state.projects[0].dependencies.some(
+  edge=>edge.from==="visual-work-5-1079"&&edge.to===targetId));
+ assert.equal(serialize(state),original);
+});

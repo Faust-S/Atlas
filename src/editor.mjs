@@ -261,8 +261,10 @@ export function editorSpec(project,action,snapshot=null){
    .map(item=>option(item.id,item.title));
   if(!candidates.length)throw Error("Нет других работ для новой зависимости");
   return {title:"Предшествующая работа для: "+target.title,
-   hint:"Выберите работу, которую нужно закончить раньше. Связь появится только после подтверждения.",
-   fields:[choice("from","Что должно быть выполнено раньше?",candidates,candidates[0].value)]};
+   hint:"Найдите работу по названию и выберите её. Связь появится только после подтверждения.",
+   fields:[{...choice("from","Что должно быть выполнено раньше?",[
+    option("","Выберите предшественника"),...candidates
+   ],""),searchable:true}]};
  }
  if(action==="dep"){
   const options=workItems(project);
