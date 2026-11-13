@@ -105,8 +105,8 @@ test("Critical-path work shortcut derives from canonical CPM and keeps full pagi
  assert.match(ui,/const criticalWorkIds=useMemo\(\(\)=>new Set<string>\(\(plan\?\.criticalIds\|\|\[\]\)\.map\(String\)\),\[plan\]\)/);
  assert.match(ui,/!workCriticalOnly\|\|criticalWorkIds\.has\(item\.id\)/);
  assert.match(ui,/const showCriticalWorks=\(\)=>\{/);
- assert.match(ui,/setWorkQuery\("");setWorkCriticalOnly\(true\);setWorkLimit\(200\)/);
- assert.match(ui,/setWorkDeadlineFilter\("all"\);setWorkQuery\("");setWorkImpactOnly\(false\);setWorkCriticalOnly\(false\)/);
+ assert.ok(ui.includes('setWorkQuery("");setWorkCriticalOnly(true);setWorkLimit(200)'));
+ assert.ok(ui.includes('setWorkDeadlineFilter("all");setWorkQuery("");setWorkImpactOnly(false);setWorkCriticalOnly(false)'));
  assert.match(ui,/workImpactActive\|\|workCriticalOnly/);
  assert.match(ui,/Показать работы на критическом пути: "\+criticalWorkIds\.size/);
  assert.match(ui,/aria-label="Расчётные риски работ"/);
