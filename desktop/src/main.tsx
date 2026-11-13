@@ -11,7 +11,7 @@ import {buildPortfolioCommand,filterPortfolioCommand} from "../../src/portfolio-
 import {buildPortfolioSearchIndex,filterPortfolioSearch,portfolioSearchReason,portfolioSearchWorkTarget} from "../../src/portfolio-search.mjs";
 import {realityOverview,workObservationIndex} from "../../src/reality-overview.mjs";
 import {responseState} from "../../src/response.mjs";
-import {scheduleProject,scheduleChangeSummary,scheduleDeadlineExplanations,criticalPathFocus,workDependencyOverview,filterWorkRowsByDependencies} from "../../src/planning.mjs";
+import {scheduleProject,scheduleChangeSummary,scheduleDeadlineExplanations,criticalPathFocus,forecastDependencyRemoval,workDependencyOverview,filterWorkRowsByDependencies} from "../../src/planning.mjs";
 import {portfolioSchedule,projectedFinishLabel} from "../../src/portfolio-schedule.mjs";
 import {portfolioResources} from "../../src/portfolio-resources.mjs";
 import {planReviewQueue,planReviewAction,planProposalAction} from "../../src/plan-review.mjs";
@@ -340,6 +340,11 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    .sort((a:any,b:any)=>(finishes.get(b.id)??0)-(finishes.get(a.id)??0)||
     String(a.title).localeCompare(String(b.title),"ru"));
  },[project,graphFocusWork,plan]);
+ const graphRemovalPreview=useMemo(()=>{
+  if(!project||!plan||!graphFocusWork||!graphFocusPredecessors.length)return null;
+  const predecessor=graphFocusPredecessors[0];
+  return forecastDependencyRemoval(project,plan,predecessor.id,graphFocusWork.id);
+ },[project,plan,graphFocusWork,graphFocusPredecessors]);
  // The table and Gantt share the canonical project schedule. Keep an indexed
  // view for large projects rather than scanning 1,200+ CPM rows per work card.
  const overdueWorkFinishes=useMemo(()=>new Map<string,string>(
@@ -2060,6 +2065,19 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
           aria-label={"Убрать связь с предшественником: "+graphFocusPredecessors[0].title}
           onClick={()=>removeDependency(graphFocusPredecessors[0].id,graphFocusWork.id)}>
           Убрать связь: {graphFocusPredecessors[0].title}</button>
+         {graphRemovalPreview&&<p className="atlas-graph-link-preview"
+          role="status" aria-label="Последствия удаления выбранной связи до подтверждения">
+          Если убрать эту связь, расчётная продолжительность проекта{" "}
+          {graphRemovalPreview.deltaDays===0?
+           "не изменится: "+graphRemovalPreview.beforeDays+" дн.":
+           "изменится с "+graphRemovalPreview.beforeDays+" до "+
+            graphRemovalPreview.afterDays+" дн."}
+          {graphRemovalPreview.afterFinish?
+           ". Новый расчётный финиш: "+graphRemovalPreview.afterFinish:""}.
+          {" "}Изменений по работам: {graphRemovalPreview.affectedWorks};
+          {" "}на критическом пути: {graphRemovalPreview.criticalChanges}.
+          {" "}Это предварительный расчёт, ничего не сохранено.
+         </p>}
          {graphFocusPredecessors.length>1&&<details className="atlas-graph-other-links">
           <summary>Другие связи ({graphFocusPredecessors.length-1})</summary>
           {graphFocusPredecessors.slice(1).map((prior:any)=>

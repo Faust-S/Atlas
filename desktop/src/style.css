@@ -965,6 +965,9 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
  width:100%;gap:8px;padding:7px 0;border-top:1px solid #dbe7f2}
 .atlas-graph-focus-relations .action-button{font-size:12px;min-height:32px}
 .atlas-graph-unlink{font-size:12px;text-align:left;white-space:normal;overflow-wrap:anywhere}
+.atlas-graph-link-preview{flex:1 1 100%;font-size:12px;line-height:1.45;
+ color:#355777;margin:3px 0 5px;padding:7px 9px;border-left:2px solid #6d9bca;
+ background:#f2f7ff;overflow-wrap:anywhere}
 .atlas-graph-other-links{min-width:0}
 .atlas-graph-other-links>summary{cursor:pointer;font-size:12px;color:#28598d}
 .atlas-graph-other-links .text-link{display:block;font-size:12px;

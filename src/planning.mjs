@@ -102,6 +102,31 @@ export function criticalPathFocus(plan){
  return candidates[0]??null;
 }
 
+/** Read-only hypothetical removal of one existing dependency.
+ * Uses canonical CPM and its comparison, never alters saved project objects.
+ */
+export function forecastDependencyRemoval(project,before,from,to){
+ if(!project||!Array.isArray(project.items)||!Array.isArray(project.dependencies)||
+    !before||!Array.isArray(before.rows))throw Error("Invalid dependency removal preview");
+ const index=project.dependencies.findIndex(edge=>(edge.from??edge.fromId)===from&&
+  (edge.to??edge.toId)===to);
+ if(index<0)throw Error("Dependency removal preview requires an existing link");
+ // Preserve all domain entities and the original schedule; remove one edge
+ // from a temporary graph only. This cannot write an Atlas draft or Store.
+ const dependencies=project.dependencies.slice();
+ dependencies.splice(index,1);
+ const after=scheduleProject({...project,dependencies});
+ const effect=scheduleChangeSummary(before,after);
+ return {
+  from,to,beforeDays:before.durationDays,afterDays:after.durationDays,
+  deltaDays:after.durationDays-before.durationDays,
+  beforeFinish:before.estimatedFinish??null,afterFinish:after.estimatedFinish??null,
+  affectedWorks:effect.affectedTotal,criticalChanges:effect.criticalChangedTotal,
+  movedWorks:effect.movedTotal,resolvedDeadlines:effect.deadlineResolvedTotal,
+  newMissedDeadlines:effect.deadlineNewMissedTotal
+ };
+}
+
 /**
  * Explain dated schedule overruns using the existing CPM rows. The limiting
  * predecessors have the same calculated finish as this work's earliest start.

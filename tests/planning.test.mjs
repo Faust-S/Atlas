@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { scheduleProject,scheduleChangeSummary,scheduleDeadlineExplanations,criticalPathFocus } from '../src/planning.mjs';
+import { scheduleProject,scheduleChangeSummary,scheduleDeadlineExplanations,criticalPathFocus,forecastDependencyRemoval } from '../src/planning.mjs';
 import toposort from '../src/vendor/toposort.mjs';
 const project=(items,dependencies=[],startDate='2026-11-01')=>({items:items.map(([id,estimateDays=1,state='todo'])=>({id,title:id,estimateDays,state})),dependencies:dependencies.map(([from,to])=>({from,to})),startDate});
 test('upstream topological core orders dependencies including isolated items',()=>{const order=toposort.array(['a','b','c','d'],[['a','b'],['b','c']]);assert(order.indexOf('a')<order.indexOf('b'));assert(order.indexOf('b')<order.indexOf('c'));assert(order.includes('d'));});
@@ -369,4 +369,32 @@ test('critical path example follows a real limiting link; independent equal fini
  assert.equal(delta.movedTotal,1);
  assert.equal(JSON.stringify(p),src);assert.equal(JSON.stringify(schedule),scheduled);
  assert.throws(()=>criticalPathFocus({durationDays:7}),/Invalid critical path/);
+});
+
+test("hypothetical link removal preserves an equal-length critical alternative",()=>{
+ const p=project([["a",3],["b",3],["finish",2]],[["a","finish"],["b","finish"]]);
+ const original=JSON.stringify(p),before=scheduleProject(p),scheduleText=JSON.stringify(before);
+ const preview=forecastDependencyRemoval(p,before,"a","finish");
+ assert.equal(preview.beforeDays,5);
+ assert.equal(preview.afterDays,5);
+ assert.equal(preview.deltaDays,0);
+ assert.ok(preview.criticalChanges>=1,"Removed predecessor leaves the critical route");
+ assert.equal(preview.beforeFinish,preview.afterFinish);
+ assert.equal(preview.from,"a");
+ assert.equal(preview.to,"finish");
+ assert.equal(JSON.stringify(p),original);
+ assert.equal(JSON.stringify(before),scheduleText);
+ assert.throws(()=>forecastDependencyRemoval(p,before,"missing","finish"),/existing link/);
+});
+test("hypothetical removal exposes a genuinely shorter schedule without modifying the project",()=>{
+ const p=project([["a",4],["finish",3],["other",2]],[["a","finish"]]);
+ const saved=JSON.stringify(p),before=scheduleProject(p);
+ const predicted=forecastDependencyRemoval(p,before,"a","finish");
+ const actual=scheduleProject({...p,dependencies:[]});
+ assert.equal(before.durationDays,7);
+ assert.equal(predicted.afterDays,actual.durationDays);
+ assert.equal(predicted.deltaDays,-3);
+ assert.ok(predicted.affectedWorks>0);
+ assert.equal(predicted.afterFinish,actual.estimatedFinish);
+ assert.equal(JSON.stringify(p),saved);
 });
