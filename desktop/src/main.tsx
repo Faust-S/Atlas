@@ -427,6 +427,10 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const portfolioSearchIndex=useMemo(()=>buildPortfolioSearchIndex(data.projects),[data.projects]);
  const filtered=useMemo(()=>filterPortfolioSearch(portfolioSearchIndex,{
   query:search,status:portfolioStatus}),[portfolioSearchIndex,search,portfolioStatus]);
+ // A single accessible name and a single visible text node. Separate
+ // expressions for the caption and count can create separate WebView2 UIA
+ // text elements despite looking like one sentence on screen.
+ const portfolioFindSummary=(search.trim()?"Найдено проектов: ":"В списке проектов: ")+filtered.length;
  const workFiltersActive=workFilter!=="all"||workTargetFilter!=="all"||
   workObservationFilter!=="all"||workDependencyFilter!=="all"||
   workDeadlineFilter!=="all"||!!workQuery.trim();
@@ -1178,9 +1182,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    {!project?<>
     <div className="page-heading"><div><small>Ваше рабочее пространство</small><h1>Портфель проектов</h1>
       <p>Что должно быть, что известно и какие решения влияют на планы.</p>
-      <p className="atlas-portfolio-find-count" role="status" aria-live="polite">
-       {search.trim()?"Найдено проектов: ":"В списке проектов: "}{filtered.length}
-      </p></div>
+      <p className="atlas-portfolio-find-count" role="status" aria-live="polite"
+       aria-label={portfolioFindSummary}>{portfolioFindSummary}</p></div>
       <div className="button-row">
        <Action onClick={startConnection}>Подключить проект</Action>
        <Action onClick={()=>openEditor("new")} primary title="Ctrl+N">＋ Новый проект</Action>

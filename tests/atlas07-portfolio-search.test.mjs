@@ -71,6 +71,8 @@ test("Portfolio search gives immediate, accessible feedback above the long atten
  const portfolioTitle=ui.indexOf('<h1>Портфель проектов</h1>');
  const queue=ui.indexOf('<section className="surface atlas-portfolio-command"');
  assert.ok(portfolioTitle>0&&location>portfolioTitle&&queue>location);
- assert.match(ui.slice(location,location+220),/search\.trim\(\)\?"Найдено проектов: ":"В списке проектов: "\}\{filtered\.length\}/);
+ assert.match(ui,/const portfolioFindSummary=\(search\.trim\(\)\?"Найдено проектов: ":"В списке проектов: "\)\+filtered\.length;/);
+ assert.match(ui.slice(location,location+230),/aria-label=\{portfolioFindSummary\}>\{portfolioFindSummary\}<\/p>/);
+ assert.doesNotMatch(ui.slice(location,location+230),/\}\{filtered\.length\}/);
  assert.match(css,/\.atlas-portfolio-find-count\{/);
 });

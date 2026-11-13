@@ -818,3 +818,14 @@ test("Installed portfolio search validates top-of-view result counts without scr
  assert.doesNotMatch(driver,/d\.wait_text\("Показано 1 из 1 проектов по текущему поиску"/);
  assert.match(driver,/d\.saved_project\(before\)==expected/);
 });
+
+
+test("Installed portfolio count is exposed as a single named WebView2 UIA status",()=>{
+ const ui=read("../desktop/src/main.tsx");
+ const driver=read("../desktop/tests/installed-atlas07-portfolio-search.py");
+ assert.match(ui,/const portfolioFindSummary=\(search\.trim\(\)\?"Найдено проектов: ":"В списке проектов: "\)\+filtered\.length;/);
+ assert.match(ui,/<p className="atlas-portfolio-find-count" role="status" aria-live="polite"\s+aria-label=\{portfolioFindSummary\}>\{portfolioFindSummary\}<\/p>/);
+ assert.match(driver,/d\.wait_text\("Найдено проектов: 1",35\)/);
+ assert.match(driver,/d\.wait_text\("Найдено проектов: 0",35\)/);
+ assert.match(driver,/d\.wait_text\("В списке проектов: 1",35\)/);
+});
