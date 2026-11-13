@@ -661,9 +661,18 @@ def qualify_visual():
     select_project()
     d.click_button("Таблица")
     d.set_text("Найти работу","Работа 0 / 2")
+    # At 820 x 650, the table row is physically below the search filters.
+    # Do not demand a visible risk label before scrolling to the real row.
+    fix=find_control("Исправить план работы Работа 0 / 2",
+                     types={"Button"},scroll=True)
+    assert rectangle_in_workspace(fix.rectangle(),win32gui.GetWindowRect(d.handle)),(
+        "Deadline correction is not physically reachable in the installed UI")
     d.wait_text("Отставание от контрольного срока: 2 дн.",25)
     driver=find_control("Открыть работу, определяющую срок Работа 0 / 1",
                         types={"Button"},scroll=True)
+    assert rectangle_in_workspace(driver.rectangle(),win32gui.GetWindowRect(d.handle)),(
+        "Limiting predecessor is not physically reachable in the installed UI")
+    capture("atlas07-work-deadline-reason-visible-820")
     driver.click_input()
     d.window_title_contains("Форма: Работа: Работа 0 / 1",25)
     assert d.head()==final_head
