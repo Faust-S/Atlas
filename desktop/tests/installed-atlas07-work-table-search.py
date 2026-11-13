@@ -95,6 +95,40 @@ def qualify():
     keyboard.send_keys("{ESC}")
     v.await_no_form()
     print("ATLAS07_WORK_TABLE_ENTER_JUMP_PASS",flush=True)
+    # Independently exercise the canonical critical-path projection through
+    # physical Windows buttons rather than a test-only backend or DOM driver.
+    win32gui.MoveWindow(d.handle,0,0,820,650,True)
+    v.select_project()
+    v.find_control("Таблица",types={"Button"}).click_input()
+    import re
+    deadline_names=d.visible_texts()
+    counts={int(match.group(1)) for name in deadline_names
+            if (match:=re.fullmatch(r"Показать работы на критическом пути: (\d+)",name))}
+    assert len(counts)==1,("Critical-path action/count not available",counts)
+    critical_count=counts.pop()
+    assert 0<critical_count<=len(expected["items"]),critical_count
+    show_critical=v.find_control(
+        "Показать работы на критическом пути: "+str(critical_count),
+        types={"Button"},scroll=True)
+    assert v.rectangle_in_workspace(show_critical.rectangle(),win32gui.GetWindowRect(d.handle))
+    show_critical.click_input()
+    d.wait_text(f"Показано {min(200,critical_count)} из {critical_count} работ по фильтру",30)
+    critical_work=v.find_control("Открыть работу Работа 0 / 1",
+                                 types={"Button"},scroll=True)
+    assert v.rectangle_in_workspace(critical_work.rectangle(),win32gui.GetWindowRect(d.handle))
+    v.capture("atlas07-critical-work-filter-820")
+    critical_work.click_input()
+    d.window_title_contains("Форма: Работа: Работа 0 / 1",25)
+    assert d.head()==before,"Opening a critical-path work silently saved data"
+    keyboard.send_keys("{ESC}")
+    v.await_no_form()
+    reset_critical=v.find_control("Снять отбор критических работ",
+                                  types={"Button"},scroll=True)
+    reset_critical.click_input()
+    d.wait_text("Показано 200 из 1213 работ по фильтру",25)
+    assert d.head()==before and d.saved_project(before)==expected
+    win32gui.MoveWindow(d.handle,0,0,1024,710,True)
+    print("ATLAS07_WORK_TABLE_CRITICAL_PATH_FILTER_PASS",flush=True)
     print("ATLAS07_INSTALLED_WORK_TABLE_CONTEXT_SEARCH_PASS",flush=True)
 
 if __name__=="__main__":

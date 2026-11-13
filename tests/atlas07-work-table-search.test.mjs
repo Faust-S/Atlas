@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {serialize,deserialize} from "../src/core.mjs";
 import {projectWorkTableSearch} from "../src/project-organization.mjs";
+import {scheduleProject} from "../src/planning.mjs";
 import {atlas06VisualPortfolio} from "./fixtures/atlas06-visual-portfolio.mjs";
 
 const getIds=(project,query)=>projectWorkTableSearch(project,query).map(work=>work.id);
@@ -89,4 +90,31 @@ test("Enter reveals the sole searched work using the existing focus and paging r
  assert.match(ui,/control\.scrollIntoView\(\{block:"center",behavior:"auto"\}\)/);
  const segment=ui.slice(ui.indexOf('<label>Найти работу <input'),ui.indexOf('<label>Сортировка <select'));
  assert.doesNotMatch(segment,/mutate\(|commitWithReadback\(|nativeInvoke\(|localStorage/);
+});
+
+test("Critical-path work shortcut derives from canonical CPM and keeps full pagination",()=>{
+ const snapshot=atlas06VisualPortfolio(),before=serialize(snapshot);
+ const project=snapshot.projects[0],calculated=scheduleProject(project);
+ const expected=new Set(calculated.rows.filter(row=>row.critical).map(row=>row.id));
+ assert.deepEqual(new Set(calculated.criticalIds),expected);
+ assert.ok(expected.size>200,"The large project must exercise paginated critical results");
+ assert.equal(project.items.filter(item=>expected.has(item.id)).length,expected.size);
+ assert.equal(calculated.rows.some(row=>row.id==="visual-unlinked-0"&&row.critical),false);
+ const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ const css=readFileSync(new URL("../desktop/src/style.css",import.meta.url),"utf8");
+ assert.match(ui,/const criticalWorkIds=useMemo\(\(\)=>new Set<string>\(\(plan\?\.criticalIds\|\|\[\]\)\.map\(String\)\),\[plan\]\)/);
+ assert.match(ui,/!workCriticalOnly\|\|criticalWorkIds\.has\(item\.id\)/);
+ assert.match(ui,/const showCriticalWorks=\(\)=>\{/);
+ assert.match(ui,/setWorkQuery\("");setWorkCriticalOnly\(true\);setWorkLimit\(200\)/);
+ assert.match(ui,/setWorkDeadlineFilter\("all"\);setWorkQuery\("");setWorkImpactOnly\(false\);setWorkCriticalOnly\(false\)/);
+ assert.match(ui,/workImpactActive\|\|workCriticalOnly/);
+ assert.match(ui,/Показать работы на критическом пути: "\+criticalWorkIds\.size/);
+ assert.match(ui,/aria-label="Расчётные риски работ"/);
+ assert.match(ui,/aria-label=\{workCriticalOnly\?"Снять отбор критических работ"/);
+ assert.match(ui,/criticalWorkIds\.has\(w\.id\)&&<small className="atlas-work-critical-label">Критический путь<\/small>/);
+ assert.match(css,/\.atlas-work-risk-actions\{/);
+ const start=ui.indexOf("const showCriticalWorks="),end=ui.indexOf("const openLinkedSource=",start);
+ assert.ok(start>=0&&end>start);
+ assert.doesNotMatch(ui.slice(start,end),/mutate\(|commitWithReadback\(|nativeInvoke\(|fetch\(/);
+ assert.equal(serialize(snapshot),before);
 });

@@ -948,3 +948,11 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
  display:block;text-align:left;width:fit-content;max-width:100%;
  white-space:normal;overflow-wrap:anywhere;font-size:12px}
 .atlas-work-deadline-drivers{display:grid;gap:3px;min-width:0}
+
+/* Keep the original overdue-risk action and critical-path filter together
+   on compact 820 x 650 Windows workspaces without another heavy panel. */
+.atlas-work-risk-actions{display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;min-width:0}
+.atlas-work-risk-actions .text-link{min-height:30px;max-width:100%;text-align:left;white-space:normal}
+.atlas-work-risk-actions small{font-size:11px;color:#526985;overflow-wrap:anywhere}
+.atlas-work-critical-label{display:block;margin-top:3px;color:#80534b;font-weight:600;
+ font-size:11px;line-height:1.35;overflow-wrap:anywhere}

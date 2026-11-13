@@ -667,7 +667,9 @@ def qualify_visual():
                      types={"Button"},scroll=True)
     assert rectangle_in_workspace(fix.rectangle(),win32gui.GetWindowRect(d.handle)),(
         "Deadline correction is not physically reachable in the installed UI")
-    d.wait_text("Отставание от контрольного срока: 2 дн.",25)
+    # The compact Windows card wraps "дн." onto another visual/UIA
+    # line. Verify the grounded amount, then the actual clickable links.
+    d.wait_text("Отставание от контрольного срока: 2",25)
     driver=find_control("Открыть работу, определяющую срок Работа 0 / 1",
                         types={"Button"},scroll=True)
     assert rectangle_in_workspace(driver.rectangle(),win32gui.GetWindowRect(d.handle)),(

@@ -255,6 +255,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const [workTargetFilter,setWorkTargetFilter]=useState("all");
  const [workDependencyFilter,setWorkDependencyFilter]=useState("all");
  const [workDeadlineFilter,setWorkDeadlineFilter]=useState("all");
+ const [workCriticalOnly,setWorkCriticalOnly]=useState(false);
  const [workObservationFilter,setWorkObservationFilter]=useState("all");
  const [workImpactOnly,setWorkImpactOnly]=useState(false);
  const [workHistoryLimits,setWorkHistoryLimits]=useState<Record<string,number>>({});
@@ -328,6 +329,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const history=useMemo(()=>project?projectHistoryRows(project,{kind:historyType,query:historyQuery}):[],
   [project,historyType,historyQuery]);
  const plan=useMemo(()=>project?scheduleProject(project):null,[project]);
+ const criticalWorkIds=useMemo(()=>new Set<string>((plan?.criticalIds||[]).map(String)),[plan]);
  // The table and Gantt share the canonical project schedule. Keep an indexed
  // view for large projects rather than scanning 1,200+ CPM rows per work card.
  const overdueWorkFinishes=useMemo(()=>new Map<string,string>(
@@ -448,11 +450,11 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const portfolioFindSummary=(search.trim()?"Найдено проектов: ":"В списке проектов: ")+filtered.length;
  const workFiltersActive=workFilter!=="all"||workTargetFilter!=="all"||
   workObservationFilter!=="all"||workDependencyFilter!=="all"||
-  workDeadlineFilter!=="all"||!!workQuery.trim()||workImpactActive;
+  workDeadlineFilter!=="all"||!!workQuery.trim()||workImpactActive||workCriticalOnly;
  const clearWorkFilters=()=>{
   setWorkFilter("all");setWorkTargetFilter("all");
   setWorkObservationFilter("all");setWorkDependencyFilter("all");
-  setWorkDeadlineFilter("all");setWorkQuery("");setWorkImpactOnly(false);
+  setWorkDeadlineFilter("all");setWorkQuery("");setWorkImpactOnly(false);setWorkCriticalOnly(false);
   if(workSort==="impact")setWorkSort("title");
   setWorkReturnId(null);setWorkLimit(200);
  };
@@ -460,7 +462,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   if(!recentScheduleEffect?.affectedIds.length||!requireClosedForm())return;
   setWorkFilter("all");setWorkTargetFilter("all");
   setWorkObservationFilter("all");setWorkDependencyFilter("all");
-  setWorkDeadlineFilter("all");setWorkQuery("");setWorkImpactOnly(true);
+  setWorkDeadlineFilter("all");setWorkQuery("");setWorkImpactOnly(true);setWorkCriticalOnly(false);
   setWorkSort("impact");setWorkReturnId(null);setWorkLimit(200);
  };
  const filteredWork=useMemo(()=>{
@@ -468,6 +470,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   const textMatches=projectWorkTableSearch(project,workQuery);
   const matching=textMatches.filter((item:any)=>
    (!workImpactActive||impactedWorkOrder.has(item.id))&&
+   (!workCriticalOnly||criticalWorkIds.has(item.id))&&
    (workFilter==="all"||item.state===workFilter)&&
    (workTargetFilter==="all"||(item.targetIds||[]).includes(workTargetFilter))&&
    (workDeadlineFilter==="all"||overdueWorkFinishes.has(item.id)));
@@ -477,7 +480,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    return rows.sort((a:any,b:any)=>(impactedWorkOrder.get(a.id)??Infinity)-
     (impactedWorkOrder.get(b.id)??Infinity));
   return sortWorkRows(rows,workSort==="impact"?"title":workSort);
- },[project,workFilter,workQuery,workSort,workTargetFilter,workObservationFilter,workDependencyFilter,workDeadlineFilter,overdueWorkFinishes,workLinks,findingsByWork,workImpactActive,impactedWorkOrder]);
+ },[project,workFilter,workQuery,workSort,workTargetFilter,workObservationFilter,workDependencyFilter,workDeadlineFilter,overdueWorkFinishes,workLinks,findingsByWork,workImpactActive,impactedWorkOrder,workCriticalOnly,criticalWorkIds]);
  useEffect(()=>{
   if(tab!=="work"||!ready||!workReturnId||!project)return;
   const index=filteredWork.findIndex((item:any)=>item.id===workReturnId);
@@ -611,7 +614,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   host?.onSelection?.({projectId:id,workId:null,revision:String(latestSnapshot.current.revision)});
   setActive(id);setTab("overview");setEditor(null);setForecastId(null);setConnectOpen(false);
   setSourceJump(null);setMapSearchReturn(null);setGraphJump(null);setWorkReturnId(null);
-  setRecentWorkId(null);setRecentPlanBefore(null);setWorkImpactOnly(false);
+  setRecentWorkId(null);setRecentPlanBefore(null);setWorkImpactOnly(false);setWorkCriticalOnly(false);
   setShowProjectRelations(false);setRelationLimit(12);setRequirementJump(null);setChangeJump(null);
   if(!afterSubmit)setMessage("");
   setWorkDependencyFilter("all");setWorkDeadlineFilter("all");setWorkFilter("all");setWorkTargetFilter("all");setWorkObservationFilter("all");setWorkHistoryLimits({});setWorkQuery("");setWorkSort("title");setWorkLimit(200);setRealityLimit(8);
@@ -675,7 +678,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   setMapSearchReturn(null);
   setWorkFilter("all");setWorkTargetFilter("all");setWorkObservationFilter("all");
   setWorkDependencyFilter("all");setWorkDeadlineFilter("all");setWorkQuery("");setWorkSort("title");setWorkLimit(200);
-  setWorkImpactOnly(false);setWorkReturnId(focusRow?id:null);
+  setWorkImpactOnly(false);setWorkCriticalOnly(false);setWorkReturnId(focusRow?id:null);
  };
  const submit=(event:React.FormEvent<HTMLFormElement>)=>{
   event.preventDefault();
@@ -1040,7 +1043,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   // Navigation remains read-only and reuses the established filter.
   view("work");
   setWorkFilter("all");setWorkTargetFilter("all");setWorkObservationFilter("all");
-  setWorkQuery("");setWorkDeadlineFilter("all");setWorkDependencyFilter("has_pending");setWorkLimit(200);
+  setWorkQuery("");setWorkDeadlineFilter("all");setWorkDependencyFilter("has_pending");setWorkCriticalOnly(false);setWorkLimit(200);
  };
  const showOverdueWorks=()=>{
   if(!project||!overdueWorkFinishes.size||!requireClosedForm())return;
@@ -1049,12 +1052,23 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   view("work");
   setWorkFilter("all");setWorkTargetFilter("all");setWorkObservationFilter("all");
   setWorkDependencyFilter("all");setWorkQuery("");setWorkDeadlineFilter("overdue");
-  setWorkLimit(200);
+  setWorkCriticalOnly(false);setWorkLimit(200);
   // The filtered table can still start below a long summary on a 820x650
   // screen. Reuse existing exact-row focus instead of creating a new scroll
   // mechanism or requiring the user to manually locate the only late work.
   setWorkReturnId(overdueWorkFinishes.size===1?
    overdueWorkFinishes.keys().next().value??null:null);
+ };
+ const showCriticalWorks=()=>{
+  if(!project||!criticalWorkIds.size||!requireClosedForm())return;
+  // This is the same read-only CPM that feeds the dependency map and Gantt.
+  // Clear unrelated filters so the critical path cannot appear incomplete.
+  view("work");
+  setWorkFilter("all");setWorkTargetFilter("all");setWorkObservationFilter("all");
+  setWorkDependencyFilter("all");setWorkDeadlineFilter("all");
+  setWorkQuery("");setWorkCriticalOnly(true);setWorkLimit(200);
+  setWorkReturnId(criticalWorkIds.size===1?
+   criticalWorkIds.values().next().value??null:null);
  };
  const openLinkedSource=(workId:string,query:string,origin:"overview"|"work"|"graph"="overview")=>{
   if(!project||!requireClosedForm())return;
@@ -1782,16 +1796,28 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
          Схема проекта</Action>
        </div>
       </div>}
-      {(overdueWorkFinishes.size>0||workDeadlineFilter==="overdue")&&
-       <div className="atlas-work-overdue-actions">
-        <button type="button" className="text-link" aria-label={workDeadlineFilter==="overdue"?
-         "Показать все работы проекта":"Показать работы позже контрольного срока"}
-         onClick={()=>{
-          if(workDeadlineFilter==="overdue"){
-           setWorkDeadlineFilter("all");setWorkLimit(200);
-          }else showOverdueWorks();
-         }}>{workDeadlineFilter==="overdue"?"Показать все работы":
-          "Позже контрольного срока: "+overdueWorkFinishes.size}</button>
+      {(overdueWorkFinishes.size>0||workDeadlineFilter==="overdue"||
+        criticalWorkIds.size>0||workCriticalOnly)&&
+       <div className="atlas-work-overdue-actions atlas-work-risk-actions"
+        role="group" aria-label="Расчётные риски работ">
+        {(overdueWorkFinishes.size>0||workDeadlineFilter==="overdue")&&
+         <button type="button" className="text-link" aria-label={workDeadlineFilter==="overdue"?
+          "Показать все работы проекта":"Показать работы позже контрольного срока"}
+          onClick={()=>{
+           if(workDeadlineFilter==="overdue"){
+            setWorkDeadlineFilter("all");setWorkLimit(200);
+           }else showOverdueWorks();
+          }}>{workDeadlineFilter==="overdue"?"Показать все работы":
+           "Позже контрольного срока: "+overdueWorkFinishes.size}</button>}
+        {(criticalWorkIds.size>0||workCriticalOnly)&&
+         <button type="button" className="text-link"
+          aria-label={workCriticalOnly?"Снять отбор критических работ":
+           "Показать работы на критическом пути: "+criticalWorkIds.size}
+          onClick={()=>{
+           if(workCriticalOnly){setWorkCriticalOnly(false);setWorkLimit(200);}
+           else showCriticalWorks();
+          }}>{workCriticalOnly?"Убрать отбор критических":"Критический путь: "+criticalWorkIds.size}</button>}
+        {workCriticalOnly&&<small>Критический путь рассчитан по зависимостям и длительностям.</small>}
        </div>}
       <div className="filter-row"><label>Требование <select aria-label="Фильтр работ по требованию"
       value={workTargetFilter} onChange={e=>{setWorkTargetFilter(e.target.value);setWorkLimit(200)}}>
@@ -1894,7 +1920,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
         </small>}
         {w.state==="done"&&(w.targetIds||[]).length>0&&<small className="atlas-work-evidence-note">
          Завершение работы заявлено; факт результата вносится отдельно.</small>}</td>
-       <td data-label="Состояние"><Badge>{workStatuses[w.state]}</Badge></td><td data-label="Длительность">{w.estimateDays??1} дн.</td>
+       <td data-label="Состояние"><Badge>{workStatuses[w.state]}</Badge></td><td data-label="Длительность">{w.estimateDays??1} дн.
+        {criticalWorkIds.has(w.id)&&<small className="atlas-work-critical-label">Критический путь</small>}
+       </td>
        <td data-label="Ответственный">{w.assignee||"Не назначен"}</td>
        <td data-label="Срок">{readable(w.dueDate)}
         {overdueWorkFinishes.has(w.id)&&<small className="atlas-work-overdue-label">
