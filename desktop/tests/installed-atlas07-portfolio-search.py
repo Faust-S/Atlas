@@ -76,6 +76,23 @@ def qualify():
     assert v.rectangle_in_workspace(work_button.rectangle(),win32gui.GetWindowRect(d.handle))
     assert d.head()==before and d.saved_project(before)==expected
     v.capture("atlas07-portfolio-direct-work-820")
+    # Real installed route: portfolio > work > saved source > same work.
+    source_button=v.find_control("Показать источник работы Работа 5 / 1080",
+                                 types={"Button"},scroll=True)
+    source_button.click_input()
+    d.wait_text("Связь работы с каталогом",25)
+    d.wait_text("Работа 5 / 1080",25)
+    back=v.find_control("Вернуться к работе Работа 5 / 1080",
+                        types={"Button"},scroll=True)
+    assert v.rectangle_in_workspace(back.rectangle(),win32gui.GetWindowRect(d.handle))
+    v.capture("atlas07-work-source-roundtrip-820")
+    assert d.head()==before and d.saved_project(before)==expected
+    back.click_input()
+    d.wait_text("Открыть работу Работа 5 / 1080",25)
+    restored=v.find_control("Открыть работу Работа 5 / 1080",
+                            types={"Button"},scroll=False)
+    assert v.rectangle_in_workspace(restored.rectangle(),win32gui.GetWindowRect(d.handle))
+    assert d.head()==before and d.saved_project(before)==expected
     d.click_button("Открыть портфель проектов")
     d.wait_text("Найдено проектов: 1",25)
     quick=v.find_control("Открыть найденный проект Контрольный большой проект",

@@ -187,3 +187,22 @@ test("Several portfolio matches offer the first three direct links above the lon
  assert.equal(serialize(snapshot),original.replace("Городская встреча без исходников",
   "Контрольный второй проект"));
 });
+
+test("A saved work source opens in Atlas and returns to exactly the filtered work",()=>{
+ const snapshot=fixture(),original=serialize(snapshot);
+ const linked=snapshot.projects[0].items.find(item=>item.id==="visual-work-5-1079");
+ const unlinked=snapshot.projects[0].items.find(item=>item.id==="visual-unlinked-0");
+ assert.ok(linked?.sourceId);
+ assert.equal(unlinked?.sourceId,null);
+ const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ const css=readFileSync(new URL("../desktop/src/style.css",import.meta.url),"utf8");
+ assert.match(ui,/w\.sourceId&&<button type="button" className="text-link atlas-work-source-link"/);
+ assert.match(ui,/aria-label=\{"Показать источник работы "\+w\.title\}/);
+ assert.match(ui,/onClick=\{\(\)=>openLinkedSource\(w\.id,workQuery,"work"\)\}/);
+ assert.match(ui,/const returnToLinkedWork=\(\)=>\{/);
+ assert.match(ui,/setWorkQuery\(query\);\s*setWorkReturnId\(workId\);/);
+ assert.match(ui,/sourceJump\?\.origin==="work"&&<button type="button"/);
+ assert.match(ui,/aria-label=\{"Вернуться к работе "\+sourceJumpContext!?\.title\}/);
+ assert.match(css,/\.atlas-work-source-link\{/);
+ assert.equal(serialize(snapshot),original);
+});

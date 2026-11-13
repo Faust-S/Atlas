@@ -278,7 +278,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const [reviewLimit,setReviewLimit]=useState(20);
  const [sourceLimit,setSourceLimit]=useState(15);
  const [sourceRowLimits,setSourceRowLimits]=useState<Record<string,number>>({});
- const [sourceJump,setSourceJump]=useState<{projectId:string;workId:string;query:string}|null>(null);
+ const [sourceJump,setSourceJump]=useState<{projectId:string;workId:string;query:string;origin:"overview"|"work"}|null>(null);
  const [mapSearchReturn,setMapSearchReturn]=useState<{workId:string;query:string}|null>(null);
  const [graphJump,setGraphJump]=useState<{projectId:string;workId:string;query:string;origin:"overview"|"work"|"board"}|null>(null);
  const [workReturnId,setWorkReturnId]=useState<string|null>(null);
@@ -1037,10 +1037,17 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   setWorkReturnId(overdueWorkFinishes.size===1?
    overdueWorkFinishes.keys().next().value??null:null);
  };
- const openLinkedSource=(workId:string,query:string)=>{
+ const openLinkedSource=(workId:string,query:string,origin:"overview"|"work"="overview")=>{
   if(!project||!requireClosedForm())return;
   view("sources");
-  setSourceJump({projectId:project.id,workId,query});
+  setSourceJump({projectId:project.id,workId,query,origin});
+ };
+ const returnToLinkedWork=()=>{
+  if(!project||sourceJump?.origin!=="work"||!requireClosedForm())return;
+  const {workId,query}=sourceJump;
+  view("work");
+  setWorkQuery(query);
+  setWorkReturnId(workId);
  };
  const openWorkGraph=(workId?:string,query?:string,origin:"overview"|"work"|"board"="overview")=>{
   if(!project||!requireClosedForm())return;
@@ -1808,6 +1815,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
         {workFolderUrl(project,w)&&<small>Каталог: <a className="text-link"
          href={workFolderUrl(project,w)!} target="_blank" rel="noopener noreferrer">
          {w.sourcePath}</a></small>}
+        {w.sourceId&&<button type="button" className="text-link atlas-work-source-link"
+         aria-label={"Показать источник работы "+w.title}
+         onClick={()=>openLinkedSource(w.id,workQuery,"work")}>Сведения об источнике</button>}
         {findingsByWork.has(w.id)&&<details className="atlas-work-observation-history">
          <summary aria-label={"История наблюдений по работе: "+w.title}>
           Заявленных наблюдений: {findingsByWork.get(w.id)?.length} · Не независимая приёмка
@@ -2028,6 +2038,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       <div className="button-row">
        <button type="button" className="text-link" disabled={busy}
         onClick={()=>openEditor("work:"+sourceJumpContext.id)}>Открыть связанную работу</button>
+       {sourceJump?.origin==="work"&&<button type="button" className="text-link"
+        aria-label={"Вернуться к работе "+sourceJumpContext.title}
+        onClick={returnToLinkedWork}>К работе</button>}
        <button type="button" className="text-link"
         onClick={()=>view("overview")}>К схеме</button>
        <button type="button" className="text-link" onClick={()=>setSourceJump(null)}>
@@ -2065,6 +2078,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
           target="_blank" rel="noopener noreferrer">Открыть найденный каталог на GitHub</a>}
          <button type="button" className="text-link" disabled={busy}
           onClick={()=>openEditor("work:"+sourceJumpContext!.id)}>Открыть связанную работу</button>
+         {sourceJump?.origin==="work"&&<button type="button" className="text-link"
+          aria-label={"Вернуться к работе "+sourceJumpContext!.title}
+          onClick={returnToLinkedWork}>К работе</button>}
          <button type="button" className="text-link" onClick={()=>view("overview")}>
           К схеме</button>
          <button type="button" className="text-link" onClick={()=>setSourceJump(null)}>
