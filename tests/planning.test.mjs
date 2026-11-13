@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { scheduleProject,scheduleChangeSummary,scheduleDeadlineExplanations } from '../src/planning.mjs';
+import { scheduleProject,scheduleChangeSummary,scheduleDeadlineExplanations,criticalPathFocus } from '../src/planning.mjs';
 import toposort from '../src/vendor/toposort.mjs';
 const project=(items,dependencies=[],startDate='2026-11-01')=>({items:items.map(([id,estimateDays=1,state='todo'])=>({id,title:id,estimateDays,state})),dependencies:dependencies.map(([from,to])=>({from,to})),startDate});
 test('upstream topological core orders dependencies including isolated items',()=>{const order=toposort.array(['a','b','c','d'],[['a','b'],['b','c']]);assert(order.indexOf('a')<order.indexOf('b'));assert(order.indexOf('b')<order.indexOf('c'));assert(order.includes('d'));});
@@ -353,4 +353,20 @@ test('deadline explanation counts leap-day lateness in UTC and ignores undated p
  assert.equal(scheduleDeadlineExplanations(scheduleProject(onTime)).size,0);
  assert.throws(()=>scheduleDeadlineExplanations(null),/Invalid deadline schedule/);
  assert.throws(()=>scheduleDeadlineExplanations(schedule,{limit:0}),/Invalid deadline explanation limit/);
+});
+
+test('critical path example follows a real limiting link; independent equal finish stays visible',()=>{
+ const p=project([['a',3],['b',4],['c',7]],[['a','b']]);
+ const src=JSON.stringify(p),schedule=scheduleProject(p),scheduled=JSON.stringify(schedule);
+ const focus=criticalPathFocus(schedule);
+ assert.equal(focus.workId,'b');assert.equal(focus.predecessorId,'a');
+ assert.equal(focus.durationDays,7);
+ const after=scheduleProject(project([['a',3],['b',4],['c',7]]));
+ const delta=scheduleChangeSummary(schedule,after);
+ assert.equal(after.durationDays,7);
+ assert.equal(criticalPathFocus(after),null,'No invented link among isolated terminal work');
+ assert.equal(delta.criticalChangedTotal,2);
+ assert.equal(delta.movedTotal,1);
+ assert.equal(JSON.stringify(p),src);assert.equal(JSON.stringify(schedule),scheduled);
+ assert.throws(()=>criticalPathFocus({durationDays:7}),/Invalid critical path/);
 });

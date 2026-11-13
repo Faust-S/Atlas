@@ -77,6 +77,31 @@ export function scheduleProject(p) {
 }
 
 
+/** One existing limiting link from a terminal critical chain, without asserting uniqueness.
+ * This is a presentation projection over the canonical CPM, not a second scheduler.
+ */
+export function criticalPathFocus(plan){
+ if(!plan||!Number.isSafeInteger(plan.durationDays)||!Array.isArray(plan.rows))
+  throw Error("Invalid critical path schedule");
+ const byId=new Map(plan.rows.map(row=>[String(row.id),row]));
+ const candidates=plan.rows.filter(row=>row.critical&&row.earlyFinish===plan.durationDays&&Array.isArray(row.predecessors))
+  .flatMap(row=>{
+   const limiting=row.predecessors.map(id=>byId.get(String(id)))
+    .filter(prior=>prior?.critical&&prior.earlyFinish===row.earlyStart)
+    .sort((a,b)=>String(a.title).localeCompare(String(b.title),"ru")||String(a.id).localeCompare(String(b.id)));
+   if(!limiting.length)return [];
+   return [{
+    workId:String(row.id),workTitle:String(row.title),
+    predecessorId:String(limiting[0].id),predecessorTitle:String(limiting[0].title),
+    driverCount:limiting.length,durationDays:plan.durationDays,
+    estimatedFinish:plan.estimatedFinish??null
+   }];
+  });
+ candidates.sort((a,b)=>b.driverCount-a.driverCount||
+  a.workTitle.localeCompare(b.workTitle,"ru")||a.workId.localeCompare(b.workId));
+ return candidates[0]??null;
+}
+
 /**
  * Explain dated schedule overruns using the existing CPM rows. The limiting
  * predecessors have the same calculated finish as this work's earliest start.

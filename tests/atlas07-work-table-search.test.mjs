@@ -1,9 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
-import {serialize,deserialize,editItem} from "../src/core.mjs";
+import {serialize,deserialize,editItem,disconnect} from "../src/core.mjs";
 import {projectWorkTableSearch} from "../src/project-organization.mjs";
-import {scheduleProject,scheduleDeadlineExplanations,scheduleChangeSummary} from "../src/planning.mjs";
+import {scheduleProject,scheduleDeadlineExplanations,scheduleChangeSummary,criticalPathFocus} from "../src/planning.mjs";
 import {editorSpec,applyEditor} from "../src/editor.mjs";
 import {deadlineFocusRows} from "../desktop/src/work-sorting.mjs";
 import {buildIwxaPortfolio,readIwxaPortfolio} from "../desktop/src/iwxa-portfolio.mjs";
@@ -261,4 +261,41 @@ test("large project: overview late-work editor, canonical replanning and IWXA re
  assert.equal(recovered.snapshot.projects[0].items.find(item=>item.id===workId).dueDate,correctedDue);
  assert.equal(scheduleDeadlineExplanations(scheduleProject(recovered.snapshot.projects[0]))
   .has(workId),false);
+});
+
+test("overview critical link opens focused relations and removal reports impact without auto-save",async()=>{
+ const snapshot=atlas06VisualPortfolio(),snapshotText=serialize(snapshot);
+ const p=snapshot.projects[0],before=scheduleProject(p),focus=criticalPathFocus(before);
+ assert.ok(focus,"Large project has a real critical dependency");
+ assert.ok(before.criticalIds.includes(focus.workId)&&before.criticalIds.includes(focus.predecessorId));
+ assert.ok(p.dependencies.some(link=>link.from===focus.predecessorId&&link.to===focus.workId));
+ const selected=before.rows.find(row=>row.id===focus.workId);
+ const predecessor=before.rows.find(row=>row.id===focus.predecessorId);
+ assert.equal(predecessor.earlyFinish,selected.earlyStart);
+ const revised=disconnect(snapshot,p.id,focus.predecessorId,focus.workId);
+ const after=scheduleProject(revised.projects[0]),effect=scheduleChangeSummary(before,after);
+ assert.ok(Array.isArray(effect.affectedIds));
+ assert.equal(revised.projects[0].dependencies.length,p.dependencies.length-1);
+ assert.equal(serialize(snapshot),snapshotText);
+ const archive=await buildIwxaPortfolio(revised,{now:"2026-11-13T20:15:00.000Z"});
+ const opened=await readIwxaPortfolio(archive);
+ assert.equal(serialize(opened.snapshot),serialize(revised));
+ const main=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ const guide=readFileSync(new URL("../desktop/src/ProjectOrganizationGuide.tsx",import.meta.url),"utf8");
+ const css=readFileSync(new URL("../desktop/src/style.css",import.meta.url),"utf8");
+ assert.match(main,/const criticalFocus=useMemo\(\(\)=>plan\?criticalPathFocus\(plan\):null,\[plan\]\)/);
+ assert.match(main,/criticalFocus=\{criticalFocus\}/);
+ assert.match(guide,/aria-label="Пример связи на критическом пути"/);
+ assert.match(guide,/onClick=\{\(\)=>onEdit\("work:"\+criticalFocus\.workId\)\}/);
+ assert.match(guide,/onClick=\{\(\)=>onOpenGraph\(criticalFocus\.workId\)\}/);
+ assert.match(main,/aria-label="Управление связями выбранной работы"/);
+ assert.match(main,/removeDependency\(graphFocusPredecessors\[0\]\.id,graphFocusWork\.id\)/);
+ assert.match(css,/\.atlas-graph-focus-relations\{display:flex/);
+ const section=main.slice(main.indexOf("const removeDependency=(from:string,to:string)=>"),
+  main.indexOf("const removeEmptyStage="));
+ assert.match(section,/confirmAction\(/);
+ assert.match(section,/const next=disconnect\(data,project\.id,from,to\)/);
+ assert.match(section,/scheduleChangeSummary\(plan,scheduleProject\(updatedProject\)\)/);
+ assert.match(section,/revealWorkInTable\(to,false\)/);
+ assert.doesNotMatch(section,/commitWithReadback\(|nativeInvoke\(|void save\(|fetch\(/);
 });

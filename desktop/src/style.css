@@ -693,6 +693,15 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .atlas-project-organization h2 .atlas-critical-work-link:focus-visible{
  outline:2px solid #316fdf;outline-offset:3px;border-radius:3px
 }
+.atlas-critical-focus{display:flex;align-items:center;justify-content:space-between;
+ flex-wrap:wrap;gap:8px;border:1px solid #c9d9ec;border-radius:9px;
+ padding:8px 12px;margin:0 0 12px;background:#f8fbff;min-width:0}
+.atlas-critical-focus-text{flex:1 1 240px;min-width:0}
+.atlas-critical-focus-text strong{display:block;font-size:12px;color:#315779}
+.atlas-critical-focus-text span{display:block;font-size:12px;font-weight:650;overflow-wrap:anywhere}
+.atlas-critical-focus-text small{display:block;font-size:11px;color:#5b7490;overflow-wrap:anywhere}
+.atlas-critical-focus-actions{display:flex;flex-wrap:wrap;gap:7px}
+.atlas-critical-focus-actions .action-button{font-size:12px;min-height:34px}
 .atlas-overdue-preview{border:1px solid #e2d3b8;border-radius:10px;background:#fffaf3;
  padding:9px 12px;margin:0 0 12px;min-width:0}
 .atlas-overdue-preview-heading{display:flex;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:4px}
@@ -952,6 +961,14 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 /* The focused dependency and its source stay actionable on small laptops. */
 .atlas-graph-focus-actions{gap:8px;align-items:center;min-width:0}
 .atlas-graph-focus-actions .minor{min-width:0;max-width:100%;margin:0 6px 0 0}
+.atlas-graph-focus-relations{display:flex;align-items:center;flex-wrap:wrap;
+ width:100%;gap:8px;padding:7px 0;border-top:1px solid #dbe7f2}
+.atlas-graph-focus-relations .action-button{font-size:12px;min-height:32px}
+.atlas-graph-unlink{font-size:12px;text-align:left;white-space:normal;overflow-wrap:anywhere}
+.atlas-graph-other-links{min-width:0}
+.atlas-graph-other-links>summary{cursor:pointer;font-size:12px;color:#28598d}
+.atlas-graph-other-links .text-link{display:block;font-size:12px;
+ text-align:left;max-width:100%;overflow-wrap:anywhere;margin-top:5px}
 .atlas-graph-focus-source{min-height:32px;max-width:100%;font-size:12px;white-space:normal}
 
 /* The real schedule comparison drives a temporary filtered work table,

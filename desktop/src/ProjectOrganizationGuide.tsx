@@ -7,7 +7,7 @@ import {ProjectSourcePlanMap} from "./ProjectVisuals";
 // Suggested roles are explanations to review, never new project entities.
 export function ProjectOrganizationGuide({snapshot,projectId,restoreSearch,onEdit,onRefresh,onOpenProject,
  onOpenSources,onOpenLinkedSource,onOpenWorks,onOpenPendingWorks,pendingWorkCount,
- onOpenOverdueWorks,overdueWorkCount,overdueHighlights,onOpenCriticalWorks,criticalWorkCount,
+ onOpenOverdueWorks,overdueWorkCount,overdueHighlights,onOpenCriticalWorks,criticalWorkCount,criticalFocus,
  onOpenStages,onAddRelation,onOpenTimeline,onOpenGraph,busy=false}:{
  snapshot:any;projectId:string;restoreSearch:{workId:string;query:string}|null;
  onEdit:(action:string)=>void;
@@ -18,6 +18,8 @@ export function ProjectOrganizationGuide({snapshot,projectId,restoreSearch,onEdi
  overdueHighlights:{id:string;title:string;daysLate:number;dueDate:string;finishDate:string;
   driver:{id:string;title:string}|null}[];
  onOpenCriticalWorks:()=>void;criticalWorkCount:number;
+ criticalFocus:{workId:string;workTitle:string;predecessorId:string;predecessorTitle:string;
+  driverCount:number;durationDays:number;estimatedFinish:string|null}|null;
  onOpenStages:()=>void;onAddRelation:()=>void;
  onOpenTimeline:()=>void;onOpenGraph:(workId?:string,query?:string)=>void;busy?:boolean;
 }){
@@ -78,6 +80,24 @@ export function ProjectOrganizationGuide({snapshot,projectId,restoreSearch,onEdi
    </div>)}
    {overdueWorkCount>overdueHighlights.length&&<button type="button" className="text-link"
     onClick={onOpenOverdueWorks}>Остальные работы позже срока: {overdueWorkCount-overdueHighlights.length}</button>}
+  </div>}
+  {criticalFocus&&<div className="atlas-critical-focus" role="group"
+   aria-label="Пример связи на критическом пути">
+   <div className="atlas-critical-focus-text">
+    <strong>Что влияет на общий срок</strong>
+    <span title={criticalFocus.workTitle}>{criticalFocus.workTitle}</span>
+    <small>Начинается после: {criticalFocus.predecessorTitle}.
+     {" "}План: {criticalFocus.durationDays} календарных дн.
+     {criticalFocus.estimatedFinish?" · Расчётное окончание "+criticalFocus.estimatedFinish:""}.</small>
+   </div>
+   <div className="atlas-critical-focus-actions">
+    <button type="button" className="action-button" disabled={busy}
+     aria-label={"Изменить длительность критической работы: "+criticalFocus.workTitle}
+     onClick={()=>onEdit("work:"+criticalFocus.workId)}>Изменить длительность</button>
+    <button type="button" className="action-button" disabled={busy}
+     aria-label={"Изменить связи критической работы: "+criticalFocus.workTitle}
+     onClick={()=>onOpenGraph(criticalFocus.workId)}>Изменить связи</button>
+   </div>
   </div>}
   {!hasSources&&recordedSources>0&&<p className="minor">
    Структура подключённых источников пока не показана. Работы и этапы остаются доступными.

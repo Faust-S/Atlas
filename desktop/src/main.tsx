@@ -11,7 +11,7 @@ import {buildPortfolioCommand,filterPortfolioCommand} from "../../src/portfolio-
 import {buildPortfolioSearchIndex,filterPortfolioSearch,portfolioSearchReason,portfolioSearchWorkTarget} from "../../src/portfolio-search.mjs";
 import {realityOverview,workObservationIndex} from "../../src/reality-overview.mjs";
 import {responseState} from "../../src/response.mjs";
-import {scheduleProject,scheduleChangeSummary,scheduleDeadlineExplanations,workDependencyOverview,filterWorkRowsByDependencies} from "../../src/planning.mjs";
+import {scheduleProject,scheduleChangeSummary,scheduleDeadlineExplanations,criticalPathFocus,workDependencyOverview,filterWorkRowsByDependencies} from "../../src/planning.mjs";
 import {portfolioSchedule,projectedFinishLabel} from "../../src/portfolio-schedule.mjs";
 import {portfolioResources} from "../../src/portfolio-resources.mjs";
 import {planReviewQueue,planReviewAction,planProposalAction} from "../../src/plan-review.mjs";
@@ -330,6 +330,16 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   [project,historyType,historyQuery]);
  const plan=useMemo(()=>project?scheduleProject(project):null,[project]);
  const criticalWorkIds=useMemo(()=>new Set<string>((plan?.criticalIds||[]).map(String)),[plan]);
+ const criticalFocus=useMemo(()=>plan?criticalPathFocus(plan):null,[plan]);
+ const graphFocusPredecessors=useMemo(()=>{
+  if(!graphFocusWork||!project)return [];
+  const byId=new Map<string,any>(project.items.map((w:any)=>[String(w.id),w]));
+  const finishes=new Map<string,number>((plan?.rows||[]).map((row:any)=>[String(row.id),Number(row.earlyFinish)]));
+  return project.dependencies.filter((link:any)=>link.to===graphFocusWork.id)
+   .map((link:any)=>byId.get(String(link.from))).filter(Boolean)
+   .sort((a:any,b:any)=>(finishes.get(b.id)??0)-(finishes.get(a.id)??0)||
+    String(a.title).localeCompare(String(b.title),"ru"));
+ },[project,graphFocusWork,plan]);
  // The table and Gantt share the canonical project schedule. Keep an indexed
  // view for large projects rather than scanning 1,200+ CPM rows per work card.
  const overdueWorkFinishes=useMemo(()=>new Map<string,string>(
@@ -963,7 +973,15 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const removeDependency=(from:string,to:string)=>{
   if(!project||!requireClosedForm()||busyRef.current)return;
   if(!confirmAction("Удалить связь между работами? Atlas пересчитает график. Изменение останется в черновике до сохранения."))return;
-  try{mutate(disconnect(data,project.id,from,to),"Зависимость удалена. Сохраните изменение.");}catch(e){issue(e)}
+  try{
+   const next=disconnect(data,project.id,from,to);
+   const updatedProject=next.projects.find((item:any)=>item.id===project.id)!;
+   const effect=plan?scheduleChangeSummary(plan,scheduleProject(updatedProject)):null;
+   mutate(next,"Связь удалена из черновика. Проверьте последствия и сохраните изменение.");
+   setRecentPlanBefore({workId:to,revision:next.revision,days:plan?.durationDays??0,change:effect});
+   setRecentWorkKind("dependency");setRecentWorkId(to);
+   revealWorkInTable(to,false);
+  }catch(e){issue(e)}
  };
  const removeEmptyStage=(id:string)=>{
   if(!project||!requireClosedForm()||busyRef.current)return;
@@ -1512,6 +1530,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       pendingWorkCount={pendingWorkCount} onOpenPendingWorks={showPendingWorks}
       overdueWorkCount={overdueWorkFinishes.size} onOpenOverdueWorks={showOverdueWorks}
       overdueHighlights={overdueHighlights}
+      criticalFocus={criticalFocus}
       criticalWorkCount={criticalWorkIds.size} onOpenCriticalWorks={showCriticalWorks}
       onOpenStages={()=>document.getElementById("atlas-project-stages")?.scrollIntoView({behavior:"smooth",block:"start"})}
       onOpenTimeline={()=>view("timeline")}
@@ -2030,6 +2049,27 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
        role="group" aria-label="Выбранная работа на схеме связей">
        <p className="minor" style={{overflowWrap:"anywhere"}}>Связи работы: <strong>{graphFocusWork.title}</strong></p>
        <Action onClick={returnFromWorkGraph}>{graphJump?.origin==="work"?"К работе в таблице":graphJump?.origin==="board"?"К работе на доске":"К найденной работе"}</Action>
+       <div className="atlas-graph-focus-relations"
+        role="group" aria-label="Управление связями выбранной работы">
+        {project.items.length>graphFocusPredecessors.length+1&&<Action
+         onClick={()=>openEditor("dep-to:"+encodeURIComponent(graphFocusWork.id))}>
+         Добавить предшественника</Action>}
+        {graphFocusPredecessors.length>0&&<>
+         <span className="minor">Предшественников: {graphFocusPredecessors.length}</span>
+         <button type="button" className="text-link atlas-graph-unlink"
+          aria-label={"Убрать связь с предшественником: "+graphFocusPredecessors[0].title}
+          onClick={()=>removeDependency(graphFocusPredecessors[0].id,graphFocusWork.id)}>
+          Убрать связь: {graphFocusPredecessors[0].title}</button>
+         {graphFocusPredecessors.length>1&&<details className="atlas-graph-other-links">
+          <summary>Другие связи ({graphFocusPredecessors.length-1})</summary>
+          {graphFocusPredecessors.slice(1).map((prior:any)=>
+           <button key={prior.id} type="button" className="text-link"
+            aria-label={"Убрать связь с предшественником: "+prior.title}
+            onClick={()=>removeDependency(prior.id,graphFocusWork.id)}>
+            Убрать связь: {prior.title}</button>)}
+         </details>}
+        </>}
+       </div>
        {graphFocusWork.sourceId&&<button type="button" className="text-link atlas-graph-focus-source"
         aria-label={"Показать источник для связей работы "+graphFocusWork.title}
         onClick={()=>openLinkedSource(graphFocusWork.id,graphJump?.query||"","graph")}>
