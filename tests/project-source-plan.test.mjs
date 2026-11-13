@@ -860,7 +860,8 @@ test("Changing only a control date explains deadline correction without claiming
  const source=read("../src/planning.mjs");
  const ui=read("../desktop/src/main.tsx");
  assert.match(source,/deadlineChangedTotal,deadlineResolvedTotal,deadlineNewMissedTotal/);
- assert.match(source,/if\(!shiftDays&&!dueDateChanged\)continue/);
+ assert.match(source,/if\(!shiftDays&&!dueDateChanged&&!criticalChanged\)continue/);
+ assert.match(source,/const criticalChanged=previousCritical!==critical/);
  assert.match(source,/affectedTotal:affected\.length/);
  assert.match(ui,/recentScheduleEffect\.deadlineChangedTotal>0/);
  assert.match(ui,/recentScheduleEffect\.deadlineResolvedTotal>0/);
