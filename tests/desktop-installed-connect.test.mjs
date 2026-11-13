@@ -834,7 +834,9 @@ test("Installed portfolio count is exposed as a single named WebView2 UIA status
 test("Installed portfolio search resets from no results through a physically accessible button",()=>{
  const driver=read("../desktop/tests/installed-atlas07-portfolio-search.py");
  assert.match(driver,/d\.wait_text\("Найдено проектов: 0",35\)/);
- assert.match(driver,/find_control\("Очистить поиск проектов",types=\{"Button"\},scroll=False\)\.click_input\(\)/);
+ assert.match(driver,/reset=v\.find_control\("Очистить поиск проектов",types=\{"Button"\},scroll=False\)/);
+ assert.match(driver,/v\.rectangle_in_workspace\(reset\.rectangle\(\),win32gui\.GetWindowRect\(d\.handle\)\)/);
+ assert.match(driver,/reset\.click_input\(\)/);
  assert.match(driver,/d\.wait_text\("В списке проектов: 1",35\)/);
  assert.match(driver,/assert d\.head\(\)==before/);
 });
