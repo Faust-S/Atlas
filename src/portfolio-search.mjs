@@ -33,3 +33,32 @@ export function filterPortfolioSearch(index,{query="",status="all"}={}){
   return !needle||fields.some(field=>field.includes(needle));
  }).map(({project})=>project);
 }
+
+
+// Explain *why* a project matched, without reinterpreting links or altering
+// the saved portfolio. This is shown only for visible results of an active
+// user search; it is never used to authorize edits or run tasks.
+export function portfolioSearchReason(project,query){
+ const needle=fold(query);
+ if(!needle||!project)return "";
+ const matches=value=>fold(value).includes(needle);
+ if(matches(project.name))return "Название проекта";
+ if(project.goal&&matches(project.goal))return "Цель проекта";
+ if(project.owner&&matches(project.owner))return "Ответственный за проект";
+ for(const stage of project.stages||[])
+  if(matches(stage.name))return "Этап: "+stage.name;
+ for(const source of project.sources||[])
+  if(matches(source.locator))return "Источник: "+source.locator;
+ const sources=new Map((project.sources||[]).map(source=>[source.id,source.locator]));
+ for(const work of project.items||[]){
+  if(matches(work.title))return "Работа: "+work.title;
+  if(work.assignee&&matches(work.assignee))
+   return "Ответственный за работу: "+work.assignee;
+  const source=sources.get(work.sourceId);
+  if(source&&work.sourcePath&&matches(source+" "+work.sourcePath))
+   return "Каталог: "+source+" / "+work.sourcePath;
+  if(!source&&work.sourcePath&&matches(work.sourcePath))
+   return "Каталог: "+work.sourcePath;
+ }
+ return "";
+}

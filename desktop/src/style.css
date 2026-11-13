@@ -890,3 +890,10 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 }
 .atlas-portfolio-search-feedback .atlas-portfolio-find-count{margin:0!important}
 .atlas-portfolio-clear{font-size:12px;line-height:1.5;min-height:28px}
+
+/* Search context remains readable in a dense 120-project portfolio.
+   Long repository paths do not expand the whole table. */
+.atlas-portfolio-match-reason{
+ display:block;max-width:260px;overflow:hidden;text-overflow:ellipsis;
+ white-space:nowrap;color:#245c96!important;font-weight:600;
+}

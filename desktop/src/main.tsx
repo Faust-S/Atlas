@@ -8,7 +8,7 @@ import {editorSpec,applyEditor,editorSelectionFields,filterWorkPickerOptions,PRO
 import {compareProject,decideChange} from "../../src/trace.mjs";
 import {projectImpact,projectNextStep} from "../../src/impact.mjs";
 import {buildPortfolioCommand,filterPortfolioCommand} from "../../src/portfolio-command.mjs";
-import {buildPortfolioSearchIndex,filterPortfolioSearch} from "../../src/portfolio-search.mjs";
+import {buildPortfolioSearchIndex,filterPortfolioSearch,portfolioSearchReason} from "../../src/portfolio-search.mjs";
 import {realityOverview,workObservationIndex} from "../../src/reality-overview.mjs";
 import {responseState} from "../../src/response.mjs";
 import {scheduleProject,scheduleChangeSummary,workDependencyOverview,filterWorkRowsByDependencies} from "../../src/planning.mjs";
@@ -427,6 +427,11 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const portfolioSearchIndex=useMemo(()=>buildPortfolioSearchIndex(data.projects),[data.projects]);
  const filtered=useMemo(()=>filterPortfolioSearch(portfolioSearchIndex,{
   query:search,status:portfolioStatus}),[portfolioSearchIndex,search,portfolioStatus]);
+ // Explain matches only when there is a query. Cache alongside the
+ // existing portfolio projection so unrelated panel state is cheap.
+ const portfolioReasons=useMemo(()=>new Map<string,string>(
+  search.trim()?filtered.map((p:any)=>[p.id,portfolioSearchReason(p,search)]):[]
+ ),[filtered,search]);
  // A single accessible name and a single visible text node. Separate
  // expressions for the caption and count can create separate WebView2 UIA
  // text elements despite looking like one sentence on screen.
@@ -1271,7 +1276,10 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      {filtered.length?<div className="table-scroll"><table><thead><tr><th>Проект</th><th>Состояние</th><th>Требует внимания</th><th>Расчётный срок</th><th>Риск срока</th><th>Действия</th></tr></thead>
       <tbody>{filtered.slice(0,portfolioLimit).map((p:any)=>{
        const imp=impactByProject.get(p.id)!,row=dates.byId.get(p.id);
-       return <tr key={p.id}><td><button className="text-link" onClick={()=>selectProject(p.id)}>{p.name}</button><small>{p.goal||"Цель не задана"}</small></td>
+       return <tr key={p.id}><td><button className="text-link" onClick={()=>selectProject(p.id)}>{p.name}</button>
+        <small>{p.goal||"Цель не задана"}</small>
+        {portfolioReasons.get(p.id)&&<small className="atlas-portfolio-match-reason"
+         title={portfolioReasons.get(p.id)}>{portfolioReasons.get(p.id)}</small>}</td>
         <td><Badge>{statuses[p.status]||p.status}</Badge></td><td className="atlas-portfolio-attention">
           {!(p.targets||[]).some((t:any)=>t.intent==="committed")?<button type="button" className="text-link"
            aria-label={"Уточнить утверждённые требования проекта "+p.name}

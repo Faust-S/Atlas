@@ -91,3 +91,31 @@ test("Portfolio search provides a direct clear action and restores input focus",
  assert.match(css,/\.atlas-portfolio-search-feedback\{/);
  assert.match(css,/\.atlas-portfolio-clear\{/);
 });
+
+
+test("Portfolio search explains whether a result came from work, stage, source or folder",()=>{
+ const snapshot=fixture(),original=serialize(snapshot);
+ const large=snapshot.projects[0],ordinary=snapshot.projects[1];
+ const {portfolioSearchReason}=await import("../src/portfolio-search.mjs");
+ assert.equal(portfolioSearchReason(large,"Работа 5 / 1080"),"Работа: Работа 5 / 1080");
+ assert.equal(portfolioSearchReason(large,"Этап работ 48"),"Этап: Этап работ 48");
+ assert.equal(portfolioSearchReason(large,"atlas-visual-fixture/project-5"),
+  "Источник: atlas-visual-fixture/project-5");
+ assert.equal(portfolioSearchReason(large,"project-5 directory-23"),
+  "Каталог: atlas-visual-fixture/project-5 / directory-23");
+ assert.equal(portfolioSearchReason(ordinary,"Открыть площадку"),
+  "Работа: Открыть площадку");
+ assert.equal(portfolioSearchReason(large,"несуществующий"),"");
+ assert.equal(portfolioSearchReason(large,""),"");
+ assert.equal(serialize(snapshot),original);
+});
+
+test("The portfolio table identifies why each project matched without a new store",()=>{
+ const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ const css=readFileSync(new URL("../desktop/src/style.css",import.meta.url),"utf8");
+ assert.match(ui,/portfolioSearchReason\(p,search\)/);
+ assert.match(ui,/portfolioReasons\.get\(p\.id\)/);
+ assert.match(ui,/className="atlas-portfolio-match-reason"/);
+ assert.match(css,/\.atlas-portfolio-match-reason\{/);
+ assert.match(css,/text-overflow:ellipsis/);
+});
