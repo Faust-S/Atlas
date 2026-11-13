@@ -144,3 +144,20 @@ test("Switching between impact, pending, overdue and critical views never inters
  assert.doesNotMatch(section("showCriticalWorks","openLinkedSource"),
   /mutate\(|commitWithReadback\(|nativeInvoke\(|fetch\(/);
 });
+
+test("Filtered work lists offer an immediate keyboard-accessible jump to the first result",()=>{
+ const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ const css=readFileSync(new URL("../desktop/src/style.css",import.meta.url),"utf8");
+ const action='aria-label="Перейти к первой найденной работе"';
+ const jump='onClick={()=>setWorkReturnId(filteredWork[0].id)}>К работам</button>';
+ const start=ui.indexOf('className="atlas-work-filter-shortcut"'),end=ui.indexOf('className="minor atlas-work-evidence-summary"',start);
+ assert.ok(start>=0&&end>start&&end-start<1500);
+ const section=ui.slice(start,end);
+ assert.ok(section.includes('filteredWork.length>0&&<button'));
+ assert.ok(section.includes('className="text-link atlas-work-jump-results"'));
+ assert.ok(section.includes(action));
+ assert.ok(section.includes(jump));
+ assert.match(css,/\.atlas-work-filter-shortcut \.atlas-work-jump-results\{/);
+ assert.match(ui,/control\.scrollIntoView\(\{block:"center",behavior:"auto"\}\)/);
+ assert.doesNotMatch(section,/mutate\(|commitWithReadback\(|nativeInvoke\(|fetch\(/);
+});

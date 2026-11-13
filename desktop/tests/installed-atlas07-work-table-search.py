@@ -38,9 +38,15 @@ def qualify():
     d.wait_text("Быстрые действия с фильтрами работ",20)
     v.capture("atlas07-work-table-source-folder-search")
     assert d.head()==before,"Folder search changed native Store"
-    # The 44 rows are sorted by title and can retain a deep scroll position
-    # from previous real GUI scenarios. Open a *physically visible* matching
-    # work, rather than assuming a particular title is on screen.
+    # At 1024 wide the first matching card starts below the controls.
+    # Jump to it using the real user-facing shortcut before looking for
+    # a physically clickable row. Do not assume the UIA "visible" flag
+    # means a work is already within the screen.
+    jump=v.find_control("Перейти к первой найденной работе",
+                        types={"Button"},scroll=False)
+    assert v.rectangle_in_workspace(jump.rectangle(),win32gui.GetWindowRect(d.handle))
+    jump.click_input()
+    v.capture("atlas07-work-table-first-filtered-row-visible")
     expected_titles={w["title"] for w in matches}
     bounds=win32gui.GetWindowRect(d.handle)
     visible=[]

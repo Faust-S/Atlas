@@ -956,3 +956,10 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .atlas-work-risk-actions small{font-size:11px;color:#526985;overflow-wrap:anywhere}
 .atlas-work-critical-label{display:block;margin-top:3px;color:#80534b;font-weight:600;
  font-size:11px;line-height:1.35;overflow-wrap:anywhere}
+
+/* With 44+ filtered rows, the first work can begin below the fold at 820x650.
+   Reuse the existing exact-row focus instead of adding another scroll surface. */
+.atlas-work-filter-shortcut .atlas-work-jump-results{
+ flex:0 1 auto;min-height:32px;max-width:100%;
+ font-size:12px;font-weight:650;white-space:normal;text-align:left;
+}

@@ -1865,6 +1865,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       role="group" aria-label="Быстрые действия с фильтрами работ">
       <small>Показано {Math.min(filteredWork.length,workLimit)} из {filteredWork.length} работ</small>
       {workQuery.trim()&&filteredWork.length===1&&<small>Enter: перейти к найденной работе</small>}
+      {filteredWork.length>0&&<button type="button" className="text-link atlas-work-jump-results"
+       aria-label="Перейти к первой найденной работе"
+       onClick={()=>setWorkReturnId(filteredWork[0].id)}>К работам</button>}
       <button type="button" className="action-button atlas-work-reset-filters"
        aria-label="Сбросить фильтры работ" onClick={clearWorkFilters}>Сбросить фильтры</button>
      </div>}
