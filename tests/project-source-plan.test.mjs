@@ -455,8 +455,10 @@ test("Searching a work opens the exact saved source and folder within Atlas",()=
  assert.match(main,/const \[mapSearchReturn,setMapSearchReturn\]=useState/);
  assert.match(main,/projectSourcePlanWorkContext\(project,sourceJump\.workId\)/);
  assert.match(main,/onOpenLinkedSource=\{openLinkedSource\}/);
- assert.match(main,/const openLinkedSource=\(workId:string,query:string\)=>\{/);
- assert.match(main,/view\("sources"\);\s*setSourceJump\(\{projectId:project\.id,workId,query\}\)/);
+ assert.match(main,/const openLinkedSource=\(workId:string,query:string,origin:"overview"\|"work"="overview"\)=>\{/);
+ assert.match(main,/view\("sources"\);\s*setSourceJump\(\{projectId:project\.id,workId,query,origin\}\)/);
+ assert.match(main,/onClick=\{\(\)=>openLinkedSource\(w\.id,workQuery,"work"\)\}/);
+ assert.match(main,/const returnToLinkedWork=\(\)=>\{/);
  assert.match(main,/target\.scrollIntoView\(\{behavior:"auto",block:"start"\}\)/);
  assert.match(main,/ref=\{selected\?sourceJumpRef:undefined\}/);
  assert.match(main,/aria-label="Каталог связанной работы"/);
