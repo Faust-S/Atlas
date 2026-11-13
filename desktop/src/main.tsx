@@ -1182,8 +1182,16 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    {!project?<>
     <div className="page-heading"><div><small>Ваше рабочее пространство</small><h1>Портфель проектов</h1>
       <p>Что должно быть, что известно и какие решения влияют на планы.</p>
-      <p className="atlas-portfolio-find-count" role="status" aria-live="polite"
-       aria-label={portfolioFindSummary}>{portfolioFindSummary}</p></div>
+      <div className="atlas-portfolio-search-feedback">
+       <p className="atlas-portfolio-find-count" role="status" aria-live="polite"
+        aria-label={portfolioFindSummary}>{portfolioFindSummary}</p>
+       {search.trim()&&<button type="button" className="text-link atlas-portfolio-clear"
+        aria-label="Очистить поиск проектов"
+        onClick={()=>{
+         setSearch("");setPortfolioLimit(150);setSidebarLimit(120);
+         document.getElementById("atlas-search")?.focus();
+        }}>Показать все проекты</button>}
+      </div></div>
       <div className="button-row">
        <Action onClick={startConnection}>Подключить проект</Action>
        <Action onClick={()=>openEditor("new")} primary title="Ctrl+N">＋ Новый проект</Action>

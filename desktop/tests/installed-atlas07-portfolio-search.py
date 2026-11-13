@@ -34,6 +34,11 @@ def qualify():
     d.set_text(SEARCH,"такого проекта нет")
     d.wait_text("Найдено проектов: 0",35)
     assert d.head()==before,"Portfolio search wrote to native Store"
+    v.capture("atlas07-portfolio-search-no-results")
+    v.find_control("Очистить поиск проектов",types={"Button"},scroll=False).click_input()
+    d.wait_text("В списке проектов: 1",35)
+    # Also verify the conventional Ctrl+A / Backspace input path on an
+    # already cleared field, without relying on it for the reset action.
     d.set_text(SEARCH,"")
     d.wait_text("В списке проектов: 1",35)
     v.select_project()

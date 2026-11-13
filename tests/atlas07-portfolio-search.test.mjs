@@ -76,3 +76,18 @@ test("Portfolio search gives immediate, accessible feedback above the long atten
  assert.doesNotMatch(ui.slice(location,location+230),/\}\{filtered\.length\}/);
  assert.match(css,/\.atlas-portfolio-find-count\{/);
 });
+
+
+test("Portfolio search provides a direct clear action and restores input focus",()=>{
+ const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ const css=readFileSync(new URL("../desktop/src/style.css",import.meta.url),"utf8");
+ const start=ui.indexOf('className="atlas-portfolio-search-feedback"');
+ const code=ui.slice(start,start+650);
+ assert.ok(start>0);
+ assert.match(code,/search\.trim\(\)&&<button type="button"/);
+ assert.match(code,/aria-label="Очистить поиск проектов"/);
+ assert.match(code,/setSearch\(""\);setPortfolioLimit\(150\);setSidebarLimit\(120\)/);
+ assert.match(code,/document\.getElementById\("atlas-search"\)\?\.focus\(\)/);
+ assert.match(css,/\.atlas-portfolio-search-feedback\{/);
+ assert.match(css,/\.atlas-portfolio-clear\{/);
+});

@@ -882,3 +882,11 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
  display:inline-block;color:#2b5d9c!important;font-weight:650!important;
  margin:3px 0 0!important;font-size:12px!important;
 }
+
+/* Atlas 0.7: clear a no-result portfolio search without scrolling past
+   the large attention queue. Keep keyboard focus ready for a new query. */
+.atlas-portfolio-search-feedback{
+ display:flex;align-items:center;flex-wrap:wrap;gap:5px 14px;margin:3px 0 0;
+}
+.atlas-portfolio-search-feedback .atlas-portfolio-find-count{margin:0!important}
+.atlas-portfolio-clear{font-size:12px;line-height:1.5;min-height:28px}
