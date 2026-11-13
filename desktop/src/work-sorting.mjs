@@ -29,6 +29,25 @@ export function firstSortedMatchingWorkId(items,matches,kind="title"){
  return sortWorkRows(items.filter(item=>matches.has(item.id)),kind)[0]?.id??null;
 }
 
+/** Read-only shortlist of the largest dated CPM overruns for the overview.
+ * Uses the existing scheduleDeadlineExplanations result. No inferred facts.
+ */
+export function deadlineFocusRows(items,details,{limit=2}={}){
+ if(!Array.isArray(items)||!(details instanceof Map))throw Error("Expected saved works and deadline details");
+ if(!Number.isInteger(limit)||limit<1||limit>10)throw Error("Invalid deadline focus limit");
+ return items.flatMap(item=>{
+  const risk=details.get(item.id);
+  if(!risk||!Number.isFinite(risk.daysLate)||risk.daysLate<=0)return [];
+  return [{id:item.id,title:String(item.title),daysLate:risk.daysLate,
+   dueDate:risk.dueDate,finishDate:risk.finishDate,
+   driver:Array.isArray(risk.drivers)&&risk.drivers.length?
+    {id:risk.drivers[0].id,title:risk.drivers[0].title}:null}];
+ }).sort((a,b)=>b.daysLate-a.daysLate||
+  String(a.dueDate).localeCompare(String(b.dueDate))||
+  a.title.localeCompare(b.title,"ru")||
+  String(a.id).localeCompare(String(b.id))).slice(0,limit);
+}
+
 /** Pure work-list filter, based only on explicitly originating observations.
  * Neither completion nor a manual finding grants independent acceptance.
  */

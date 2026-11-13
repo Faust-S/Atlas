@@ -196,3 +196,25 @@ test("Overview opens canonical critical and overdue work without hidden table se
  assert.match(css,/\.atlas-work-filter-shortcut \.atlas-work-return-overview\{/);
  assert.equal(serialize(snapshot),original);
 });
+
+test("overview gives direct edit of scheduled overruns, followed by explicit plan Save",()=>{
+ const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ const guide=readFileSync(new URL("../desktop/src/ProjectOrganizationGuide.tsx",import.meta.url),"utf8");
+ const css=readFileSync(new URL("../desktop/src/style.css",import.meta.url),"utf8");
+ assert.match(ui,/const overdueHighlights=useMemo\(\(\)=>project\?/);
+ assert.match(ui,/deadlineFocusRows\(project\.items,deadlineRiskDetails\)/);
+ assert.match(ui,/overdueHighlights=\{overdueHighlights\}/);
+ assert.match(guide,/role="group" aria-label="Работы с наибольшим расчётным отставанием"/);
+ assert.match(guide,/overdueHighlights\.map\(row=>/);
+ assert.match(guide,/aria-label=\{"Исправить работу позже контрольного срока: "\+row\.title\}/);
+ assert.match(guide,/onClick=\{\(\)=>onEdit\("work:"\+row\.id\)\}/);
+ assert.match(guide,/onClick=\{\(\)=>onEdit\("work:"\+row\.driver!\.id\)\}/);
+ assert.match(css,/\.atlas-overdue-preview-row\{display:flex/);
+ const preview=guide.slice(guide.indexOf('className="atlas-overdue-preview"'),
+  guide.indexOf('!hasSources&&recordedSources>0'));
+ assert.doesNotMatch(preview,/mutate\(|commitWithReadback\(|nativeInvoke\(|fetch\(/);
+ assert.match(ui,/className="atlas-work-save-shortcut"/);
+ assert.match(ui,/onClick=\{\(\)=>void save\(\)\}>Сохранить пересчитанный план/);
+ assert.match(ui,/setRecentWorkKind\("adjusted"\)/);
+ assert.match(ui,/revealWorkInTable\(correctedId,false\)/);
+});

@@ -693,6 +693,22 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .atlas-project-organization h2 .atlas-critical-work-link:focus-visible{
  outline:2px solid #316fdf;outline-offset:3px;border-radius:3px
 }
+.atlas-overdue-preview{border:1px solid #e2d3b8;border-radius:10px;background:#fffaf3;
+ padding:9px 12px;margin:0 0 12px;min-width:0}
+.atlas-overdue-preview-heading{display:flex;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:4px}
+.atlas-overdue-preview-heading strong{font-size:13px;color:#785223}
+.atlas-overdue-preview-heading small{font-size:11px;color:#866d4c}
+.atlas-overdue-preview-row{display:flex;align-items:center;justify-content:space-between;
+ flex-wrap:wrap;gap:8px;padding:7px 0;border-top:1px solid #eadfce;min-width:0}
+.atlas-overdue-preview-detail{flex:1 1 250px;min-width:0}
+.atlas-overdue-preview-detail>strong{display:block;font-size:12px;overflow-wrap:anywhere}
+.atlas-overdue-preview-detail>small{display:block;font-size:11px;line-height:1.45;overflow-wrap:anywhere}
+.atlas-overdue-preview-detail .text-link{font-size:inherit;text-align:left;white-space:normal;overflow-wrap:anywhere}
+.atlas-overdue-preview-row>.action-button{flex:0 0 auto;font-size:12px;min-height:32px}
+.atlas-overdue-preview>.text-link{font-size:12px;margin-top:5px}
+.atlas-work-save-shortcut{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin:9px 0}
+.atlas-work-save-shortcut small{font-size:12px;color:#436285;flex:1 1 200px}
+.atlas-work-save-shortcut .action-button{font-size:12px;min-height:34px}
 .atlas-organization-source{border-top:1px solid #e0e8f1;padding:14px 0}
 .atlas-organization-source-heading{display:flex;align-items:center;flex-wrap:wrap;gap:10px}
 .atlas-organization-source-heading strong{font-size:14px;overflow-wrap:anywhere}

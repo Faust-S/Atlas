@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {sortWorkRows,firstSortedMatchingWorkId,filterWorkRowsByObservation} from "../desktop/src/work-sorting.mjs";
+import {sortWorkRows,firstSortedMatchingWorkId,deadlineFocusRows,filterWorkRowsByObservation} from "../desktop/src/work-sorting.mjs";
 test("R3 work ordering uses a projection and keeps the original rows unchanged",()=>{
  const input=[
   {id:"a",title:"Gamma",priority:"normal",state:"todo",estimateDays:4,dueDate:null},
@@ -56,4 +56,25 @@ test("overview deadline shortcuts focus the first sorted matching work without e
  assert.equal(firstSortedMatchingWorkId(items,new Set()),null);
  assert.throws(()=>firstSortedMatchingWorkId(items,["late-a"]),/Expected matched work IDs/);
  assert.equal(JSON.stringify(items),before);
+});
+
+test("overview selects the most delayed scheduled work and its recorded predecessor without writes",()=>{
+ const items=[{id:"first",title:"Первый"},{id:"second",title:"Второй"},
+  {id:"third",title:"Третий"},{id:"no-date",title:"Без срока"}];
+ const details=new Map([
+  ["first",{daysLate:1,dueDate:"2026-11-16",finishDate:"2026-11-17",
+   drivers:[{id:"no-date",title:"Без срока"}]}],
+  ["second",{daysLate:5,dueDate:"2026-11-18",finishDate:"2026-11-23",drivers:[]}],
+  ["third",{daysLate:5,dueDate:"2026-11-14",finishDate:"2026-11-19",drivers:[]}],
+  ["no-date",{daysLate:0,dueDate:"2026-11-13",finishDate:"2026-11-13",drivers:[]}]
+ ]);
+ const before=JSON.stringify([items,[...details]]);
+ assert.deepEqual(deadlineFocusRows(items,details).map(row=>row.id),["third","second"]);
+ const all=deadlineFocusRows(items,details,{limit:3});
+ assert.equal(all[2].id,"first");
+ assert.deepEqual(all[2].driver,{id:"no-date",title:"Без срока"});
+ assert.deepEqual(deadlineFocusRows(items,new Map()),[]);
+ assert.throws(()=>deadlineFocusRows(items,details,{limit:0}),/focus limit/);
+ assert.throws(()=>deadlineFocusRows(items,{}),/deadline details/);
+ assert.equal(JSON.stringify([items,[...details]]),before);
 });

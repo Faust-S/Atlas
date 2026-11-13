@@ -7,7 +7,7 @@ import {ProjectSourcePlanMap} from "./ProjectVisuals";
 // Suggested roles are explanations to review, never new project entities.
 export function ProjectOrganizationGuide({snapshot,projectId,restoreSearch,onEdit,onRefresh,onOpenProject,
  onOpenSources,onOpenLinkedSource,onOpenWorks,onOpenPendingWorks,pendingWorkCount,
- onOpenOverdueWorks,overdueWorkCount,onOpenCriticalWorks,criticalWorkCount,
+ onOpenOverdueWorks,overdueWorkCount,overdueHighlights,onOpenCriticalWorks,criticalWorkCount,
  onOpenStages,onAddRelation,onOpenTimeline,onOpenGraph,busy=false}:{
  snapshot:any;projectId:string;restoreSearch:{workId:string;query:string}|null;
  onEdit:(action:string)=>void;
@@ -15,6 +15,8 @@ export function ProjectOrganizationGuide({snapshot,projectId,restoreSearch,onEdi
  onOpenSources:()=>void;onOpenLinkedSource:(workId:string,query:string)=>void;
  onOpenWorks:()=>void;onOpenPendingWorks:()=>void;pendingWorkCount:number;
  onOpenOverdueWorks:()=>void;overdueWorkCount:number;
+ overdueHighlights:{id:string;title:string;daysLate:number;dueDate:string;finishDate:string;
+  driver:{id:string;title:string}|null}[];
  onOpenCriticalWorks:()=>void;criticalWorkCount:number;
  onOpenStages:()=>void;onAddRelation:()=>void;
  onOpenTimeline:()=>void;onOpenGraph:(workId?:string,query?:string)=>void;busy?:boolean;
@@ -54,6 +56,29 @@ export function ProjectOrganizationGuide({snapshot,projectId,restoreSearch,onEdi
     "Здесь показаны ваши работы, этапы и записанные зависимости."}</p>
   </div>{!recordedSources&&<button type="button"
    className="action-button" onClick={onOpenSources}>Подключить источник</button>}</div>
+  {overdueHighlights.length>0&&<div className="atlas-overdue-preview"
+   role="group" aria-label="Работы с наибольшим расчётным отставанием">
+   <div className="atlas-overdue-preview-heading">
+    <strong>Проверить сроки</strong>
+    <small>Расчёт по плану, не факт выполнения</small>
+   </div>
+   {overdueHighlights.map(row=><div className="atlas-overdue-preview-row" key={row.id}>
+    <div className="atlas-overdue-preview-detail">
+     <strong title={row.title}>{row.title}</strong>
+     <small>Отставание {row.daysLate} дн. · Контроль: {row.dueDate} · Расчёт: {row.finishDate}</small>
+     {row.driver&&<small>На начало влияет:{" "}
+      <button type="button" className="text-link"
+       aria-label={"Проверить предшествующую работу: "+row.driver.title}
+       disabled={busy} onClick={()=>onEdit("work:"+row.driver!.id)}>
+       {row.driver.title}</button></small>}
+    </div>
+    <button type="button" className="action-button" disabled={busy}
+     aria-label={"Исправить работу позже контрольного срока: "+row.title}
+     onClick={()=>onEdit("work:"+row.id)}>Исправить работу</button>
+   </div>)}
+   {overdueWorkCount>overdueHighlights.length&&<button type="button" className="text-link"
+    onClick={onOpenOverdueWorks}>Остальные работы позже срока: {overdueWorkCount-overdueHighlights.length}</button>}
+  </div>}
   {!hasSources&&recordedSources>0&&<p className="minor">
    Структура подключённых источников пока не показана. Работы и этапы остаются доступными.
    {" "}<button type="button" className="text-link" onClick={onOpenSources}>

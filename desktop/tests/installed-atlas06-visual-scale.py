@@ -821,6 +821,20 @@ def qualify_visual():
     d.wait_text("Состав проекта",25)
     assert d.head()==final_head and d.saved_project(final_head)==final,(
         "Returning to overview from critical work modified native Store")
+    # From the initial overview the largest late work is directly editable,
+    # without opening or filtering the table first.
+    overdue_edit=find_control("Исправить работу позже контрольного срока: Работа 0 / 2",
+                              types={"Button"},scroll=False)
+    assert rectangle_in_workspace(overdue_edit.rectangle(),win32gui.GetWindowRect(d.handle)),(
+        "Direct overdue-work edit is not physically visible at 820x650")
+    overdue_edit.click_input()
+    d.window_title_contains("Форма: Работа: Работа 0 / 2",25)
+    assert d.head()==final_head,"Overdue edit preview changed native Store"
+    keyboard.send_keys("{ESC}")
+    await_no_form()
+    d.wait_text("Состав проекта",25)
+    assert d.head()==final_head and d.saved_project(final_head)==final
+    print("ATLAS07_OVERVIEW_DIRECT_OVERDUE_EDITOR_PASS",flush=True)
     overview_overdue=find_control("Показать работы позже контрольного срока",
                                  types={"Button"},scroll=False)
     assert rectangle_in_workspace(overview_overdue.rectangle(),win32gui.GetWindowRect(d.handle)),(

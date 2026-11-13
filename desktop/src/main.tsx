@@ -31,7 +31,7 @@ import {prepareImportedSnapshot} from "./import-snapshot.mjs";
 import {buildIwxaPortfolio,readIwxaPortfolio,toBase64,fromBase64} from "./iwxa-portfolio.mjs";
 import {commitWithReadback,readSavedSnapshotForReference} from "./native-save.mjs";
 import {projectHistoryRows} from "./history-view.mjs";
-import {sortWorkRows,firstSortedMatchingWorkId,filterWorkRowsByObservation} from "./work-sorting.mjs";
+import {sortWorkRows,firstSortedMatchingWorkId,deadlineFocusRows,filterWorkRowsByObservation} from "./work-sorting.mjs";
 import {createAtlasSavedRef} from "../../src/project-host-port.mjs";
 import {invokeAtlasHost,type AtlasEmbeddedHost} from "./embedded-host";
 
@@ -336,6 +336,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   (plan?.rows||[]).filter((row:any)=>row.dueDate&&row.finishDate&&row.finishDate>row.dueDate)
    .map((row:any)=>[String(row.id),String(row.finishDate)] as [string,string])),[plan]);
  const deadlineRiskDetails=useMemo(()=>scheduleDeadlineExplanations(plan||{rows:[]}),[plan]);
+ const overdueHighlights=useMemo(()=>project?
+  deadlineFocusRows(project.items,deadlineRiskDetails):[],[project,deadlineRiskDetails]);
  const recentPlanRow=recentWork&&plan?plan.rows.find((row:any)=>row.id===recentWork.id):null;
  const planBeforeRecent=recentWork&&recentPlanBefore&&
   recentPlanBefore.workId===recentWork.id&&recentPlanBefore.revision===data.revision?
@@ -1509,6 +1511,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       onOpenWorks={()=>view("work")}
       pendingWorkCount={pendingWorkCount} onOpenPendingWorks={showPendingWorks}
       overdueWorkCount={overdueWorkFinishes.size} onOpenOverdueWorks={showOverdueWorks}
+      overdueHighlights={overdueHighlights}
       criticalWorkCount={criticalWorkIds.size} onOpenCriticalWorks={showCriticalWorks}
       onOpenStages={()=>document.getElementById("atlas-project-stages")?.scrollIntoView({behavior:"smooth",block:"start"})}
       onOpenTimeline={()=>view("timeline")}
@@ -1745,6 +1748,11 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
              aria-label="Вернуться ко всем работам после изменения плана"
              onClick={clearWorkFilters}>Все работы проекта</button>}
            {workImpactActive&&<small role="status">Показаны работы с изменением расчётного окончания, контрольного срока или критического пути.</small>}
+          </div>}
+          {dirty&&<div className="atlas-work-save-shortcut">
+           <small>Новый расчёт в черновике. Сохранение выполняется только по вашему выбору.</small>
+           <Action primary disabled={busy||!!editor}
+            onClick={()=>void save()}>Сохранить пересчитанный план</Action>
           </div>}
           {recentScheduleEffect.examples.length>0&&<ul className="atlas-work-effect-list">
            {recentScheduleEffect.examples.map((item,index)=><li key={item.id}>
