@@ -118,3 +118,29 @@ test("Critical-path work shortcut derives from canonical CPM and keeps full pagi
  assert.doesNotMatch(ui.slice(start,end),/mutate\(|commitWithReadback\(|nativeInvoke\(|fetch\(/);
  assert.equal(serialize(snapshot),before);
 });
+
+test("Switching between impact, pending, overdue and critical views never intersects stale selections",()=>{
+ const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ const section=(name,next)=>{
+  const start=ui.indexOf("const "+name+"=()=>{");
+  const end=ui.indexOf("const "+next+"=",start);
+  assert.ok(start>=0&&end>start, name+" navigation exists");
+  return ui.slice(start,end);
+ };
+ for(const [name,next] of [
+  ["showPendingWorks","showOverdueWorks"],
+  ["showOverdueWorks","showCriticalWorks"],
+  ["showCriticalWorks","openLinkedSource"]
+ ]){
+  const body=section(name,next);
+  assert.match(body,/setWorkImpactOnly\(false\)/,name+" clears impact selection");
+  assert.match(body,/setWorkCriticalOnly\((?:true|false)\)/,name+" applies the intended critical selection");
+  assert.match(body,/if\(workSort==="impact"\)setWorkSort\("title"\)/,name+" resets hidden impact ordering");
+ }
+ const affected=section("showAffectedWorks","filteredWork");
+ assert.match(affected,/setWorkImpactOnly\(true\);setWorkCriticalOnly\(false\)/);
+ const view=ui.slice(ui.indexOf("const view=(tabId:Tab)=>"),ui.indexOf("const showPendingWorks=()=>"));
+ assert.match(view,/if\(tabId!=="work"\)\{setRecentWorkId\(null\);setWorkImpactOnly\(false\);setWorkCriticalOnly\(false\)/);
+ assert.doesNotMatch(section("showCriticalWorks","openLinkedSource"),
+  /mutate\(|commitWithReadback\(|nativeInvoke\(|fetch\(/);
+});

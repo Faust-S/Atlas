@@ -663,14 +663,15 @@ def qualify_visual():
     d.set_text("Найти работу","Работа 0 / 2")
     # At 820 x 650, the table row is physically below the search filters.
     # Do not demand a visible risk label before scrolling to the real row.
-    fix=find_control("Исправить план работы Работа 0 / 2",
+    fix=find_control("Исправить план работы Работа 0 / 2. Отставание от контрольного срока: 2 дн.",
                      types={"Button"},scroll=True)
     assert rectangle_in_workspace(fix.rectangle(),win32gui.GetWindowRect(d.handle)),(
         "Deadline correction is not physically reachable in the installed UI")
-    # In compact WebView2 the visible small-text label can wrap into
-    # multiple UIA text nodes. Check normalized observed Windows labels,
-    # not a single unwrapped text node. This retains the concrete 2-day
-    # assertion and does not access DOM or application internals.
+    # WebView2 does not expose some static small-text nodes to UIA, even
+    # when they are visibly drawn. The real correction button now carries
+    # the exact CPM lateness in its accessible name. Check its UIA value
+    # and physically click the actual button, never assume screenshot-only
+    # content satisfies accessibility.
     target="Отставаниеотконтрольногосрока:2дн."
     risk_seen=False
     risk_labels=[]
@@ -699,7 +700,7 @@ def qualify_visual():
     assert d.head()==final_head
     keyboard.send_keys("{ESC}")
     await_no_form()
-    fix=find_control("Исправить план работы Работа 0 / 2",
+    fix=find_control("Исправить план работы Работа 0 / 2. Отставание от контрольного срока: 2 дн.",
                      types={"Button"},scroll=True)
     assert rectangle_in_workspace(fix.rectangle(),win32gui.GetWindowRect(d.handle))
     capture("atlas07-work-deadline-explanation-820")

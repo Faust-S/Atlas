@@ -949,7 +949,8 @@ test("Overdue work explains dated delay and limiting predecessor from canonical 
  assert.match(main,/aria-label=\{"Почему нарушается срок работы "\+w\.title\}/);
  assert.match(main,/Отставание от контрольного срока: \{deadlineRiskDetails\.get\(w\.id\)!\.daysLate\} дн\./);
  assert.match(main,/aria-label=\{"Открыть работу, определяющую срок "\+driver\.title\}/);
- assert.match(main,/aria-label=\{"Исправить план работы "\+w\.title\}/);
+ assert.ok(main.includes('aria-label={"Исправить план работы "+w.title+". Отставание от контрольного срока: "+'));
+ assert.match(main,/deadlineRiskDetails\.get\(w\.id\)!\.daysLate\+" дн\."\}/);
  assert.match(main,/onClick=\{\(\)=>openEditor\("work:"\+driver\.id\)\}/);
  assert.match(css,/\.atlas-work-deadline-context\{/);
  const work=main.slice(main.indexOf('className="atlas-work-deadline-context"'),

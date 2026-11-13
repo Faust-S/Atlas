@@ -1033,7 +1033,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    graphJump.projectId===project?.id?
    {workId:graphJump.workId,query:graphJump.query}:null);
   setSourceJump(null);
-  if(tabId!=="work"){setRecentWorkId(null);setWorkImpactOnly(false);if(workSort==="impact")setWorkSort("title")}
+  if(tabId!=="work"){setRecentWorkId(null);setWorkImpactOnly(false);setWorkCriticalOnly(false);
+   if(workSort==="impact")setWorkSort("title")}
   if(tabId!=="graph")setGraphJump(null);
   setTab(tabId);setEditor(null);setForecastId(null);
  };
@@ -1043,7 +1044,10 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   // Navigation remains read-only and reuses the established filter.
   view("work");
   setWorkFilter("all");setWorkTargetFilter("all");setWorkObservationFilter("all");
-  setWorkQuery("");setWorkDeadlineFilter("all");setWorkDependencyFilter("has_pending");setWorkCriticalOnly(false);setWorkLimit(200);
+  setWorkQuery("");setWorkDeadlineFilter("all");setWorkDependencyFilter("has_pending");
+  setWorkImpactOnly(false);setWorkCriticalOnly(false);
+  if(workSort==="impact")setWorkSort("title");
+  setWorkLimit(200);
  };
  const showOverdueWorks=()=>{
   if(!project||!overdueWorkFinishes.size||!requireClosedForm())return;
@@ -1052,7 +1056,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   view("work");
   setWorkFilter("all");setWorkTargetFilter("all");setWorkObservationFilter("all");
   setWorkDependencyFilter("all");setWorkQuery("");setWorkDeadlineFilter("overdue");
-  setWorkCriticalOnly(false);setWorkLimit(200);
+  setWorkImpactOnly(false);setWorkCriticalOnly(false);
+  if(workSort==="impact")setWorkSort("title");
+  setWorkLimit(200);
   // The filtered table can still start below a long summary on a 820x650
   // screen. Reuse existing exact-row focus instead of creating a new scroll
   // mechanism or requiring the user to manually locate the only late work.
@@ -1066,7 +1072,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   view("work");
   setWorkFilter("all");setWorkTargetFilter("all");setWorkObservationFilter("all");
   setWorkDependencyFilter("all");setWorkDeadlineFilter("all");
-  setWorkQuery("");setWorkCriticalOnly(true);setWorkLimit(200);
+  setWorkQuery("");setWorkImpactOnly(false);setWorkCriticalOnly(true);
+  if(workSort==="impact")setWorkSort("title");
+  setWorkLimit(200);
   setWorkReturnId(criticalWorkIds.size===1?
    criticalWorkIds.values().next().value??null:null);
  };
@@ -1945,7 +1953,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
           </div>:
           <small>Предшествующих работ нет. Проверьте длительность и контрольный срок.</small>}
          <button type="button" className="text-link"
-          aria-label={"Исправить план работы "+w.title}
+          aria-label={"Исправить план работы "+w.title+". Отставание от контрольного срока: "+
+           deadlineRiskDetails.get(w.id)!.daysLate+" дн."}
           onClick={()=>openEditor("work:"+w.id)}>Изменить срок или длительность</button>
         </div>}
        </td>
