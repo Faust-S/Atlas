@@ -254,7 +254,7 @@ def click_project_tab(name):
         shortcut={"Таблица":"^1","График":"^2"}.get(name)
         if not shortcut:
             capture("project-tab-not-reachable")
-            raise AssertionError("Project view navigation is not reachable: "+name)
+            raise AssertionError("Project view navigation is not available in the viewport: "+name)
         keyboard.send_keys(shortcut)
         print("ATLAS07_PROJECT_TAB_SHORTCUT_USED "+name,flush=True)
     d.window_title_contains(PROJECT+" — "+name,25)
