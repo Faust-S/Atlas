@@ -995,18 +995,18 @@ def qualify_visual():
         "Reading critical path from overview changed native Store")
     critical_link.click_input()
     d.wait_text("Зависимости работ",35)
+    unlink=find_control("Убрать связь с предшественником: Работа 0 / 12",
+                        types={"Button"},scroll=True)
+    assert rectangle_in_workspace(unlink.rectangle(),win32gui.GetWindowRect(d.handle)),(
+        "Critical predecessor action is offscreen in installed Windows Atlas")
     d.wait_text("Предшественников: 5",35)
-    # Assert the real rendered UIA name of the selected link's own forecast,
-    # not only a screenshot or an unrelated static control.
+    # The selected link and its actual forecast must both be observable
+    # before deletion, rather than trusting the hidden/offscreen DOM.
     d.wait_text("Прогноз удаления связи с Работа 0 / 12",35)
     d.wait_text("продолжительность: 2 дн., станет 2 дн.",35)
     capture("atlas07-critical-removal-forecast-820")
     assert d.head()==resolved_head and d.saved_project(resolved_head)==resolved,(
         "Hypothetical removal forecast silently saved or changed the plan")
-    unlink=find_control("Убрать связь с предшественником: Работа 0 / 12",
-                        types={"Button"},scroll=True)
-    assert rectangle_in_workspace(unlink.rectangle(),win32gui.GetWindowRect(d.handle)),(
-        "Critical predecessor action is offscreen in installed Windows Atlas")
     unlink.click_input()
     # The existing product confirmation is a real WebView2 dialog.
     time.sleep(0.35)

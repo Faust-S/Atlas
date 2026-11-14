@@ -2055,7 +2055,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       <Action onClick={()=>openEditor("dep")}>＋ Зависимость</Action></div>
       {graphFocusWork&&<div className="button-row atlas-graph-focus-actions"
        role="group" aria-label="Выбранная работа на схеме связей">
-       <p className="minor" style={{overflowWrap:"anywhere"}}>Связи работы: <strong>{graphFocusWork.title}</strong></p>
+       <p className="minor" title={graphFocusWork.title} style={{overflowWrap:"anywhere"}}>Связи работы: <strong>{graphFocusWork.title}</strong></p>
        <Action onClick={returnFromWorkGraph}>{graphJump?.origin==="work"?"К работе в таблице":graphJump?.origin==="board"?"К работе на доске":"К найденной работе"}</Action>
        <div className="atlas-graph-focus-relations"
         role="group" aria-label="Управление связями выбранной работы">

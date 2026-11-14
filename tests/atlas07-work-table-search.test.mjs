@@ -399,3 +399,20 @@ test("installed Windows 0.7 separates actionable long-name editor from static cr
  assert.ok(workflow.indexOf("installed-atlas07-critical-link.py")<
   workflow.indexOf("Qualify large Atlas 0.6 map in installed Windows GUI"));
 });
+
+test("focused graph truncates an inert long title but exposes the full title and true link controls",()=>{
+ const css=readFileSync(new URL("../desktop/src/style.css",import.meta.url),"utf8");
+ const main=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ const focused=readFileSync(new URL("../desktop/tests/installed-atlas07-critical-link.py",import.meta.url),"utf8");
+ const ruleStart=css.indexOf(".atlas-graph-focus-actions>p.minor{");
+ assert.ok(ruleStart>0);
+ const rule=css.slice(ruleStart,css.indexOf("}",ruleStart));
+ assert.match(rule,/-webkit-line-clamp:2/);
+ assert.match(rule,/max-height:2\.8em/);
+ assert.match(main,/className="minor" title=\{graphFocusWork\.title\}/);
+ assert.match(main,/aria-label="Управление связями выбранной работы"/);
+ const findAt=focused.indexOf('button=v.find_control("Убрать связь с предшественником: Работа 0 / 12"');
+ const previewAt=focused.indexOf('d.wait_text("Прогноз удаления связи с Работа 0 / 12"');
+ assert.ok(findAt>0&&findAt<previewAt);
+ assert.match(focused,/assert v\.rectangle_in_workspace\(button\.rectangle\(\),win32gui\.GetWindowRect\(d\.handle\)\)/);
+});

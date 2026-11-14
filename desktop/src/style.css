@@ -965,6 +965,9 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 /* The focused dependency and its source stay actionable on small laptops. */
 .atlas-graph-focus-actions{gap:8px;align-items:center;min-width:0}
 .atlas-graph-focus-actions .minor{min-width:0;max-width:100%;margin:0 6px 0 0}
+.atlas-graph-focus-actions>p.minor{display:-webkit-box;flex:1 1 100%;
+ line-height:1.4;max-height:2.8em;-webkit-box-orient:vertical;
+ -webkit-line-clamp:2;line-clamp:2;overflow:hidden;overflow-wrap:anywhere}
 .atlas-graph-focus-relations{display:flex;align-items:center;flex-wrap:wrap;
  width:100%;gap:8px;padding:7px 0;border-top:1px solid #dbe7f2}
 .atlas-graph-focus-relations .action-button{font-size:12px;min-height:32px}

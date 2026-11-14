@@ -52,15 +52,18 @@ def qualify():
     v.capture("atlas07-critical-direct-overview-820")
     critical.click_input()
     d.wait_text("Зависимости работ",35)
+    # The graph may require one ordinary scroll on a 820x650 laptop.
+    # Bring the actual removal command into the physical viewport before
+    # inspecting the forecast associated with that specific link.
+    button=v.find_control("Убрать связь с предшественником: Работа 0 / 12",
+                          types={"Button"},scroll=True)
+    assert v.rectangle_in_workspace(button.rectangle(),win32gui.GetWindowRect(d.handle))
     d.wait_text("Предшественников: 5",35)
     d.wait_text("Прогноз удаления связи с Работа 0 / 12",35)
     d.wait_text("продолжительность: 2 дн., станет 2 дн.",35)
     assert d.head()==imported and d.saved_project(imported)==original, (
         "Hypothetical critical link removal wrote Store")
     v.capture("atlas07-critical-link-forecast-820")
-    button=v.find_control("Убрать связь с предшественником: Работа 0 / 12",
-                          types={"Button"},scroll=True)
-    assert v.rectangle_in_workspace(button.rectangle(),win32gui.GetWindowRect(d.handle))
     button.click_input()
     time.sleep(0.3)
     keyboard.send_keys("{ENTER}")
