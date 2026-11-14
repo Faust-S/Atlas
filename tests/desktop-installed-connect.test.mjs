@@ -478,7 +478,7 @@ test("Installed Windows Gantt filters dated work deadline violations and opens t
  const script=read("../desktop/tests/installed-atlas06-visual-scale.py");
  const component=read("../desktop/src/ProjectVisuals.tsx");
  assert.match(script,/ATLAS06_VISUAL_GANTT_WORK_DEADLINE_FILTER_PASS/);
- assert.match(script,/d\.click_button\("График"\)/);
+ assert.match(script,/click_project_tab\("График"\)/);
  assert.match(script,/Только работы позже контрольного срока/);
  assert.match(script,/deadline_filter\.get_toggle_state\(\)==1/);
  assert.match(script,/visible_bars=\[element for element in d\.window\(\)\.descendants/);

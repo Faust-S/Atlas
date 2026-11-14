@@ -78,7 +78,7 @@ test("Filtered large work lists keep one reset action available while scrolling 
  assert.equal(ui.match(/aria-label="Сбросить фильтры работ"/g)?.length,1);
  assert.match(ui.slice(open,count),/onClick=\{clearWorkFilters\}/);
  assert.match(ui.slice(open,count),/role="group" aria-label="Быстрые действия с фильтрами работ"/);
- assert.match(css,/\.atlas-work-filter-shortcut\{[\s\S]*?position:sticky;top:75px;z-index:7/);
+ assert.match(css,/\.atlas-work-filter-shortcut\{[\s\S]*?position:sticky;top:123px;z-index:6/);
  assert.match(css,/\.atlas-work-filter-shortcut \.atlas-work-reset-filters/);
  assert.match(ui,/const clearWorkFilters=\(\)=>/);
 });
