@@ -698,8 +698,12 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
  padding:8px 12px;margin:0 0 12px;background:#f8fbff;min-width:0}
 .atlas-critical-focus-text{flex:1 1 240px;min-width:0}
 .atlas-critical-focus-text strong{display:block;font-size:12px;color:#315779}
-.atlas-critical-focus-text span{display:block;font-size:12px;font-weight:650;overflow-wrap:anywhere}
-.atlas-critical-focus-text small{display:block;font-size:11px;color:#5b7490;overflow-wrap:anywhere}
+.atlas-critical-focus-text span{display:-webkit-box;font-size:12px;font-weight:650;
+ line-height:1.4;max-height:2.8em;-webkit-box-orient:vertical;
+ -webkit-line-clamp:2;line-clamp:2;overflow:hidden;overflow-wrap:anywhere}
+.atlas-critical-focus-text small{display:-webkit-box;font-size:11px;color:#5b7490;
+ line-height:1.4;max-height:2.8em;-webkit-box-orient:vertical;
+ -webkit-line-clamp:2;line-clamp:2;overflow:hidden;overflow-wrap:anywhere}
 .atlas-critical-focus-actions{display:flex;flex-wrap:wrap;gap:7px}
 .atlas-critical-focus-actions .action-button{font-size:12px;min-height:34px}
 .atlas-overdue-preview{border:1px solid #e2d3b8;border-radius:10px;background:#fffaf3;

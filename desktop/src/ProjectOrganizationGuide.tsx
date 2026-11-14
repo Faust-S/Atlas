@@ -86,7 +86,7 @@ export function ProjectOrganizationGuide({snapshot,projectId,restoreSearch,onEdi
    <div className="atlas-critical-focus-text">
     <strong>Что влияет на общий срок</strong>
     <span title={criticalFocus.workTitle}>{criticalFocus.workTitle}</span>
-    <small>Начинается после: {criticalFocus.predecessorTitle}.
+    <small title={"Начинается после: "+criticalFocus.predecessorTitle}>Начинается после: {criticalFocus.predecessorTitle}.
      {criticalFocus.driverCount>1?
       " Других равнозначных предшественников: "+(criticalFocus.driverCount-1)+".":""}
      {" "}План: {criticalFocus.durationDays} календарных дн.

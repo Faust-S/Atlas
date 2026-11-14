@@ -348,3 +348,24 @@ test("Windows large-project critical preview names the exact selected link and p
  assert.equal(forecast.deltaDays,0);
  assert.equal(serialize(snap),before,"Preview never mutates the actual project");
 });
+
+test("very long critical path names stay compact so the map search remains reachable on Windows",()=>{
+ const css=readFileSync(new URL("../desktop/src/style.css",import.meta.url),"utf8");
+ const guide=readFileSync(new URL("../desktop/src/ProjectOrganizationGuide.tsx",import.meta.url),"utf8");
+ const visuals=readFileSync(new URL("../desktop/src/ProjectVisuals.tsx",import.meta.url),"utf8");
+ for(const selector of [".atlas-critical-focus-text span",".atlas-critical-focus-text small"]){
+  const start=css.indexOf(selector+"{");
+  assert.ok(start>=0,"Missing clamp for "+selector);
+  const rule=css.slice(start,css.indexOf("}",start));
+  assert.match(rule,/-webkit-line-clamp:2/);
+  assert.match(rule,/overflow:hidden/);
+  assert.match(rule,/max-height:2\.8em/);
+ }
+ assert.match(guide,/title=\{criticalFocus\.workTitle\}/);
+ assert.match(guide,/title=\{"Начинается после: "\+criticalFocus\.predecessorTitle\}/);
+ assert.match(guide,/<ProjectSourcePlanMap projection=\{projection\}/);
+ assert.match(visuals,/className="atlas-source-plan-find"/);
+ assert.match(visuals,/>Найти<\/button>/);
+ const native=readFileSync(new URL("../desktop/tests/installed-atlas06-visual-scale.py",import.meta.url),"utf8");
+ assert.match(native,/find_control\("Найти",types=\{"Button"\},scroll=False\)\.click_input\(\)/);
+});
