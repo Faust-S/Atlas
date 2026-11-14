@@ -416,3 +416,14 @@ test("focused graph truncates an inert long title but exposes the full title and
  assert.ok(findAt>0&&findAt<previewAt);
  assert.match(focused,/assert v\.rectangle_in_workspace\(button\.rectangle\(\),win32gui\.GetWindowRect\(d\.handle\)\)/);
 });
+
+test("installed focused graph exposes a readable predecessor count via UIA status",()=>{
+ const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ const native=readFileSync(new URL("../desktop/tests/installed-atlas07-critical-link.py",import.meta.url),"utf8");
+ const count=ui.indexOf('aria-label={"Предшественников: "+graphFocusPredecessors.length}');
+ assert.ok(count>0);
+ const snippet=ui.slice(count-95,count+200);
+ assert.match(snippet,/role="status" aria-live="off"/);
+ assert.match(snippet,/Предшественников: \{graphFocusPredecessors.length\}/);
+ assert.match(native,/d\.wait_text\("Предшественников: 5",35\)/);
+});

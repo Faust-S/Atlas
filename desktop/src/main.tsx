@@ -2063,7 +2063,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
          onClick={()=>openEditor("dep-to:"+encodeURIComponent(graphFocusWork.id))}>
          Добавить предшественника</Action>}
         {graphFocusPredecessors.length>0&&<>
-         <span className="minor">Предшественников: {graphFocusPredecessors.length}</span>
+         <span className="minor" role="status" aria-live="off"
+          aria-label={"Предшественников: "+graphFocusPredecessors.length}>
+          Предшественников: {graphFocusPredecessors.length}</span>
          <button type="button" className="text-link atlas-graph-unlink"
           aria-label={"Убрать связь с предшественником: "+graphSelectedPredecessor.title}
           onClick={()=>removeDependency(graphSelectedPredecessor.id,graphFocusWork.id)}>
