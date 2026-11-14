@@ -2069,7 +2069,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
           onClick={()=>removeDependency(graphSelectedPredecessor.id,graphFocusWork.id)}>
           Убрать связь: {graphSelectedPredecessor.title}</button>
          {graphRemovalPreview&&<p className="atlas-graph-link-preview"
-          role="status" aria-label="Последствия удаления выбранной связи до подтверждения">
+          role="status" aria-label={"Прогноз удаления связи с "+graphSelectedPredecessor.title+
+           ", продолжительность: "+graphRemovalPreview.beforeDays+" дн., станет "+
+           graphRemovalPreview.afterDays+" дн., затронуто работ: "+graphRemovalPreview.affectedWorks}>
           Если убрать связь с {graphSelectedPredecessor.title},
           расчётная продолжительность проекта{" "}
           {graphRemovalPreview.deltaDays===0?

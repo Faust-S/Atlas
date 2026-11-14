@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {serialize,deserialize,editItem,disconnect} from "../src/core.mjs";
 import {projectWorkTableSearch} from "../src/project-organization.mjs";
-import {scheduleProject,scheduleDeadlineExplanations,scheduleChangeSummary,criticalPathFocus} from "../src/planning.mjs";
+import {scheduleProject,scheduleDeadlineExplanations,scheduleChangeSummary,criticalPathFocus,forecastDependencyRemoval} from "../src/planning.mjs";
 import {editorSpec,applyEditor} from "../src/editor.mjs";
 import {deadlineFocusRows} from "../desktop/src/work-sorting.mjs";
 import {buildIwxaPortfolio,readIwxaPortfolio} from "../desktop/src/iwxa-portfolio.mjs";
@@ -307,7 +307,8 @@ test("focused graph shows a read-only forecast before any critical dependency re
  assert.match(main,/forecastDependencyRemoval\(project,plan,graphSelectedPredecessor\.id,graphFocusWork\.id\)/);
  assert.match(main,/setGraphPreviewFrom\(prior\.id\)/);
  assert.match(main,/Если убрать связь с \{graphSelectedPredecessor\.title\}/);
- assert.match(main,/aria-label="Последствия удаления выбранной связи до подтверждения"/);
+ assert.match(main,/aria-label=\{"Прогноз удаления связи с "\+graphSelectedPredecessor\.title/);
+ assert.match(main,/graphRemovalPreview\.afterDays\+" дн\., затронуто работ: "/);
  assert.match(main,/graphRemovalPreview\.deltaDays===0/);
  assert.match(main,/Изменений по работам: \{graphRemovalPreview\.affectedWorks\}/);
  assert.match(main,/ничего не сохранено/);
@@ -328,4 +329,22 @@ test("selection must precede removal for every alternate critical predecessor",(
  assert.match(graph,/onClick=\{\(\)=>setGraphPreviewFrom\(prior\.id\)\}/);
  assert.doesNotMatch(graph,/removeDependency\(prior\.id,graphFocusWork\.id\)/);
  assert.match(main,/useEffect\(\(\)=>setGraphPreviewFrom\(null\),\[project\?\.id,graphFocusWork\?\.id\]\)/);
+});
+
+test("Windows large-project critical preview names the exact selected link and predicts zero duration change",()=>{
+ const snap=atlas06VisualPortfolio();
+ const project=snap.projects[0],before=serialize(snap);
+ const plan=scheduleProject(project);
+ const focus=criticalPathFocus(plan);
+ assert.equal(focus?.workId,"visual-work-5-0","Native deep-work fixture must remain the critical focus");
+ assert.equal(focus.driverCount,5,"Five limiting predecessors expected on the installed fixture");
+ const predecessors=project.dependencies.filter(link=>link.to===focus.workId)
+  .map(link=>project.items.find(work=>work.id===link.from))
+  .sort((a,b)=>a.title.localeCompare(b.title,"ru"));
+ assert.equal(predecessors[0].id,"visual-work-0-11","Windows locates the actual first selected link");
+ const forecast=forecastDependencyRemoval(project,plan,predecessors[0].id,focus.workId);
+ assert.equal(forecast.beforeDays,2);
+ assert.equal(forecast.afterDays,2);
+ assert.equal(forecast.deltaDays,0);
+ assert.equal(serialize(snap),before,"Preview never mutates the actual project");
 });

@@ -982,6 +982,10 @@ def qualify_visual():
     critical_link.click_input()
     d.wait_text("Зависимости работ",35)
     d.wait_text("Предшественников: 5",35)
+    # Assert the real rendered UIA name of the selected link's own forecast,
+    # not only a screenshot or an unrelated static control.
+    d.wait_text("Прогноз удаления связи с Работа 0 / 12",35)
+    d.wait_text("продолжительность: 2 дн., станет 2 дн.",35)
     capture("atlas07-critical-removal-forecast-820")
     assert d.head()==resolved_head and d.saved_project(resolved_head)==resolved,(
         "Hypothetical removal forecast silently saved or changed the plan")
@@ -991,6 +995,7 @@ def qualify_visual():
         "Critical predecessor action is offscreen in installed Windows Atlas")
     unlink.click_input()
     # The existing product confirmation is a real WebView2 dialog.
+    time.sleep(0.35)
     keyboard.send_keys("{ENTER}")
     d.wait_text("Связь удалена из черновика.",35)
     d.wait_text("Расчётные сроки существующих работ не сдвинулись.",35)
