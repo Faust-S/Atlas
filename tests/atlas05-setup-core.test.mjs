@@ -34,7 +34,7 @@ test("Setup Core is pinned and compiled from original Center, not copied or fork
  assert.match(setup,/--verify-installed-file/);
  assert.match(setup,/--locations-file/);
  assert.match(setup,/ATLAS05_SETUP_CORE_NATIVE_INSTALL_PASS/);
- assert.match(setup,/IWXA-Atlas-0\.7\.0-dev\.1-Setup\.exe/);
+ assert.match(setup,/IWXA-Atlas-0\.7\.0-Setup\.exe/);
  assert.match(workflow,/ref: 0ef7544e2a6fd5fab5994f7f25abbb960063908c/);
  assert.match(workflow,/repository: Faust-S\/Center/);
  assert.match(workflow,/desktop\/installer\/build-setup-core\.ps1/);
