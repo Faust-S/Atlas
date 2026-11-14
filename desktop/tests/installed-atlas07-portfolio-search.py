@@ -101,7 +101,7 @@ def qualify():
     d.wait_text("Зависимости работ",25)
     source_from_graph=v.find_control(
         "Показать источник для связей работы Работа 5 / 1080",
-        types={"Button"},scroll=False)
+        types={"Button"},scroll=True)
     assert v.rectangle_in_workspace(source_from_graph.rectangle(),
                                     win32gui.GetWindowRect(d.handle))
     source_from_graph.click_input()

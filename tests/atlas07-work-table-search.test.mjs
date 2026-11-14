@@ -461,3 +461,10 @@ test("Windows navigation uses visible tab geometry or the real advertised Ctrl+1
  assert.match(ui,/\["Digit1","Digit2","Digit3"\]\.includes\(code\)/);
  assert.match(ui,/\{Digit1:"work",Digit2:"timeline",Digit3:"graph"\}/);
 });
+
+test("installed portfolio graph source navigation scrolls into physical Windows viewport",()=>{
+ const script=readFileSync(new URL("../desktop/tests/installed-atlas07-portfolio-search.py",import.meta.url),"utf8");
+ assert.match(script,/Показать источник для связей работы Работа 5 \/ 1080",\s*types=\{"Button"\},scroll=True\)/);
+ assert.match(script,/assert v\.rectangle_in_workspace\(source_from_graph\.rectangle\(\),/);
+ assert.match(script,/source_from_graph\.click_input\(\)/);
+});
