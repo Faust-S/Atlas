@@ -11,6 +11,7 @@ on:
       - release/0.6
       - release/0.7
       - work/2026-11-12-atlas-0-7
+      - work/2026-11-14-atlas-0-8
     paths:
       - 'src/**'
       - 'tests/**'
