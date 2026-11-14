@@ -384,3 +384,18 @@ test("installed predecessor edits require an explicit native selection before ap
  assert.ok(edit.indexOf('choose.click_input()')<edit.indexOf('confirm.click_input()'));
  assert.match(native,/Selecting a predecessor saved without approval/);
 });
+
+test("installed Windows 0.7 separates actionable long-name editor from static critical-path label",()=>{
+ const visual=readFileSync(new URL("../desktop/tests/installed-atlas06-visual-scale.py",import.meta.url),"utf8");
+ const focused=readFileSync(new URL("../desktop/tests/installed-atlas07-critical-link.py",import.meta.url),"utf8");
+ const workflow=readFileSync(new URL("../.github/workflows/atlas-0-2-1-branding.yml",import.meta.url),"utf8");
+ assert.match(visual,/long_work=find_control\("Изменить длительность критической работы: "\+LONG_WORK,/);
+ assert.doesNotMatch(visual,/find_control\(LONG_WORK,types=\{"Button","Hyperlink","Text"\}\)/);
+ assert.match(focused,/ATLAS07_CRITICAL_LINK_FOCUSED_WINDOWS_PASS/);
+ assert.match(focused,/d\.head\(\)==imported and d\.saved_project\(imported\)==original/);
+ assert.match(focused,/assert actual==expected/);
+ assert.match(focused,/d\.stop\(\)\n    d\.launch\(\)/);
+ assert.match(workflow,/Qualify Atlas 0\.7 critical-link preview and cold restart first/);
+ assert.ok(workflow.indexOf("installed-atlas07-critical-link.py")<
+  workflow.indexOf("Qualify large Atlas 0.6 map in installed Windows GUI"));
+});

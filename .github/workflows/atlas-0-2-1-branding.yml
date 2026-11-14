@@ -134,6 +134,14 @@ jobs:
           node tests/fixtures/atlas06-visual-portfolio.mjs $archive
           if ($LASTEXITCODE -ne 0 -or !(Test-Path -LiteralPath $archive)) { throw 'ATLAS06_VISUAL_FIXTURE_FAILED' }
           "ATLAS06_VISUAL_IWXA=$archive" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Qualify Atlas 0.7 critical-link preview and cold restart first
+        if: github.ref_name == 'work/2026-11-12-atlas-0-7'
+        shell: pwsh
+        timeout-minutes: 6
+        run: |
+          python -m py_compile desktop/tests/installed-atlas07-critical-link.py
+          python desktop/tests/installed-atlas07-critical-link.py
+          if ($LASTEXITCODE -ne 0) { throw 'ATLAS07_CRITICAL_LINK_NATIVE_FAILED' }
       - name: Qualify large Atlas 0.6 map in installed Windows GUI
         if: (github.ref_name == 'work/2026-11-10-atlas-0-6' || github.ref_name == 'release/0.6' || github.ref_name == 'work/2026-11-12-atlas-0-7')
         shell: pwsh

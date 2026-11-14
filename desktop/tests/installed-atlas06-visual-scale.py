@@ -399,7 +399,10 @@ def qualify_visual():
     time.sleep(0.6)
     d.wait_text("atlas-visual-fixture/project-5",25)
     capture("large-project-820-before-scroll")
-    long_work=find_control(LONG_WORK,types={"Button","Hyperlink","Text"})
+    # Only the real editor command is actionable. The new compact overview
+    # repeats the same full title as static text, which must not be clicked.
+    long_work=find_control("Изменить длительность критической работы: "+LONG_WORK,
+                           types={"Button"},scroll=False)
     bounds=win32gui.GetWindowRect(d.handle)
     assert rectangle_in_workspace(long_work.rectangle(),bounds),"Long work clipped in narrow window"
     capture("long-work-820")
@@ -415,7 +418,7 @@ def qualify_visual():
     print("ATLAS06_VISUAL_LONG_WORK_NAVIGATION_PASS",flush=True)
 
     # Existing stage is navigable from the map, not synthesized by the view.
-    stage=find_control(LONG_STAGE,types={"Button","Hyperlink","Text"})
+    stage=find_control(LONG_STAGE,types={"Button","Hyperlink"},scroll=True)
     stage.click_input()
     d.window_title_contains("Форма:",25)
     assert d.head()==saved
