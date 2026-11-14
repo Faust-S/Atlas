@@ -603,11 +603,11 @@ test("Atlas 0.7 keeps the accepted 0.6 release gate and checks its own manifests
  const tauri=JSON.parse(read("../desktop/src-tauri/tauri.conf.json"));
  const manifest=JSON.parse(read("../desktop/package.json"));
  const lock=JSON.parse(read("../desktop/package-lock.json"));
- assert.equal(product.version,"0.7.0-dev.1");
- assert.equal(tauri.version,"0.7.0-dev.1");
- assert.equal(manifest.version,"0.7.0-dev.1");
- assert.equal(lock.version,"0.7.0-dev.1");
- assert.equal(lock.packages[""].version,"0.7.0-dev.1");
+ assert.equal(product.version,"0.7.0");
+ assert.equal(tauri.version,"0.7.0");
+ assert.equal(manifest.version,"0.7.0");
+ assert.equal(lock.version,"0.7.0");
+ assert.equal(lock.packages[""].version,"0.7.0");
  assert.match(workflow,/release\/0\.6/);
  assert.match(workflow,/Require successful live GitHub first-use on Atlas 0\.6/);
  assert.match(workflow,/Qualify large Atlas 0\.6 map in installed Windows GUI/);
