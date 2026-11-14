@@ -447,3 +447,17 @@ test("sticky project views remain physically available during deep-map Windows n
  assert.doesNotMatch(win,/d\.click_button\("График"\)/);
  assert.ok(win.split('click_project_tab("Таблица")').length>=8);
 });
+
+test("Windows navigation uses visible tab geometry or the real advertised Ctrl+1/Ctrl+2 shortcuts",()=>{
+ const script=readFileSync(new URL("../desktop/tests/installed-atlas06-visual-scale.py",import.meta.url),"utf8");
+ const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ assert.match(script,/def click_project_tab\(name\):/);
+ assert.match(script,/ATLAS07_PROJECT_TAB_UIA /);
+ assert.match(script,/if len\(physical\)==1:/);
+ assert.match(script,/physical\[0\]\.click_input\(\)/);
+ assert.match(script,/shortcut=\{"Таблица":"\^1","График":"\^2"\}/);
+ assert.match(script,/keyboard\.send_keys\(shortcut\)/);
+ assert.match(script,/d\.window_title_contains\(PROJECT\+" — "\+name,25\)/);
+ assert.match(ui,/code==="Digit1"/);
+ assert.match(ui,/\{Digit1:"work",Digit2:"timeline",Digit3:"graph"\}/);
+});

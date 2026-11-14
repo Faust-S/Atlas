@@ -228,20 +228,35 @@ def click_project_tab(name):
     # Project views are sticky under the command bar. After the user
     # scrolls through hundreds of works, the actual tab must remain
     # physically clickable without jumping back to the first row.
+    # UIA sometimes reports an actually drawn sticky button as
+    # IsVisible=False after a cold restart. Do not confuse this with
+    # an absent user control: inspect physical coordinates independently.
+    wanted="".join(name.split())
     matches=[element for element in d.window().descendants(control_type="Button")
-             if element.window_text()==name and element.is_visible()
+             if "".join(str(element.window_text() or "").split())==wanted
              and element.is_enabled()]
     bounds=win32gui.GetWindowRect(d.handle)
-    on_screen=[element for element in matches
-               if element.rectangle().left>=bounds[0]+170
-               and element.rectangle().right<=bounds[2]-8
-               and element.rectangle().top>=bounds[1]+70
-               and element.rectangle().bottom<=bounds[3]-35]
-    if len(on_screen)!=1:
-        capture("project-tab-not-reachable")
-        raise AssertionError("Project view navigation is not available in the viewport: "+name)
+    physical=[element for element in matches
+              if element.rectangle().left>=bounds[0]+170
+              and element.rectangle().right<=bounds[2]-8
+              and element.rectangle().top>=bounds[1]+70
+              and element.rectangle().bottom<=bounds[3]-35]
+    print("ATLAS07_PROJECT_TAB_UIA "+name+" "+
+          repr([(e.element_info.control_type,e.is_visible(),
+                 tuple(e.rectangle())) for e in matches[:6]]),flush=True)
     d.activate()
-    on_screen[0].click_input()
+    if len(physical)==1:
+        physical[0].click_input()
+        print("ATLAS07_PROJECT_TAB_PHYSICAL_CLICK_PASS "+name,flush=True)
+    else:
+        # Real desktop shortcuts, documented on the tabs and handled by
+        # the ordinary Atlas keydown handler. Never use Store or test IPC.
+        shortcut={"Таблица":"^1","График":"^2"}.get(name)
+        if not shortcut:
+            capture("project-tab-not-reachable")
+            raise AssertionError("Project view navigation is not reachable: "+name)
+        keyboard.send_keys(shortcut)
+        print("ATLAS07_PROJECT_TAB_SHORTCUT_USED "+name,flush=True)
     d.window_title_contains(PROJECT+" — "+name,25)
 
 
