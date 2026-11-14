@@ -243,7 +243,7 @@ def click_project_tab(name):
               and element.rectangle().bottom<=bounds[3]-35]
     print("ATLAS07_PROJECT_TAB_UIA "+name+" "+
           repr([(e.element_info.control_type,e.is_visible(),
-                 tuple(e.rectangle())) for e in matches[:6]]),flush=True)
+                 str(e.rectangle())) for e in matches[:6]]),flush=True)
     d.activate()
     if len(physical)==1:
         physical[0].click_input()

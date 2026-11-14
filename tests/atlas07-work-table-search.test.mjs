@@ -458,6 +458,6 @@ test("Windows navigation uses visible tab geometry or the real advertised Ctrl+1
  assert.match(script,/shortcut=\{"Таблица":"\^1","График":"\^2"\}/);
  assert.match(script,/keyboard\.send_keys\(shortcut\)/);
  assert.match(script,/d\.window_title_contains\(PROJECT\+" — "\+name,25\)/);
- assert.match(ui,/code==="Digit1"/);
+ assert.match(ui,/\["Digit1","Digit2","Digit3"\]\.includes\(code\)/);
  assert.match(ui,/\{Digit1:"work",Digit2:"timeline",Digit3:"graph"\}/);
 });
