@@ -369,3 +369,18 @@ test("very long critical path names stay compact so the map search remains reach
  const native=readFileSync(new URL("../desktop/tests/installed-atlas06-visual-scale.py",import.meta.url),"utf8");
  assert.match(native,/find_control\("Найти",types=\{"Button"\},scroll=False\)\.click_input\(\)/);
 });
+
+test("installed predecessor edits require an explicit native selection before applying either dependency",()=>{
+ const native=readFileSync(new URL("../desktop/tests/installed-atlas06-visual-scale.py",import.meta.url),"utf8");
+ const long=native.slice(native.indexOf('    # A previously created work can receive another predecessor directly'),
+  native.indexOf('    # Changing a real existing dependency must explain the resulting delay'));
+ assert.ok(long.includes('choice.click_input()'));
+ assert.ok(long.includes('keyboard.send_keys("{HOME}{DOWN}{ENTER}")'));
+ assert.ok(long.indexOf('choice.click_input()')<long.indexOf('submit.click_input()'));
+ const edit=native.slice(native.indexOf('    # Changing a real existing dependency must explain the resulting delay'),
+  native.indexOf('    # In the installed compact work table'));
+ assert.ok(edit.includes('choose.click_input()'));
+ assert.ok(edit.includes('keyboard.send_keys("{HOME}{DOWN}{ENTER}")'));
+ assert.ok(edit.indexOf('choose.click_input()')<edit.indexOf('confirm.click_input()'));
+ assert.match(native,/Selecting a predecessor saved without approval/);
+});

@@ -536,8 +536,11 @@ def qualify_visual():
     choice=d.window().child_window(
         title="Что должно быть выполнено раньше?",control_type="ComboBox")
     assert choice.exists(timeout=10) and choice.is_enabled()
-    # First available work is visual-work-0-1. visual-work-0-0 was
-    # already connected during the initial creation and must be excluded.
+    # The dependent work is fixed, but the predecessor has no default.
+    # Select visual-work-0-1 explicitly; visual-work-0-0 was already linked.
+    choice.click_input()
+    keyboard.send_keys("{HOME}{DOWN}{ENTER}")
+    assert d.head()==changed,"Selecting an explicit predecessor saved the project"
     submit=find_control("Применить к черновику",types={"Button"})
     submit.click_input()
     await_no_form()
@@ -583,6 +586,14 @@ def qualify_visual():
                         types={"Button"})
     direct.click_input()
     d.window_title_contains("Форма: Предшествующая работа для:",25)
+    # The search picker intentionally starts empty. Choose visual-work-0-0
+    # as the predecessor of visual-work-0-1 by a real native select action.
+    choose=d.window().child_window(
+        title="Что должно быть выполнено раньше?",control_type="ComboBox")
+    assert choose.exists(timeout=10) and choose.is_enabled()
+    choose.click_input()
+    keyboard.send_keys("{HOME}{DOWN}{ENTER}")
+    assert d.head()==linked_head,"Selecting a predecessor saved without approval"
     confirm=find_control("Применить к черновику",types={"Button"})
     confirm.click_input()
     await_no_form()
