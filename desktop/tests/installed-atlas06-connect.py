@@ -84,7 +84,17 @@ def wait_button(name,timeout=35):
     until=time.monotonic()+timeout
     while time.monotonic()<until:
         if process.poll() is not None:raise AssertionError("Atlas closed while seeking "+name)
-        found=[element for element in window().descendants(control_type="Button")
+        try:
+            # WebView2 UIA may expose an incompletely typed element for a
+            # single frame immediately after changing project views.
+            # Retry only that transient wrapper lookup, never the product
+            # action or an actual missing control.
+            controls=window().descendants(control_type="Button")
+        except KeyError as exc:
+            print("ATLAS07_UIA_TRANSIENT_BUTTON_TREE_RETRY "+repr(exc),flush=True)
+            time.sleep(0.2)
+            continue
+        found=[element for element in controls
                if element.window_text()==name and element.is_visible() and element.is_enabled()]
         if len(found)==1:return found[0]
         if len(found)>1:

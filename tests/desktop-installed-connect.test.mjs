@@ -864,3 +864,18 @@ test("Installed Atlas 0.7 opens one matched project from the top of a 820x650 po
  assert.match(driver,/quick\.click_input\(\)/);
  assert.match(driver,/assert d\.head\(\)==before and d\.saved_project\(before\)==expected/);
 });
+
+test("installed WebView2 button enumeration retries a transient UIA wrapper race but still times out on missing controls",()=>{
+ const driver=read("../desktop/tests/installed-atlas06-connect.py");
+ const start=driver.indexOf("def wait_button(name,timeout=35):");
+ const end=driver.indexOf("def click_button(name,timeout=35):",start);
+ assert.ok(start>=0&&end>start);
+ const code=driver.slice(start,end);
+ assert.match(code,/try:\s*# WebView2 UIA may expose/);
+ assert.match(code,/controls=window\(\)\.descendants\(control_type="Button"\)/);
+ assert.match(code,/except KeyError as exc:/);
+ assert.match(code,/ATLAS07_UIA_TRANSIENT_BUTTON_TREE_RETRY/);
+ assert.match(code,/time\.sleep\(0\.2\)\s*continue/);
+ assert.match(code,/if len\(found\)==1:return found\[0\]/);
+ assert.match(code,/raise AssertionError\("Missing installed button: "\+name\)/);
+});
