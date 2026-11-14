@@ -244,6 +244,10 @@ export function projectSourcePlanProjection(snapshot,projectId,{
 // available to open through its ordinary editor. This never writes to a plan.
 const searchLabel=value=>String(value??"").normalize("NFKC")
  .toLocaleLowerCase("ru-RU").replace(/ё/g,"е").replace(/\s+/g," ").trim();
+// Tokens may be reordered inside one actual saved value, but unrelated
+// work, stage and source records must not create a false match.
+const matchesSearchField=(field,needle,words)=>field.includes(needle)||
+ (words.length>1&&words.every(word=>field.includes(word)));
 
 // Find currently observed GitHub directories across *all* connected sources,
 // including those omitted from the bounded diagram. A partial observation
@@ -299,7 +303,7 @@ export function projectWorkTableSearch(project,query){
   const folder=work.sourcePath||"";
   const fields=[work.title,work.assignee||"",stages.get(work.stageId)||"",
    folder,repository].map(searchLabel);
-  if(fields.some(value=>value.includes(needle)))return true;
+  if(fields.some(value=>matchesSearchField(value,needle,tokens)))return true;
   // A user can type "project-5 directory-23", but words from a work
   // title must never accidentally complete an unrelated stage name.
   const sourceContext=searchLabel(repository+" "+folder);
@@ -313,13 +317,15 @@ export function projectSourcePlanSearch(project,query,{limit=8,priorityWorkId=""
   throw Error("Некорректный предел поиска");
  const needle=searchLabel(query);
  if(!needle)return {matches:[],total:0,hidden:0};
+ const tokens=needle.split(" ").filter(Boolean);
  const stages=new Map(project.stages.map(stage=>[stage.id,stage.name]));
  const results=[];
  let order=0;
  const add=(kind,record,stageName=null)=>{
   const label=searchLabel(kind==="work"?record.title:record.name);
-  if(!label.includes(needle))return;
-  const rank=label===needle?0:label.startsWith(needle)?1:2;
+  if(!matchesSearchField(label,needle,tokens))return;
+  const rank=label===needle?0:label.startsWith(needle)?1:
+   label.includes(needle)?2:3;
   results.push({kind,id:record.id,title:kind==="work"?record.title:record.name,
    stageName,rank,order:order++});
  };
