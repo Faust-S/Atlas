@@ -427,3 +427,23 @@ test("installed focused graph exposes a readable predecessor count via UIA statu
  assert.match(snippet,/Предшественников: \{graphFocusPredecessors.length\}/);
  assert.match(native,/d\.wait_text\("Предшественников: 5",35\)/);
 });
+
+test("sticky project views remain physically available during deep-map Windows navigation",()=>{
+ const css=readFileSync(new URL("../desktop/src/style.css",import.meta.url),"utf8");
+ const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ const win=readFileSync(new URL("../desktop/tests/installed-atlas06-visual-scale.py",import.meta.url),"utf8");
+ const nav=css.indexOf(".atlas-compact-tabs{");
+ assert.ok(nav>0);
+ const rule=css.slice(nav,css.indexOf("}",nav));
+ assert.match(rule,/position:sticky;top:73px/);
+ assert.match(rule,/z-index:7/);
+ assert.match(css,/\.commandbar\{[^}]*position:sticky;top:0;z-index:8;/);
+ assert.match(css,/\.atlas-work-filter-shortcut\{\s*position:sticky;top:123px;z-index:6;/);
+ assert.match(css,/@media\(max-width:560px\)\{\.atlas-compact-tabs\{position:static/);
+ assert.match(ui,/className="tabbar atlas-compact-tabs" aria-label="Представления проекта"/);
+ assert.match(win,/def click_project_tab\(name\):/);
+ assert.match(win,/raise AssertionError\("Project view navigation is not available in the viewport: "\+name\)/);
+ assert.doesNotMatch(win,/d\.click_button\("Таблица"\)/);
+ assert.doesNotMatch(win,/d\.click_button\("График"\)/);
+ assert.ok(win.split('click_project_tab("Таблица")').length>=8);
+});

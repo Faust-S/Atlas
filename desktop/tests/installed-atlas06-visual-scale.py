@@ -224,6 +224,27 @@ def select_project():
     capture("synthetic-project-navigation-missing")
     raise AssertionError("Synthetic project not accessible from native sidebar")
 
+def click_project_tab(name):
+    # Project views are sticky under the command bar. After the user
+    # scrolls through hundreds of works, the actual tab must remain
+    # physically clickable without jumping back to the first row.
+    matches=[element for element in d.window().descendants(control_type="Button")
+             if element.window_text()==name and element.is_visible()
+             and element.is_enabled()]
+    bounds=win32gui.GetWindowRect(d.handle)
+    on_screen=[element for element in matches
+               if element.rectangle().left>=bounds[0]+170
+               and element.rectangle().right<=bounds[2]-8
+               and element.rectangle().top>=bounds[1]+70
+               and element.rectangle().bottom<=bounds[3]-35]
+    if len(on_screen)!=1:
+        capture("project-tab-not-reachable")
+        raise AssertionError("Project view navigation is not available in the viewport: "+name)
+    d.activate()
+    on_screen[0].click_input()
+    d.window_title_contains(PROJECT+" — "+name,25)
+
+
 def saved_head_or_none():
     # Offline visual qualification can begin before live GitHub first-use.
     # Absent native index means nothing has been saved yet.
@@ -448,7 +469,7 @@ def qualify_visual():
     # New user work is alphabetically beyond the initial 200 rows.
     # The existing ID-based return must expand the real list and focus its row.
     new_title="Якорная работа большого проекта, созданная вручную"
-    d.click_button("Таблица")
+    click_project_tab("Таблица")
     d.window_title_contains(PROJECT+" — Таблица",35)
     d.click_button("＋ Работа")
     d.window_title_contains("Форма: Новая работа",25)
@@ -528,7 +549,7 @@ def qualify_visual():
     # A previously created work can receive another predecessor directly from
     # its own row. The dependent work is fixed by that row, never reselected.
     select_project()
-    d.click_button("Таблица")
+    click_project_tab("Таблица")
     d.window_title_contains(PROJECT+" — Таблица",35)
     d.set_text("Найти работу",new_title)
     action=find_control("Добавить предшественника для работы "+new_title,
@@ -582,7 +603,7 @@ def qualify_visual():
     # Changing a real existing dependency must explain the resulting delay
     # and let a user open an affected work directly in its original editor.
     select_project()
-    d.click_button("Таблица")
+    click_project_tab("Таблица")
     d.window_title_contains(PROJECT+" — Таблица",35)
     d.set_text("Найти работу","Работа 0 / 2")
     direct=find_control("Добавить предшественника для работы Работа 0 / 2",
@@ -673,7 +694,7 @@ def qualify_visual():
     # the start. Opening either work is read-only until an explicit Save.
     win32gui.MoveWindow(d.handle,0,0,820,650,True)
     select_project()
-    d.click_button("Таблица")
+    click_project_tab("Таблица")
     d.set_text("Найти работу","Работа 0 / 2")
     # At 820 x 650, the table row is physically below the search filters.
     # Do not demand a visible risk label before scrolling to the real row.
@@ -731,7 +752,7 @@ def qualify_visual():
     # finish passes its own control date. Filtering and opening it are
     # read-only; no synthetic native state or implicit Save.
     select_project()
-    d.click_button("График")
+    click_project_tab("График")
     d.wait_text("График работ",35)
     deadline_filter=d.window().child_window(
         title="Только работы позже контрольного срока",control_type="CheckBox")
@@ -762,7 +783,7 @@ def qualify_visual():
 
     # The same real CPM warning is visible and actionable in the work table,
     # with one click to show all late works even beyond its 200-row preview.
-    d.click_button("Таблица")
+    click_project_tab("Таблица")
     show_late=find_control("Показать работы позже контрольного срока",
                            types={"Button"})
     show_late.click_input()
@@ -909,7 +930,7 @@ def qualify_visual():
     # the CPM finish does not move. Use the installed work editor and retain
     # all original dependencies, stages, source references and duration.
     select_project()
-    d.click_button("Таблица")
+    click_project_tab("Таблица")
     d.set_text("Найти работу","Работа 0 / 2")
     open_work=find_control("Открыть работу Работа 0 / 2",types={"Button"})
     open_work.click_input()
@@ -951,7 +972,7 @@ def qualify_visual():
     # Correct that date without changing a work duration or link. Only the
     # recorded control date should change, and the warning must disappear.
     select_project()
-    d.click_button("Таблица")
+    click_project_tab("Таблица")
     d.set_text("Найти работу","Работа 0 / 2")
     open_again=find_control("Открыть работу Работа 0 / 2",types={"Button"})
     open_again.click_input()

@@ -418,7 +418,11 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 @container atlas-panel (max-width:850px){.atlas-reality-grid{grid-template-columns:1fr}}
 
 /* Atlas 0.4: only four frequent views consume the permanent tab row. */
-.atlas-compact-tabs{flex-wrap:wrap;overflow:visible;position:relative;align-items:stretch}
+/* Keep the project views available while inspecting a deep source map or
+   a 1213-work table. This sticks below the existing 73px command bar. */
+.atlas-compact-tabs{flex-wrap:wrap;overflow:visible;position:sticky;top:73px;
+ z-index:7;align-items:stretch;background:#eff4fb;
+ box-shadow:0 5px 12px #253d5f14}
 .atlas-compact-tabs>button{font-size:13px}
 .atlas-view-menu{position:relative;flex:none}
 .atlas-view-menu summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:5px;
@@ -893,7 +897,7 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
    Keep the one-click reset reachable after opening a deep work and returning
    to the same scroll position. Stay below the existing sticky command bar. */
 .atlas-work-filter-shortcut{
- position:sticky;top:75px;z-index:7;
+ position:sticky;top:123px;z-index:6;
  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;
  padding:7px 10px;margin:0 0 12px;border:1px solid #bad0ee;
  border-radius:9px;background:#f6faff;
@@ -1011,3 +1015,8 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
  flex:0 1 auto;min-height:32px;max-width:100%;
  font-size:12px;font-weight:650;white-space:normal;text-align:left;
 }
+
+/* At phone widths the outer app, not .workspace, scrolls. Keep controls
+   in document flow rather than pinning them to the wrong scroll root. */
+@media(max-width:760px){.atlas-work-filter-shortcut{position:static}}
+@media(max-width:560px){.atlas-compact-tabs{position:static;box-shadow:none}}
