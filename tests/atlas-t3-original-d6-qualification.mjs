@@ -90,7 +90,10 @@ test("Original T3 signed Result -> native Atlas decision -> cold double readback
  const preview=await originalD6.preview(originalRef);
  assert.equal(preview.status,"AVAILABLE");
  const result=await originalD6.continueSelected(originalRef);
- assert.equal(result.status,"OWNER_READBACK_CONFIRMED");
+ assert.equal(result.status,"OWNER_READBACK_CONFIRMED",JSON.stringify({
+  status:result.status,reason:result.reason??null,operationId:result.operationId,
+  savedRevision:snapshot.revision,decisions:snapshot.projects[0].decisions.length
+ }));
  assert.equal(nativeWrites,1);
  assert.equal(reviews,1);
  const pSaved=snapshot.projects.find(row=>row.id===p.id);
