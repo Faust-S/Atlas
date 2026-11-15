@@ -31,8 +31,9 @@ def qualify():
     # No original signed Agent/T3 owner is installed on this clean runner.
     # The standalone table MUST NOT display actions that pretend to exist.
     route.d.wait_text("Работы проекта",20)
-    controls=route.d.window().descendants(control_type="Button")
-    displayed={str(control.window_text() or "") for control in controls}
+    # UIA may expose transiently untyped WebView nodes during repaint:
+    # use the original raw accessibility text reader, not wrapper creation.
+    displayed={name.strip() for name in route.d.visible_texts()}
     forbidden={"Поручить Agent","Получить Result","Проверить Result"}
     unexpected=forbidden.intersection(displayed)
     if unexpected:
