@@ -3,11 +3,11 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 const read=p=>readFileSync(new URL(p,import.meta.url),"utf8");
 
-test("Atlas 0.8 candidate has stable metadata but no ungated release publication",()=>{
+test("Atlas 0.9 development preserves the accepted 0.8 release gate",()=>{
  const pkg=JSON.parse(read("../desktop/package.json"));
  const manifest=JSON.parse(read("../desktop/installer/atlas.json"));
  const tauri=JSON.parse(read("../desktop/src-tauri/tauri.conf.json"));
- assert.equal(pkg.version,"0.8.0");
+ assert.equal(pkg.version,"0.9.0-dev.1");
  assert.equal(manifest.version,pkg.version);
  assert.equal(tauri.version,pkg.version);
  assert.equal(manifest.entrypoint,"iwxa-atlas-desktop.exe");
@@ -18,5 +18,9 @@ test("Atlas 0.8 candidate has stable metadata but no ungated release publication
  assert.match(workflow,/ATLAS08_RC_INSTALLER_SHA256_PASS/);
  assert.doesNotMatch(workflow,/gh release (?:create|upload|edit)/);
  assert.match(read("../desktop/tests/installed-atlas08-corrections.py"),/ATLAS08_INSTALLED_LONG_TITLE_WRAP_PASS/);
+ const candidate=read("../.github/workflows/atlas-0-9-windows.yml");
+ assert.match(candidate,/work\/2026-11-16-atlas-0-9-t3/);
+ assert.match(candidate,/IWXA-Atlas-0\.9\.0-dev\.1-Setup\.exe/);
+ assert.doesNotMatch(candidate,/gh release (?:create|upload|edit)/);
  assert.match(read("../.github/workflows/manual-check.yml"),/release\/0\.8/);
 });
