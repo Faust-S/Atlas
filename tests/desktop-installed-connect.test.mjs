@@ -38,6 +38,16 @@ test("Native GUI test requires a read-only public discovery and explicit native 
  assert.match(installed,/ATLAS06_CONNECT_BRANCH_TREE_RESTART_PASS/);
  assert.doesNotMatch(installed,/CDP|test-only app API|fake fetch responses/);
 });
+test("PERSON native write refusal leaves every durable Store file unchanged",()=>{
+ assert.match(installed,/def durable_store_snapshot\(/);
+ assert.match(installed,/STORE\.rglob\("\*"\)/);
+ assert.match(installed,/entry\.relative_to\(STORE\)\.as_posix\(\)/);
+ assert.match(installed,/name=="atlas\.lock"/);
+ assert.match(installed,/hashlib\.sha256\(entry\.read_bytes\(\)\)\.hexdigest\(\)/);
+ assert.match(installed,/durable_store_snapshot\(\)==baseline/);
+ assert.match(installed,/ATLAS_PERSON_UNBUNDLED_DURABLE_STORE_UNCHANGED_PASS/);
+});
+
 test("The user can switch development branches without silently accepting stale preview",()=>{
  assert.match(ui,/aria-label="Ветка исходников для подключения"/);
  assert.match(ui,/onClick=\{\(\)=>void inspect\(null,branchChoice\)\}/);

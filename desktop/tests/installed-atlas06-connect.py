@@ -274,6 +274,22 @@ def qualify():
     screenshot("reopened-project")
     print("ATLAS06_CONNECT_BRANCH_TREE_RESTART_PASS",flush=True)
 
+def durable_store_snapshot():
+    """Witness ALL original native Store files, excluding only atlas.lock."""
+    if not STORE.exists():
+        return {}
+    files={}
+    for entry in STORE.rglob("*"):
+        if entry.is_symlink():
+            raise AssertionError("Unexpected symlink in native Store")
+        if entry.is_file():
+            name=entry.relative_to(STORE).as_posix()
+            if name=="atlas.lock":
+                continue  # Advisory lock is allowed to change on open/close.
+            files[name]=hashlib.sha256(entry.read_bytes()).hexdigest()
+    return files
+
+
 def qualify_person_unbundled_denial():
     """Real feature-enforced native executable, intentionally without T3.
 
@@ -286,16 +302,19 @@ def qualify_person_unbundled_denial():
         raise AssertionError("Private T3 executable unexpectedly present in public CI")
     launch()
     wait_button("Моя лицензия",60)  # Compiled edition really has PERSON UI.
+    baseline=durable_store_snapshot()
     click_button("Создать новый проект")
     wait_text("Новый проект")
     set_text("Название проекта","Atlas PERSON no consumer")
     click_button("Применить к черновику")
     wait_button("Сохранить")
     assert not (STORE/"head.json").exists(), "Draft unexpectedly persisted before Save"
+    assert durable_store_snapshot()==baseline, "Draft changed durable Store before Save"
     click_button("Сохранить")
     wait_text("В эту установку Atlas ещё не включён проверяющий компонент T3.",45)
     wait_text("ATLAS_PERSON_T3_COMPONENT_NOT_BUNDLED",10)
     assert not (STORE/"head.json").exists(), "Denied licensed write created native head"
+    assert durable_store_snapshot()==baseline, "Denied write changed native blocks/history"
     screenshot("person-unbundled-native-denial")
     print("ATLAS_PERSON_UNBUNDLED_NATIVE_WORKSPACE_WRITE_DENIED_PASS",flush=True)
 
@@ -307,8 +326,10 @@ def qualify_person_unbundled_denial():
     launch()
     wait_text("Начать работу с Atlas",60)
     assert not (STORE/"head.json").exists(), "Denied licensed write survived restart"
+    assert durable_store_snapshot()==baseline, "Denied write left durable files after restart"
     if any("Atlas PERSON no consumer" in x for x in visible_texts()):
         raise AssertionError("Unlicensed project reappeared in the installed GUI")
+    print("ATLAS_PERSON_UNBUNDLED_DURABLE_STORE_UNCHANGED_PASS",flush=True)
     print("ATLAS_PERSON_UNBUNDLED_COLD_RESTART_NO_WRITE_PASS",flush=True)
 
 
