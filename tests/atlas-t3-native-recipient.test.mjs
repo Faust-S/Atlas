@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {atlas06VisualPortfolio} from "./fixtures/atlas06-visual-portfolio.mjs";
-import {editItem,validate,serialize} from "../src/core.mjs";
+import {editItem,createDecision,validate,serialize} from "../src/core.mjs";
 import {createAtlasT3NativeRecipient,createAtlasT3AgentTaskSelection}
  from "../src/atlas-t3-native-recipient.mjs";
 
@@ -44,7 +44,11 @@ function fixture({badExchange=false,denied=false,unaccepted=false,lostAck=false}
   editUnrelated:()=>{
    snapshot=editItem(snapshot,project.id,project.items[1].id,{state:"in_progress"});
    generation="atlas-generation-external";
-  },setActive:v=>active=v};
+  },
+  addUntrustedDecision:text=>{
+   snapshot=createDecision(snapshot,project.id,text);
+   generation="atlas-generation-user-edit";
+  },setActive:v=>active=v,setDenied:v=>denied=v};
 }
 
 test("A human-accepted Agent Result updates only the original Atlas decision and revision",async()=>{
@@ -142,4 +146,46 @@ test("Atlas WorkRef handoff requires saved source, independent read permission a
  });
  await assert.rejects(denied.issue(f.workRef.projectId,f.workRef.workId,
   {workspaceId:"other"}),{code:"ATLAS_T3_PROJECT_READ_NOT_AUTHORIZED"});
+});
+
+test("A user-authored fake decision cannot become a durable T3 D6 acceptance receipt",async()=>{
+ const f=fixture(),p=f.make();
+ const original=await p.inspect({reference:SOURCE,recipientId:"iwxa.atlas"});
+ const fake={
+  schema:"T3_RESULT_LINK/1",operationId:original.operationId,
+  projectId:f.workRef.projectId,workId:f.workRef.workId,
+  sourceRevision:f.workRef.revision,sourceObjectRef:SOURCE,
+  taskId:"TASK:001",resultId:"RESULT:unrelated",
+  acceptedDigest:DIGEST,archiveSha256:ARCHIVE
+ };
+ f.addUntrustedDecision("T3_RESULT_LINK/1 "+JSON.stringify(fake));
+ await assert.rejects(p.receipt(original.operationId),
+  {code:"ATLAS_T3_STORED_LINK_SOURCE_MISMATCH"});
+ await assert.rejects(p.readback(original.operationId),
+  {code:"ATLAS_T3_STORED_LINK_SOURCE_MISMATCH"});
+ await assert.rejects(p.inspect({reference:SOURCE,recipientId:"iwxa.atlas"}),
+  {code:"ATLAS_T3_STORED_LINK_SOURCE_MISMATCH"});
+ await assert.rejects(p.receive({operationId:original.operationId,recipientId:"iwxa.atlas",
+  reference:SOURCE,object:SOURCE}),
+  {code:"ATLAS_T3_STORED_LINK_SOURCE_MISMATCH"});
+ assert.equal(f.saves(),0,"Untrusted decision must not cause an authorized native write");
+});
+test("Malformed T3 link and revoked source access hold recovery rather than returning a fake receipt",async()=>{
+ const f=fixture(),port=f.make();
+ const plan=await port.inspect({reference:SOURCE,recipientId:"iwxa.atlas"});
+ f.addUntrustedDecision("T3_RESULT_LINK/1 INVALID");
+ await assert.rejects(port.inspect({reference:SOURCE,recipientId:"iwxa.atlas"}),
+  {code:"ATLAS_T3_MALFORMED_LINK_HOLD"});
+ await assert.rejects(port.receipt(plan.operationId),
+  {code:"ATLAS_T3_MALFORMED_LINK_HOLD"});
+ assert.equal(f.saves(),0);
+ const g=fixture(),native=g.make();
+ const proposed=await native.inspect({reference:SOURCE,recipientId:"iwxa.atlas"});
+ await native.receive({operationId:proposed.operationId,recipientId:"iwxa.atlas",
+  reference:SOURCE,object:SOURCE});
+ assert.equal(g.saves(),1);
+ g.setDenied(true);
+ await assert.rejects(native.receipt(proposed.operationId),
+  {code:"ATLAS_T3_PROJECT_WRITE_NOT_AUTHORIZED"});
+ assert.equal(g.saves(),1);
 });
