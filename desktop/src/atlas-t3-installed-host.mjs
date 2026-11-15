@@ -118,13 +118,27 @@ export async function createInstalledAtlasT3Host({
   readOriginalExchangeReceipt:input=>originalExchange.readReceipt(input),
   continueOriginalAcceptedResult,recoverOriginalAcceptedResult,
  });
- const t3=Object.freeze({
-  issueSelectedWork:ports.issueSelectedWork,
-  continueSelectedResult:ports.continueSelectedResult,
-  recoverSelectedResult:ports.recoverSelectedResult,
- });
- if(Object.values(t3).some(value=>typeof value!=="function"))
+ const issueSelectedWork=ports.issueSelectedWork;
+ const continueSelectedResult=ports.continueSelectedResult;
+ const recoverSelectedResult=ports.recoverSelectedResult;
+ if([issueSelectedWork,continueSelectedResult,recoverSelectedResult]
+    .some(value=>typeof value!=="function"))
   die("ATLAS_T3_INSTALLED_ROUTES_UNAVAILABLE");
+ const t3=Object.freeze({
+  async issueSelectedWork(selection){
+   const response=await issueSelectedWork(selection);
+   if(!response||!ID.test(response.taskId??"")||
+      response.workRef?.projectId!==selection.projectId||
+      response.workRef?.workId!==selection.workId||
+      !/^(0|[1-9][0-9]*)$/.test(String(response.workRef?.revision)))
+    throw new Error("ATLAS_T3_INSTALLED_AGENT_TASK_READBACK_INVALID");
+   return {taskId:response.taskId,
+    workRef:{projectId:response.workRef.projectId,
+      workId:response.workRef.workId,revision:String(response.workRef.revision)}};
+  },
+  continueSelectedResult:selection=>continueSelectedResult(selection),
+  recoverSelectedResult:selection=>recoverSelectedResult(selection),
+ });
  return Object.freeze({
   invoke,authorizeCommand,t3,
   ...(typeof onStateChange==="function"?{onStateChange}:{}),
