@@ -154,7 +154,10 @@ export function createAtlasT3NativeRecipient({
   const state=await checked(objectRef(reference));
   const saved=await load();
   const existing=findReceipt(saved.snapshot,state.op);
-  if(existing)return {status:"RECOVER_ONLY",operationId:state.op,
+  // Original T3 D6 checks the durable receipt before any native dispatch.
+  // Keep inspect READY after a cold open so continueSelected can recover the
+  // original receipt itself. Its public preview will still say RECOVER_ONLY.
+  if(existing)return {status:"READY",operationId:state.op,
    recipientId,reference:state.ref};
   const r=state.accepted.work;
   if(String(saved.snapshot.revision)!==r.revision)
