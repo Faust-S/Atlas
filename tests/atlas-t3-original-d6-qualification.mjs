@@ -14,6 +14,8 @@ import {createAtlasT3OriginalHostPorts}
  from "../desktop/src/atlas-t3-original-host-ports.mjs";
 import {createAtlasT3OriginalSourceSelection}
  from "../desktop/src/atlas-t3-original-source-selection.mjs";
+import {findConfirmedAtlasT3Decision}
+ from "../src/atlas-t3-confirmed-projection.mjs";
 
 const source=process.env.ATLAS_T3_ORIGINAL_D6_MODULE;
 if(!source)throw new Error("Original T3 D6 source path is required");
@@ -162,6 +164,13 @@ test("Original T3 signed Result -> native Atlas decision -> cold double readback
  const pSaved=snapshot.projects.find(row=>row.id===p.id);
  assert.equal(pSaved.decisions.length,1);
  assert.equal(pSaved.items.find(row=>row.id===w.id).state,"todo");
+ const displayed=findConfirmedAtlasT3Decision(snapshot,{
+  projectId:p.id,workId:w.id,operationId:result.operationId,
+  resultRef:result.resultRef
+ });
+ assert.equal(displayed.taskId,issued.taskId);
+ assert.equal(displayed.resultId,"RESULT:original-1");
+ assert.equal(displayed.workId,w.id);
  const firstCold=make();
  assert.equal((await firstCold.preview(originalRef)).status,"RECOVER_ONLY");
  assert.equal((await firstCold.continueSelected(originalRef)).status,"OWNER_READBACK_CONFIRMED");
@@ -172,6 +181,10 @@ test("Original T3 signed Result -> native Atlas decision -> cold double readback
  assert.equal(recoveredThroughAtlas.status,"OWNER_READBACK_CONFIRMED");
  assert.deepEqual(recoveredThroughAtlas.workRef,ref);
  assert.equal(recoveredThroughAtlas.resultRef,result.resultRef);
+ assert.deepEqual(findConfirmedAtlasT3Decision(snapshot,{
+  projectId:p.id,workId:w.id,operationId:recoveredThroughAtlas.operationId,
+  resultRef:recoveredThroughAtlas.resultRef
+ }),displayed);
  assert.ok(selectedPurposes.includes("atlas.result.recover"));
  assert.ok(snapshot.revision>Number(ref.revision));
  nativeReceiptOutage=true;
