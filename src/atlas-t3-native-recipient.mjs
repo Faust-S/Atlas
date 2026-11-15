@@ -19,7 +19,7 @@ const workRef=(r)=>{
  id(r.projectId,"ATLAS_T3_PROJECT_ID_INVALID");
  id(r.workId,"ATLAS_T3_WORK_ID_INVALID");
  const revision=String(r.revision);
- if(!/^[1-9]\d*$/.test(revision)||!Number.isSafeInteger(Number(revision)))
+ if(!/^(0|[1-9]\d*)$/.test(revision)||!Number.isSafeInteger(Number(revision)))
   fail("ATLAS_T3_WORK_REVISION_INVALID");
  return Object.freeze({projectId:r.projectId,workId:r.workId,revision});
 };
@@ -50,7 +50,7 @@ const decisionRecord=(d)=>{
   if(row?.schema!=="T3_RESULT_LINK/1"||!ID.test(row.operationId)||
      !ID.test(row.taskId)||!ID.test(row.resultId)||
      !ID.test(row.projectId)||!ID.test(row.workId)||
-     !/^[1-9]\d*$/.test(String(row.sourceRevision))||
+     !/^(0|[1-9]\d*)$/.test(String(row.sourceRevision))||
      !SHA.test(row.archiveSha256)||!SHA.test(row.acceptedDigest))return null;
   const ref=objectRef(row.sourceObjectRef);
   return {...row,sourceObjectRef:ref};
