@@ -14,10 +14,19 @@ export interface AtlasT3SelectedTaskRoute {
  issueSelectedWork:(selection:{projectId:string;workId:string})=>
   Promise<{taskId:string;workRef:{projectId:string;workId:string;revision:string}}>;
 }
+export interface AtlasT3SelectedResultRoute {
+ // Only the original D6 Host provides this route, not the Atlas UI.
+ continueSelectedResult:(selection:{projectId:string;workId:string})=>
+  Promise<{status:"OWNER_READBACK_CONFIRMED"|"USER_CANCELLED"|
+   "OUTCOME_UNKNOWN"|"OPERATION_IN_PROGRESS";
+   workRef:{projectId:string;workId:string;revision:string};
+   operationId?:string;resultRef?:string}>;
+}
 export interface AtlasEmbeddedHost {
  invoke:<T>(command:AtlasHostCommand,args?:AtlasHostArgs)=>Promise<T>;
  authorizeCommand:(command:AtlasHostCommand,args?:AtlasHostArgs)=>Promise<boolean>|boolean;
- t3?:AtlasT3SelectedTaskRoute; // optional genuine owner binding, absent in standalone
+ t3?:Partial<AtlasT3SelectedTaskRoute&AtlasT3SelectedResultRoute>;
+ // Optional original owner routes are absent in the standalone product.
  assetUrl?:string; // Host-served Atlas logo; standalone keeps its existing public asset
  onStateChange?:(value:{ready:boolean;dirty:boolean;formOpen:boolean;busy:boolean;revision:string;generation:string})=>void;
  onSelection?:(ref:{projectId:string|null;workId:string|null;revision:string})=>void;
