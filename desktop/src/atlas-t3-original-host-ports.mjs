@@ -10,6 +10,7 @@ export function createAtlasT3OriginalHostPorts({
  invoke,authorizeCommand,
  authorizeAtlasProjectRead,issueOriginalAgentTask,readOriginalAgentTask,
  findOriginalAgentTask,currentAgentContext,continueOriginalAcceptedResult,
+ recoverOriginalAcceptedResult,
  readOriginalAgentAccepted,readOriginalExchangeReceipt,verifyAtlasWrite,
  isHostActive
 }={}){
@@ -88,7 +89,61 @@ export function createAtlasT3OriginalHostPorts({
      workRef:selected,operationId:result.operationId,resultRef:receipt.resultRef});
    }
   : null;
+ // Recovery is READ ONLY and uses the original D6 recover() operation.
+ // Original Agent/T3 owns the accepted Result reference and its operationId.
+ // An already committed Atlas Decision has advanced the native revision:
+ // therefore recovery may bind an older source WorkRef to a CURRENT selected
+ // project/work, but may never dispatch a new receive() or agent Task.
+ const recoverSelectedResult=typeof currentAgentContext==="function"&&
+  typeof recoverOriginalAcceptedResult==="function"
+  ? async({projectId,workId}={})=>{
+    if(isHostActive()!==true)throw Error("ATLAS_T3_HOST_DISPOSED");
+    const context=await currentAgentContext();
+    if(isHostActive()!==true||!context||typeof context!=="object")
+     throw Error("ATLAS_T3_AGENT_CONTEXT_UNAVAILABLE");
+    const saved=await store.readSaved();
+    const current=createAtlasSavedRef(saved.snapshot,{projectId,workId},
+     {persisted:true,dirty:false});
+    if(await authorizeAtlasProjectRead({workRef:current,context,
+      purpose:"atlas.work.result.recovery"})!==true)
+     throw Error("ATLAS_T3_PROJECT_READ_NOT_AUTHORIZED");
+    if(isHostActive()!==true)throw Error("ATLAS_T3_HOST_DISPOSED");
+    const result=await recoverOriginalAcceptedResult({projectId,workId,context});
+    if(isHostActive()!==true)throw Error("ATLAS_T3_HOST_DISPOSED");
+    if(result?.status==="OUTCOME_UNKNOWN"||result?.status==="OPERATION_IN_PROGRESS")
+     return Object.freeze({status:result.status,workRef:current});
+    if(result?.status!=="OWNER_READBACK_CONFIRMED"||
+       result.recipientId!==atlas.recipientId||
+       typeof result.operationId!=="string"||
+       typeof result.resultRef!=="string"||!result.reference)
+     throw Error("ATLAS_T3_ORIGINAL_D6_RECOVERY_UNVERIFIED");
+    const receipt=await atlas.receipt(result.operationId);
+    const readback=await atlas.readback(result.operationId);
+    const sameSource=(a,b)=>!!a&&!!b&&
+     ["workspace_id","object_id","schema_id","revision"].every(k=>a[k]===b[k]);
+    if(receipt?.state!=="COMMITTED"||readback?.state!=="PERSISTED"||
+       receipt.operationId!==result.operationId||
+       receipt.resultRef!==result.resultRef||
+       readback.resultRef!==receipt.resultRef||
+       !sameSource(receipt.reference,result.reference)||
+       !sameSource(readback.reference,result.reference))
+     throw Error("ATLAS_T3_ORIGINAL_RESULT_READBACK_UNVERIFIED");
+    const accepted=await readOriginalAgentAccepted(result.reference);
+    if(isHostActive()!==true)throw Error("ATLAS_T3_HOST_DISPOSED");
+    if(accepted?.acceptanceKind!=="HUMAN_ACCEPTED_DRAFT"||
+       accepted.readOnly!==true||
+       accepted.workRef?.projectId!==current.projectId||
+       accepted.workRef?.workId!==current.workId||
+       !sameSource(accepted.sourceObjectRef,result.reference))
+     throw Error("ATLAS_T3_SELECTED_WORK_RESULT_MISMATCH");
+    return Object.freeze({status:"OWNER_READBACK_CONFIRMED",
+     workRef:Object.freeze({projectId:current.projectId,workId:current.workId,
+      revision:String(accepted.workRef.revision)}),
+     operationId:result.operationId,resultRef:receipt.resultRef});
+   }
+  : null;
  return Object.freeze({issueTask:agent.issue,
   ...(issueSelectedWork?{issueSelectedWork}:{}),
-  ...(continueSelectedResult?{continueSelectedResult}:{}),recipient:atlas});
+  ...(continueSelectedResult?{continueSelectedResult}:{}),
+  ...(recoverSelectedResult?{recoverSelectedResult}:{}),recipient:atlas});
 }
