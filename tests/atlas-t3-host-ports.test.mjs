@@ -61,6 +61,17 @@ test("Embedded original owners use only Atlas native commands for Agent Task and
    const receipt=await host.recipient.receipt(preview.operationId);
    return {status:"OWNER_READBACK_CONFIRMED",operationId:preview.operationId,
     recipientId:"iwxa.atlas",resultRef:receipt.resultRef,reference:source};
+  },
+  recoverOriginalAcceptedResult:async({projectId,workId,context})=>{
+   assert.equal(projectId,p.id);
+   assert.equal(workId,w.id);
+   assert.deepEqual(context,{owner:"trusted-installed-agent"});
+   const preview=await host.recipient.inspect({reference:source,recipientId:"iwxa.atlas"});
+   const receipt=await host.recipient.receipt(preview.operationId);
+   return receipt
+    ?{status:"OWNER_READBACK_CONFIRMED",operationId:preview.operationId,
+      recipientId:"iwxa.atlas",resultRef:receipt.resultRef,reference:source}
+    :{status:"OUTCOME_UNKNOWN",operationId:preview.operationId};
   }
  };
  host=createAtlasT3OriginalHostPorts(owners);
@@ -78,14 +89,38 @@ test("Embedded original owners use only Atlas native commands for Agent Task and
  assert.equal((await host.recipient.readback(preview.operationId)).state,"PERSISTED");
  const cold=createAtlasT3OriginalHostPorts(owners);
  assert.equal((await cold.recipient.receipt(preview.operationId)).state,"COMMITTED");
+ const recovered=await cold.recoverSelectedResult({projectId:p.id,workId:w.id});
+ assert.equal(recovered.status,"OWNER_READBACK_CONFIRMED");
+ assert.deepEqual(recovered.workRef,ref,"Recovery must preserve original Task revision");
+ assert.equal(recovered.resultRef,result.resultRef);
+ assert.equal(commits,1,"Read-only recovery cannot dispatch a second native commit");
+ assert.ok(snapshot.revision>Number(ref.revision));
  await cold.recipient.receive({operationId:preview.operationId,recipientId:"iwxa.atlas",
   reference:source,object:source});
  assert.equal(commits,1);
  assert.equal(commands.filter(c=>c==="atlas_commit").length,1);
  assert.ok(commands.filter(c=>c==="atlas_open").length>=4);
  const withoutD6=createAtlasT3OriginalHostPorts({...owners,
-  continueOriginalAcceptedResult:undefined});
+  continueOriginalAcceptedResult:undefined,recoverOriginalAcceptedResult:undefined});
  assert.equal(withoutD6.continueSelectedResult,undefined);
+ assert.equal(withoutD6.recoverSelectedResult,undefined);
+ const unknown=createAtlasT3OriginalHostPorts({...owners,
+  recoverOriginalAcceptedResult:async()=>({status:"OUTCOME_UNKNOWN"})});
+ const unknownResult=await unknown.recoverSelectedResult({projectId:p.id,workId:w.id});
+ assert.equal(unknownResult.status,"OUTCOME_UNKNOWN");
+ assert.equal(commits,1);
+ const wrongSource=createAtlasT3OriginalHostPorts({...owners,
+  recoverOriginalAcceptedResult:async()=>({
+   status:"OWNER_READBACK_CONFIRMED",operationId:"atlas:t3:"+"0".repeat(64),
+   recipientId:"iwxa.atlas",resultRef:"atlas:decision:forged",reference:source
+  })});
+ await assert.rejects(wrongSource.recoverSelectedResult({projectId:p.id,workId:w.id}),
+  /ATLAS_T3_ORIGINAL_RESULT_READBACK_UNVERIFIED/);
+ const refused=createAtlasT3OriginalHostPorts({...owners,
+  authorizeAtlasProjectRead:async()=>false,
+  recoverOriginalAcceptedResult:async()=>{throw Error("MUST_NOT_INVOKE_D6");}});
+ await assert.rejects(refused.recoverSelectedResult({projectId:p.id,workId:w.id}),
+  /ATLAS_T3_PROJECT_READ_NOT_AUTHORIZED/);
  const forged=createAtlasT3OriginalHostPorts({...owners,
   continueOriginalAcceptedResult:async()=>({
    status:"OWNER_READBACK_CONFIRMED",operationId:"atlas:t3:"+"0".repeat(64),
