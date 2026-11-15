@@ -8,7 +8,7 @@ import {createAtlasT3NativeRecipient,createAtlasT3AgentTaskSelection}
 export function createAtlasT3OriginalHostPorts({
  invoke,authorizeCommand,
  authorizeAtlasProjectRead,issueOriginalAgentTask,readOriginalAgentTask,
- findOriginalAgentTask,
+ findOriginalAgentTask,currentAgentContext,
  readOriginalAgentAccepted,readOriginalExchangeReceipt,verifyAtlasWrite,
  isHostActive
 }={}){
@@ -24,5 +24,17 @@ export function createAtlasT3OriginalHostPorts({
   readOriginalAgentAccepted,readOriginalExchangeReceipt,
   verifyAtlasWrite,isHostActive
  });
- return Object.freeze({issueTask:agent.issue,recipient:atlas});
+ // UI never chooses the Agent subject or grant. The trusted installed
+ // owner resolves its current context for each explicit user selection.
+ const issueSelectedWork=typeof currentAgentContext==="function"
+  ? async({projectId,workId}={})=>{
+    if(isHostActive()!==true)throw Error("ATLAS_T3_HOST_DISPOSED");
+    const context=await currentAgentContext();
+    if(isHostActive()!==true||!context||typeof context!=="object")
+     throw Error("ATLAS_T3_AGENT_CONTEXT_UNAVAILABLE");
+    return agent.issue(projectId,workId,context);
+   }
+  : null;
+ return Object.freeze({issueTask:agent.issue,
+  ...(issueSelectedWork?{issueSelectedWork}:{}),recipient:atlas});
 }
