@@ -636,7 +636,7 @@ test("Atlas 0.9 development inherits the qualified original Setup Core route",()
  const setup=read("../desktop/installer/build-setup-core.ps1");
  assert.match(workflow,/work\/2026-11-12-atlas-0-7/);
  assert.match(workflow,/Qualify ordinary project without GitHub on installed Atlas 0\.6/);
- assert.match(setup,/IWXA-Atlas-0\.8\.0-Setup\.exe/);
+ assert.match(setup,/IWXA-Atlas-0\.9\.0-dev\.1-Setup\.exe/);
  assert.match(workflow,/gh release create v0\.6\.0/);
 });
 
