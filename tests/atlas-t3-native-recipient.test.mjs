@@ -127,6 +127,8 @@ test("Atlas WorkRef handoff requires saved source, independent read permission a
  const port=createAtlasT3AgentTaskSelection({
   readSaved:f.readSaved,isHostActive:()=>true,
   authorizeProjectRead:async()=>true,
+  findOriginalAgentTask:async({workRef})=>({status:"NOT_FOUND_CONFIRMED",
+   projectId:workRef.projectId,workId:workRef.workId,sourceRevision:workRef.revision}),
   issueOriginalAgentTask:async({workRef})=>{
    issued++;return {taskId:"TASK:001",projectId:workRef.projectId,
     workId:workRef.workId,sourceRevision:workRef.revision};
@@ -142,6 +144,7 @@ test("Atlas WorkRef handoff requires saved source, independent read permission a
  const denied=createAtlasT3AgentTaskSelection({
   readSaved:f.readSaved,isHostActive:()=>true,
   authorizeProjectRead:async()=>false,
+  findOriginalAgentTask:async()=>{throw Error("Must not look up");},
   issueOriginalAgentTask:async()=>{throw Error("Must not issue");},
   readOriginalAgentTask:async()=>{throw Error("Must not read");}
  });
