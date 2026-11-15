@@ -277,3 +277,19 @@ standalone Atlas без original T3 D6 она отсутствует.
 
 **Релизный статус:** `SOURCE_TEST_PENDING`,
 `ATLAS_T3_INSTALLED=HOLD`, `T3_READY=false`.
+
+### Подтверждённая исходная квалификация нового маршрута
+
+[GitHub Actions №43757811052](https://github.com/Faust-S/Atlas/actions/runs/43757811052)
+завершился `SUCCESS` на точном кодовом HEAD
+`9a36775b6f2b3f6f7ef4904ca4bfe01317c67e9c`.
+Штатные Node-тесты **674/674 PASS**; оригинальный
+`T3 D6` импортирован из публичного owning checkout и успешно
+исполнен **1/1 PASS**; проверка носителя `.iwxa`, исходного
+контракта Center, TypeScript и Vite завершились успешно.
+
+**SOURCE-INTEGRATION PASS. INSTALLED MULTI-PRODUCT HOLD.**
+В тесте присутствуют явные doubles подписанного Agent/Kernel/Exchange
+и native Tauri IPC. Реальная установленная связка и две холодные
+Windows-проверки ещё не подтвердили готовность; никакие
+`T3_READY` / `ATLAS_T3_INSTALLED_ACCEPTED` не присвоены.
