@@ -168,6 +168,26 @@ def wait_text(value,timeout=90):
     screenshot("view-timeout")
     raise AssertionError("Installed UI never rendered: "+value)
 
+def wait_reopened_project(name,timeout=60):
+    # A native window can exist before WebView2/React have rendered the
+    # persisted portfolio. Verify the saved project is visible as an actual
+    # UIA Button, not merely present in head.json or the window title.
+    until=time.monotonic()+timeout
+    while time.monotonic()<until:
+        if process.poll() is not None:
+            raise AssertionError("Atlas exited before the saved project rendered")
+        try:
+            found=[element for element in window().element_info.descendants()
+                   if element.control_type=="Button" and element.name==name]
+        except (KeyError,OSError):
+            found=[]
+        if found:
+            print("ATLAS06_CONNECT_REOPENED_PROJECT_VISIBLE_PASS",flush=True)
+            return
+        time.sleep(0.35)
+    screenshot("reopened-project-not-visible")
+    raise AssertionError("Saved project is not visible after native restart: "+name)
+
 def stop():
     global process,handle
     if process is None:return
@@ -250,6 +270,7 @@ def qualify():
     second=head()
     assert second==first,"Saved structure or source changed after native restart"
     assert saved_project(second)==project,"Project block changed after restart"
+    wait_reopened_project("Atlas")
     screenshot("reopened-project")
     print("ATLAS06_CONNECT_BRANCH_TREE_RESTART_PASS",flush=True)
 

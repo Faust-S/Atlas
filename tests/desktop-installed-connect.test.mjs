@@ -33,6 +33,8 @@ test("Native GUI test requires a read-only public discovery and explicit native 
  assert.match(installed,/click_button\("Сохранить"\)/);
  assert.match(installed,/observation\["structure"\]\["commitSha"\]==observation\["branchHeads"\]\[BRANCH\]/);
  assert.match(installed,/assert second==first/);
+ assert.match(installed,/wait_reopened_project\("Atlas"\)/);
+ assert.match(installed,/ATLAS06_CONNECT_REOPENED_PROJECT_VISIBLE_PASS/);
  assert.match(installed,/ATLAS06_CONNECT_BRANCH_TREE_RESTART_PASS/);
  assert.doesNotMatch(installed,/CDP|test-only app API|fake fetch responses/);
 });
