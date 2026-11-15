@@ -31,6 +31,8 @@ test("Embedded original owners use only Atlas native commands for Agent Task and
   ...native,
   isHostActive:()=>true,
   authorizeAtlasProjectRead:async()=>true,
+  findOriginalAgentTask:async({workRef})=>({status:"NOT_FOUND_CONFIRMED",
+   projectId:workRef.projectId,workId:workRef.workId,sourceRevision:workRef.revision}),
   issueOriginalAgentTask:async({workRef})=>{
    agentWrites++;return {taskId:"TASK:external-1",projectId:workRef.projectId,
     workId:workRef.workId,sourceRevision:workRef.revision};
@@ -76,6 +78,7 @@ test("Embedded T3 route never falls back when native Store, Agent or project aut
   invoke:async()=>({generation:"gen:1",snapshot:empty(),needsConfirmation:false}),
   authorizeCommand:()=>false,isHostActive:()=>true,
   authorizeAtlasProjectRead:async()=>true,
+  findOriginalAgentTask:async()=>{throw Error("No source");},
   issueOriginalAgentTask:async()=>{throw Error("No source");},
   readOriginalAgentTask:async()=>{throw Error("No source");},
   readOriginalAgentAccepted:async()=>{throw Error("No source");},
