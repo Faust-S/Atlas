@@ -102,7 +102,18 @@ def qualify():
     v.capture("atlas08-cumulative-work-forecast-820")
     submit.click_input()
     v.await_no_form()
-    d.wait_text("Последовательные правки: 1",35)
+    # The correction receipt belongs above the fold, not only far below
+    # the work table. This is an actual Windows accessibility observation.
+    try:
+        d.wait_text("Последовательные правки: 1",25)
+    except AssertionError:
+        shown=[name for name in d.visible_texts()
+               if any(word in name.lower() for word in
+                      ("правк","планом","затронуто","сохран"))]
+        print("ATLAS08_CORRECTION_RECEIPT_DIAGNOSTIC "+
+              repr(shown[:30]),flush=True)
+        v.capture("atlas08-post-second-apply-no-receipt")
+        raise
     assert d.head()==saved,"Second correction wrote Store before Save"
     v.capture("atlas08-two-work-corrections-not-saved-820")
 
