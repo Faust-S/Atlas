@@ -7,6 +7,9 @@ import {invoke as atlasNativeInvoke,isTauri} from "@tauri-apps/api/core";
 import {deserialize} from "../../src/core.mjs";
 import {createAtlasT3OriginalHostPorts}
  from "./atlas-t3-original-host-ports.mjs";
+import {createAtlasT3DesktopStorePort} from "./atlas-t3-store-port.mjs";
+import {createAtlasT3NativeRecipient}
+ from "../../src/atlas-t3-native-recipient.mjs";
 
 const ID=/^[A-Za-z0-9][A-Za-z0-9._:/@-]{0,159}$/;
 const SOURCE_KEYS=["workspace_id","object_id","schema_id","revision"];
@@ -128,5 +131,59 @@ export async function createInstalledAtlasT3Host({
   ...(typeof onSelection==="function"?{onSelection}:{}),
   ...(typeof onReadback==="function"?{onReadback}:{}),
   ...(typeof assetUrl==="string"?{assetUrl}:{}),
+ });
+}
+
+
+/** FIRST stage, before the original T3 Workspace Host starts.
+ * This is the real installed Atlas recipient backed by its Tauri Store.
+ * Pass the result to the EXISTING T3 createWorkspaceHostRuntime as
+ * nativeContinuationOwner, alongside that runtime's original signed
+ * accessForRead and Human consent owner. Do not instantiate another Host.
+ *
+ * The ORIGINAL Agent and Exchange own acceptance and verified .iwxa receipts.
+ * This function supplies none of those proofs itself and never substitutes
+ * fabricated readback data if they are absent.
+ */
+export async function createInstalledAtlasT3NativeRecipient({
+ originalAgent,originalExchange,atlasAuthority,hostLifecycle,
+}={}){
+ if(!isTauri())die("ATLAS_T3_INSTALLED_ATLAS_TAURI_REQUIRED");
+ for(const [owner,methods] of [
+  [originalAgent,["readAccepted"]],
+  [originalExchange,["readReceipt"]],
+  [atlasAuthority,["authorizeCommand","verifyWrite"]],
+  [hostLifecycle,["isActive"]],
+ ])for(const method of methods)fn(owner,method);
+ const active=()=>{
+  if(!isTauri()||hostLifecycle.isActive()!==true)
+   die("ATLAS_T3_INSTALLED_HOST_DISPOSED");
+ };
+ const authorizeCommand=async(command,args)=>{
+  active();const ok=await atlasAuthority.authorizeCommand(command,args);
+  active();return ok===true;
+ };
+ const invoke=async(command,args)=>{
+  active();
+  if(!["atlas_open","atlas_commit"].includes(command))
+   die("ATLAS_T3_INSTALLED_NATIVE_COMMAND_UNSUPPORTED");
+  if(await authorizeCommand(command,args)!==true)
+   die("ATLAS_T3_INSTALLED_NATIVE_COMMAND_DENIED");
+  const result=await atlasNativeInvoke(command,args);
+  active();
+  return result;
+ };
+ const store=createAtlasT3DesktopStorePort({invoke,authorizeCommand});
+ // Native package identity is confirmed now, not assumed because an
+ // unrelated Tauri process answered some arbitrary browser callback.
+ await store.readSaved();
+ active();
+ return createAtlasT3NativeRecipient({
+  recipientId:"iwxa.atlas",
+  isHostActive:()=>isTauri()&&hostLifecycle.isActive()===true,
+  readSaved:store.readSaved,commitSaved:store.commitSaved,
+  readOriginalAgentAccepted:ref=>originalAgent.readAccepted(ref),
+  readOriginalExchangeReceipt:input=>originalExchange.readReceipt(input),
+  verifyAtlasWrite:input=>atlasAuthority.verifyWrite(input),
  });
 }
