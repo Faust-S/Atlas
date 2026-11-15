@@ -160,9 +160,11 @@ test("Only one work-title match allows a direct work jump from the portfolio",()
  const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
  assert.match(ui,/portfolioSearchWorkTarget\(filtered\[0\],search\)/);
  assert.match(ui,/aria-label=\{"Перейти к найденной работе "\+portfolioQuickWork\.title\}/);
- assert.match(ui,/openProjectTab\(filtered\[0\]\.id,"work"\)/);
- assert.match(ui,/setWorkQuery\(portfolioQuickWork\.title\)/);
- assert.match(ui,/setWorkReturnId\(portfolioQuickWork\.id\)/);
+ assert.match(ui,/openPortfolioWorkResults\(filtered\[0\]\.id,portfolioQuickWork\.title,portfolioQuickWork\.id\)/);
+ const route=ui.slice(ui.indexOf("const openPortfolioWorkResults="),ui.indexOf("const inspectPortfolioSignal="));
+ assert.match(route,/requireClosedForm\(\)/);
+ assert.match(route,/selectProject\(id,true\);setTab\("work"\);setWorkQuery\(query\)/);
+ assert.match(route,/setWorkReturnId\(focusWorkId\)/);
  assert.equal(serialize(snapshot),original);
 });
 
@@ -177,7 +179,7 @@ test("Several portfolio matches offer the first three direct links above the lon
  const first=ui.indexOf('className="atlas-portfolio-quick-list"');
  const table=ui.indexOf('className="atlas-portfolio-match-reason"');
  assert.ok(first>0&&table>first);
- const excerpt=ui.slice(first,first+1000);
+ const excerpt=ui.slice(first,first+1500);
  assert.match(ui,/filtered\.length>1&&<div className="atlas-portfolio-quick-list"/);
  assert.match(excerpt,/role="group" aria-label="Быстрый переход к найденным проектам"/);
  assert.match(excerpt,/filtered\.slice\(0,3\)\.map\(\(p:any,index:number\)=>/);
