@@ -1413,7 +1413,13 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
        return <tr key={p.id}><td><button className="text-link" onClick={()=>selectProject(p.id)}>{p.name}</button>
         <small>{p.goal||"Цель не задана"}</small>
         {portfolioReasons.get(p.id)&&<small className="atlas-portfolio-match-reason"
-         title={portfolioReasons.get(p.id)}>{portfolioReasons.get(p.id)}</small>}</td>
+         title={portfolioReasons.get(p.id)}>{portfolioReasons.get(p.id)}</small>}
+        {search.trim()&&(portfolioWorkMatches.get(p.id)||0)>0&&
+         <button type="button" className="text-link atlas-portfolio-work-results"
+          aria-label={"Показать найденные работы проекта "+p.name}
+          onClick={()=>openPortfolioWorkResults(p.id,search)}>
+          Работы по запросу: {portfolioWorkMatches.get(p.id)}
+         </button>}</td>
         <td><Badge>{statuses[p.status]||p.status}</Badge></td><td className="atlas-portfolio-attention">
           {!(p.targets||[]).some((t:any)=>t.intent==="committed")?<button type="button" className="text-link"
            aria-label={"Уточнить утверждённые требования проекта "+p.name}
