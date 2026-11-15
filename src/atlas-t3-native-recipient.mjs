@@ -274,45 +274,81 @@ export function createAtlasT3NativeRecipient({
 // the actual Task only after independently checking its own rights/Workspace.
 export function createAtlasT3AgentTaskSelection({
  readSaved,authorizeProjectRead,issueOriginalAgentTask,
- readOriginalAgentTask,isHostActive
+ readOriginalAgentTask,findOriginalAgentTask,isHostActive
 }={}){
  if([readSaved,authorizeProjectRead,issueOriginalAgentTask,
-     readOriginalAgentTask,isHostActive]
+     readOriginalAgentTask,findOriginalAgentTask,isHostActive]
    .some(fn=>typeof fn!=="function"))fail("ATLAS_T3_AGENT_HOST_REQUIRED");
- const issuing=new Set(); // one native owner dispatch per live host + WorkRef
+ const issuing=new Set();
+ const uncertain=new Set(); // lifetime guard only; original Agent owns durable Task
+ const live=()=>{if(isHostActive()!==true)fail("ATLAS_T3_HOST_DISPOSED");};
+ const verifyOwnerTask=async(taskId,ref,agentContext)=>{
+  id(taskId,"ATLAS_T3_AGENT_TASK_ID_INVALID");
+  const task=await readOriginalAgentTask(taskId,agentContext);
+  live();
+  if(task?.status!=="PERSISTED"||task.taskId!==taskId||
+     task.projectId!==ref.projectId||task.workId!==ref.workId||
+     String(task.sourceRevision)!==ref.revision)
+   fail("ATLAS_T3_AGENT_TASK_READBACK_UNVERIFIED");
+  return Object.freeze({workRef:ref,taskId});
+ };
+ const sameWork=(row,ref)=>row?.projectId===ref.projectId&&
+  row?.workId===ref.workId&&String(row?.sourceRevision)===ref.revision;
  return Object.freeze({async issue(projectId,workId,agentContext){
-  if(isHostActive()!==true)fail("ATLAS_T3_HOST_DISPOSED");
+  live();
   const saved=await readSaved();
   if(!saved?.generation||saved.needs_confirmation===true)
    fail("ATLAS_T3_NATIVE_STORE_UNAVAILABLE");
   const ref=createAtlasSavedRef(saved.snapshot,{projectId,workId},
    {persisted:true,dirty:false});
-  const permitted=await authorizeProjectRead({workRef:ref,context:agentContext,
-   purpose:"atlas.work.task.selection"});
-  if(isHostActive()!==true||permitted!==true)
+  if(await authorizeProjectRead({workRef:ref,context:agentContext,
+     purpose:"atlas.work.task.selection"})!==true)
    fail("ATLAS_T3_PROJECT_READ_NOT_AUTHORIZED");
+  live();
   const key=JSON.stringify(ref);
   if(issuing.has(key))fail("ATLAS_T3_AGENT_TASK_ISSUE_IN_PROGRESS");
   issuing.add(key);
   try{
-   const issued=await issueOriginalAgentTask({workRef:ref,context:agentContext});
-   if(isHostActive()!==true||!issued||!ID.test(issued.taskId??"")||
-      issued.projectId!==ref.projectId||
-      issued.workId!==ref.workId||
-      String(issued.sourceRevision)!==ref.revision)
-    fail("ATLAS_T3_AGENT_TASK_ISSUANCE_UNVERIFIED");
-   const readback=await readOriginalAgentTask(issued.taskId,agentContext);
-   if(isHostActive()!==true||readback?.status!=="PERSISTED"||
-      readback.taskId!==issued.taskId||
-      readback.projectId!==ref.projectId||readback.workId!==ref.workId||
-      String(readback.sourceRevision)!==ref.revision)
-    fail("ATLAS_T3_AGENT_TASK_READBACK_UNVERIFIED");
+   // Original Agent is the ONLY Task source of truth. After a cold restart,
+   // query its durable Task index BEFORE dispatching any new Task. A missing
+   // or uncertain owner answer never authorizes retry.
+   const prior=await findOriginalAgentTask({workRef:ref,context:agentContext});
+   live();
+   if(!sameWork(prior,ref))
+    fail("ATLAS_T3_AGENT_TASK_LOOKUP_UNVERIFIED");
+   let result;
+   if(prior.status==="PERSISTED"){
+    result=await verifyOwnerTask(prior.taskId,ref,agentContext);
+   }else if(prior.status==="NOT_FOUND_CONFIRMED"){
+    if(uncertain.has(key))fail("ATLAS_T3_AGENT_TASK_OUTCOME_UNKNOWN");
+    const head=await readSaved();
+    live();
+    if(head?.generation!==saved.generation||
+       String(head?.snapshot?.revision)!==ref.revision)
+     fail("ATLAS_T3_WORK_CHANGED_DURING_TASK_ISSUE");
+    // Dispatch ONCE. A lost reply can mean a committed original Task.
+    // The owner must return a persistently deduplicated Task for this ref;
+    // no retry here, even if its returned receipt cannot be read back.
+    uncertain.add(key);
+    let issued;
+    try{issued=await issueOriginalAgentTask({workRef:ref,context:agentContext});}
+    catch{fail("ATLAS_T3_AGENT_TASK_OUTCOME_UNKNOWN");}
+    live();
+    if(!sameWork(issued,ref)||!ID.test(issued?.taskId??""))
+     fail("ATLAS_T3_AGENT_TASK_OUTCOME_UNKNOWN");
+    result=await verifyOwnerTask(issued.taskId,ref,agentContext);
+    uncertain.delete(key);
+   }else{
+    // A stale NONE/READY/timeout is not proof that the Agent has not
+    // already committed the exact Task on another process or earlier run.
+    fail("ATLAS_T3_AGENT_TASK_OUTCOME_UNKNOWN");
+   }
    const after=await readSaved();
-   if(isHostActive()!==true||after?.generation!==saved.generation||
+   live();
+   if(after?.generation!==saved.generation||
       String(after?.snapshot?.revision)!==ref.revision)
     fail("ATLAS_T3_WORK_CHANGED_DURING_TASK_ISSUE");
-   // No new Task is created in Atlas; Agent retains its native Task owner.
-   return Object.freeze({workRef:ref,taskId:issued.taskId});
+   return result;
   }finally{issuing.delete(key);}
  }});
 }
