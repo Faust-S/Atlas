@@ -136,8 +136,34 @@ export async function createInstalledAtlasT3Host({
     workRef:{projectId:response.workRef.projectId,
       workId:response.workRef.workId,revision:String(response.workRef.revision)}};
   },
-  continueSelectedResult:selection=>continueSelectedResult(selection),
-  recoverSelectedResult:selection=>recoverSelectedResult(selection),
+  async continueSelectedResult(selection){
+   const result=await continueSelectedResult(selection);
+   if(!result||!["OWNER_READBACK_CONFIRMED","USER_CANCELLED",
+      "OUTCOME_UNKNOWN","OPERATION_IN_PROGRESS"].includes(result.status)||
+      result.workRef?.projectId!==selection.projectId||
+      result.workRef?.workId!==selection.workId||
+      !/^(0|[1-9][0-9]*)$/.test(String(result.workRef?.revision)))
+    throw new Error("ATLAS_T3_INSTALLED_D6_READBACK_INVALID");
+   return {status:result.status,workRef:{
+    projectId:result.workRef.projectId,workId:result.workRef.workId,
+    revision:String(result.workRef.revision)},
+    ...(typeof result.operationId==="string"?{operationId:result.operationId}:{}),
+    ...(typeof result.resultRef==="string"?{resultRef:result.resultRef}:{})};
+  },
+  async recoverSelectedResult(selection){
+   const result=await recoverSelectedResult(selection);
+   if(!result||!["OWNER_READBACK_CONFIRMED","OUTCOME_UNKNOWN",
+      "OPERATION_IN_PROGRESS"].includes(result.status)||
+      result.workRef?.projectId!==selection.projectId||
+      result.workRef?.workId!==selection.workId||
+      !/^(0|[1-9][0-9]*)$/.test(String(result.workRef?.revision)))
+    throw new Error("ATLAS_T3_INSTALLED_D6_RECOVERY_INVALID");
+   return {status:result.status,workRef:{
+    projectId:result.workRef.projectId,workId:result.workRef.workId,
+    revision:String(result.workRef.revision)},
+    ...(typeof result.operationId==="string"?{operationId:result.operationId}:{}),
+    ...(typeof result.resultRef==="string"?{resultRef:result.resultRef}:{})};
+  },
  });
  return Object.freeze({
   invoke,authorizeCommand,t3,
