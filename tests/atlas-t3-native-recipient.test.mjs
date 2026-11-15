@@ -125,7 +125,10 @@ test("Atlas WorkRef handoff requires saved source, independent read permission a
   issueOriginalAgentTask:async({workRef})=>{
    issued++;return {taskId:"TASK:001",projectId:workRef.projectId,
     workId:workRef.workId,sourceRevision:workRef.revision};
-  }
+  },
+  readOriginalAgentTask:async taskId=>({status:"PERSISTED",taskId,
+   projectId:f.workRef.projectId,workId:f.workRef.workId,
+   sourceRevision:f.workRef.revision})
  });
  const task=await port.issue(f.workRef.projectId,f.workRef.workId,{workspaceId:"agent:ws"});
  assert.deepEqual(task.workRef,f.workRef);
@@ -134,7 +137,8 @@ test("Atlas WorkRef handoff requires saved source, independent read permission a
  const denied=createAtlasT3AgentTaskSelection({
   readSaved:f.readSaved,isHostActive:()=>true,
   authorizeProjectRead:async()=>false,
-  issueOriginalAgentTask:async()=>{throw Error("Must not issue");}
+  issueOriginalAgentTask:async()=>{throw Error("Must not issue");},
+  readOriginalAgentTask:async()=>{throw Error("Must not read");}
  });
  await assert.rejects(denied.issue(f.workRef.projectId,f.workRef.workId,
   {workspaceId:"other"}),{code:"ATLAS_T3_PROJECT_READ_NOT_AUTHORIZED"});
