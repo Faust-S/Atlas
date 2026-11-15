@@ -31,7 +31,7 @@ test("A work table return remembers every active filter and the scroll batch",()
   "setWorkSort(context.sort)","setWorkLimit(context.limit)","setWorkReturnId(workId)"]){
   assert.ok(restore.includes(line),"Missing restored work field: "+line);
  }
- assert.match(restore,/context\.projectId===project\.id&&context\.workId===workId&&/);
+ assert.match(restore,/context\?\.projectId===project\.id&&context\.workId===workId&&/);
  assert.match(restore,/context\.revision===data\.revision/);
  assert.match(restore,/else setWorkQuery\(fallbackQuery\)/);
  assert.match(restore,/workNavigationContext\.current=null/);
@@ -42,7 +42,7 @@ test("Table to source and graph navigation returns to the exact previous search"
  const source=portion("const openLinkedSource=","const returnToLinkedWork=");
  const sourceBack=portion("const returnToLinkedWork=","const openWorkGraph=");
  const graph=portion("const openWorkGraph=","const returnToLinkedGraph=");
- const graphBack=portion("const returnFromWorkGraph=","useEffect(()=>{\n   const key=");
+ const graphBack=portion("const returnFromWorkGraph=","useEffect(()=>{\n  const key=");
  assert.match(source,/if\(origin==="work"\)rememberWorkTable\(workId\)/);
  assert.match(sourceBack,/returnToWorkTable\(sourceJump\.workId,sourceJump\.query\)/);
  assert.match(graph,/if\(origin==="work"&&work\)rememberWorkTable\(work\.id\)/);
