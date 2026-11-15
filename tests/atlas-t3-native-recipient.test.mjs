@@ -2,8 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {atlas06VisualPortfolio} from "./fixtures/atlas06-visual-portfolio.mjs";
 import {editItem,createDecision,validate,serialize} from "../src/core.mjs";
-import {createAtlasT3NativeRecipient,createAtlasT3AgentTaskSelection}
- from "../src/atlas-t3-native-recipient.mjs";
+import {createAtlasT3NativeRecipient,createAtlasT3AgentTaskSelection,
+ atlasT3DecisionSummary} from "../src/atlas-t3-native-recipient.mjs";
+import {readFileSync} from "node:fs";
 
 const SOURCE=Object.freeze({workspace_id:"ws:agent-personal",object_id:"result:accepted-1",
  schema_id:"iwxa.result",revision:2});
@@ -188,4 +189,23 @@ test("Malformed T3 link and revoked source access hold recovery rather than retu
  await assert.rejects(native.receipt(proposed.operationId),
   {code:"ATLAS_T3_PROJECT_WRITE_NOT_AUTHORIZED"});
  assert.equal(g.saves(),1);
+});
+
+test("Existing Atlas history presents Agent/T3 links readably but does not claim a current grant",async()=>{
+ const f=fixture(),owner=f.make(),preview=await owner.inspect({
+  reference:SOURCE,recipientId:"iwxa.atlas"});
+ await owner.receive({operationId:preview.operationId,recipientId:"iwxa.atlas",
+  reference:SOURCE,object:SOURCE});
+ const text=f.get().projects[0].decisions.at(-1).text;
+ const summary=atlasT3DecisionSummary(text);
+ assert.match(summary,/Связь с результатом Agent/);
+ assert.match(summary,/Task TASK:001, Result RESULT:001/);
+ assert.match(summary,/Источник и полномочия проверяются заново/);
+ assert.doesNotMatch(summary,/T3_RESULT_LINK\/1|archiveSha256/);
+ assert.equal(atlasT3DecisionSummary("Обычное решение Atlas"),null);
+ assert.match(atlasT3DecisionSummary("T3_RESULT_LINK/1 invalid"),/Повреждена/);
+ const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ assert.match(ui,/atlasT3DecisionSummary\(decision\.text\)\|\|decision\.text/);
+ assert.match(ui,/atlasT3DecisionSummary\(entry\.text\)\|\|entry\.text/);
+ assert.match(ui,/Актуальность источника и подписанные полномочия проверяются оригинальным T3/);
 });
