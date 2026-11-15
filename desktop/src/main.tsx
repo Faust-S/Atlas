@@ -13,6 +13,7 @@ import {realityOverview,workObservationIndex} from "../../src/reality-overview.m
 import {responseState} from "../../src/response.mjs";
 import {scheduleProject,scheduleChangeSummary,scheduleDeadlineExplanations,criticalPathFocus,forecastDependencyRemoval,workDependencyOverview,filterWorkRowsByDependencies} from "../../src/planning.mjs";
 import {previewWorkScheduleEdit} from "../../src/work-schedule-preview.mjs";
+import {startWorkCorrection,continueWorkCorrection} from "../../src/work-correction-flow.mjs";
 import {portfolioSchedule,projectedFinishLabel} from "../../src/portfolio-schedule.mjs";
 import {portfolioResources} from "../../src/portfolio-resources.mjs";
 import {planReviewQueue,planReviewAction,planProposalAction} from "../../src/plan-review.mjs";
@@ -349,9 +350,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const [workReturnId,setWorkReturnId]=useState<string|null>(null);
  const [recentWorkId,setRecentWorkId]=useState<string|null>(null);
  const [recentWorkKind,setRecentWorkKind]=useState<"created"|"dependency"|"adjusted">("created");
- const [recentPlanBefore,setRecentPlanBefore]=useState<{
-  workId:string;revision:number;days:number;change:ReturnType<typeof scheduleChangeSummary>|null
- }|null>(null);
+ const [recentPlanBefore,setRecentPlanBefore]=useState<
+  ReturnType<typeof startWorkCorrection>|null
+ >(null);
  const [recheckLimit,setRecheckLimit]=useState(25);
  const project=data.projects.find((p:any)=>p.id===active)||null;
  const recentWork=recentWorkId?project?.items.find((item:any)=>item.id===recentWorkId):null;
@@ -789,9 +790,10 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    if(result.projectId)selectProject(result.projectId,true);
    if(result.workId){
     const updatedProject=result.state.projects.find((p:any)=>p.id===formProject);
-    const change=plan&&updatedProject?scheduleChangeSummary(plan,scheduleProject(updatedProject)):null;
-    setRecentPlanBefore({workId:result.workId,revision:result.state.revision,
-     days:plan?.durationDays??0,change});
+    setRecentPlanBefore(plan&&updatedProject?startWorkCorrection({
+     projectId:formProject,workId:result.workId,revision:result.state.revision,
+     beforePlan:plan,afterPlan:scheduleProject(updatedProject)
+    }):null);
     const isDependencyChange=editor.action.startsWith("dep-to:");
     setRecentWorkKind(isDependencyChange?"dependency":"created");
     setRecentWorkId(result.workId);
@@ -807,16 +809,32 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     const scheduleFieldsChanged=previousWork&&correctedWork&&(
      (previousWork.estimateDays??1)!==(correctedWork.estimateDays??1)||
      (previousWork.dueDate??null)!==(correctedWork.dueDate??null));
-    const fromImpactList=recentScheduleEffect&&
+    // Consecutive corrections must be compared with the plan before the
+    // original edit. A comparison with the immediate prior revision hides
+    // earlier shifts and makes an unfinished correction look completed.
+    const fromImpactList=Boolean(recentScheduleEffect&&
      (recentWorkKind==="dependency"||recentWorkKind==="adjusted")&&
-     recentScheduleEffect.affectedIds.includes(correctedId);
+     recentScheduleEffect.affectedIds.includes(correctedId));
     if(scheduleFieldsChanged||fromImpactList){
-     const change=plan&&updatedProject?scheduleChangeSummary(plan,scheduleProject(updatedProject)):null;
-     setRecentPlanBefore({workId:correctedId,revision:result.state.revision,
-      days:plan?.durationDays??0,change});
+     const updatedPlan=updatedProject?scheduleProject(updatedProject):null;
+     const continued=fromImpactList&&updatedPlan?continueWorkCorrection(
+      recentPlanBefore,{projectId:formProject,workId:correctedId,
+       revision:data.revision,nextRevision:result.state.revision,afterPlan:updatedPlan}
+     ):null;
+     const nextContext=continued||(plan&&updatedPlan?startWorkCorrection({
+      projectId:formProject,workId:correctedId,revision:result.state.revision,
+      beforePlan:plan,afterPlan:updatedPlan
+     }):null);
+     setRecentPlanBefore(nextContext);
      setRecentWorkKind("adjusted");
-     setRecentWorkId(correctedId);
-     revealWorkInTable(correctedId,false);
+     setRecentWorkId(nextContext?.workId||correctedId);
+     revealWorkInTable(nextContext?.workId||correctedId,false);
+     if(continued){
+      // Show the remaining affected works, not the now-obsolete list from
+      // the last change. Zero remaining differences returns to all works.
+      setWorkImpactOnly(continued.change.affectedTotal>0);
+      if(continued.change.affectedTotal>0)setWorkSort("impact");
+     }
     }
    }
    editorDirtyRef.current=false;setEditor(null);
@@ -1060,9 +1078,11 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   try{
    const next=disconnect(data,project.id,from,to);
    const updatedProject=next.projects.find((item:any)=>item.id===project.id)!;
-   const effect=plan?scheduleChangeSummary(plan,scheduleProject(updatedProject)):null;
    mutate(next,"Связь удалена из черновика. Проверьте последствия и сохраните изменение.");
-   setRecentPlanBefore({workId:to,revision:next.revision,days:plan?.durationDays??0,change:effect});
+   setRecentPlanBefore(plan?startWorkCorrection({
+    projectId:project.id,workId:to,revision:next.revision,
+    beforePlan:plan,afterPlan:scheduleProject(updatedProject)
+   }):null);
    setRecentWorkKind("dependency");setRecentWorkId(to);
    revealWorkInTable(to,false);
   }catch(e){issue(e)}
@@ -1865,6 +1885,12 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
         {(recentWorkKind==="dependency"||recentWorkKind==="adjusted")&&recentScheduleEffect&&
          <div className="atlas-work-plan-effect"
           aria-label={recentWorkKind==="adjusted"?"Последствия изменения работы":"Последствия изменения зависимости"}>
+          {recentPlanBefore?.followups.length>0&&<p className="atlas-work-correction-context"
+           role="status">
+           Последовательные правки: {recentPlanBefore.followups.length}.
+           {" "}Сравнение ведётся с планом до первого изменения.
+           {" "}Сейчас затронуто работ: {recentScheduleEffect.affectedTotal}.
+          </p>}
           <p>{recentScheduleEffect.movedTotal>0?
            "Изменились расчётные сроки. Затронуто работ: "+recentScheduleEffect.movedTotal+". "+
            (recentScheduleEffect.delayedTotal?"Позже: "+recentScheduleEffect.delayedTotal+". ":"")+
