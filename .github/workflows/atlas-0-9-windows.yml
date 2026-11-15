@@ -1,0 +1,137 @@
+name: IWXA Atlas 0.9 development Windows qualification
+
+on:
+  push:
+    branches:
+      - work/2026-11-16-atlas-0-9-t3
+    paths:
+      - '.github/workflows/atlas-0-9-windows.yml'
+      - 'desktop/tests/installed-atlas08-corrections.py'
+      - 'desktop/src/**'
+      - 'desktop/installer/**'
+      - 'src/**'
+      - 'tests/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: atlas09-installed-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  installed-atlas09:
+    if: github.ref_name == 'work/2026-11-16-atlas-0-9-t3'
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout exact Atlas 0.9 development revision
+        uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build original Atlas Tauri application without an alternate installer
+        working-directory: desktop
+        shell: pwsh
+        timeout-minutes: 18
+        run: |
+          $ErrorActionPreference = 'Stop'
+          npm ci --no-audit --no-fund
+          if ($LASTEXITCODE -ne 0) { throw 'ATLAS09_NPM_CI_FAILED' }
+          npm run desktop:build -- --no-bundle
+          if ($LASTEXITCODE -ne 0) { throw 'ATLAS09_TAURI_BUILD_FAILED' }
+
+      - name: Checkout pinned original IWXA Setup Core
+        uses: actions/checkout@v4
+        with:
+          repository: Faust-S/Center
+          ref: 0ef7544e2a6fd5fab5994f7f25abbb960063908c
+          path: setup-core-source
+          persist-credentials: false
+
+      - name: Build, inspect and install Atlas 0.9 development via original Setup Core
+        shell: pwsh
+        timeout-minutes: 8
+        run: |
+          $ErrorActionPreference = 'Stop'
+          ./desktop/installer/build-setup-core.ps1 -InstallForQualification
+          if ($LASTEXITCODE -ne 0) { throw 'ATLAS09_SETUP_CORE_INSTALL_FAILED' }
+
+      - name: Verify native Rust persistence and readback contracts
+        shell: pwsh
+        timeout-minutes: 5
+        run: |
+          cargo test --release --locked --manifest-path desktop/src-tauri/Cargo.toml --lib
+          if ($LASTEXITCODE -ne 0) { throw 'ATLAS09_RUST_PERSISTENCE_FAILED' }
+
+      - name: Produce authentic large Atlas IWXA project for user-path qualification
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $archive = Join-Path $env:RUNNER_TEMP 'atlas08-large-project.iwxa'
+          node tests/fixtures/atlas06-visual-portfolio.mjs $archive
+          if ($LASTEXITCODE -ne 0 -or !(Test-Path -LiteralPath $archive)) {
+            throw 'ATLAS09_FIXTURE_CARRIER_FAILED'
+          }
+          "ATLAS06_VISUAL_IWXA=$archive" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Install independent native Windows accessibility driver
+        shell: pwsh
+        timeout-minutes: 4
+        run: |
+          python -m pip install pywinauto==0.6.9 pillow==11.3.0
+          if ($LASTEXITCODE -ne 0) { throw 'ATLAS09_UIA_DRIVER_UNAVAILABLE' }
+          python -m py_compile desktop/tests/installed-atlas06-connect.py
+          python -m py_compile desktop/tests/installed-atlas06-visual-scale.py
+          python -m py_compile desktop/tests/installed-atlas08-corrections.py
+          if ($LASTEXITCODE -ne 0) { throw 'ATLAS09_NATIVE_WITNESS_SYNTAX_FAILED' }
+
+      - name: Verify exact release-candidate installer SHA-256
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = 'artifacts/IWXA-Atlas-0.9.0-dev.1-Setup.exe'
+          $sumfile = $exe + '.sha256'
+          if (!(Test-Path -LiteralPath $exe) -or !(Test-Path -LiteralPath $sumfile)) {
+            throw 'ATLAS09_SETUP_CORE_ARTIFACT_MISSING'
+          }
+          $sha = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          $listed = (Get-Content -LiteralPath $sumfile -Raw).Trim()
+          if ($listed -ne ($sha + ' *IWXA-Atlas-0.9.0-dev.1-Setup.exe')) {
+            throw 'ATLAS09_INSTALLER_SHA256_MISMATCH'
+          }
+          Write-Host "ATLAS09_RC_INSTALLER_SHA256_PASS $sha"
+
+      - name: Exercise installed portfolio, two work changes, explicit Save and cold restart
+        shell: pwsh
+        timeout-minutes: 11
+        run: |
+          python desktop/tests/installed-atlas08-corrections.py
+          if ($LASTEXITCODE -ne 0) { throw 'ATLAS09_WINDOWS_USER_ROUTE_FAILED' }
+
+      - name: Keep Windows screen evidence on success or failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas09-installed-windows-evidence
+          path: desktop/tests/visual-evidence/*.png
+          if-no-files-found: ignore
+          retention-days: 5
+
+      - name: Keep Atlas 0.9 development installer (not published)
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas09-setup-core-development
+          path: |
+            artifacts/IWXA-Atlas-0.9.0-dev.1-Setup.exe
+            artifacts/IWXA-Atlas-0.9.0-dev.1-Setup.exe.sha256
+          if-no-files-found: error
+          retention-days: 5
