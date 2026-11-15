@@ -348,3 +348,77 @@ Windows cold-open. Тестовые ответы внешних владельц
 `ATLAS_T3_INSTALLED=HOLD`, `T3_READY=false`.
 `release/0.8` и опубликованный установщик `v0.8.0`
 не изменялись.
+
+## Реальное подключение владельца Atlas Tauri к original T3 D6, 16.11.2026
+
+**Реализовано в рабочей серии Atlas 0.8**, без подмены стабильной
+`release/0.8`:
+
+- `desktop/src/atlas-t3-installed-host.mjs`: производственный Tauri
+  gateway, использующий фактический `@tauri-apps/api/core.invoke`.
+  При запуске в чужом Tauri-процессе, отказе команды
+  `atlas_open`, несоответствии исходной модели или отсутствии
+  полномочий соединение не активируется.
+- `createInstalledAtlasT3NativeRecipient`: первая стадия,
+  оригинальный `iwxa.atlas` D6 recipient поверх действующих
+  `atlas_open/atlas_commit`, поколения и CAS native Store.
+  Его нужно передавать в **существующий** T3
+  `createWorkspaceHostRuntime({nativeContinuationOwner, ...})`
+  вместе с original signed D1 read, текущей Workspace и
+  Human consent. Второй Host/Store не создаётся.
+- `desktop/src/atlas-t3-original-source-selection.mjs`:
+  оригинальный Agent возвращает только собственный Human-accepted
+  source Object по точному WorkRef; оригинальный D6 `preview`
+  предварительно проверяет `recipientId=iwxa.atlas`,
+  signed workspace и исходную ревизию. После
+  `RECOVER_ONLY` следует исключительно read-only `recover`,
+  а не повторный `continueSelected`.
+- `createInstalledAtlasT3Host`: вторая стадия получает
+  уже работающий **оригинальный** T3 `nativeContinuation`,
+  текущие installed Agent, Exchange и Atlas Authority ports.
+  Дальше стандартная `mountInstalledAtlasT3Surface`
+  монтирует тот же AtlasWorkspace, а не другую версию UI.
+  Полный Task/Result readback обязателен до показа успеха.
+- В автономном standalone Atlas никакие неподтверждённые
+  Agent/T3-операции не включаются. Публичный код не содержит
+  приватных подписантов, ключей, паролей, Exchange receipt
+  из fixture или фиктивной сети.
+
+**Доступный вход для штатного установленного владельца**:
+
+1. Инициализировать сохранённый Atlas AppHandle и оригинальный
+   Agent/Exchange/Atlas Authority с требуемыми действующими
+   разрешениями. Без них `createInstalledAtlasT3NativeRecipient`
+   прекращает запуск.
+2. В исходном T3 Host с original signed access и выбранной
+   Workspace использовать этот `iwxa.atlas` recipient.
+   Готовый original `nativeContinuation` вернуть в тот же
+   доверенный Atlas Tauri Host.
+3. Вызвать `mountInstalledAtlasT3Surface` только из скомпилированной
+   владельцем программы с подписанным D6 и
+   `originalAgent.selectAcceptedForWork`. Никакая
+   `window.__owner` или анонимная JS-инъекция не допускается.
+4. После записи использовать штатный `atlas_open` и original
+   D6 `recover`; два настоящих cold open должны читать один и тот
+   сохранённый Decision без новой записи.
+
+**Граница результата:** production binding больше не имитирует
+`atlas_open/atlas_commit` и не создаёт собственную квитанцию.
+Источник T3 D6 и выбор WorkRef проверяются общей адресной
+исходной квалификацией; тестовые Agent/Exchange/Kernel остаются
+только в source-тестах, не в production пути.
+
+**Ещё отсутствует для сквозного installed PASS:** в текущем
+Personal Agent 0.6 нет подтверждённого установленного
+`selectAcceptedForWork/readAccepted` с оригинальным
+подписанным `.iwxa` и квитанцией для `iwxa.atlas`;
+также нет доказанного одновременно работающего native
+T3 signed owner в установленном Atlas Tauri процессе.
+Поэтому нельзя утверждать, что две отдельные существующие
+Windows-программы уже передают Result. Эта стадия требует
+реального owning Agent/T3 Host binding, а не ещё одной Atlas
+квитанции или новой службы.
+
+`SOURCE_INTEGRATION` и Windows standalone qualification
+фиксировать отдельно от `ATLAS_T3_INSTALLED`, который
+остаётся `HOLD` до подлинной операции.
