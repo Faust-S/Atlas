@@ -93,7 +93,11 @@ export function createAtlasT3NativeRecipient({
  function findReceipt(snapshot,op){
   const found=[];
   for(const project of snapshot.projects)for(const d of project.decisions){
+   const isLinked=typeof d.text==="string"&&d.text.startsWith(PREFIX);
    const record=decisionRecord(d);
+   // An incomplete Atlas T3 marker is not permission to attempt a new
+   // delivery: the original native writer may have lost its acknowledgement.
+   if(isLinked&&!record)fail("ATLAS_T3_MALFORMED_LINK_HOLD");
    if(record?.operationId===op){
     if(project.id!==record.projectId)fail("ATLAS_T3_RECEIPT_CROSS_PROJECT");
     const work=project.items.find(w=>w.id===record.workId);
@@ -109,6 +113,7 @@ export function createAtlasT3NativeRecipient({
   const saved=await load();
   const entry=findReceipt(saved.snapshot,op);
   if(!entry)return null;
+  await verifyPersisted(entry,saved,op);
   return {state,operationId:op,recipientId,
    reference:entry.record.sourceObjectRef,
    resultRef:"atlas:decision:"+entry.decisionId};
@@ -133,6 +138,25 @@ export function createAtlasT3NativeRecipient({
   const op=await hashOperation(ref,accepted);active();
   return {ref,accepted,op};
  }
+ async function verifyPersisted(entry,saved,op,state=null){
+  // An Atlas decision is source data, not a cryptographic native receipt.
+  // Rebind it to ORIGINAL accepted Agent Result and original Exchange
+  // evidence every time, including after a cold Atlas/T3 Host restart.
+  const verified=state??await checked(entry.record.sourceObjectRef);
+  const row=entry.record,ref=verified.accepted.work;
+  if(verified.op!==op||row.operationId!==op||
+     !sameRef(row.sourceObjectRef,verified.ref)||
+     row.projectId!==ref.projectId||row.workId!==ref.workId||
+     String(row.sourceRevision)!==ref.revision||
+     row.taskId!==verified.accepted.taskId||
+     row.resultId!==verified.accepted.resultId||
+     row.acceptedDigest!==verified.accepted.acceptedDigest||
+     row.archiveSha256!==verified.accepted.archiveSha256||
+     !(saved.snapshot.revision>Number(ref.revision)))
+    fail("ATLAS_T3_STORED_LINK_SOURCE_MISMATCH");
+  await permitted(verified,"atlas.work.result.readback");
+  return verified;
+ }
  async function permitted(state,action){
   const verdict=await verifyAtlasWrite({
    operationId:state.op,action,recipientId,
@@ -154,6 +178,7 @@ export function createAtlasT3NativeRecipient({
   const state=await checked(objectRef(reference));
   const saved=await load();
   const existing=findReceipt(saved.snapshot,state.op);
+  if(existing)await verifyPersisted(existing,saved,state.op,state);
   // Original T3 D6 checks the durable receipt before any native dispatch.
   // Keep inspect READY after a cold open so continueSelected can recover the
   // original receipt itself. Its public preview will still say RECOVER_ONLY.
@@ -179,7 +204,10 @@ export function createAtlasT3NativeRecipient({
   // Atlas separately verifies its own native write permission JIT.
   await permitted(state,"atlas.work.result.apply");
   const before=await load(),existing=findReceipt(before.snapshot,state.op);
-  if(existing)return; // Original decision already committed. No second write.
+  if(existing){
+   await verifyPersisted(existing,before,state.op,state);
+   return; // Original verified decision committed. No second write.
+  }
   const r=state.accepted.work;
   if(String(before.snapshot.revision)!==r.revision)
    fail("ATLAS_T3_SOURCE_REVISION_CHANGED");
@@ -200,9 +228,9 @@ export function createAtlasT3NativeRecipient({
    PREFIX+JSON.stringify(record));
   await commitSaved(before.generation,next);
   active();
-  const observed=await load();
-  if(!findReceipt(observed.snapshot,state.op))
-   fail("ATLAS_T3_NATIVE_READBACK_UNCONFIRMED");
+  const observed=await load(),persisted=findReceipt(observed.snapshot,state.op);
+  if(!persisted)fail("ATLAS_T3_NATIVE_READBACK_UNCONFIRMED");
+  await verifyPersisted(persisted,observed,state.op,state);
  }
  return Object.freeze({
   recipientId,
