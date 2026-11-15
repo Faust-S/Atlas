@@ -8,6 +8,8 @@ import {pathToFileURL} from "node:url";
 import {empty,createProject,createItem,validate} from "../src/core.mjs";
 import {createAtlasT3NativeRecipient,createAtlasT3AgentTaskSelection}
  from "../src/atlas-t3-native-recipient.mjs";
+import {createAtlasT3DesktopStorePort}
+ from "../desktop/src/atlas-t3-store-port.mjs";
 
 const source=process.env.ATLAS_T3_ORIGINAL_D6_MODULE;
 if(!source)throw new Error("Original T3 D6 source path is required");
@@ -33,16 +35,28 @@ test("Original T3 signed Result -> native Atlas decision -> cold double readback
  assert.equal(issued.workRef.revision,ref.revision);
  const originalRef={workspace_id:"ws:personal",object_id:"result:accepted-1",
   schema_id:"iwxa.result",revision:2};
+ const commands=[];
+ const originalStore=createAtlasT3DesktopStorePort({
+  authorizeCommand:async command=>["atlas_open","atlas_commit"].includes(command),
+  invoke:async(command,args)=>{
+   commands.push(command);
+   if(command==="atlas_open")
+    return {snapshot:structuredClone(snapshot),generation,needsConfirmation:false};
+   if(command==="atlas_commit"){
+    if(args.expectedGeneration!==generation)
+     throw Error("ORIGINAL_NATIVE_CAS_STALE");
+    validate(args.snapshot);snapshot=structuredClone(args.snapshot);
+    generation="native:"+(++nativeWrites);
+    return {generation,revision:snapshot.revision};
+   }
+   throw Error("No alternative native persistence");
+  }
+ });
  const nativeOpts={
   recipientId:"iwxa.atlas",
   isHostActive:()=>true,
-  readSaved:async()=>({snapshot:structuredClone(snapshot),generation}),
-  commitSaved:async(expected,next)=>{
-   if(expected!==generation)throw Error("ORIGINAL_NATIVE_CAS_STALE");
-   validate(next);snapshot=structuredClone(next);
-   generation="native:"+(++nativeWrites);
-   return {generation,revision:next.revision};
-  },
+  readSaved:originalStore.readSaved,
+  commitSaved:originalStore.commitSaved,
   readOriginalAgentAccepted:async()=>({
    acceptanceKind:"HUMAN_ACCEPTED_DRAFT",readOnly:true,
    taskId:issued.taskId,resultId:"RESULT:original-1",
@@ -106,6 +120,8 @@ test("Original T3 signed Result -> native Atlas decision -> cold double readback
  assert.equal((await secondCold.recover(originalRef)).status,"OWNER_READBACK_CONFIRMED");
  assert.equal(nativeWrites,1);
  assert.equal(reviews,1);
+ assert.equal(commands.filter(command=>command==="atlas_commit").length,1);
+ assert.ok(commands.filter(command=>command==="atlas_open").length>=3);
  // Original T3 D1 authority revocation blocks subsequent signed read.
  denied=true;
  await assert.rejects(secondCold.continueSelected(originalRef),
