@@ -5,6 +5,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {createAtlasT3OriginalSourceSelection} from "../desktop/src/atlas-t3-original-source-selection.mjs";
+import {createAtlasT3DesktopStorePort} from "../desktop/src/atlas-t3-store-port.mjs";
+import {empty} from "../src/core.mjs";
 const read=path=>readFileSync(new URL("../"+path,import.meta.url),"utf8");
 const binding=read("desktop/src/atlas-t3-installed-host.mjs");
 const surface=read("desktop/src/atlas-react-surface.tsx");
@@ -88,5 +90,46 @@ test("Original signed D6 source selector refuses foreign WorkRef and recipient b
  });
  assert.equal((await recoverOnly.continueOriginalAcceptedResult({workRef,context:{}})).status,
   "OUTCOME_UNKNOWN");
+ assert.equal(dispatches,0);
+});
+
+test("Original T3 installer read/write consumes exactly one Atlas owner command decision",async()=>{
+ const calls=[],grants=[];
+ const initial=empty();
+ const native=createAtlasT3DesktopStorePort({
+  authorizeCommand:async command=>{grants.push(command);return true;},
+  invoke:async(command,args)=>{
+   calls.push(command);
+   if(command==="atlas_open")return {generation:"first",snapshot:initial,
+    needsConfirmation:false};
+   if(command==="atlas_commit")return {generation:"next",snapshot:args.snapshot};
+   throw Error("WRONG_NATIVE_COMMAND");
+  },
+ });
+ const opened=await native.readSaved();
+ assert.equal(opened.generation,"first");
+ await native.commitSaved("first",opened.snapshot);
+ assert.deepEqual(grants,["atlas_open","atlas_commit"]);
+ assert.deepEqual(calls,["atlas_open","atlas_commit"]);
+});
+test("T3 signed source selection refuses detached Host after preview, without native dispatch",async()=>{
+ const saved={projectId:"project:1",workId:"work:1",revision:"3"};
+ const reference={workspace_id:"ws:personal",object_id:"result:one",
+  schema_id:"result.schema",revision:2};
+ let active=true,dispatches=0;
+ const selector=createAtlasT3OriginalSourceSelection({
+  isHostActive:()=>active,
+  originalAgent:{selectAcceptedForWork:async()=>({
+   acceptanceKind:"HUMAN_ACCEPTED_DRAFT",readOnly:true,
+   workRef:saved,sourceObjectRef:reference})},
+  originalT3:{
+   preview:async()=>{active=false;return {
+    recipientId:"iwxa.atlas",status:"AVAILABLE",reference};},
+   continueSelected:async()=>{dispatches++;return {status:"OUTCOME_UNKNOWN"};},
+   recover:async()=>({status:"OUTCOME_UNKNOWN"}),
+  },
+ });
+ await assert.rejects(selector.continueOriginalAcceptedResult({
+  workRef:saved,context:{}}),{code:"ATLAS_T3_INSTALLED_HOST_DISPOSED"});
  assert.equal(dispatches,0);
 });
