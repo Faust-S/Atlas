@@ -727,7 +727,7 @@ test("Plan feedback is calculated from the existing schedule, without background
  assert.ok(ui.includes("const recentPlanRow=recentWork&&plan?plan.rows.find"));
  assert.ok(ui.includes("recentPlanBefore.workId===recentWork.id&&recentPlanBefore.revision===data.revision?"));
  assert.ok(ui.includes("recentPlanBefore.days:null"));
- assert.ok(ui.includes("days:plan?.durationDays??0"));
+ assert.ok(ui.includes("beforePlan:plan,afterPlan:scheduleProject(updatedProject)"));
  assert.ok(ui.includes("revision:result.state.revision"));
  assert.ok(ui.includes("Продолжительность плана: было {planBeforeRecent} дн., стало {plan.durationDays} дн."));
  assert.ok(ui.includes("recentPlanRow.predecessors.length"));
@@ -742,7 +742,8 @@ test("An existing-work dependency explains CPM effects without writing data",()=
  const editor=read("../src/editor.mjs");
  const plan=read("../src/planning.mjs");
  assert.match(editor,/return \{state:connect\(snapshot,projectId,from,id\),workId:id\}/);
- assert.match(ui,/scheduleChangeSummary\(plan,scheduleProject\(updatedProject\)\)/);
+ assert.match(ui,/startWorkCorrection\(\{/);
+ assert.match(ui,/beforePlan:plan,afterPlan:scheduleProject\(updatedProject\)/);
  assert.match(ui,/const isDependencyChange=editor\.action\.startsWith\("dep-to:"\)/);
  assert.match(ui,/setRecentWorkKind\(isDependencyChange\?"dependency":"created"\)/);
  assert.match(ui,/Изменение зависимостей работы/);
@@ -800,12 +801,13 @@ test("Correcting a work named in the impact list recalculates the schedule befor
  assert.match(ui,/recentWorkKind==="adjusted"/);
  assert.match(ui,/else if\(editor\.action\.startsWith\("work:"\)\)/);
  assert.match(ui,/const scheduleFieldsChanged=previousWork&&correctedWork/);
- assert.match(ui,/const fromImpactList=recentScheduleEffect&&/);
+ assert.match(ui,/const fromImpactList=Boolean\(recentScheduleEffect&&/);
  assert.match(ui,/recentScheduleEffect\.affectedIds\.includes\(correctedId\)/);
  assert.match(ui,/const correctedId=editor\.action\.slice\(5\)/);
- assert.match(ui,/scheduleChangeSummary\(plan,scheduleProject\(updatedProject\)\)/);
+ assert.match(ui,/startWorkCorrection\(\{/);
+ assert.match(ui,/beforePlan:plan,afterPlan:scheduleProject\(updatedProject\)/);
  assert.match(ui,/setRecentWorkKind\("adjusted"\)/);
- assert.match(ui,/revealWorkInTable\(correctedId,false\)/);
+ assert.match(ui,/revealWorkInTable\(nextContext\?\.workId\|\|correctedId,false\)/);
  assert.match(ui,/Последствия изменения работы/);
  assert.match(ui,/Работа изменена в черновике\. Сохраните изменения\./);
  const a=ui.indexOf('else if(editor.action.startsWith("work:")');
@@ -850,9 +852,10 @@ test("A direct work duration or deadline change recalculates without leaving the
  assert.match(route,/\(previousWork\.estimateDays\?\?1\)!==\(correctedWork\.estimateDays\?\?1\)/);
  assert.match(route,/\(previousWork\.dueDate\?\?null\)!==\(correctedWork\.dueDate\?\?null\)/);
  assert.match(route,/if\(scheduleFieldsChanged\|\|fromImpactList\)/);
- assert.match(route,/scheduleChangeSummary\(plan,scheduleProject\(updatedProject\)\)/);
+ assert.match(route,/const continued=fromImpactList&&updatedPlan\?continueWorkCorrection\(/);
+ assert.match(route,/beforePlan:plan,afterPlan:updatedPlan/);
  assert.match(route,/setRecentWorkKind\("adjusted"\)/);
- assert.match(route,/revealWorkInTable\(correctedId,false\)/);
+ assert.match(route,/revealWorkInTable\(nextContext\?\.workId\|\|correctedId,false\)/);
  assert.doesNotMatch(route,/commitWithReadback\(|nativeInvoke\(|localStorage|fetch\(/);
 });
 
