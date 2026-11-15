@@ -136,10 +136,10 @@ function WorkDependencyHint({info,onOpenWork}:{info?:WorkLinkPreview|null;onOpen
   {later&&<span>{later}</span>}
  </div>;
 }
-function EditorPanel({editor,onSubmit,onCancel,onDirtyChange,busy,project,plan}:{
+function EditorPanel({editor,onSubmit,onCancel,onDirtyChange,busy,project,plan,correctionBaseline}:{
  editor:Editor;onSubmit:(event:React.FormEvent<HTMLFormElement>)=>void;
  onCancel:()=>void;onDirtyChange:(changed:boolean)=>void;busy:boolean;
- project:Atlas|null;plan:any|null
+ project:Atlas|null;plan:any|null;correctionBaseline:any|null
 }){
  const [fields,setFields]=useState<Record<string,string>>({});
  const [workQuery,setWorkQuery]=useState("");
@@ -154,8 +154,8 @@ function EditorPanel({editor,onSubmit,onCancel,onDirtyChange,busy,project,plan}:
   if(!editor.action.startsWith("work:")||!project||!plan||
      fields.estimateDays===undefined||fields.dueDate===undefined)return null;
   return previewWorkScheduleEdit(project,editor.action.slice(5),
-   {estimateDays:fields.estimateDays,dueDate:fields.dueDate},plan);
- },[editor.action,project,plan,fields.estimateDays,fields.dueDate]);
+   {estimateDays:fields.estimateDays,dueDate:fields.dueDate},plan,correctionBaseline);
+ },[editor.action,project,plan,fields.estimateDays,fields.dueDate,correctionBaseline]);
  useEffect(()=>{
   setFields(Object.fromEntries(editor.spec.fields.map(f=>[f.name,String(f.value??"")])));
   setWorkQuery("");
@@ -257,6 +257,20 @@ function EditorPanel({editor,onSubmit,onCancel,onDirtyChange,busy,project,plan}:
       </details>}
      <small>Предварительный расчёт по календарным дням, без выравнивания ресурсов.
       Изменения ещё не применены к черновику и не сохранены на диск.</small>
+    </div>}
+   {workDraftPreview?.cumulative&&
+    <div className="atlas-work-cumulative-preview" role="group"
+     aria-label="Общий итог последовательных исправлений">
+     <strong>От плана до первой правки</strong>
+     <p>Продолжительность: было {workDraftPreview.cumulative.beforeDays} дн.,
+      станет {workDraftPreview.cumulative.afterDays} дн.
+      {" "}Останутся изменения по {workDraftPreview.cumulative.affectedTotal} работам.
+      {workDraftPreview.cumulative.criticalChangedTotal>0?
+       " Изменён критический путь у "+workDraftPreview.cumulative.criticalChangedTotal+" работ.":""}
+     </p>
+     <small>Общий итог учитывает предыдущие исправления
+      {workDraftPreview.kind==="changed"?" и предложенную правку":""}.
+      Данные не записаны на диск.</small>
     </div>}
    {workDraftPreview?.kind==="invalid"&&
     <p className="atlas-work-draft-invalid" role="status">{workDraftPreview.reason}</p>}
@@ -426,6 +440,16 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const recentScheduleEffect=recentWork&&recentPlanBefore&&
   recentPlanBefore.workId===recentWork.id&&recentPlanBefore.revision===data.revision?
   recentPlanBefore.change:null;
+ // A cumulative forecast is valid only for an affected work from the
+ // current series, project and revision.
+ const correctionBaseline=useMemo(()=>{
+  if(!editor?.action.startsWith("work:")||!project||!recentPlanBefore||
+     recentPlanBefore.projectId!==project.id||
+     recentPlanBefore.revision!==data.revision||
+     recentPlanBefore.workId!==recentWorkId)return null;
+  return recentPlanBefore.change.affectedIds.includes(editor.action.slice(5))?
+   recentPlanBefore.baseline:null;
+ },[editor?.action,project,recentPlanBefore,data.revision,recentWorkId]);
  const impactedWorkOrder=useMemo(()=>new Map<string,number>(
   (recentScheduleEffect?.affectedIds||[]).map((id:string,index:number):[string,number]=>[id,index])
  ),[recentScheduleEffect]);
@@ -819,7 +843,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      const updatedPlan=updatedProject?scheduleProject(updatedProject):null;
      const continued=fromImpactList&&updatedPlan?continueWorkCorrection(
       recentPlanBefore,{projectId:formProject,workId:correctedId,
-       revision:data.revision,nextRevision:result.state.revision,afterPlan:updatedPlan}
+       revision:data.revision,nextRevision:result.state.revision,afterPlan:updatedPlan,
+       recordCorrection:Boolean(scheduleFieldsChanged)}
      ):null;
      const nextContext=continued||(plan&&updatedPlan?startWorkCorrection({
       projectId:formProject,workId:correctedId,revision:result.state.revision,
@@ -2691,7 +2716,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   {inspector&&<aside className={"inspector"+(editor?" atlas-inspector-editing":"")}>
    {editor?<EditorPanel key={editor.action} editor={editor} onSubmit={submit}
     onCancel={cancelEditor} onDirtyChange={changed=>{editorDirtyRef.current=changed}}
-    busy={busy} project={project} plan={plan}/>:
+    busy={busy} project={project} plan={plan}
+    correctionBaseline={correctionBaseline}/>:
    <section><div className="section-heading"><h2>Инспектор</h2><button className="icon-button" aria-label="Скрыть инспектор" onClick={()=>setInspector(false)}>×</button></div>
     <div className="inspector-block"><small>Текущий контекст</small><strong>{project?.name||"Портфель проектов"}</strong>
      <p>{project?.goal||"Выберите проект для работы с планом, доказательствами и изменениями."}</p></div>
