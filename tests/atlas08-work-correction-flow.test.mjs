@@ -110,3 +110,10 @@ test("A metadata-only edit keeps the original comparison without claiming a new 
  assert.match(ui,/recentPlanBefore\.projectId!==project\.id/);
  assert.match(ui,/recentPlanBefore\.change\.affectedIds\.includes\(editor\.action\.slice\(5\)\)/);
 });
+
+test("Very long affected-work names may wrap within the 820px inspector",()=>{
+ const css=readFileSync(new URL("../desktop/src/style.css",import.meta.url),"utf8");
+ assert.match(css,/\.atlas-work-effect-list li\{[^}]*overflow-wrap:anywhere/);
+ assert.match(css,/\.atlas-work-effect-list li strong,\.atlas-work-effect-list li \.text-link\{/);
+ assert.match(css,/\.atlas-work-effect-list li strong,\.atlas-work-effect-list li \.text-link\{[^}]*word-break:break-word/);
+});
