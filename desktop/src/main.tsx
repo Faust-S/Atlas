@@ -35,7 +35,8 @@ import {commitWithReadback,readSavedSnapshotForReference} from "./native-save.mj
 import {projectHistoryRows} from "./history-view.mjs";
 import {sortWorkRows,firstSortedMatchingWorkId,deadlineFocusRows,filterWorkRowsByObservation} from "./work-sorting.mjs";
 import {createAtlasSavedRef} from "../../src/project-host-port.mjs";
-import {atlasT3DecisionSummary} from "../../src/atlas-t3-native-recipient.mjs";
+import {atlasT3DecisionSummary,atlasT3RecordedWorkLinks}
+ from "../../src/atlas-t3-native-recipient.mjs";
 import {invokeAtlasHost,type AtlasEmbeddedHost} from "./embedded-host";
 
 // Show the same product version that was packaged in Tauri, without leaking
@@ -370,6 +371,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  >(null);
  const [recheckLimit,setRecheckLimit]=useState(25);
  const project=data.projects.find((p:any)=>p.id===active)||null;
+ const t3WorkLinks=useMemo(()=>atlasT3RecordedWorkLinks(project),[project]);
  const recentWork=recentWorkId?project?.items.find((item:any)=>item.id===recentWorkId):null;
  const recentStage=recentWork?.stageId?
   project?.stages.find((stage:any)=>stage.id===recentWork.stageId):null;
@@ -2142,7 +2144,13 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
           :"В проекте ещё нет требований. Добавьте ожидаемый результат в «План / факт», затем свяжите работу."}
         </small>}
         {w.state==="done"&&(w.targetIds||[]).length>0&&<small className="atlas-work-evidence-note">
-         Завершение работы заявлено; факт результата вносится отдельно.</small>}</td>
+         Завершение работы заявлено; факт результата вносится отдельно.</small>}
+        {(t3WorkLinks.get(w.id)||[]).slice(-2).map((link:any)=>
+         <small key={link.decisionId} className="atlas-work-evidence-note">
+          Agent Result {link.resultId}. Сохранена ссылка; доступ проверяется в T3.
+         </small>)}
+        {(t3WorkLinks.get(w.id)||[]).length>2&&<small className="atlas-work-evidence-note">
+         Ещё {(t3WorkLinks.get(w.id)||[]).length-2} ссылок в истории.</small>}</td>
        <td data-label="Состояние"><Badge>{workStatuses[w.state]}</Badge></td><td data-label="Длительность">{w.estimateDays??1} дн.
         {criticalWorkIds.has(w.id)&&<small className="atlas-work-critical-label">Критический путь</small>}
        </td>
