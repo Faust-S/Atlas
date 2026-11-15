@@ -855,6 +855,13 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      setRecentWorkId(nextContext?.workId||correctedId);
      revealWorkInTable(nextContext?.workId||correctedId,false);
      if(continued){
+      // Keep the result visible immediately on a compact Windows display.
+      // The detailed comparison remains in the work card below the table
+      // header, but a user must not need to scroll to confirm the series.
+      setMessage("Последовательные правки: "+continued.followups.length+
+       ". Сравнение с планом до первой правки. Сейчас затронуто работ: "+
+       continued.change.affectedTotal+
+       ". Изменения в черновике, сохраните их на диск отдельно.");
       // Show the remaining affected works, not the now-obsolete list from
       // the last change. Zero remaining differences returns to all works.
       setWorkImpactOnly(continued.change.affectedTotal>0);
