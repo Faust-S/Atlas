@@ -25,6 +25,8 @@ test("Native GUI test requires a read-only public discovery and explicit native 
  assert.match(installed,/not \(STORE\/"head\.json"\)\.exists\(\)/);
  assert.match(installed,/click_button_below_fold\("Добавить в Atlas"\)/);
  assert.match(installed,/def click_button_below_fold\(/);
+ assert.match(installed,/window\(\)\.element_info\.descendants\(\)/);
+ assert.doesNotMatch(installed,/window\(\)\.descendants\(\)\s*\n\s*if element\.window_text/);
  assert.match(installed,/mouse\.scroll\(wheel_dist=-2/);
  assert.match(installed,/control\.is_visible\(\) and control\.is_enabled\(\)/);
  assert.match(installed,/bounds\.bottom<=viewport\.bottom-30/);

@@ -69,8 +69,20 @@ def window():
     return Desktop(backend="uia").window(handle=handle)
 
 def visible_texts():
-    return [str(element.window_text()) for element in window().descendants()
-            if element.window_text()]
+    # WebView2 may contain transient accessibility nodes with no control
+    # type during a React update. Wrapping ALL nodes in pywinauto triggers
+    # KeyError(None); use their raw UIA information instead.
+    try:
+        names=[]
+        for element in window().element_info.descendants():
+            name=element.name
+            if name:names.append(str(name))
+        return names
+    except (KeyError,OSError) as exc:
+        # wait_text retries under its existing timeout. Never report PASS
+        # from a failed or incomplete accessibility snapshot.
+        print("ATLAS06_UIA_SNAPSHOT_RETRY "+type(exc).__name__,flush=True)
+        return []
 
 def wait_button(name,timeout=35):
     until=time.monotonic()+timeout
