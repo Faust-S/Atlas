@@ -686,7 +686,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    const actual=await readSavedSnapshotForReference({invoke,
     expectedGeneration,snapshot:started,signature:snapshotText,
     readValidated:(raw:Atlas)=>deserialize(JSON.stringify(raw))});
-   const ref=createAtlasSavedRef(actual,{projectId,workId},{persisted:true,dirty:false});
+   const ref=createAtlasSavedRef(actual,{projectId,workId},{persisted:true,dirty:false}) as
+    {projectId:string;workId:string;revision:string};
    if(latestSnapshot.current!==started||dirtyRef.current||editorOpenRef.current)
     throw Error("Изменения в Atlas во время подготовки поручения. Agent не запускался.");
    const received=await host.t3.issueSelectedWork({projectId,workId});
@@ -2227,9 +2228,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
         </small>}
         {w.state==="done"&&(w.targetIds||[]).length>0&&<small className="atlas-work-evidence-note">
          Завершение работы заявлено; факт результата вносится отдельно.</small>}
-        {t3AgentTask?.projectId===project.id&&t3AgentTask.workId===w.id&&
+        {t3AgentTask?.projectId===project.id&&t3AgentTask?.workId===w.id&&
          <small className="atlas-work-evidence-note">
-          Task {t3AgentTask.taskId} сохранён у Agent. Результат ещё не принят в Atlas.
+          Task {t3AgentTask?.taskId} сохранён у Agent. Результат ещё не принят в Atlas.
          </small>}
         {(t3WorkLinks.get(w.id)||[]).slice(-2).map((link:any)=>
          <small key={link.decisionId} className="atlas-work-evidence-note">
