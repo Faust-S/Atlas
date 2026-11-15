@@ -67,6 +67,24 @@ export function atlasT3DecisionSummary(text){
   ", Task "+record.taskId+", Result "+record.resultId+
   ". Источник и полномочия проверяются заново при использовании.";
 }
+// One read-only index for the EXISTING Atlas work table. Entries are source
+// references, never T3 permission decisions or claims that Work is complete.
+export function atlasT3RecordedWorkLinks(project){
+ const links=new Map();
+ if(!project||!Array.isArray(project.items)||!Array.isArray(project.decisions))
+  return links;
+ const works=new Set(project.items.map(w=>w.id));
+ for(const decision of project.decisions){
+  const row=decisionRecord(decision);
+  if(!row||row.projectId!==project.id||!works.has(row.workId))continue;
+  if(!links.has(row.workId))links.set(row.workId,[]);
+  links.get(row.workId).push(Object.freeze({
+   taskId:row.taskId,resultId:row.resultId,decisionId:decision.id,
+   sourceObjectRef:row.sourceObjectRef,
+  }));
+ }
+ return links;
+}
 async function hashOperation(ref,accepted){
  const input=JSON.stringify([ref.workspace_id,ref.object_id,ref.schema_id,
   ref.revision,accepted.work.projectId,accepted.work.workId,
