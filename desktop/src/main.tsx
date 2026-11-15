@@ -221,6 +221,13 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const changeCardRef=useRef<HTMLDivElement|null>(null);
  const sourceJumpRef=useRef<HTMLDivElement|null>(null);
  const workReturnRef=useRef<HTMLButtonElement|null>(null);
+ // UI-only return point. It is never serialized or shared with another host.
+ const workNavigationContext=useRef<{
+  projectId:string;workId:string;revision:number;query:string;
+  filter:string;targetFilter:string;observationFilter:string;
+  dependencyFilter:string;deadlineFilter:string;criticalOnly:boolean;
+  impactOnly:boolean;sort:string;limit:number;
+ }|null>(null);
  const logoUrl=host?.assetUrl??"/atlas-mark.svg";
  const [data,setData]=useState<Atlas>(()=>empty());
  const [ready,setReady]=useState(false),[busy,setBusy]=useState(false);
@@ -535,7 +542,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   control.focus({preventScroll:true});
   setWorkReturnId(null);
  },[tab,ready,workReturnId,project,boardLimits]);
- const mutate=(next:Atlas,notice:string)=>{setSavedRefPreview(null);latestSnapshot.current=next;setData(next);setMessage(notice);setError("");};
+ const mutate=(next:Atlas,notice:string)=>{workNavigationContext.current=null;setSavedRefPreview(null);latestSnapshot.current=next;setData(next);setMessage(notice);setError("");};
  const issue=(e:unknown)=>{setError(deepFreezeError(e));setMessage("");};
  const showSavedReference=async(projectId:string,workId?:string)=>{
   if(busyRef.current||!ready||!requireClosedForm())return;
@@ -636,6 +643,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  };
  const selectProject=(id:string|null,afterSubmit=false)=>{
   if(!afterSubmit&&!requireClosedForm())return;
+  workNavigationContext.current=null;
   resetWorkspaceScroll();
   host?.onSelection?.({projectId:id,workId:null,revision:String(latestSnapshot.current.revision)});
   setActive(id);setTab("overview");setEditor(null);setForecastId(null);setConnectOpen(false);
@@ -1117,24 +1125,54 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   setWorkReturnId(firstSortedMatchingWorkId(project.items,criticalWorkIds,
    workSort==="impact"?"title":workSort));
  };
+ const rememberWorkTable=(workId:string)=>{
+  if(!project||tab!=="work")return;
+  workNavigationContext.current={
+   projectId:project.id,workId,revision:data.revision,query:workQuery,
+   filter:workFilter,targetFilter:workTargetFilter,
+   observationFilter:workObservationFilter,dependencyFilter:workDependencyFilter,
+   deadlineFilter:workDeadlineFilter,criticalOnly:workCriticalOnly,
+   impactOnly:workImpactOnly,sort:workSort,limit:workLimit
+  };
+ };
+ const returnToWorkTable=(workId:string,fallbackQuery:string)=>{
+  if(!project||!requireClosedForm())return;
+  const context=workNavigationContext.current;
+  // A changed project revision must not revive obsolete impact or critical
+  // filters. The work search is retained even when this context is stale.
+  const valid=context?.projectId===project.id&&context.workId===workId&&
+   context.revision===data.revision;
+  view("work");
+  if(valid&&context){
+   setWorkQuery(context.query);setWorkFilter(context.filter);
+   setWorkTargetFilter(context.targetFilter);
+   setWorkObservationFilter(context.observationFilter);
+   setWorkDependencyFilter(context.dependencyFilter);
+   setWorkDeadlineFilter(context.deadlineFilter);
+   setWorkCriticalOnly(context.criticalOnly);
+   setWorkImpactOnly(context.impactOnly);
+   setWorkSort(context.sort);setWorkLimit(context.limit);
+  }else setWorkQuery(fallbackQuery);
+  setWorkReturnId(workId);
+  workNavigationContext.current=null;
+ };
  const openLinkedSource=(workId:string,query:string,origin:"overview"|"work"|"graph"="overview")=>{
   if(!project||!requireClosedForm())return;
+  if(origin==="work")rememberWorkTable(workId);
   // Preserve the diagram's original return target before switching tabs.
   const graphOrigin=origin==="graph"?graphJump?.origin||"overview":null;
   view("sources");
   setSourceJump({projectId:project.id,workId,query,origin,graphOrigin});
  };
  const returnToLinkedWork=()=>{
-  if(!project||sourceJump?.origin!=="work"||!requireClosedForm())return;
-  const {workId,query}=sourceJump;
-  view("work");
-  setWorkQuery(query);
-  setWorkReturnId(workId);
+  if(!project||sourceJump?.origin!=="work")return;
+  returnToWorkTable(sourceJump.workId,sourceJump.query);
  };
  const openWorkGraph=(workId?:string,query?:string,origin:"overview"|"work"|"board"="overview")=>{
   if(!project||!requireClosedForm())return;
-  view("graph");
   const work=workId&&project.items.find((item:any)=>item.id===workId);
+  if(origin==="work"&&work)rememberWorkTable(work.id);
+  view("graph");
   setGraphJump(work?{projectId:project.id,workId:work.id,query:query||"",origin}:null);
  };
  const returnToLinkedGraph=()=>{
@@ -1142,10 +1180,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   openWorkGraph(sourceJump.workId,sourceJump.query,sourceJump.graphOrigin||"overview");
  };
  const returnFromWorkGraph=()=>{
-  if(graphJump?.origin==="work"){
-   setWorkReturnId(graphJump.workId);
-   view("work");
-  }else if(graphJump?.origin==="board"){
+  if(graphJump?.origin==="work")returnToWorkTable(graphJump.workId,graphJump.query);
+  else if(graphJump?.origin==="board"){
    setWorkReturnId(graphJump.workId);
    view("board");
   }else view("overview");
