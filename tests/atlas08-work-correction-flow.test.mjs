@@ -90,3 +90,21 @@ test("The existing work editor returns to remaining affected works without savin
  assert.match(submit,/setWorkSort\("impact"\)/);
  assert.match(ui,/Сравнение ведётся с планом до первого изменения/);
 });
+
+test("A metadata-only edit keeps the original comparison without claiming a new schedule correction",()=>{
+ const p=project(),before=scheduleProject(p),changed=revised(p,"a",4);
+ const initial=startWorkCorrection({projectId:"p",workId:"a",revision:12,
+  beforePlan:before,afterPlan:scheduleProject(changed)});
+ const advanced=continueWorkCorrection(initial,{projectId:"p",workId:"b",
+  revision:12,nextRevision:13,afterPlan:scheduleProject(changed),recordCorrection:false});
+ assert.ok(advanced);
+ assert.equal(advanced.revision,13);
+ assert.deepEqual(advanced.followups,[]);
+ assert.deepEqual(advanced.change,initial.change);
+ assert.equal(initial.revision,12);
+ const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ assert.match(ui,/recordCorrection:Boolean\(scheduleFieldsChanged\)/);
+ assert.match(ui,/recentPlanBefore\.revision!==data\.revision/);
+ assert.match(ui,/recentPlanBefore\.projectId!==project\.id/);
+ assert.match(ui,/recentPlanBefore\.change\.affectedIds\.includes\(editor\.action\.slice\(5\)\)/);
+});
