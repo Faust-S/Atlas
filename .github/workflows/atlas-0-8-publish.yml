@@ -1,0 +1,75 @@
+name: Publish accepted IWXA Atlas 0.8.0 from exact Windows-qualified SHA
+
+on:
+  push:
+    branches:
+      - release/0.8
+    paths:
+      - '.github/workflows/atlas-0-8-publish.yml'
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish-stable:
+    if: github.ref == 'refs/heads/release/0.8' && contains(github.event.head_commit.message, '[publish-release-0.8]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ACCEPTED_RUN: '43708483434'
+      ACCEPTED_SHA: '94d009a9e454132b2b9293b29a4bbfa451d13118'
+    steps:
+      - name: Inspect accepted full Windows run and matching immutable SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          run_json="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$ACCEPTED_RUN")"
+          test "$(jq -r .status <<<"$run_json")" = completed
+          test "$(jq -r .conclusion <<<"$run_json")" = success
+          test "$(jq -r .head_sha <<<"$run_json")" = "$ACCEPTED_SHA"
+          test "$(jq -r .head_branch <<<"$run_json")" = 'release/0.8'
+          if gh release view v0.8.0 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "ATLAS08_RELEASE_ALREADY_EXISTS"
+            exit 1
+          fi
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v0.8.0" >/dev/null 2>&1; then
+            echo "ATLAS08_RELEASE_TAG_ALREADY_EXISTS"
+            exit 1
+          fi
+          echo "ATLAS08_EXACT_ACCEPTED_WINDOWS_SHA_PASS $ACCEPTED_SHA"
+
+      - name: Download Windows-accepted installer without rebuilding or repackaging
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p publish
+          gh run download "$ACCEPTED_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name atlas08-setup-core-release-candidate --dir publish
+          test -s publish/IWXA-Atlas-0.8.0-Setup.exe
+          test -s publish/IWXA-Atlas-0.8.0-Setup.exe.sha256
+          (cd publish && sha256sum --check IWXA-Atlas-0.8.0-Setup.exe.sha256)
+          echo "ATLAS08_ACCEPTED_INSTALLER_SHA256_PASS"
+
+      - name: Publish version 0.8.0 on the accepted source SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > release-notes.txt <<'NOTES'
+          IWXA Atlas 0.8.0 for Windows x64.
+
+          Work with large projects: reordered-word search within saved work/stage/source fields, direct access to filtered works from portfolio results, and restoration of work-table context after viewing dependencies and sources. Preview schedule changes before applying a work edit, make successive corrections against the original plan, and see the remaining impact and critical path. Explicit Save and cold restart are preserved.
+
+          Installed Tauri/WebView2 and the original IWXA Setup Core passed Windows qualification on the exact source SHA, including a 1,212-work IWXA archive, two sequential corrections, persistence/readback after cold restart and a compact 820 x 650 interface. SHA-256 of the downloaded installer is supplied separately.
+
+          Center interoperability remains read-only where applicable. Atlas does not issue execution authority. An Authenticode publisher signature is not included.
+          NOTES
+          gh release create v0.8.0 \
+            publish/IWXA-Atlas-0.8.0-Setup.exe \
+            publish/IWXA-Atlas-0.8.0-Setup.exe.sha256 \
+            --repo "$GITHUB_REPOSITORY" --target "$ACCEPTED_SHA" \
+            --title "IWXA Atlas 0.8.0" --notes-file release-notes.txt
+          actual="$(gh release view v0.8.0 --repo "$GITHUB_REPOSITORY" --json tagName,targetCommitish -q '.targetCommitish')"
+          test "$actual" = "$ACCEPTED_SHA"
+          echo "ATLAS08_STABLE_RELEASE_PUBLISHED $ACCEPTED_SHA"
