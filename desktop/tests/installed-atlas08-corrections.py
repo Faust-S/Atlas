@@ -133,6 +133,43 @@ def qualify():
     assert d.saved_project(updated_head)==expected,"Cold restart lost corrections"
     print("ATLAS08_INSTALLED_CUMULATIVE_CORRECTIONS_SAVE_RESTART_PASS",flush=True)
 
+    # The unchanged large fixture has one unbroken 360-character work title.
+    # Change an existing predecessor through the normal form so this title
+    # appears in a real impact list. Verify Windows UIA horizontal geometry.
+    long_title = "Проверить" + "ОченьДлинноеНазваниеРаботыБезПробелов"*10
+    assert any(w["title"] == long_title for w in original["items"])
+    predecessor = "Работа 0 / 4"
+    d.click_button("Открыть портфель проектов")
+    d.wait_text("Проекты и последствия",35)
+    d.set_text("Найти проект по работе, этапу или источнику",predecessor)
+    d.wait_text("Найдено проектов: 1",35)
+    v.find_control("Перейти к найденной работе "+predecessor,
+                   types={"Button"},scroll=True).click_input()
+    d.wait_text("Работы проекта",35)
+    v.find_control("Открыть работу "+predecessor,
+                   types={"Button"},scroll=True).click_input()
+    d.window_title_contains("Форма: Работа: "+predecessor,25)
+    win32gui.MoveWindow(d.handle,0,0,820,650,True)
+    submit=edit_duration(5)
+    assert d.head()==updated_head,"Preview of long work wrote Store"
+    submit.click_input()
+    v.await_no_form()
+    d.wait_text("Последствия изменения работы",35)
+    matched=[]
+    for element in d.window().descendants():
+        shown="".join(str(element.window_text() or "").split())
+        if "".join(long_title[:60].split()) in shown:
+            matched.append(element)
+    assert matched,"No actual long-title effect was rendered"
+    bounds=win32gui.GetWindowRect(d.handle)
+    fitting=[e for e in matched if
+             v.rectangle_in_workspace(e.rectangle(),bounds,require_vertical=False)]
+    v.capture("atlas08-long-title-impact-820")
+    assert fitting,("Long affected-work caption exceeds Windows viewport: "+
+                    repr([(e.rectangle().left,e.rectangle().right) for e in matched]))
+    assert d.head()==updated_head,"Long-title inspection wrote Store"
+    print("ATLAS08_INSTALLED_LONG_TITLE_WRAP_PASS",flush=True)
+
 if __name__=="__main__":
     try:
         qualify()

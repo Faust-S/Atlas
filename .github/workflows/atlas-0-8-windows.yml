@@ -1,9 +1,9 @@
-name: IWXA Atlas 0.8 installed Windows acceptance candidate
+name: IWXA Atlas 0.8 exact release-candidate Windows acceptance
 
 on:
   push:
     branches:
-      - work/2026-11-14-atlas-0-8
+      - release/0.8
     paths:
       - '.github/workflows/atlas-0-8-windows.yml'
   workflow_dispatch:
@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   installed-atlas08:
-    if: github.ref_name == 'work/2026-11-14-atlas-0-8'
+    if: github.ref_name == 'release/0.8'
     runs-on: windows-latest
     timeout-minutes: 40
     steps:
@@ -88,21 +88,21 @@ jobs:
           python -m py_compile desktop/tests/installed-atlas08-corrections.py
           if ($LASTEXITCODE -ne 0) { throw 'ATLAS08_NATIVE_WITNESS_SYNTAX_FAILED' }
 
-      - name: Verify exact development installer SHA-256
+      - name: Verify exact release-candidate installer SHA-256
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $exe = 'artifacts/IWXA-Atlas-0.8.0-dev.1-Setup.exe'
+          $exe = 'artifacts/IWXA-Atlas-0.8.0-Setup.exe'
           $sumfile = $exe + '.sha256'
           if (!(Test-Path -LiteralPath $exe) -or !(Test-Path -LiteralPath $sumfile)) {
             throw 'ATLAS08_SETUP_CORE_ARTIFACT_MISSING'
           }
           $sha = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant()
           $listed = (Get-Content -LiteralPath $sumfile -Raw).Trim()
-          if ($listed -ne ($sha + ' *IWXA-Atlas-0.8.0-dev.1-Setup.exe')) {
+          if ($listed -ne ($sha + ' *IWXA-Atlas-0.8.0-Setup.exe')) {
             throw 'ATLAS08_INSTALLER_SHA256_MISMATCH'
           }
-          Write-Host "ATLAS08_DEV_INSTALLER_SHA256_PASS $sha"
+          Write-Host "ATLAS08_RC_INSTALLER_SHA256_PASS $sha"
 
       - name: Exercise installed portfolio, two work changes, explicit Save and cold restart
         shell: pwsh
@@ -120,13 +120,13 @@ jobs:
           if-no-files-found: ignore
           retention-days: 5
 
-      - name: Keep exact 0.8 development installer (not a release)
+      - name: Keep exact 0.8 release candidate installer (not published)
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: atlas08-setup-core-windows-candidate
+          name: atlas08-setup-core-release-candidate
           path: |
-            artifacts/IWXA-Atlas-0.8.0-dev.1-Setup.exe
-            artifacts/IWXA-Atlas-0.8.0-dev.1-Setup.exe.sha256
+            artifacts/IWXA-Atlas-0.8.0-Setup.exe
+            artifacts/IWXA-Atlas-0.8.0-Setup.exe.sha256
           if-no-files-found: error
           retention-days: 5
