@@ -10,6 +10,7 @@ test("Atlas 0.9 ships both entrypoints in one original Tauri dist",()=>{
  const standalone=read("desktop/src/standalone.tsx");
  const tauri=JSON.parse(read("desktop/src-tauri/tauri.conf.json"));
  assert.match(vite,/manifest:true/);
+ assert.match(vite,/preserveEntrySignatures:"strict"/);
  assert.match(vite,/desktop:resolve\(desktopRoot,"index\.html"\)/);
  assert.match(vite,/installedT3Host:resolve\(desktopRoot,"src\/atlas-react-surface\.tsx"\)/);
  assert.match(hosted,/export async function mountInstalledAtlasT3Surface\(/);
