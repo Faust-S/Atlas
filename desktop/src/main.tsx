@@ -35,6 +35,7 @@ import {commitWithReadback,readSavedSnapshotForReference} from "./native-save.mj
 import {projectHistoryRows} from "./history-view.mjs";
 import {sortWorkRows,firstSortedMatchingWorkId,deadlineFocusRows,filterWorkRowsByObservation} from "./work-sorting.mjs";
 import {createAtlasSavedRef} from "../../src/project-host-port.mjs";
+import {atlasT3DecisionSummary} from "../../src/atlas-t3-native-recipient.mjs";
 import {invokeAtlasHost,type AtlasEmbeddedHost} from "./embedded-host";
 
 // Show the same product version that was packaged in Tauri, without leaking
@@ -1888,7 +1889,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
         <p className="minor">Риски ещё не внесены.</p>}
         {project.risks.length>30&&<p className="minor">Показаны 30 из {project.risks.length} рисков.</p>}</div>
        <div><h3>Последние решения</h3>{project.decisions.length?project.decisions.slice(-15).reverse().map((decision:any)=>
-        <div className="detail-row" key={decision.id}><span>{decision.text}</span><small>{readable(decision.at)}</small></div>):
+        <div className="detail-row" key={decision.id}><span>{atlasT3DecisionSummary(decision.text)||decision.text}</span><small>{readable(decision.at)}</small></div>):
         <p className="minor">Решений пока нет.</p>}
         {project.decisions.length>15&&<Action onClick={()=>view("history")}>Вся история</Action>}</div>
       </div>
@@ -2379,7 +2380,14 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      </div>
      {history.slice(0,historyLimit).map((entry:any)=><div className="history-entry" key={entry.kind+"-"+entry.id}>
       <small>{readable(entry.at)} · {entry.kind==="decision"?"Решение":"Заявление"}{entry.source?" · "+entry.source:""}</small>
-      <p>{entry.text||"Без пояснения"}</p>
+      <p>{atlasT3DecisionSummary(entry.text)||entry.text||"Без пояснения"}</p>
+      {entry.kind==="decision"&&atlasT3DecisionSummary(entry.text)&&
+       <details className="atlas-technical-details">
+        <summary>Исходная запись связи T3</summary>
+        <code>{entry.text}</code>
+        <p className="minor">Связь с Agent Result не предоставляет прав доступа.
+         Актуальность источника и подписанные полномочия проверяются оригинальным T3.</p>
+       </details>}
       {entry.revision&&<details className="atlas-technical-details"><summary>Версия источника</summary><code>{entry.revision}</code></details>}
      </div>)}
      {!history.length&&<Fallback message={(project.decisions.length+(project.findings||[]).length)>0?
