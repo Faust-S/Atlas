@@ -98,6 +98,19 @@ export async function createInstalledAtlasT3Host({
  const continueOriginalAcceptedResult=async({workRef,context})=>{
   const source=await select(workRef,context,true);
   active();
+  // The signed ORIGINAL D6 preview must select Atlas's own recipient
+  // before Human consent and BEFORE any possible native dispatch.
+  const preview=await originalT3.preview(source);
+  active();
+  if(!preview||preview.recipientId!=="iwxa.atlas"||
+     !SOURCE_KEYS.every(k=>preview.reference?.[k]===source[k]))
+   die("ATLAS_T3_INSTALLED_ORIGINAL_RECIPIENT_MISMATCH");
+  if(preview.status==="OPERATION_IN_PROGRESS")
+   return {status:"OPERATION_IN_PROGRESS"};
+  if(preview.status==="RECOVER_ONLY")
+   return {status:"OUTCOME_UNKNOWN"};
+  if(preview.status!=="AVAILABLE")
+   die("ATLAS_T3_INSTALLED_ORIGINAL_D6_PREVIEW_INVALID");
   return originalT3.continueSelected(source);
  };
  const recoverOriginalAcceptedResult=async({projectId,workId,context})=>{
