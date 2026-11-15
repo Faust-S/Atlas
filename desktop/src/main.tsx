@@ -708,6 +708,48 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    setError("");
   }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
  };
+ // An original T3 D6 Host owns signed Result selection and Human consent.
+ // Atlas provides only the exact saved Project/WorkRef.
+ const receiveAtlasAgentResult=async(projectId:string,workId:string)=>{
+  if(!host?.t3?.continueSelectedResult){
+   issue(Error("Оригинальный T3 для получения Result не подключён."));return;
+  }
+  if(!ready||busyRef.current||dirtyRef.current||!persisted||
+     editorOpenRef.current||pendingImportOpenRef.current||
+     savedVersionsOpenRef.current||savedRefOpenRef.current){
+   issue(Error("Сохраните проект и закройте формы перед получением Result."));return;
+  }
+  const started=latestSnapshot.current,expectedGeneration=generation;
+  busyRef.current=true;setBusy(true);
+  try{
+   const actual=await readSavedSnapshotForReference({invoke,
+    expectedGeneration,snapshot:started,signature:snapshotText,
+    readValidated:(raw:Atlas)=>deserialize(JSON.stringify(raw))});
+   const ref=createAtlasSavedRef(actual,{projectId,workId},
+    {persisted:true,dirty:false}) as
+    {projectId:string;workId:string;revision:string};
+   if(latestSnapshot.current!==started||dirtyRef.current||editorOpenRef.current)
+    throw Error("Проект изменился до выбора Result. Получение не запускалось.");
+   const result=await host.t3.continueSelectedResult({projectId,workId});
+   if(result?.workRef?.projectId!==ref.projectId||
+      result?.workRef?.workId!==ref.workId||
+      result?.workRef?.revision!==ref.revision)
+    throw Error("T3 вернул Result для другой редакции работы. Проверьте Agent и сохранённый Atlas.");
+   if(result.status==="OWNER_READBACK_CONFIRMED"){
+    if(typeof result.operationId!=="string"||!/^atlas:t3:[0-9a-f]{64}$/.test(result.operationId)||
+       typeof result.resultRef!=="string"||!result.resultRef.startsWith("atlas:decision:"))
+     throw Error("T3 не подтвердил исходную квитанцию Atlas.");
+    setMessage("T3 подтвердил сохранение ссылки на принятый Agent Result. Нажмите «Перечитать сохранённое», чтобы увидеть её у работы. Выполнение работы не менялось.");
+   }else if(result.status==="USER_CANCELLED"){
+    setMessage("Получение Result отменено. Проект не изменён.");
+   }else if(result.status==="OUTCOME_UNKNOWN"||result.status==="OPERATION_IN_PROGRESS"){
+    setMessage("Исход получения Result не подтверждён. Не повторяйте применение. Сначала перечитайте Atlas и восстановите квитанцию через оригинальный T3.");
+   }else{
+    throw Error("Неизвестный ответ T3. Получение Result не подтверждено.");
+   }
+   setError("");
+  }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
+ };
  // Another product may have written the native Atlas head by an authorized T3
  // route. Explicit native reread only, never an implicit overwrite of a draft.
  const rereadAtlasFromNative=async()=>{
@@ -2293,6 +2335,10 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
          disabled={busy||dirty||!persisted||!!editor}
          onClick={()=>void issueAtlasAgentTask(project.id,w.id)}
          title="Только оригинальный Agent и сохранённый WorkRef">Поручить Agent</Action>}
+        {host?.t3?.continueSelectedResult&&<Action
+         disabled={busy||dirty||!persisted||!!editor}
+         onClick={()=>void receiveAtlasAgentResult(project.id,w.id)}
+         title="Принятый Agent Result, original signed T3 D6 и .iwxa">Получить Result</Action>}
         <Action disabled={busy||dirty||!persisted||!!editor} onClick={()=>showSavedReference(project.id,w.id)} title="Только сохранённая редакция">Ссылка</Action>
         <Action onClick={()=>removeWork(w.id)}>Удалить</Action></td></tr>)}</tbody></table></div>
      {project.items.length>0&&<p className="minor">Показано {Math.min(filteredWork.length,workLimit)} из {filteredWork.length} работ по фильтру; всего в проекте: {project.items.length}.</p>}
