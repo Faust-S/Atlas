@@ -28,6 +28,9 @@ test("Installed signed D6 owner is mandatory; there is no browser-provided autho
  assert.match(binding,/selectAcceptedForWork/);
  assert.match(binding,/originalT3\.continueSelected\(source\)/);
  assert.match(binding,/originalT3\.recover\(source\)/);
+ assert.ok(binding.includes("ATLAS_T3_INSTALLED_AGENT_TASK_READBACK_INVALID"));
+ assert.ok(binding.includes("ATLAS_T3_INSTALLED_D6_READBACK_INVALID"));
+ assert.ok(binding.includes("ATLAS_T3_INSTALLED_D6_RECOVERY_INVALID"));
  assert.match(binding,/validateOriginalSource\(selection,requested,strictRevision\)/);
  assert.match(binding,/originalExchange\.readReceipt\(input\)/);
  assert.match(binding,/atlasAuthority\.verifyWrite\(input\)/);
