@@ -75,6 +75,12 @@ export function portfolioSearchReason(project,query){
 export function portfolioSearchWorkTarget(project,query){
  const needle=fold(query);
  if(!needle||!project)return null;
+ // A fully entered saved title has priority over fuzzy token fragments.
+ // Otherwise "Работа 0 / 20" collides with unrelated "Работа 1 / 20"
+ // because the token "0" is also a substring of "20".
+ const exact=(project.items||[]).filter(work=>fold(work.title)===needle);
+ if(exact.length>1)return null;
+ if(exact.length===1)return {id:exact[0].id,title:exact[0].title};
  const words=needle.split(" ").filter(Boolean);
  let selected=null;
  for(const work of project.items||[]){
