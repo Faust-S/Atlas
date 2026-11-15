@@ -10,6 +10,8 @@ import {createAtlasT3NativeRecipient,createAtlasT3AgentTaskSelection}
  from "../src/atlas-t3-native-recipient.mjs";
 import {createAtlasT3DesktopStorePort}
  from "../desktop/src/atlas-t3-store-port.mjs";
+import {createAtlasT3OriginalHostPorts}
+ from "../desktop/src/atlas-t3-original-host-ports.mjs";
 
 const source=process.env.ATLAS_T3_ORIGINAL_D6_MODULE;
 if(!source)throw new Error("Original T3 D6 source path is required");
@@ -105,7 +107,33 @@ test("Original T3 signed Result -> native Atlas decision -> cold double readback
  const originalD6=make();
  const preview=await originalD6.preview(originalRef);
  assert.equal(preview.status,"AVAILABLE");
- const result=await originalD6.continueSelected(originalRef);
+ const atlasHost=createAtlasT3OriginalHostPorts({
+  invoke:async(command,args)=>{
+   if(command==="atlas_open"){
+    const native=await originalStore.readSaved();
+    return {snapshot:native.snapshot,generation:native.generation,needsConfirmation:false};
+   }
+   if(command==="atlas_commit")
+    return originalStore.commitSaved(args.expectedGeneration,args.snapshot);
+   throw Error("No other native command");
+  },
+  authorizeCommand:async c=>["atlas_open","atlas_commit"].includes(c),
+  authorizeAtlasProjectRead:async()=>true,
+  isHostActive:()=>true,
+  currentAgentContext:async()=>({workspaceId:"agent:personal"}),
+  findOriginalAgentTask:async()=>({status:"PERSISTED",taskId:issued.taskId,
+   projectId:ref.projectId,workId:ref.workId,sourceRevision:ref.revision}),
+  issueOriginalAgentTask:async()=>{throw Error("Task already exists");},
+  readOriginalAgentTask:async()=>({status:"PERSISTED",taskId:issued.taskId,
+   projectId:ref.projectId,workId:ref.workId,sourceRevision:ref.revision}),
+  ...nativeOpts,
+  continueOriginalAcceptedResult:async({workRef})=>{
+   assert.deepEqual(workRef,ref);
+   return originalD6.continueSelected(originalRef);
+  }
+ });
+ const result=await atlasHost.continueSelectedResult({projectId:p.id,workId:w.id});
+ assert.deepEqual(result.workRef,ref);
  assert.equal(result.status,"OWNER_READBACK_CONFIRMED",JSON.stringify({
   status:result.status,reason:result.reason??null,operationId:result.operationId,
   savedRevision:snapshot.revision,decisions:snapshot.projects[0].decisions.length
