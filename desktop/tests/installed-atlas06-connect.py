@@ -274,8 +274,48 @@ def qualify():
     screenshot("reopened-project")
     print("ATLAS06_CONNECT_BRANCH_TREE_RESTART_PASS",flush=True)
 
+def qualify_person_unbundled_denial():
+    """Real feature-enforced native executable, intentionally without T3.
+
+    This PUBLIC negative witness cannot sign a license. Its only PASS
+    condition is a failed native save and unchanged local project store.
+    """
+    if (STORE/"head.json").exists():
+        raise AssertionError("PERSON refusal witness needs a new empty Atlas profile")
+    if (APP.parent/"t3"/"iwxa-t3-product-consumer.exe").exists():
+        raise AssertionError("Private T3 executable unexpectedly present in public CI")
+    launch()
+    wait_button("Моя лицензия",60)  # Compiled edition really has PERSON UI.
+    click_button("Создать новый проект")
+    wait_text("Новый проект")
+    set_text("Название проекта","Atlas PERSON no consumer")
+    click_button("Применить к черновику")
+    wait_button("Сохранить")
+    assert not (STORE/"head.json").exists(), "Draft unexpectedly persisted before Save"
+    click_button("Сохранить")
+    wait_text("ATLAS_PERSON_T3_COMPONENT_NOT_BUNDLED",45)
+    assert not (STORE/"head.json").exists(), "Denied licensed write created native head"
+    screenshot("person-unbundled-native-denial")
+    print("ATLAS_PERSON_UNBUNDLED_NATIVE_WORKSPACE_WRITE_DENIED_PASS",flush=True)
+
+    # Close an unsaved draft explicitly through the real GUI, then reopen.
+    activate()
+    keyboard.send_keys("%{F4}")
+    click_button("Закрыть без сохранения",15)
+    process.wait(timeout=15)
+    launch()
+    wait_text("Начать работу с Atlas",60)
+    assert not (STORE/"head.json").exists(), "Denied licensed write survived restart"
+    if any("Atlas PERSON no consumer" in x for x in visible_texts()):
+        raise AssertionError("Unlicensed project reappeared in the installed GUI")
+    print("ATLAS_PERSON_UNBUNDLED_COLD_RESTART_NO_WRITE_PASS",flush=True)
+
+
 try:
-    qualify()
+    if os.environ.get("ATLAS_PERSON_EXPECT_UNBUNDLED_DENIAL")=="1":
+        qualify_person_unbundled_denial()
+    else:
+        qualify()
 except Exception as exc:
     print("ATLAS06_CONNECT_WINDOWS_HOLD "+repr(exc),flush=True)
     screenshot("failure")
