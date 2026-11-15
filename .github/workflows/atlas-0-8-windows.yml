@@ -9,6 +9,8 @@ on:
       - 'desktop/tests/installed-atlas08-corrections.py'
       - 'desktop/src/**'
       - 'desktop/installer/**'
+      - 'src/**'
+      - 'tests/**'
   workflow_dispatch:
 
 permissions:
