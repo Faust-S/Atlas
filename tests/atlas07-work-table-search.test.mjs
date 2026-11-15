@@ -219,7 +219,7 @@ test("overview gives direct edit of scheduled overruns, followed by explicit pla
  assert.match(ui,/className="atlas-work-save-shortcut"/);
  assert.match(ui,/onClick=\{\(\)=>void save\(\)\}>Сохранить пересчитанный план/);
  assert.match(ui,/setRecentWorkKind\("adjusted"\)/);
- assert.match(ui,/revealWorkInTable\(correctedId,false\)/);
+ assert.match(ui,/revealWorkInTable\(nextContext\?\.workId\|\|correctedId,false\)/);
 });
 
 test("large project: overview late-work editor, canonical replanning and IWXA reopen",async()=>{
@@ -295,7 +295,8 @@ test("overview critical link opens focused relations and removal reports impact 
   main.indexOf("const removeEmptyStage="));
  assert.match(section,/confirmAction\(/);
  assert.match(section,/const next=disconnect\(data,project\.id,from,to\)/);
- assert.match(section,/scheduleChangeSummary\(plan,scheduleProject\(updatedProject\)\)/);
+ assert.match(section,/startWorkCorrection\(\{/);
+ assert.match(section,/beforePlan:plan,afterPlan:scheduleProject\(updatedProject\)/);
  assert.match(section,/revealWorkInTable\(to,false\)/);
  assert.doesNotMatch(section,/commitWithReadback\(|nativeInvoke\(|void save\(|fetch\(/);
 });
