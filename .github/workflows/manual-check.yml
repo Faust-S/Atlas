@@ -13,6 +13,7 @@ on:
       - release/0.8
       - work/2026-11-12-atlas-0-7
       - work/2026-11-14-atlas-0-8
+      - work/2026-11-15-atlas08-t3-project-work-result
     paths:
       - 'src/**'
       - 'tests/**'
@@ -52,6 +53,18 @@ jobs:
         run: |
           node --check src/app.mjs
           node --check src/project-host-port.mjs
+          node --check src/atlas-t3-native-recipient.mjs
+      - name: Checkout exact original public T3 D6 owner (no alternate Kernel)
+        uses: actions/checkout@v4
+        with:
+          repository: Faust-S/knowledge
+          ref: ae7f229d859f88092edce0825c773ecb43902bd3
+          path: t3-original
+          persist-credentials: false
+      - name: Qualify actual original T3 D6 with Atlas native recipient source
+        env:
+          ATLAS_T3_ORIGINAL_D6_MODULE: ${{ github.workspace }}/t3-original/packages/t3-core/src/t3/native-result-continuation.mjs
+        run: node --test tests/atlas-t3-original-d6-qualification.mjs
       - name: Checkout actual public Admin Center contract at audited revision
         uses: actions/checkout@v4
         with:
