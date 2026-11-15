@@ -464,6 +464,12 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const portfolioQuickWork=useMemo(()=>
   search.trim()&&filtered.length===1?portfolioSearchWorkTarget(filtered[0],search):null,
   [filtered,search]);
+ // Stage and source searches may find many existing works. Use the
+ // existing read-only work table filter, without duplicating search logic.
+ const portfolioWorkMatches=useMemo(()=>new Map<string,number>(
+  search.trim()?filtered.map((p:any):[string,number]=>
+   [p.id,projectWorkTableSearch(p,search).length]):[]
+ ),[filtered,search]);
  // A single accessible name and a single visible text node. Separate
  // expressions for the caption and count can create separate WebView2 UIA
  // text elements despite looking like one sentence on screen.
@@ -649,6 +655,13 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    setForecastId(changeId);
    setChangeJump({projectId:id,changeId});
   }
+ };
+ const openPortfolioWorkResults=(id:string,query:string,focusWorkId:string|null=null)=>{
+  if(busyRef.current||!requireClosedForm())return;
+  // One existing project switch clears unrelated filters; the table keeps
+  // exactly the user's search. Navigating never writes a saved project.
+  selectProject(id,true);setTab("work");setWorkQuery(query);
+  setWorkReturnId(focusWorkId);setMessage("");
  };
  const inspectPortfolioSignal=(projectId:string,signal:{kind:string;panel:string;ref?:string})=>{
   if(!requireClosedForm())return;
@@ -1291,12 +1304,13 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
         onClick={()=>selectProject(filtered[0].id)}>Открыть проект</button>
        {portfolioQuickWork&&<button type="button" className="text-link"
         aria-label={"Перейти к найденной работе "+portfolioQuickWork.title}
-        onClick={()=>{
-         if(!requireClosedForm())return;
-         openProjectTab(filtered[0].id,"work");
-         setWorkQuery(portfolioQuickWork.title);
-         setWorkReturnId(portfolioQuickWork.id);
-        }}>К работе</button>}
+        onClick={()=>openPortfolioWorkResults(filtered[0].id,portfolioQuickWork.title,portfolioQuickWork.id)}>К работе</button>}
+       {!portfolioQuickWork&&(portfolioWorkMatches.get(filtered[0].id)||0)>0&&
+        <button type="button" className="text-link"
+         aria-label={"Показать найденные работы проекта "+filtered[0].name}
+         onClick={()=>openPortfolioWorkResults(filtered[0].id,search)}>
+         К работам ({portfolioWorkMatches.get(filtered[0].id)})
+        </button>}
       </div>}
       {search.trim()&&filtered.length>1&&<div className="atlas-portfolio-quick-list"
        role="group" aria-label="Быстрый переход к найденным проектам">
@@ -1307,6 +1321,11 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
         <button type="button" className="text-link"
          aria-label={"Открыть найденный проект "+p.name+" (результат "+(index+1)+")"}
          onClick={()=>selectProject(p.id)}>Открыть проект</button>
+        {(portfolioWorkMatches.get(p.id)||0)>0&&<button type="button" className="text-link"
+         aria-label={"Показать найденные работы проекта "+p.name}
+         onClick={()=>openPortfolioWorkResults(p.id,search)}>
+         К работам ({portfolioWorkMatches.get(p.id)})
+        </button>}
        </div>)}
        {filtered.length>3&&<small className="atlas-portfolio-more">
         Ещё {filtered.length-3} проектов в списке ниже
