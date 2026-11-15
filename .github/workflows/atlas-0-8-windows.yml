@@ -6,6 +6,9 @@ on:
       - release/0.8
     paths:
       - '.github/workflows/atlas-0-8-windows.yml'
+      - 'desktop/tests/installed-atlas08-corrections.py'
+      - 'desktop/src/**'
+      - 'desktop/installer/**'
   workflow_dispatch:
 
 permissions:

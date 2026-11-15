@@ -138,7 +138,8 @@ def qualify():
     # appears in a real impact list. Verify Windows UIA horizontal geometry.
     long_title = "Проверить" + "ОченьДлинноеНазваниеРаботыБезПробелов"*10
     assert any(w["title"] == long_title for w in original["items"])
-    predecessor = "Работа 0 / 4"
+    # An unambiguous saved title. "Работа 0 / 4" matches other works by tokens.
+    predecessor = "Работа 0 / 20"
     d.click_button("Открыть портфель проектов")
     d.wait_text("Проекты и последствия",35)
     d.set_text("Найти проект по работе, этапу или источнику",predecessor)

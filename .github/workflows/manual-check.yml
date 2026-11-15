@@ -17,6 +17,7 @@ on:
       - 'src/**'
       - 'tests/**'
       - 'desktop/src/**'
+      - 'desktop/tests/**'
       - 'desktop/src-tauri/**'
       - 'desktop/installer/**'
       - 'desktop/public/**'
