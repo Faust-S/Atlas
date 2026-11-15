@@ -16,7 +16,7 @@ import win32con
 import win32gui
 import win32process
 from PIL import ImageGrab
-from pywinauto import Desktop, keyboard
+from pywinauto import Desktop, keyboard, mouse
 
 sys.stdout.reconfigure(encoding="utf-8",errors="replace")
 APP=Path(os.environ["ATLAS_INSTALLED_EXE"])
@@ -89,6 +89,40 @@ def click_button(name,timeout=35):
     activate()
     wait_button(name,timeout).click_input()
     time.sleep(0.3)
+
+def click_button_below_fold(name,timeout=45):
+    # A repository preview can be taller than the installed 1024x710 window.
+    # Exercise the actual Windows wheel instead of asking UIA to click a
+    # hidden/off-screen element. Never force JS state or bypass Save.
+    activate()
+    until=time.monotonic()+timeout
+    seen=False
+    while time.monotonic()<until:
+        if process.poll() is not None:
+            raise AssertionError("Atlas closed while seeking scrolled action: "+name)
+        candidates=[element for element in window().descendants(control_type="Button")
+                    if element.window_text()==name]
+        if len(candidates)>1:
+            raise AssertionError("Ambiguous scrolled native button: "+name)
+        if candidates:
+            seen=True
+            control=candidates[0]
+            viewport=window().rectangle()
+            bounds=control.rectangle()
+            if (control.is_visible() and control.is_enabled() and
+                bounds.top>=viewport.top+30 and
+                bounds.bottom<=viewport.bottom-30):
+                screenshot("action-scrolled-into-view")
+                control.click_input()
+                time.sleep(0.3)
+                return
+        viewport=window().rectangle()
+        mouse.scroll(wheel_dist=-2,
+                     coords=(viewport.right-100,viewport.bottom-140))
+        time.sleep(0.35)
+    screenshot("scrolled-action-not-found")
+    raise AssertionError("Missing visible scrolled native button: "+name+
+                         " (present in UIA tree="+str(seen)+")")
 
 def set_text(name,value):
     # HTML input[list] is represented by Windows UIA as ComboBox, while
@@ -170,7 +204,7 @@ def qualify():
     wait_text("Корневая структура",90)
     screenshot("selected-branch-preview")
     assert not (STORE/"head.json").exists(),"Read-only inspection wrote native storage"
-    click_button("Добавить в Atlas")
+    click_button_below_fold("Добавить в Atlas")
     wait_button("Сохранить")
     assert not (STORE/"head.json").exists(),"Creating a project draft unexpectedly saved"
     click_button("Сохранить")
