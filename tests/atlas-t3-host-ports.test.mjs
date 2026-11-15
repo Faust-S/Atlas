@@ -27,6 +27,7 @@ test("Embedded original owners use only Atlas native commands for Agent Task and
   },
   authorizeCommand:async c=>["atlas_open","atlas_commit"].includes(c)
  };
+ let host;
  const owners={
   ...native,
   isHostActive:()=>true,
@@ -50,17 +51,27 @@ test("Embedded original owners use only Atlas native commands for Agent Task and
   verifyAtlasWrite:async({operationId,recipientId,workRef})=>({
    allowed:true,operationId,recipientId,projectId:workRef.projectId,
    workId:workRef.workId,revision:workRef.revision
-  })
+  }),
+  continueOriginalAcceptedResult:async({workRef,context})=>{
+   assert.deepEqual(workRef,ref);
+   assert.deepEqual(context,{owner:"trusted-installed-agent"});
+   const preview=await host.recipient.inspect({reference:source,recipientId:"iwxa.atlas"});
+   await host.recipient.receive({operationId:preview.operationId,recipientId:"iwxa.atlas",
+    reference:source,object:source});
+   const receipt=await host.recipient.receipt(preview.operationId);
+   return {status:"OWNER_READBACK_CONFIRMED",operationId:preview.operationId,
+    recipientId:"iwxa.atlas",resultRef:receipt.resultRef,reference:source};
+  }
  };
- const host=createAtlasT3OriginalHostPorts(owners);
+ host=createAtlasT3OriginalHostPorts(owners);
  const issued=await host.issueSelectedWork({projectId:p.id,workId:w.id});
  assert.deepEqual(issued.workRef,ref);
  assert.equal(issued.taskId,"TASK:external-1");
  assert.equal(agentWrites,1);
- const preview=await host.recipient.inspect({reference:source,recipientId:"iwxa.atlas"});
- assert.equal(preview.status,"READY");
- await host.recipient.receive({operationId:preview.operationId,recipientId:"iwxa.atlas",
-  reference:source,object:source});
+ const result=await host.continueSelectedResult({projectId:p.id,workId:w.id});
+ assert.equal(result.status,"OWNER_READBACK_CONFIRMED");
+ assert.deepEqual(result.workRef,ref);
+ const preview={operationId:result.operationId};
  assert.equal(commits,1);
  assert.equal(snapshot.projects[0].decisions.length,1);
  assert.equal(snapshot.projects[0].items[0].state,"todo");
@@ -72,6 +83,16 @@ test("Embedded original owners use only Atlas native commands for Agent Task and
  assert.equal(commits,1);
  assert.equal(commands.filter(c=>c==="atlas_commit").length,1);
  assert.ok(commands.filter(c=>c==="atlas_open").length>=4);
+ const withoutD6=createAtlasT3OriginalHostPorts({...owners,
+  continueOriginalAcceptedResult:undefined});
+ assert.equal(withoutD6.continueSelectedResult,undefined);
+ const forged=createAtlasT3OriginalHostPorts({...owners,
+  continueOriginalAcceptedResult:async()=>({
+   status:"OWNER_READBACK_CONFIRMED",operationId:"atlas:t3:"+"0".repeat(64),
+   recipientId:"iwxa.atlas",resultRef:"atlas:decision:forged",reference:source
+  })});
+ await assert.rejects(forged.continueSelectedResult({projectId:p.id,workId:w.id}),
+  /ATLAS_T3_ORIGINAL_RESULT_READBACK_UNVERIFIED/);
 });
 test("Embedded T3 route never falls back when native Store, Agent or project authorization is absent",async()=>{
  assert.throws(()=>createAtlasT3OriginalHostPorts(),{code:"ATLAS_T3_U05_TRUSTED_HOST_REQUIRED"});
