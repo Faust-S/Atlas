@@ -14,6 +14,7 @@ on:
       - work/2026-11-12-atlas-0-7
       - work/2026-11-14-atlas-0-8
       - work/2026-11-15-atlas08-t3-project-work-result
+      - work/2026-11-16-atlas-0-9-t3
     paths:
       - 'src/**'
       - 'tests/**'
@@ -45,7 +46,7 @@ jobs:
       - name: Install pinned desktop frontend
         working-directory: desktop
         run: npm ci --no-audit --no-fund
-      - name: Existing Atlas and new 0.3 regression suite
+      - name: Atlas 0.9 with original T3 and project regression suite
         run: npm test
       - name: Independently read Atlas IWXA 1.0 ZIP carrier with Python
         run: node tests/iwxa-python-carrier.mjs
