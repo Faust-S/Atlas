@@ -70,7 +70,7 @@ jobs:
   person-windows-compile:
     if: github.ref_name == 'work/2026-11-10-atlas-person-license-consumer'
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 55
     permissions:
       contents: read
     steps:
@@ -96,4 +96,64 @@ jobs:
         shell: pwsh
         run: |
           if (Test-Path desktop/src-tauri/private-t3) { throw 'ATLAS_PERSON_PRIVATE_T3_IN_PUBLIC_CI' }
+          if (Test-Path desktop/src-tauri/target/release/t3) { throw 'ATLAS_PERSON_PRIVATE_RESOURCE_IN_PUBLIC_CI' }
           Write-Host 'ATLAS_PERSON_PUBLIC_TRANSPORT_ONLY_PASS'
+      # Only the PUBLIC, unlicensed Atlas edition is installed here.
+      # ORIGINAL private T3 signing, trust and signed PERSON intake remain
+      # restricted to qualification/person-publisher-native-local.ps1 on an
+      # isolated Windows profile. Never substitute this GUI test for that gate.
+      - name: Build actual public Atlas Tauri EXE for Windows GUI qualification
+        working-directory: desktop
+        shell: pwsh
+        run: |
+          npm run desktop:build -- --no-bundle
+          if ($LASTEXITCODE -ne 0) { throw 'ATLAS_PERSON_PUBLIC_TAURI_EXE_BUILD_FAILED' }
+          if (!(Test-Path 'src-tauri/target/release/iwxa-atlas-desktop.exe')) {
+            throw 'ATLAS_PERSON_PUBLIC_TAURI_EXE_MISSING'
+          }
+      - name: Checkout original public Setup Core at exact approved revision
+        uses: actions/checkout@v4
+        with:
+          repository: Faust-S/Center
+          ref: 6603a11764ff86853e5abf4d209d55f79fddd8b1
+          path: setup-core-source
+          persist-credentials: false
+      - name: Install and verify real public Atlas via original IWXA Setup Core
+        shell: pwsh
+        timeout-minutes: 9
+        run: |
+          $pin = (& git -C setup-core-source rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or $pin -ne '6603a11764ff86853e5abf4d209d55f79fddd8b1') {
+            throw 'ATLAS_PERSON_PUBLIC_SETUP_CORE_SOURCE_PIN_MISMATCH'
+          }
+          if (Test-Path 'desktop/src-tauri/target/release/t3') {
+            throw 'ATLAS_PERSON_PRIVATE_RESOURCE_IN_PUBLIC_INSTALL'
+          }
+          ./desktop/installer/build-setup-core.ps1 `
+            -SetupCoreRoot 'setup-core-source' `
+            -Output 'artifacts/IWXA-Atlas-0.6.0-dev.1-PUBLIC-qualification.exe' `
+            -InstallForQualification
+          if ($LASTEXITCODE -ne 0) { throw 'ATLAS_PERSON_PUBLIC_SETUP_CORE_INSTALL_FAILED' }
+          Write-Host 'ATLAS_PERSON_PUBLIC_SETUP_CORE_INSTALLED_NO_PRIVATE_T3_PASS'
+      - name: Qualify actual installed public Atlas GUI save and cold restart
+        shell: pwsh
+        timeout-minutes: 12
+        run: |
+          python -m pip install pywinauto==0.6.9 pillow==11.3.0
+          if ($LASTEXITCODE -ne 0) { throw 'ATLAS_PERSON_PUBLIC_UIA_DEPENDENCIES_FAILED' }
+          python -m py_compile desktop/tests/installed-atlas06-connect.py
+          if ($LASTEXITCODE -ne 0) { throw 'ATLAS_PERSON_PUBLIC_UIA_SYNTAX_FAILED' }
+          python desktop/tests/installed-atlas06-connect.py
+          if ($LASTEXITCODE -ne 0) { throw 'ATLAS_PERSON_PUBLIC_INSTALLED_GUI_FAILED' }
+          Write-Host 'ATLAS_PERSON_PUBLIC_INSTALLED_GUI_PASS_NO_PRIVATE_T3'
+      - name: Retain public installed Atlas qualification candidate and GUI evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas-person-public-installed-gui-no-private-t3
+          path: |
+            artifacts/IWXA-Atlas-0.6.0-dev.1-PUBLIC-qualification.exe
+            artifacts/IWXA-Atlas-0.6.0-dev.1-PUBLIC-qualification.exe.sha256
+            desktop/tests/visual-evidence/atlas06-connect-*.png
+          if-no-files-found: ignore
+          retention-days: 3
