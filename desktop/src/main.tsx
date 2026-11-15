@@ -31,7 +31,7 @@ import {repoName} from "../../src/github-public.mjs";
 import {applyPublicProjectPreview} from "../../src/project-onboarding.mjs";
 import {prepareImportedSnapshot} from "./import-snapshot.mjs";
 import {buildIwxaPortfolio,readIwxaPortfolio,toBase64,fromBase64} from "./iwxa-portfolio.mjs";
-import {commitWithReadback,readSavedSnapshotForReference} from "./native-save.mjs";
+import {commitWithReadback,readSavedSnapshotForReference,readExternalAtlasUpdate} from "./native-save.mjs";
 import {projectHistoryRows} from "./history-view.mjs";
 import {sortWorkRows,firstSortedMatchingWorkId,deadlineFocusRows,filterWorkRowsByObservation} from "./work-sorting.mjs";
 import {createAtlasSavedRef} from "../../src/project-host-port.mjs";
@@ -352,6 +352,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const [selectedHistory,setSelectedHistory]=useState<HistoryEntry|null>(null);
  const [pendingImport,setPendingImport]=useState<ImportPreview|null>(null);
  const [savedRefPreview,setSavedRefPreview]=useState<SavedRefPreview|null>(null);
+ const [t3AgentTask,setT3AgentTask]=useState<{projectId:string;workId:string;taskId:string}|null>(null);
  const savedRefOpenRef=useRef(false);savedRefOpenRef.current=savedRefPreview!==null;
  const savedVersionsOpenRef=useRef(false);savedVersionsOpenRef.current=savedVersions!==null;
  const pendingImportOpenRef=useRef(false);pendingImportOpenRef.current=pendingImport!==null;
@@ -667,6 +668,82 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   }
   issue(Error("Открытая форма содержит неприменённые данные. Примените её (Ctrl+Enter) или нажмите «Отмена» перед переходом."));
   return false;
+ };
+ // An installed T3/Agent Host owns context, Task creation and readback.
+ // The Atlas UI supplies ONLY the exact saved work selection, never a grant.
+ const issueAtlasAgentTask=async(projectId:string,workId:string)=>{
+  if(!host?.t3?.issueSelectedWork){
+   issue(Error("Подключённый оригинальный Agent пока недоступен."));return;
+  }
+  if(!ready||busyRef.current||dirtyRef.current||!persisted||
+     editorOpenRef.current||pendingImportOpenRef.current||
+     savedVersionsOpenRef.current||savedRefOpenRef.current){
+   issue(Error("Сохраните проект и закройте формы перед поручением Agent."));return;
+  }
+  const started=latestSnapshot.current,expectedGeneration=generation;
+  busyRef.current=true;setBusy(true);
+  try{
+   const actual=await readSavedSnapshotForReference({invoke,
+    expectedGeneration,snapshot:started,signature:snapshotText,
+    readValidated:(raw:Atlas)=>deserialize(JSON.stringify(raw))});
+   const ref=createAtlasSavedRef(actual,{projectId,workId},{persisted:true,dirty:false});
+   if(latestSnapshot.current!==started||dirtyRef.current||editorOpenRef.current)
+    throw Error("Изменения в Atlas во время подготовки поручения. Agent не запускался.");
+   const received=await host.t3.issueSelectedWork({projectId,workId});
+   if(received?.workRef?.projectId!==ref.projectId||
+      received?.workRef?.workId!==ref.workId||
+      received?.workRef?.revision!==ref.revision||
+      typeof received?.taskId!=="string"||
+      !/^[A-Za-z0-9][A-Za-z0-9._:/@-]{0,159}$/.test(received.taskId))
+    throw Error("Ответ Agent не подтверждает исходную работу. Не повторяйте поручение без проверки Task в Agent.");
+   setT3AgentTask({projectId,workId,taskId:received.taskId});
+   const now=await invoke<OpenResult>("atlas_open");
+   if(now.needsConfirmation||now.generation!==expectedGeneration||
+      latestSnapshot.current!==started||dirtyRef.current){
+    setMessage("Task "+received.taskId+" найден у Agent, но Atlas изменился. Перечитайте проект перед следующими действиями.");
+   }else{
+    setMessage("Agent сохранил Task "+received.taskId+". Исходная работа не менялась. Ожидайте принятый Result, затем перечитайте Atlas.");
+   }
+   setError("");
+  }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
+ };
+ // Another product may have written the native Atlas head by an authorized T3
+ // route. Explicit native reread only, never an implicit overwrite of a draft.
+ const rereadAtlasFromNative=async()=>{
+  if(!ready||busyRef.current||dirtyRef.current||editorOpenRef.current||
+     pendingImportOpenRef.current||savedVersionsOpenRef.current||
+     savedRefOpenRef.current||!persisted){
+   issue(Error("Сначала сохраните черновик и закройте формы, затем перечитайте проект."));return;
+  }
+  const started=latestSnapshot.current,expectedGeneration=generation;
+  const unchanged=()=>{
+   if(latestSnapshot.current!==started||dirtyRef.current||
+      editorOpenRef.current||pendingImportOpenRef.current||
+      savedVersionsOpenRef.current||savedRefOpenRef.current)
+    throw Error("Черновик или форма изменились во время чтения. Данные Atlas не заменены.");
+  };
+  busyRef.current=true;setBusy(true);
+  try{
+   const result=await readExternalAtlasUpdate({
+    invoke,expectedGeneration,snapshot:started,signature:snapshotText,
+    readValidated:(raw:Atlas)=>deserialize(JSON.stringify(raw)),
+    assertUnchanged:unchanged
+   });
+   if(result.status==="UNCHANGED"){
+    setMessage("Сохранённый портфель не изменился.");
+   }else{
+    const checked=result.snapshot;
+    unchanged();
+    latestSnapshot.current=checked;
+    saved.current=snapshotText(checked);
+    setData(checked);setGeneration(result.generation);
+    if(active&&!checked.projects.some((p:any)=>p.id===active))setActive(null);
+    setRecentWorkId(null);setRecentPlanBefore(null);
+    workNavigationContext.current=null;
+    setMessage("Перечитана новая сохранённая редакция Atlas. Ссылки на Agent Result показаны у работ; права проверяются отдельно через T3.");
+   }
+   setError("");
+  }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
  };
  useEffect(()=>{
   if(!native){setError("Откройте установленное приложение Atlas в отдельном окне Windows, чтобы работать с проектами.");return}
@@ -1898,7 +1975,12 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      </section>
     </>}
     {tab==="work"&&<section className="surface atlas-work-surface">
-     <div className="section-heading"><div><h2>Работы проекта</h2><p>Изменения отражаются в доске, графике и зависимостях.</p></div>
+     <div className="section-heading"><div><h2>Работы проекта</h2><p>Изменения отражаются в доске, графике и зависимостях.
+      {" "}<button type="button" className="text-link"
+       disabled={busy||dirty||!!editor||!persisted}
+       onClick={()=>void rereadAtlasFromNative()}
+       title="Прочитать действующий Atlas Store без изменения своего черновика">
+       Перечитать сохранённое</button></p></div>
       <div className="button-row"><Action onClick={()=>openEditor("item")} primary title="Ctrl+Shift+N">＋ Работа</Action><Action onClick={()=>openEditor("stage")}>＋ Этап</Action><Action onClick={()=>openEditor("dep")} title="Ctrl+Shift+L">Связь работ</Action></div></div>
      {recentWork&&<div className="atlas-work-created"
       aria-label={recentWorkKind==="dependency"?"Изменение зависимостей работы":
@@ -2145,6 +2227,10 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
         </small>}
         {w.state==="done"&&(w.targetIds||[]).length>0&&<small className="atlas-work-evidence-note">
          Завершение работы заявлено; факт результата вносится отдельно.</small>}
+        {t3AgentTask?.projectId===project.id&&t3AgentTask.workId===w.id&&
+         <small className="atlas-work-evidence-note">
+          Task {t3AgentTask.taskId} сохранён у Agent. Результат ещё не принят в Atlas.
+         </small>}
         {(t3WorkLinks.get(w.id)||[]).slice(-2).map((link:any)=>
          <small key={link.decisionId} className="atlas-work-evidence-note">
           Agent Result {link.resultId}. Сохранена ссылка; доступ проверяется в T3.
@@ -2202,6 +2288,10 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
         <button type="button" className="action-button"
          aria-label={"Связи работы "+w.title}
          onClick={()=>openWorkGraph(w.id,workQuery,"work")}>Связи</button>
+        {host?.t3?.issueSelectedWork&&<Action
+         disabled={busy||dirty||!persisted||!!editor}
+         onClick={()=>void issueAtlasAgentTask(project.id,w.id)}
+         title="Только оригинальный Agent и сохранённый WorkRef">Поручить Agent</Action>}
         <Action disabled={busy||dirty||!persisted||!!editor} onClick={()=>showSavedReference(project.id,w.id)} title="Только сохранённая редакция">Ссылка</Action>
         <Action onClick={()=>removeWork(w.id)}>Удалить</Action></td></tr>)}</tbody></table></div>
      {project.items.length>0&&<p className="minor">Показано {Math.min(filteredWork.length,workLimit)} из {filteredWork.length} работ по фильтру; всего в проекте: {project.items.length}.</p>}
