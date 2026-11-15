@@ -88,13 +88,6 @@ jobs:
           python -m py_compile desktop/tests/installed-atlas08-corrections.py
           if ($LASTEXITCODE -ne 0) { throw 'ATLAS08_NATIVE_WITNESS_SYNTAX_FAILED' }
 
-      - name: Exercise installed portfolio, two work changes, explicit Save and cold restart
-        shell: pwsh
-        timeout-minutes: 11
-        run: |
-          python desktop/tests/installed-atlas08-corrections.py
-          if ($LASTEXITCODE -ne 0) { throw 'ATLAS08_WINDOWS_USER_ROUTE_FAILED' }
-
       - name: Verify exact development installer SHA-256
         shell: pwsh
         run: |
@@ -110,6 +103,13 @@ jobs:
             throw 'ATLAS08_INSTALLER_SHA256_MISMATCH'
           }
           Write-Host "ATLAS08_DEV_INSTALLER_SHA256_PASS $sha"
+
+      - name: Exercise installed portfolio, two work changes, explicit Save and cold restart
+        shell: pwsh
+        timeout-minutes: 11
+        run: |
+          python desktop/tests/installed-atlas08-corrections.py
+          if ($LASTEXITCODE -ne 0) { throw 'ATLAS08_WINDOWS_USER_ROUTE_FAILED' }
 
       - name: Keep Windows screen evidence on success or failure
         if: always()
