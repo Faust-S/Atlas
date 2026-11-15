@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - release/0.8
+      - work/2026-11-15-atlas08-t3-project-work-result
     paths:
       - '.github/workflows/atlas-0-8-windows.yml'
       - 'desktop/tests/installed-atlas08-corrections.py'
@@ -22,7 +23,7 @@ concurrency:
 
 jobs:
   installed-atlas08:
-    if: github.ref_name == 'release/0.8'
+    if: github.ref_name == 'release/0.8' || github.ref_name == 'work/2026-11-15-atlas08-t3-project-work-result'
     runs-on: windows-latest
     timeout-minutes: 40
     steps:
