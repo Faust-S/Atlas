@@ -133,3 +133,25 @@ test("T3 signed source selection refuses detached Host after preview, without na
   workRef:saved,context:{}}),{code:"ATLAS_T3_INSTALLED_HOST_DISPOSED"});
  assert.equal(dispatches,0);
 });
+
+test("Original D6 may commit before Host shutdown: report UNKNOWN, not a safe retry",async()=>{
+ const workRef={projectId:"p:9",workId:"w:9",revision:"4"};
+ const reference={workspace_id:"ws:installed",object_id:"result:committed",
+  schema_id:"iwxa.result",revision:1};
+ let active=true,dispatches=0;
+ const source=createAtlasT3OriginalSourceSelection({
+  isHostActive:()=>active,
+  originalAgent:{selectAcceptedForWork:async()=>({
+   acceptanceKind:"HUMAN_ACCEPTED_DRAFT",readOnly:true,
+   sourceObjectRef:reference,workRef})},
+  originalT3:{
+   preview:async()=>({status:"AVAILABLE",recipientId:"iwxa.atlas",reference}),
+   continueSelected:async()=>{dispatches++;active=false;
+    return {status:"OWNER_READBACK_CONFIRMED"};},
+   recover:async()=>({status:"OUTCOME_UNKNOWN"}),
+  },
+ });
+ await assert.rejects(source.continueOriginalAcceptedResult({workRef,context:{}}),
+  {code:"ATLAS_T3_INSTALLED_D6_OUTCOME_UNKNOWN"});
+ assert.equal(dispatches,1);
+});
