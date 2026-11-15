@@ -48,6 +48,12 @@ jobs:
           npm run desktop:build -- --no-bundle
           if ($LASTEXITCODE -ne 0) { throw 'ATLAS09_TAURI_BUILD_FAILED' }
 
+      - name: Confirm installed Atlas 0.9 packages original T3 Host in single dist
+        shell: pwsh
+        run: |
+          node tests/verify-atlas09-host-dist.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'ATLAS09_HOST_DIST_NOT_DELIVERED' }
+
       - name: Checkout pinned original IWXA Setup Core
         uses: actions/checkout@v4
         with:
