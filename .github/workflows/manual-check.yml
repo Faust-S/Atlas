@@ -19,6 +19,8 @@ on:
       - 'src/**'
       - 'tests/**'
       - 'desktop/src/**'
+      - 'desktop/vite.config.ts'
+      - 'desktop/index.html'
       - 'desktop/tests/**'
       - 'desktop/src-tauri/**'
       - 'desktop/installer/**'
