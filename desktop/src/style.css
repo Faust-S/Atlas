@@ -935,6 +935,13 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
  display:block;max-width:260px;overflow:hidden;text-overflow:ellipsis;
  white-space:nowrap;color:#245c96!important;font-weight:600;
 }
+.atlas-portfolio-work-results{
+ display:block;max-width:260px;margin-top:7px;font-size:12px;
+ white-space:normal;overflow-wrap:anywhere;line-height:1.4
+}
+.atlas-portfolio-work-results:focus-visible{
+ outline:2px solid #4c8afc;outline-offset:3px;border-radius:3px
+}
 
 /* One matching project remains actionable without scrolling to the table. */
 .atlas-portfolio-quick-hit{
