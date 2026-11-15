@@ -56,6 +56,17 @@ const decisionRecord=(d)=>{
   return {...row,sourceObjectRef:ref};
  }catch{return null;}
 };
+// Pure UI projection only: a stored Atlas Decision is not proof that the
+// current Agent/Exchange permission remains valid. Verification occurs only
+// via the original T3/Atlas Host ports at receipt/readback time.
+export function atlasT3DecisionSummary(text){
+ if(typeof text!=="string"||!text.startsWith(PREFIX))return null;
+ const record=decisionRecord({text});
+ if(!record)return "Повреждена запись связи Atlas с T3. Требуется проверка.";
+ return "Связь с результатом Agent: работа "+record.workId+
+  ", Task "+record.taskId+", Result "+record.resultId+
+  ". Источник и полномочия проверяются заново при использовании.";
+}
 async function hashOperation(ref,accepted){
  const input=JSON.stringify([ref.workspace_id,ref.object_id,ref.schema_id,
   ref.revision,accepted.work.projectId,accepted.work.workId,
