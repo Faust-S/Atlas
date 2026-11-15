@@ -292,6 +292,11 @@ test("The Atlas work UI offers signed D6 Result continuation only via installed 
  assert.ok(ui.includes('result.status==="OWNER_READBACK_CONFIRMED"'));
  assert.ok(ui.includes("Не повторяйте применение"));
  assert.ok(ui.includes("Получить Result</Action>"));
+ assert.ok(ui.includes("const recoverAtlasAgentResult=async(projectId:string,workId:string)"));
+ assert.ok(ui.includes("host?.t3?.recoverSelectedResult&&<Action"));
+ assert.ok(ui.includes("Проверить Result</Action>"));
+ assert.ok(ui.includes("не требует старой генерации")===false);
  assert.ok(host.includes("continueSelectedResult:"));
+ assert.ok(host.includes("recoverSelectedResult:"));
  assert.ok(ui.includes("readSavedSnapshotForReference({invoke,"));
 });
