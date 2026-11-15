@@ -231,3 +231,55 @@ test("Original accepted Result appears on its exact WorkRef, not on unrelated At
  assert.match(ui,/Agent Result \{link\.resultId\}\. Сохранена ссылка; доступ проверяется в T3/);
  assert.match(ui,/Ещё \{\(t3WorkLinks\.get\(w\.id\)\|\|\[\]\)\.length-2\} ссылок в истории/);
 });
+
+test("Lost Agent Task ACK is recovered from original durable Task, never blindly issued again",async()=>{
+ const f=fixture();let writes=0,found=false;
+ const opts={
+  readSaved:f.readSaved,isHostActive:()=>true,
+  authorizeProjectRead:async()=>true,
+  findOriginalAgentTask:async({workRef})=>({
+   status:found?"PERSISTED":"NOT_FOUND_CONFIRMED",
+   ...(found?{taskId:"TASK:durable-001"}:{}),
+   projectId:workRef.projectId,workId:workRef.workId,
+   sourceRevision:workRef.revision
+  }),
+  issueOriginalAgentTask:async()=>{
+   writes++;found=true;throw Error("Native Agent reply lost after its commit");
+  },
+  readOriginalAgentTask:async taskId=>({
+   status:"PERSISTED",taskId,projectId:f.workRef.projectId,
+   workId:f.workRef.workId,sourceRevision:f.workRef.revision
+  })
+ };
+ const old=createAtlasT3AgentTaskSelection(opts);
+ await assert.rejects(old.issue(f.workRef.projectId,f.workRef.workId,
+  {workspaceId:"signed:agent"}),{code:"ATLAS_T3_AGENT_TASK_OUTCOME_UNKNOWN"});
+ assert.equal(writes,1);
+ const recovered=await old.issue(f.workRef.projectId,f.workRef.workId,
+  {workspaceId:"signed:agent"});
+ assert.equal(recovered.taskId,"TASK:durable-001");
+ const cold=createAtlasT3AgentTaskSelection(opts);
+ assert.equal((await cold.issue(f.workRef.projectId,f.workRef.workId,
+  {workspaceId:"signed:agent"})).taskId,"TASK:durable-001");
+ assert.equal(writes,1);
+});
+test("After unknown Agent issuance, a stale NOT_FOUND owner reply cannot dispatch a second Task",async()=>{
+ const f=fixture();let writes=0;
+ const port=createAtlasT3AgentTaskSelection({
+  readSaved:f.readSaved,isHostActive:()=>true,
+  authorizeProjectRead:async()=>true,
+  findOriginalAgentTask:async({workRef})=>({
+   status:"NOT_FOUND_CONFIRMED",projectId:workRef.projectId,
+   workId:workRef.workId,sourceRevision:workRef.revision
+  }),
+  issueOriginalAgentTask:async()=>{
+   writes++;throw Error("ACK_LOST");
+  },
+  readOriginalAgentTask:async()=>null
+ });
+ await assert.rejects(port.issue(f.workRef.projectId,f.workRef.workId,
+  {workspaceId:"agent"}),{code:"ATLAS_T3_AGENT_TASK_OUTCOME_UNKNOWN"});
+ await assert.rejects(port.issue(f.workRef.projectId,f.workRef.workId,
+  {workspaceId:"agent"}),{code:"ATLAS_T3_AGENT_TASK_OUTCOME_UNKNOWN"});
+ assert.equal(writes,1);
+});
