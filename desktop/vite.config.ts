@@ -10,7 +10,10 @@ export default defineConfig({
   // standalone index.html; the trusted owner explicitly imports/mounts it.
   build: {
     outDir: resolve(desktopRoot,"dist"),emptyOutDir: true,manifest:true,
-    rollupOptions:{input:{
+    // Preserve the public mounted-Host exports of the secondary JS entry.
+    // Without a strict entry signature Rollup may eliminate these exports,
+    // leaving an asset that exists but cannot be imported by the T3 owner.
+    rollupOptions:{preserveEntrySignatures:"strict",input:{
       desktop:resolve(desktopRoot,"index.html"),
       installedT3Host:resolve(desktopRoot,"src/atlas-react-surface.tsx")
     }}
