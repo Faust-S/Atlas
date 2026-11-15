@@ -283,3 +283,15 @@ test("After unknown Agent issuance, a stale NOT_FOUND owner reply cannot dispatc
   {workspaceId:"agent"}),{code:"ATLAS_T3_AGENT_TASK_OUTCOME_UNKNOWN"});
  assert.equal(writes,1);
 });
+
+test("The Atlas work UI offers signed D6 Result continuation only via installed Host",()=>{
+ const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ const host=readFileSync(new URL("../desktop/src/embedded-host.ts",import.meta.url),"utf8");
+ assert.ok(ui.includes("host?.t3?.continueSelectedResult&&<Action"));
+ assert.ok(ui.includes("const receiveAtlasAgentResult=async(projectId:string,workId:string)"));
+ assert.ok(ui.includes('result.status==="OWNER_READBACK_CONFIRMED"'));
+ assert.ok(ui.includes("Не повторяйте применение"));
+ assert.ok(ui.includes("Получить Result</Action>"));
+ assert.ok(host.includes("continueSelectedResult:"));
+ assert.ok(ui.includes("readSavedSnapshotForReference({invoke,"));
+});
