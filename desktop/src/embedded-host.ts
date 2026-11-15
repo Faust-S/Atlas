@@ -22,10 +22,19 @@ export interface AtlasT3SelectedResultRoute {
    workRef:{projectId:string;workId:string;revision:string};
    operationId?:string;resultRef?:string}>;
 }
+export interface AtlasT3RecoveryRoute {
+ // Read-only original D6 recover for an Agent Result already selected by
+ // its owner. The Result WorkRef may predate a committed Atlas Decision.
+ recoverSelectedResult:(selection:{projectId:string;workId:string})=>
+  Promise<{status:"OWNER_READBACK_CONFIRMED"|"OUTCOME_UNKNOWN"|
+   "OPERATION_IN_PROGRESS";
+   workRef:{projectId:string;workId:string;revision:string};
+   operationId?:string;resultRef?:string}>;
+}
 export interface AtlasEmbeddedHost {
  invoke:<T>(command:AtlasHostCommand,args?:AtlasHostArgs)=>Promise<T>;
  authorizeCommand:(command:AtlasHostCommand,args?:AtlasHostArgs)=>Promise<boolean>|boolean;
- t3?:Partial<AtlasT3SelectedTaskRoute&AtlasT3SelectedResultRoute>;
+ t3?:Partial<AtlasT3SelectedTaskRoute&AtlasT3SelectedResultRoute&AtlasT3RecoveryRoute>;
  // Optional original owner routes are absent in the standalone product.
  assetUrl?:string; // Host-served Atlas logo; standalone keeps its existing public asset
  onStateChange?:(value:{ready:boolean;dirty:boolean;formOpen:boolean;busy:boolean;revision:string;generation:string})=>void;
