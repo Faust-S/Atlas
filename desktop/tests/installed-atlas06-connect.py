@@ -293,7 +293,8 @@ def qualify_person_unbundled_denial():
     wait_button("Сохранить")
     assert not (STORE/"head.json").exists(), "Draft unexpectedly persisted before Save"
     click_button("Сохранить")
-    wait_text("ATLAS_PERSON_T3_COMPONENT_NOT_BUNDLED",45)
+    wait_text("В эту установку Atlas ещё не включён проверяющий компонент T3.",45)
+    wait_text("ATLAS_PERSON_T3_COMPONENT_NOT_BUNDLED",10)
     assert not (STORE/"head.json").exists(), "Denied licensed write created native head"
     screenshot("person-unbundled-native-denial")
     print("ATLAS_PERSON_UNBUNDLED_NATIVE_WORKSPACE_WRITE_DENIED_PASS",flush=True)

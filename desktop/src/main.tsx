@@ -29,7 +29,7 @@ import {projectHistoryRows} from "./history-view.mjs";
 import {sortWorkRows,filterWorkRowsByObservation} from "./work-sorting.mjs";
 import {createAtlasSavedRef} from "../../src/project-host-port.mjs";
 import {invokeAtlasHost,type AtlasEmbeddedHost} from "./embedded-host";
-import {AtlasPersonLicense} from "./AtlasPersonLicense";
+import {AtlasPersonLicense,explainAtlasPersonNativeError} from "./AtlasPersonLicense";
 
 type Atlas = any;
 type HistoryEntry = {generation:string;revision:number;projects:number};
@@ -328,7 +328,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   return sortWorkRows(filterWorkRowsByObservation(matching,findingsByWork,workObservationFilter),workSort);
  },[project,workFilter,workQuery,workSort,workTargetFilter,workObservationFilter,findingsByWork]);
  const mutate=(next:Atlas,notice:string)=>{setSavedRefPreview(null);latestSnapshot.current=next;setData(next);setMessage(notice);setError("");};
- const issue=(e:unknown)=>{setError(deepFreezeError(e));setMessage("");};
+ const issue=(e:unknown)=>{setError(explainAtlasPersonNativeError(deepFreezeError(e)));setMessage("");};
  const showSavedReference=async(projectId:string,workId?:string)=>{
   if(busyRef.current||!ready||!requireClosedForm())return;
   const startedWith=latestSnapshot.current,expectedGeneration=generation;

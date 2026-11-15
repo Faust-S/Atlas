@@ -46,6 +46,14 @@ test('PERSON consent and public trust remain distinct from archive import',()=>{
  assert.match(main,/!embedded&&<AtlasPersonLicense enabled=\{native\}/);
  assert.doesNotMatch(ui,/localStorage|sessionStorage|privateKey|createSigner/);
 });
+test('signed PERSON native refusals are explained at the actual Save boundary',()=>{
+ assert.match(ui,/export function explainAtlasPersonNativeError/);
+ assert.match(ui,/PERSON_ERROR_MESSAGES\[raw\]/);
+ assert.match(ui,/ATLAS_PERSON_T3_COMPONENT_NOT_BUNDLED/);
+ assert.match(ui,/ATLAS_PERSON_WORKSPACE_LICENSE_REQUIRED/);
+ assert.match(main,/setError\(explainAtlasPersonNativeError\(deepFreezeError\(e\)\)\)/);
+});
+
 test('public Atlas stores no new T3 keys or pinned production issuer trust',()=>{
  assert.equal(config.identifier,'ru.iwxa.atlas');
  assert.equal(config.bundle.active,false);

@@ -16,8 +16,7 @@ type WorkspaceAccess={operation:"PERSON_AUTHORIZE";productId:string;featureId:st
   productionActivation:false;activeSeats:0};
 
 const code=(error:unknown)=>error instanceof Error?error.message:String(error);
-function describe(raw:string){
- const matches:Record<string,string>={
+const PERSON_ERROR_MESSAGES:Record<string,string>={
   ATLAS_PERSON_T3_COMPONENT_NOT_BUNDLED:"В эту установку Atlas ещё не включён проверяющий компонент T3.",
   ATLAS_PERSON_WINDOWS_REQUIRED:"Проверка персональных лицензий доступна в установленной версии для Windows.",
   PERSON_RECIPIENT_NOT_ENROLLED:"Этот компьютер ещё не привязан к получателю лицензии.",
@@ -32,8 +31,15 @@ function describe(raw:string){
   PERSON_LICENSE_PRODUCT_MISMATCH:"Лицензия выдана для другой программы.",
   PERSON_RECIPIENT_ALREADY_ENROLLED:"Получатель уже привязан к текущему профилю Windows.",
   PERSON_RECIPIENT_WINDOWS_BINDING_INVALID:"Не удалось подтвердить привязку к текущему компьютеру."
- };
- return matches[raw]??"Не удалось выполнить проверку: "+raw;
+};
+// The same original T3 refusal must be understandable during a native Save
+// and inside the license dialog. No UI code grants a WORKSPACE capability.
+export function explainAtlasPersonNativeError(raw:string){
+ const detail=PERSON_ERROR_MESSAGES[raw];
+ return detail?detail+" ("+raw+")":raw;
+}
+function describe(raw:string){
+ return PERSON_ERROR_MESSAGES[raw]??"Не удалось выполнить проверку: "+raw;
 }
 const status=(license:License)=>{
  if(license.status==="REVOKED")return "Отозвана";
