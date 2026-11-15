@@ -213,10 +213,13 @@ export function createAtlasT3NativeRecipient({
 // owner. Atlas does not create or sign a Task. The original Agent owner issues
 // the actual Task only after independently checking its own rights/Workspace.
 export function createAtlasT3AgentTaskSelection({
- readSaved,authorizeProjectRead,issueOriginalAgentTask,isHostActive
+ readSaved,authorizeProjectRead,issueOriginalAgentTask,
+ readOriginalAgentTask,isHostActive
 }={}){
- if([readSaved,authorizeProjectRead,issueOriginalAgentTask,isHostActive]
+ if([readSaved,authorizeProjectRead,issueOriginalAgentTask,
+     readOriginalAgentTask,isHostActive]
    .some(fn=>typeof fn!=="function"))fail("ATLAS_T3_AGENT_HOST_REQUIRED");
+ const issuing=new Set(); // one native owner dispatch per live host + WorkRef
  return Object.freeze({async issue(projectId,workId,agentContext){
   if(isHostActive()!==true)fail("ATLAS_T3_HOST_DISPOSED");
   const saved=await readSaved();
@@ -228,13 +231,28 @@ export function createAtlasT3AgentTaskSelection({
    purpose:"atlas.work.task.selection"});
   if(isHostActive()!==true||permitted!==true)
    fail("ATLAS_T3_PROJECT_READ_NOT_AUTHORIZED");
-  const issued=await issueOriginalAgentTask({workRef:ref,context:agentContext});
-  if(isHostActive()!==true||!issued||!ID.test(issued.taskId??"")||
-     issued.projectId!==ref.projectId||
-     issued.workId!==ref.workId||
-     String(issued.sourceRevision)!==ref.revision)
-   fail("ATLAS_T3_AGENT_TASK_ISSUANCE_UNVERIFIED");
-  // The only next step is original Agent Task/Result and original T3 Exchange.
-  return Object.freeze({workRef:ref,taskId:issued.taskId});
+  const key=JSON.stringify(ref);
+  if(issuing.has(key))fail("ATLAS_T3_AGENT_TASK_ISSUE_IN_PROGRESS");
+  issuing.add(key);
+  try{
+   const issued=await issueOriginalAgentTask({workRef:ref,context:agentContext});
+   if(isHostActive()!==true||!issued||!ID.test(issued.taskId??"")||
+      issued.projectId!==ref.projectId||
+      issued.workId!==ref.workId||
+      String(issued.sourceRevision)!==ref.revision)
+    fail("ATLAS_T3_AGENT_TASK_ISSUANCE_UNVERIFIED");
+   const readback=await readOriginalAgentTask(issued.taskId,agentContext);
+   if(isHostActive()!==true||readback?.status!=="PERSISTED"||
+      readback.taskId!==issued.taskId||
+      readback.projectId!==ref.projectId||readback.workId!==ref.workId||
+      String(readback.sourceRevision)!==ref.revision)
+    fail("ATLAS_T3_AGENT_TASK_READBACK_UNVERIFIED");
+   const after=await readSaved();
+   if(isHostActive()!==true||after?.generation!==saved.generation||
+      String(after?.snapshot?.revision)!==ref.revision)
+    fail("ATLAS_T3_WORK_CHANGED_DURING_TASK_ISSUE");
+   // No new Task is created in Atlas; Agent retains its native Task owner.
+   return Object.freeze({workRef:ref,taskId:issued.taskId});
+  }finally{issuing.delete(key);}
  }});
 }
