@@ -12,6 +12,7 @@ import {buildPortfolioSearchIndex,filterPortfolioSearch,portfolioSearchReason,po
 import {realityOverview,workObservationIndex} from "../../src/reality-overview.mjs";
 import {responseState} from "../../src/response.mjs";
 import {scheduleProject,scheduleChangeSummary,scheduleDeadlineExplanations,criticalPathFocus,forecastDependencyRemoval,workDependencyOverview,filterWorkRowsByDependencies} from "../../src/planning.mjs";
+import {previewWorkScheduleEdit} from "../../src/work-schedule-preview.mjs";
 import {portfolioSchedule,projectedFinishLabel} from "../../src/portfolio-schedule.mjs";
 import {portfolioResources} from "../../src/portfolio-resources.mjs";
 import {planReviewQueue,planReviewAction,planProposalAction} from "../../src/plan-review.mjs";
@@ -134,9 +135,10 @@ function WorkDependencyHint({info,onOpenWork}:{info?:WorkLinkPreview|null;onOpen
   {later&&<span>{later}</span>}
  </div>;
 }
-function EditorPanel({editor,onSubmit,onCancel,onDirtyChange,busy}:{
+function EditorPanel({editor,onSubmit,onCancel,onDirtyChange,busy,project,plan}:{
  editor:Editor;onSubmit:(event:React.FormEvent<HTMLFormElement>)=>void;
- onCancel:()=>void;onDirtyChange:(changed:boolean)=>void;busy:boolean
+ onCancel:()=>void;onDirtyChange:(changed:boolean)=>void;busy:boolean;
+ project:Atlas|null;plan:any|null
 }){
  const [fields,setFields]=useState<Record<string,string>>({});
  const [workQuery,setWorkQuery]=useState("");
@@ -145,6 +147,14 @@ function EditorPanel({editor,onSubmit,onCancel,onDirtyChange,busy}:{
   filterWorkPickerOptions(searchableField.options||[],workQuery,
    fields[searchableField.name]??""):null,
   [searchableField,workQuery,fields]);
+ // CPM is recalculated only when the plan, selected work, duration or date
+ // changes. Typing in unrelated text fields never triggers this projection.
+ const workDraftPreview=useMemo(()=>{
+  if(!editor.action.startsWith("work:")||!project||!plan||
+     fields.estimateDays===undefined||fields.dueDate===undefined)return null;
+  return previewWorkScheduleEdit(project,editor.action.slice(5),
+   {estimateDays:fields.estimateDays,dueDate:fields.dueDate},plan);
+ },[editor.action,project,plan,fields.estimateDays,fields.dueDate]);
  useEffect(()=>{
   setFields(Object.fromEntries(editor.spec.fields.map(f=>[f.name,String(f.value??"")])));
   setWorkQuery("");
@@ -204,6 +214,51 @@ function EditorPanel({editor,onSubmit,onCancel,onDirtyChange,busy}:{
     }
    </label>)}
    </div>
+   {workDraftPreview?.kind==="changed"&&
+    <div className="atlas-work-draft-preview" role="status"
+     aria-label="Предварительный расчёт изменения работы">
+     <strong>Если применить эти значения</strong>
+     <p>План проекта: было {workDraftPreview.beforeDays} дн.,
+      станет {workDraftPreview.afterDays} дн.
+      {workDraftPreview.afterDays!==workDraftPreview.beforeDays?
+       " Сдвиг "+(workDraftPreview.afterDays>workDraftPreview.beforeDays?"+":"")+
+        (workDraftPreview.afterDays-workDraftPreview.beforeDays)+" дн.":""}
+     </p>
+     <p>Финиш выбранной работы: было {workDraftPreview.oldFinish||
+       "через "+workDraftPreview.oldFinishOffset+" дн. от начала"},
+      станет {workDraftPreview.newFinish||
+       "через "+workDraftPreview.newFinishOffset+" дн. от начала"}.</p>
+     <p>Затронуто работ: {workDraftPreview.affectedTotal}.
+      {workDraftPreview.delayedTotal>0?" Позже: "+workDraftPreview.delayedTotal+".":""}
+      {workDraftPreview.earlierTotal>0?" Раньше: "+workDraftPreview.earlierTotal+".":""}
+      {workDraftPreview.criticalChangedTotal>0?
+       " Изменение критического пути: "+workDraftPreview.criticalChangedTotal+".":""}
+     </p>
+     {workDraftPreview.oldDueDate!==workDraftPreview.dueDate&&
+      <p>Контрольный срок: было {workDraftPreview.oldDueDate||"не задан"},
+       станет {workDraftPreview.dueDate||"не задан"}.
+       {!workDraftPreview.dueDate?" Соблюдение снятого срока больше не проверяется.":""}</p>}
+     {workDraftPreview.willBeLate===true&&
+      <p className="atlas-schedule-warning">Расчётный финиш работы позже контрольного срока.</p>}
+     {workDraftPreview.willBeLate===null&&workDraftPreview.dueDate&&
+      <p className="minor">Без даты начала проекта нельзя проверить соблюдение календарного срока.</p>}
+     {workDraftPreview.examples.length>0&&
+      <details className="atlas-work-draft-details">
+       <summary>Изменения по работам ({workDraftPreview.affectedTotal})</summary>
+       <ul>{workDraftPreview.examples.map((row:any)=>
+        <li key={row.id}>{row.title}: {row.shiftDays!==0?
+         "сдвиг "+(row.shiftDays>0?"+":"")+row.shiftDays+" дн.":"без сдвига финиша"}
+         {row.dueDateChanged?", контрольный срок изменён":""}
+         {row.criticalChanged?", положение на критическом пути изменилось":""}
+        </li>)}</ul>
+       {workDraftPreview.affectedTotal>workDraftPreview.examples.length&&
+        <small>Показаны первые {workDraftPreview.examples.length} затронутых работ.</small>}
+      </details>}
+     <small>Предварительный расчёт по календарным дням, без выравнивания ресурсов.
+      Изменения ещё не применены к черновику и не сохранены на диск.</small>
+    </div>}
+   {workDraftPreview?.kind==="invalid"&&
+    <p className="atlas-work-draft-invalid" role="status">{workDraftPreview.reason}</p>}
    <div className="form-footer"><Action onClick={onCancel}>Отмена</Action><button className="action-button primary" disabled={busy} type="submit" title="Ctrl+Enter">{editor.action.startsWith("folder-work:")?"Добавить работу":"Применить к черновику"}</button></div>
   </form>
  </section>
@@ -2609,7 +2664,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   </main>
   {inspector&&<aside className={"inspector"+(editor?" atlas-inspector-editing":"")}>
    {editor?<EditorPanel key={editor.action} editor={editor} onSubmit={submit}
-    onCancel={cancelEditor} onDirtyChange={changed=>{editorDirtyRef.current=changed}} busy={busy}/>:
+    onCancel={cancelEditor} onDirtyChange={changed=>{editorDirtyRef.current=changed}}
+    busy={busy} project={project} plan={plan}/>:
    <section><div className="section-heading"><h2>Инспектор</h2><button className="icon-button" aria-label="Скрыть инспектор" onClick={()=>setInspector(false)}>×</button></div>
     <div className="inspector-block"><small>Текущий контекст</small><strong>{project?.name||"Портфель проектов"}</strong>
      <p>{project?.goal||"Выберите проект для работы с планом, доказательствами и изменениями."}</p></div>
