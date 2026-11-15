@@ -293,3 +293,58 @@ standalone Atlas без original T3 D6 она отсутствует.
 и native Tauri IPC. Реальная установленная связка и две холодные
 Windows-проверки ещё не подтвердили готовность; никакие
 `T3_READY` / `ATLAS_T3_INSTALLED_ACCEPTED` не присвоены.
+
+## Продолжение 16 ноября: безопасный read-only recovery оригинального D6
+
+**Рабочий код**: `63799d53053aee4c2eeae39aeebbc064fe0f935c`.
+**Оригинальный T3 D6 pinned**: `Faust-S/knowledge@724a199352e66faadee16ed0f71755c613bd501c`;
+исходный blob `native-result-continuation.mjs`:
+`76a4bd14a662bccc54ee815552f033c0be993c0b`.
+
+1. В `createAtlasT3OriginalHostPorts` появился **отдельный,
+   необязательный** `recoverOriginalAcceptedResult` только от
+   оригинального T3 D6 `recover()`. Он не вызывает `receive()`,
+   `atlas_commit`, Task issue или новый Exchange.
+2. Встроенная рабочая таблица показывает `Проверить Result`
+   только если установленный Host передал оригинальный
+   `recoverSelectedResult`. После неизвестного исхода `Получить Result`
+   предлагает проверку, а не повторное применение. В standalone
+   Atlas этой команды нет.
+3. Recovery читает текущую native редакцию для свежего
+   разрешения на выбранный Project/Work. **Исходный WorkRef Result
+   может иметь предыдущую ревизию**: это нормально после сохранения
+   Atlas Decision. Результат вновь связывается с exact
+   Project/Work через оригинальный Agent readback, Exchange,
+   native receipt/readback и JIT Atlas grant.
+4. Поддельная квитанция, отсутствие действующего read grant,
+   чужая WorkRef, отозванный подписанный T3 D1 доступ и
+   неуникальный/неопределённый owner result не разрешают запись
+   или заявленное подтверждение. При недоступной native
+   квитанции результат остаётся `OUTCOME_UNKNOWN`. Original D6
+   больше не превращает исходный signed отказ в обычный outage.
+5. Проверка не изменяет state `done`, сроки, источники,
+   dependencies и не создаёт второй журнал. Для отображения
+   подтверждённого Decision используется действующая команда
+   `Перечитать сохранённое` после явного закрытия черновика.
+
+**Исходная проверка**:
+[Actions №43761985806](https://github.com/Faust-S/Atlas/actions/runs/43761985806)
+на указанном кодовом SHA завершилась **SUCCESS**:
+`674/674` штатных Node PASS; original T3 D6 `1/1` PASS;
+независимое чтение `.iwxa`, Center interop, TypeScript/Vite PASS.
+В D6 source-кейсе проверены два холодных Host, временный
+receipt outage, восстановление и оригинальный signed D1 отказ.
+
+**Что ещё не принято**: фактический установленный Agent 0.6
+пока экспортирует выбранный accepted Result как локальный текст,
+а не как original signed `.iwxa` с полными исходными
+Task/Result/WorkRef для адресата `iwxa.atlas`. Также не
+подтверждены установленный Atlas+Agent/T3 IPC, Person entitlement,
+реальная независимая Exchange-проверка получателя и два
+Windows cold-open. Тестовые ответы внешних владельцев не
+являются этими подтверждениями.
+
+**Статус:** `SOURCE-INTEGRATION PASS`,
+`ATLAS_T3_INSTALLED=HOLD`, `T3_READY=false`.
+`release/0.8` и подписанный установщик `v0.8.0`
+не изменялись.
