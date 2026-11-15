@@ -29,6 +29,12 @@ test("Atlas 0.9 has its own installed Windows gate and cannot publish a release"
  assert.match(ci,/work\/2026-11-16-atlas-0-9-t3/);
  assert.match(ci,/IWXA-Atlas-0\.9\.0-dev\.1-Setup\.exe/);
  assert.match(ci,/installed-atlas08-corrections\.py/);
+ assert.match(ci,/python desktop\/tests\/installed-atlas09-qualification\.py/);
+ const windows=read("desktop/tests/installed-atlas09-qualification.py");
+ assert.match(windows,/route\.qualify\(\)/);
+ assert.match(windows,/0\.9\.0 \(разработка\)/);
+ assert.match(windows,/ATLAS09_INSTALLED_PRODUCT_VERSION_PASS/);
+ assert.match(windows,/ATLAS09_STANDALONE_NO_FAKE_T3_OWNER_PASS/);
  assert.match(ci,/ATLAS09_RC_INSTALLER_SHA256_PASS/);
  assert.match(ci,/atlas09-setup-core-development/);
  assert.doesNotMatch(ci,/gh release (?:create|edit|upload)/);
