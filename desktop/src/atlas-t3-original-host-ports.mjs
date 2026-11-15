@@ -54,8 +54,18 @@ export function createAtlasT3OriginalHostPorts({
       purpose:"atlas.work.result.selection"})!==true)
      throw Error("ATLAS_T3_PROJECT_READ_NOT_AUTHORIZED");
     if(isHostActive()!==true)throw Error("ATLAS_T3_HOST_DISPOSED");
-    const result=await continueOriginalAcceptedResult({workRef:selected,context});
-    if(isHostActive()!==true)throw Error("ATLAS_T3_HOST_DISPOSED");
+    let result;
+    try{result=await continueOriginalAcceptedResult({workRef:selected,context});}
+    catch(error){
+     // Original native write may have committed before its Host shut down.
+     // Preserve the selected SAVED WorkRef for UI read-only recovery.
+     if(["ATLAS_T3_INSTALLED_D6_OUTCOME_UNKNOWN",
+          "T3_D6_NATIVE_OUTCOME_UNKNOWN"].includes(error?.code))
+      return Object.freeze({status:"OUTCOME_UNKNOWN",workRef:selected});
+     throw error;
+    }
+    if(isHostActive()!==true)
+     return Object.freeze({status:"OUTCOME_UNKNOWN",workRef:selected});
     if(["USER_CANCELLED","OUTCOME_UNKNOWN","OPERATION_IN_PROGRESS"].includes(result?.status))
      return Object.freeze({status:result.status,workRef:selected});
     if(result?.status!=="OWNER_READBACK_CONFIRMED"||
