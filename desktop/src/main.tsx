@@ -37,6 +37,7 @@ import {sortWorkRows,firstSortedMatchingWorkId,deadlineFocusRows,filterWorkRowsB
 import {createAtlasSavedRef} from "../../src/project-host-port.mjs";
 import {atlasT3DecisionSummary,atlasT3RecordedWorkLinks}
  from "../../src/atlas-t3-native-recipient.mjs";
+import {findConfirmedAtlasT3Decision} from "../../src/atlas-t3-confirmed-projection.mjs";
 import {invokeAtlasHost,type AtlasEmbeddedHost} from "./embedded-host";
 
 // Show the same product version that was packaged in Tauri, without leaking
@@ -708,6 +709,38 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    setError("");
   }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
  };
+ // Once the ORIGINAL D6 confirms the receipt, display that exact
+ // Decision from the ORIGINAL Atlas native head. This is read-only:
+ // never merge a dirty draft or infer permission from a stored link.
+ const displayConfirmedAtlasResult=async({
+  projectId,workId,operationId,resultRef
+ }:{projectId:string;workId:string;operationId:string;resultRef:string})=>{
+  const started=latestSnapshot.current,expectedGeneration=generation;
+  const unchanged=()=>{
+   if(latestSnapshot.current!==started||dirtyRef.current||
+      editorOpenRef.current||pendingImportOpenRef.current||
+      savedVersionsOpenRef.current||savedRefOpenRef.current)
+    throw Error("ATLAS_T3_LOCAL_DRAFT_CHANGED");
+  };
+  const reread=await readExternalAtlasUpdate({
+   invoke,expectedGeneration,snapshot:started,signature:snapshotText,
+   readValidated:(raw:Atlas)=>deserialize(JSON.stringify(raw)),
+   assertUnchanged:unchanged
+  });
+  const link=findConfirmedAtlasT3Decision(reread.snapshot,{
+   projectId,workId,operationId,resultRef
+  });
+  unchanged();
+  if(reread.status==="UPDATED"){
+   latestSnapshot.current=reread.snapshot;
+   saved.current=snapshotText(reread.snapshot);
+   setData(reread.snapshot);setGeneration(reread.generation);
+   if(active&&!reread.snapshot.projects.some((p:any)=>p.id===active))setActive(null);
+   setRecentWorkId(null);setRecentPlanBefore(null);
+   workNavigationContext.current=null;
+  }
+  return Object.freeze({status:reread.status,link});
+ };
  // An original T3 D6 Host owns signed Result selection and Human consent.
  // Atlas provides only the exact saved Project/WorkRef.
  const receiveAtlasAgentResult=async(projectId:string,workId:string)=>{
@@ -739,7 +772,19 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     if(typeof result.operationId!=="string"||!/^atlas:t3:[0-9a-f]{64}$/.test(result.operationId)||
        typeof result.resultRef!=="string"||!result.resultRef.startsWith("atlas:decision:"))
      throw Error("T3 не подтвердил исходную квитанцию Atlas.");
-    setMessage("T3 подтвердил сохранение ссылки на принятый Agent Result. Нажмите «Перечитать сохранённое», чтобы увидеть её у работы. Выполнение работы не менялось.");
+    try{
+     const observed=await displayConfirmedAtlasResult({
+      projectId,workId,operationId:result.operationId,resultRef:result.resultRef
+     });
+     setMessage("Ссылка на Agent Result "+observed.link.resultId+
+      " подтверждена и "+(observed.status==="UPDATED"?"показана в сохранённом проекте.":"уже присутствует в проекте.")+
+      " Статус работы и зависимости не менялись.");
+     setError("");
+    }catch(readbackError){
+     setMessage("T3 подтвердил приём Result, но Atlas не смог показать сохранённую редакцию. Не повторяйте применение. Проверьте квитанцию и перечитайте проект.");
+     setError("Обновление Atlas: "+String(readbackError instanceof Error?readbackError.message:readbackError));
+    }
+    return;
    }else if(result.status==="USER_CANCELLED"){
     setMessage("Получение Result отменено. Проект не изменён.");
    }else if(result.status==="OUTCOME_UNKNOWN"||result.status==="OPERATION_IN_PROGRESS"){
@@ -780,7 +825,19 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     if(typeof result.operationId!=="string"||!/^atlas:t3:[0-9a-f]{64}$/.test(result.operationId)||
        typeof result.resultRef!=="string"||!result.resultRef.startsWith("atlas:decision:"))
      throw Error("Квитанция оригинального T3 не подтверждена.");
-    setMessage("Квитанция Agent Result подтверждена оригинальным T3 и сохранённым Atlas. Нажмите «Перечитать сохранённое», чтобы обновить работу. Статус выполнения не менялся.");
+    try{
+     const observed=await displayConfirmedAtlasResult({
+      projectId,workId,operationId:result.operationId,resultRef:result.resultRef
+     });
+     setMessage("Исходный T3 восстановил квитанцию Agent Result "+observed.link.resultId+
+      ". "+(observed.status==="UPDATED"?"Сохранённая редакция Atlas обновлена.":"Ссылка уже показана в проекте.")+
+      " Статус выполнения работы не менялся.");
+     setError("");
+    }catch(readbackError){
+     setMessage("Оригинальный T3 подтвердил квитанцию Result, но отображение Atlas не проверено. Не отправляйте Result повторно. Перечитайте сохранённое после проверки черновика.");
+     setError("Восстановление отображения: "+String(readbackError instanceof Error?readbackError.message:readbackError));
+    }
+    return;
    }else if(result.status==="OUTCOME_UNKNOWN"||result.status==="OPERATION_IN_PROGRESS"){
     setMessage("Квитанция Result пока не подтверждена. Повторно применять Result нельзя. Проверьте исходный Agent и оригинальный T3.");
    }else{
