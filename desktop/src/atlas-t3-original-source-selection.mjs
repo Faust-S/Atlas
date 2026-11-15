@@ -54,8 +54,18 @@ export function createAtlasT3OriginalSourceSelection({
     return {status:"OUTCOME_UNKNOWN"};
    if(preview.status!=="AVAILABLE")
     fail("ATLAS_T3_INSTALLED_ORIGINAL_D6_PREVIEW_INVALID");
-   const response=await originalT3.continueSelected(source);
-   live();
+   // After dispatch an original native Decision may already be durable.
+   // If this Host closes while D6 is applying, do not report a definite
+   // failure that might invite the user to send the Result a second time.
+   let response;
+   try{response=await originalT3.continueSelected(source);}
+   catch(error){
+    if(isHostActive()!==true)
+     fail("ATLAS_T3_INSTALLED_D6_OUTCOME_UNKNOWN");
+    throw error; // Original signed denial is not an ACK outage.
+   }
+   if(isHostActive()!==true)
+    fail("ATLAS_T3_INSTALLED_D6_OUTCOME_UNKNOWN");
    return response;
   },
   async recoverOriginalAcceptedResult({projectId,workId,context}){
