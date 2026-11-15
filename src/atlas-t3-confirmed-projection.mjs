@@ -15,7 +15,8 @@ const fail=()=>{
 export function findConfirmedAtlasT3Decision(snapshot,{
  projectId,workId,operationId,resultRef
 }={}){
- if(!ID.test(projectId)||!ID.test(workId)||
+ if(typeof projectId!=="string"||!ID.test(projectId)||
+    typeof workId!=="string"||!ID.test(workId)||
     typeof operationId!=="string"||!OPERATION.test(operationId)||
     typeof resultRef!=="string"||!resultRef.startsWith(PREFIX)||
     !ID.test(resultRef.slice(PREFIX.length)))fail();
