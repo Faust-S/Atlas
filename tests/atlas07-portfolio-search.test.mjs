@@ -202,7 +202,9 @@ test("A saved work source opens in Atlas and returns to exactly the filtered wor
  assert.match(ui,/aria-label=\{"Показать источник работы "\+w\.title\}/);
  assert.match(ui,/onClick=\{\(\)=>openLinkedSource\(w\.id,workQuery,"work"\)\}/);
  assert.match(ui,/const returnToLinkedWork=\(\)=>\{/);
- assert.match(ui,/setWorkQuery\(query\);\s*setWorkReturnId\(workId\);/);
+ assert.match(ui,/returnToWorkTable\(sourceJump\.workId,sourceJump\.query\)/);
+ assert.match(ui,/setWorkQuery\(context\.query\)/);
+ assert.match(ui,/setWorkReturnId\(workId\)/);
  assert.match(ui,/sourceJump\?\.origin==="work"&&<button type="button"/);
  assert.match(ui,/aria-label=\{"Вернуться к работе "\+sourceJumpContext!?\.title\}/);
  assert.match(css,/\.atlas-work-source-link\{/);
