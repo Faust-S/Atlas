@@ -26,6 +26,8 @@ test("Original T3 signed Result -> native Atlas decision -> cold double readback
   readSaved:async()=>({snapshot,generation}),
   isHostActive:()=>true,
   authorizeProjectRead:async()=>true,
+  findOriginalAgentTask:async({workRef})=>({status:"NOT_FOUND_CONFIRMED",
+   projectId:workRef.projectId,workId:workRef.workId,sourceRevision:workRef.revision}),
   issueOriginalAgentTask:async({workRef})=>({taskId:"TASK:original-1",
    projectId:workRef.projectId,workId:workRef.workId,sourceRevision:workRef.revision}),
   readOriginalAgentTask:async taskId=>({status:"PERSISTED",taskId,
