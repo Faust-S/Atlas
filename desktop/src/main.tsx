@@ -1140,8 +1140,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   const context=workNavigationContext.current;
   // A changed project revision must not revive obsolete impact or critical
   // filters. The work search is retained even when this context is stale.
-  const valid=context?.projectId===project.id&&context.workId===workId&&
-   context.revision===data.revision;
+  const valid=context!==null&&context.projectId===project.id&&
+   context.workId===workId&&context.revision===data.revision;
   view("work");
   if(valid&&context){
    setWorkQuery(context.query);setWorkFilter(context.filter);
