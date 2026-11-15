@@ -158,3 +158,75 @@ jobs:
             desktop/tests/visual-evidence/atlas06-connect-*.png
           if-no-files-found: ignore
           retention-days: 3
+
+  person-windows-unbundled-denial:
+    if: github.ref_name == 'work/2026-11-10-atlas-person-license-consumer'
+    runs-on: windows-latest
+    timeout-minutes: 55
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build actual PERSON-enforced Tauri EXE without private T3
+        working-directory: desktop
+        shell: pwsh
+        run: |
+          npm ci --no-audit --no-fund
+          if ($LASTEXITCODE -ne 0) { throw 'ATLAS_PERSON_NEGATIVE_NPM_FAILED' }
+          npm run desktop:build -- --no-bundle --features person-license-enforced
+          if ($LASTEXITCODE -ne 0) { throw 'ATLAS_PERSON_NEGATIVE_NATIVE_BUILD_FAILED' }
+          if (!(Test-Path 'src-tauri/target/release/iwxa-atlas-desktop.exe')) {
+            throw 'ATLAS_PERSON_NEGATIVE_NATIVE_EXE_MISSING'
+          }
+          if (Test-Path 'src-tauri/target/release/t3') {
+            throw 'ATLAS_PERSON_PRIVATE_T3_IN_PUBLIC_NEGATIVE_CI'
+          }
+      - name: Checkout exact original public Setup Core
+        uses: actions/checkout@v4
+        with:
+          repository: Faust-S/Center
+          ref: 6603a11764ff86853e5abf4d209d55f79fddd8b1
+          path: setup-core-source
+          persist-credentials: false
+      - name: Install feature-enforced Atlas without private Consumer
+        shell: pwsh
+        timeout-minutes: 9
+        run: |
+          $pin = (& git -C setup-core-source rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or $pin -ne '6603a11764ff86853e5abf4d209d55f79fddd8b1') {
+            throw 'ATLAS_PERSON_NEGATIVE_SETUP_CORE_PIN_MISMATCH'
+          }
+          if (Test-Path 'desktop/src-tauri/target/release/t3') {
+            throw 'ATLAS_PERSON_PRIVATE_T3_IN_PUBLIC_NEGATIVE_PACKAGE'
+          }
+          ./desktop/installer/build-setup-core.ps1 `
+            -SetupCoreRoot 'setup-core-source' `
+            -Output 'artifacts/IWXA-Atlas-0.6.0-dev.1-PERSON-NO-CONSUMER-qualification.exe' `
+            -InstallForQualification
+          if ($LASTEXITCODE -ne 0) { throw 'ATLAS_PERSON_NEGATIVE_SETUP_FAILED' }
+      - name: Qualify actual native write denial and cold restart
+        shell: pwsh
+        timeout-minutes: 12
+        env:
+          ATLAS_PERSON_EXPECT_UNBUNDLED_DENIAL: '1'
+        run: |
+          python -m pip install pywinauto==0.6.9 pillow==11.3.0
+          if ($LASTEXITCODE -ne 0) { throw 'ATLAS_PERSON_NEGATIVE_UIA_DEPS_FAILED' }
+          python -m py_compile desktop/tests/installed-atlas06-connect.py
+          if ($LASTEXITCODE -ne 0) { throw 'ATLAS_PERSON_NEGATIVE_UIA_SYNTAX_FAILED' }
+          python desktop/tests/installed-atlas06-connect.py
+          if ($LASTEXITCODE -ne 0) { throw 'ATLAS_PERSON_NEGATIVE_INSTALLED_WRITE_DENIAL_FAILED' }
+          Write-Host 'ATLAS_PERSON_UNBUNDLED_NATIVE_FAIL_CLOSED_PASS_NO_PRIVATE_T3'
+      - name: Retain public negative installed GUI evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas-person-enforced-without-private-consumer
+          path: |
+            desktop/tests/visual-evidence/atlas06-connect-*.png
+          if-no-files-found: ignore
+          retention-days: 3
