@@ -10,29 +10,13 @@ import {createAtlasT3OriginalHostPorts}
 import {createAtlasT3DesktopStorePort} from "./atlas-t3-store-port.mjs";
 import {createAtlasT3NativeRecipient}
  from "../../src/atlas-t3-native-recipient.mjs";
+import {createAtlasT3OriginalSourceSelection}
+ from "./atlas-t3-original-source-selection.mjs";
 
 const ID=/^[A-Za-z0-9][A-Za-z0-9._:/@-]{0,159}$/;
-const SOURCE_KEYS=["workspace_id","object_id","schema_id","revision"];
 const die=code=>{throw Object.assign(new Error(code),{code});};
 const fn=(owner,name)=>typeof owner?.[name]==="function"||
  die("ATLAS_T3_INSTALLED_"+name.toUpperCase()+"_OWNER_REQUIRED");
-function validateOriginalSource(selection,requested,strictRevision){
- if(!selection||selection.acceptanceKind!=="HUMAN_ACCEPTED_DRAFT"||
-    selection.readOnly!==true)
-  die("ATLAS_T3_INSTALLED_ACCEPTED_SOURCE_REQUIRED");
- const work=selection.workRef,ref=selection.sourceObjectRef;
- if(!work||work.projectId!==requested.projectId||
-    work.workId!==requested.workId||
-    !/^(0|[1-9][0-9]*)$/.test(String(work.revision))||
-    !Number.isSafeInteger(Number(work.revision))||
-    (strictRevision&&String(work.revision)!==String(requested.revision)))
-  die("ATLAS_T3_INSTALLED_SOURCE_WORK_MISMATCH");
- if(!ref||!SOURCE_KEYS.slice(0,3).every(k=>ID.test(ref[k]))||
-    !Number.isSafeInteger(ref.revision)||ref.revision<1)
-  die("ATLAS_T3_INSTALLED_SOURCE_REF_INVALID");
- return Object.freeze({workspace_id:ref.workspace_id,
-  object_id:ref.object_id,schema_id:ref.schema_id,revision:ref.revision});
-}
 // Must be called from the installed native Host composition, NOT from a
 // browser global, file import or a user-supplied owner URL. The original T3
 // runtime must already have installed its signed D1 and D6 continuation.
@@ -85,39 +69,12 @@ export async function createInstalledAtlasT3Host({
   die("ATLAS_T3_INSTALLED_NATIVE_HEAD_UNAVAILABLE");
  try{deserialize(JSON.stringify(head.snapshot));}
  catch{die("ATLAS_T3_INSTALLED_NATIVE_HEAD_INVALID");}
- const select=async(requested,context,strictRevision)=>{
-  active();
-  // Only the installed Agent selects a HUMAN-ACCEPTED Result. UI never
-  // supplies a source Object ID or an owner grant.
-  const selection=await originalAgent.selectAcceptedForWork({
-   ...requested,context,purpose:strictRevision?"atlas.result.continue":
-    "atlas.result.recover"});
-  active();
-  return validateOriginalSource(selection,requested,strictRevision);
- };
- const continueOriginalAcceptedResult=async({workRef,context})=>{
-  const source=await select(workRef,context,true);
-  active();
-  // The signed ORIGINAL D6 preview must select Atlas's own recipient
-  // before Human consent and BEFORE any possible native dispatch.
-  const preview=await originalT3.preview(source);
-  active();
-  if(!preview||preview.recipientId!=="iwxa.atlas"||
-     !SOURCE_KEYS.every(k=>preview.reference?.[k]===source[k]))
-   die("ATLAS_T3_INSTALLED_ORIGINAL_RECIPIENT_MISMATCH");
-  if(preview.status==="OPERATION_IN_PROGRESS")
-   return {status:"OPERATION_IN_PROGRESS"};
-  if(preview.status==="RECOVER_ONLY")
-   return {status:"OUTCOME_UNKNOWN"};
-  if(preview.status!=="AVAILABLE")
-   die("ATLAS_T3_INSTALLED_ORIGINAL_D6_PREVIEW_INVALID");
-  return originalT3.continueSelected(source);
- };
- const recoverOriginalAcceptedResult=async({projectId,workId,context})=>{
-  const source=await select({projectId,workId},context,false);
-  active();
-  return originalT3.recover(source);
- };
+ const {continueOriginalAcceptedResult,recoverOriginalAcceptedResult}=
+  createAtlasT3OriginalSourceSelection({
+   originalT3,originalAgent,isHostActive:()=>{
+    return isTauri()&&hostLifecycle.isActive()===true;
+   },
+  });
  const ports=createAtlasT3OriginalHostPorts({
   invoke,authorizeCommand,
   isHostActive:()=>isTauri()&&hostLifecycle.isActive()===true,
