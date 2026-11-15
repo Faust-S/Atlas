@@ -19,6 +19,7 @@ const {createTrustedNativeContinuation} = await import(pathToFileURL(source).hre
 
 test("Original T3 signed Result -> native Atlas decision -> cold double readback, with no repeat",async()=>{
  let snapshot=empty(),generation="native:0",nativeWrites=0,denied=false,sourceRev=2;
+ let nativeReceiptOutage=false;
  const p=createProject(snapshot,{name:"Real enterprise workspace",type:"engineering"});
  snapshot=p.state;
  const w=createItem(snapshot,p.id,{title:"Documented equipment installation"});
@@ -99,11 +100,18 @@ test("Original T3 signed Result -> native Atlas decision -> cold double readback
    deleted:false},relations:{incoming:[],outgoing:[]}};}
  };
  let reviews=0;
- const make=()=>createTrustedNativeContinuation({
-  kernel,accessForRead:async()=>access,currentWorkspace,
-  nativeOwner:createAtlasT3NativeRecipient(nativeOpts),
-  confirmHuman:async()=>{reviews++;return true;},isHostActive:()=>true
- });
+ const make=()=>{
+  const originalRecipient=createAtlasT3NativeRecipient(nativeOpts);
+  return createTrustedNativeContinuation({
+   kernel,accessForRead:async()=>access,currentWorkspace,
+   nativeOwner:{...originalRecipient,
+    receipt:async operationId=>{
+     if(nativeReceiptOutage)throw Error("ORIGINAL_ATLAS_RECEIPT_UNAVAILABLE");
+     return originalRecipient.receipt(operationId);
+    }},
+   confirmHuman:async()=>{reviews++;return true;},isHostActive:()=>true
+  });
+ };
  const originalD6=make();
  const preview=await originalD6.preview(originalRef);
  assert.equal(preview.status,"AVAILABLE");
@@ -130,6 +138,11 @@ test("Original T3 signed Result -> native Atlas decision -> cold double readback
   continueOriginalAcceptedResult:async({workRef})=>{
    assert.deepEqual(workRef,ref);
    return originalD6.continueSelected(originalRef);
+  },
+  recoverOriginalAcceptedResult:async({projectId,workId})=>{
+   assert.equal(projectId,p.id);
+   assert.equal(workId,w.id);
+   return make().recover(originalRef);
   }
  });
  const result=await atlasHost.continueSelectedResult({projectId:p.id,workId:w.id});
@@ -148,6 +161,18 @@ test("Original T3 signed Result -> native Atlas decision -> cold double readback
  assert.equal((await firstCold.continueSelected(originalRef)).status,"OWNER_READBACK_CONFIRMED");
  const secondCold=make();
  assert.equal((await secondCold.recover(originalRef)).status,"OWNER_READBACK_CONFIRMED");
+ const recoveredThroughAtlas=await atlasHost.recoverSelectedResult({
+  projectId:p.id,workId:w.id});
+ assert.equal(recoveredThroughAtlas.status,"OWNER_READBACK_CONFIRMED");
+ assert.deepEqual(recoveredThroughAtlas.workRef,ref);
+ assert.equal(recoveredThroughAtlas.resultRef,result.resultRef);
+ assert.ok(snapshot.revision>Number(ref.revision));
+ nativeReceiptOutage=true;
+ const uncertain=await atlasHost.recoverSelectedResult({projectId:p.id,workId:w.id});
+ assert.equal(uncertain.status,"OUTCOME_UNKNOWN");
+ nativeReceiptOutage=false;
+ assert.equal((await atlasHost.recoverSelectedResult({projectId:p.id,workId:w.id})).status,
+  "OWNER_READBACK_CONFIRMED");
  assert.equal(nativeWrites,1);
  assert.equal(reviews,1);
  assert.equal(commands.filter(command=>command==="atlas_commit").length,1);
@@ -155,6 +180,8 @@ test("Original T3 signed Result -> native Atlas decision -> cold double readback
  // Original T3 D1 authority revocation blocks subsequent signed read.
  denied=true;
  await assert.rejects(secondCold.continueSelected(originalRef),
+  {code:"T3_ACCESS_NOT_PERMITTED"});
+ await assert.rejects(atlasHost.recoverSelectedResult({projectId:p.id,workId:w.id}),
   {code:"T3_ACCESS_NOT_PERMITTED"});
  denied=false;
  sourceRev=3;
