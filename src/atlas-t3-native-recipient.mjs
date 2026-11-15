@@ -80,7 +80,7 @@ export function atlasT3RecordedWorkLinks(project){
   if(!links.has(row.workId))links.set(row.workId,[]);
   links.get(row.workId).push(Object.freeze({
    taskId:row.taskId,resultId:row.resultId,decisionId:decision.id,
-   sourceObjectRef:row.sourceObjectRef,
+   operationId:row.operationId,sourceObjectRef:row.sourceObjectRef,
   }));
  }
  return links;
