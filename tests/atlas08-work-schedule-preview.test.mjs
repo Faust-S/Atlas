@@ -1,7 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
-import {scheduleProject} from "../src/planning.mjs";
+import {scheduleProject,scheduleChangeSummary} from "../src/planning.mjs";
+import {editorSpec,applyEditor} from "../src/editor.mjs";
+import {serialize} from "../src/core.mjs";
+import {atlas06VisualPortfolio} from "./fixtures/atlas06-visual-portfolio.mjs";
 import {previewWorkScheduleEdit} from "../src/work-schedule-preview.mjs";
 
 const fixture=()=>({
@@ -80,4 +83,31 @@ test("The original inspector shows the preview before apply, with accessible com
  assert.match(css,/\.editor-panel \.atlas-work-draft-preview\{/);
  assert.match(css,/max-height:min\(29vh,190px\)/);
  assert.match(css,/\.editor-panel \.form-footer\{flex:0 0 auto/);
+});
+
+test("The preview and actual work editor produce identical effects on a large project",()=>{
+ const snapshot=atlas06VisualPortfolio(),beforeState=serialize(snapshot);
+ const project=snapshot.projects[0],work=project.items.find(w=>w.id==="visual-work-5-1079");
+ assert.ok(work,"Large fixture work must exist");
+ const action="work:"+work.id,fields=editorSpec(project,action,snapshot).fields;
+ const form=new FormData();
+ for(const field of fields)form.set(field.name,String(field.value??""));
+ const draft={estimateDays:String((work.estimateDays??1)+2),dueDate:work.dueDate??""};
+ form.set("estimateDays",draft.estimateDays);
+ form.set("dueDate",draft.dueDate);
+ const before=scheduleProject(project);
+ const projected=previewWorkScheduleEdit(project,work.id,draft,before);
+ assert.equal(projected.kind,"changed");
+ const applied=applyEditor(snapshot,project.id,action,form).state;
+ const after=scheduleProject(applied.projects.find(p=>p.id===project.id));
+ const comparison=scheduleChangeSummary(before,after,{limit:3});
+ assert.equal(projected.afterDays,after.durationDays);
+ assert.equal(projected.beforeDays,before.durationDays);
+ for(const key of ["affectedTotal","movedTotal","criticalChangedTotal",
+  "deadlineChangedTotal","deadlineResolvedTotal","deadlineRemovedTotal"]){
+  assert.equal(projected[key],comparison[key],key);
+ }
+ assert.deepEqual(projected.affectedIds,comparison.affectedIds);
+ assert.deepEqual(projected.examples,comparison.examples);
+ assert.equal(serialize(snapshot),beforeState);
 });
