@@ -8,6 +8,7 @@ test("Embedded original owners use only Atlas native commands for Agent Task and
  let snapshot=empty(),generation="gen:initial",commits=0,agentWrites=0;
  const p=createProject(snapshot,{name:"One genuine Atlas project"});snapshot=p.state;
  const w=createItem(snapshot,p.id,{title:"Return original external Result"});snapshot=w.state;
+ const unrelated=createItem(snapshot,p.id,{title:"Unrelated work in same project"});snapshot=unrelated.state;
  const ref={projectId:p.id,workId:w.id,revision:String(snapshot.revision)};
  const source={workspace_id:"ws:agent",object_id:"result:accepted",
   schema_id:"iwxa.result",revision:1};
@@ -75,6 +76,9 @@ test("Embedded original owners use only Atlas native commands for Agent Task and
   }
  };
  host=createAtlasT3OriginalHostPorts(owners);
+ const beforeResult=await host.recoverSelectedResult({projectId:p.id,workId:w.id});
+ assert.equal(beforeResult.status,"OUTCOME_UNKNOWN");
+ assert.equal(commits,0,"Recovery must never write an unreceived Result");
  const issued=await host.issueSelectedWork({projectId:p.id,workId:w.id});
  assert.deepEqual(issued.workRef,ref);
  assert.equal(issued.taskId,"TASK:external-1");
@@ -121,6 +125,16 @@ test("Embedded original owners use only Atlas native commands for Agent Task and
   recoverOriginalAcceptedResult:async()=>{throw Error("MUST_NOT_INVOKE_D6");}});
  await assert.rejects(refused.recoverSelectedResult({projectId:p.id,workId:w.id}),
   /ATLAS_T3_PROJECT_READ_NOT_AUTHORIZED/);
+ const mismatchedWork=createAtlasT3OriginalHostPorts({...owners,
+  recoverOriginalAcceptedResult:async()=>{
+   const p=await host.recipient.inspect({reference:source,recipientId:"iwxa.atlas"});
+   const receipt=await host.recipient.receipt(p.operationId);
+   return {status:"OWNER_READBACK_CONFIRMED",operationId:p.operationId,
+    recipientId:"iwxa.atlas",resultRef:receipt.resultRef,reference:source};
+  }});
+ await assert.rejects(mismatchedWork.recoverSelectedResult({
+  projectId:p.id,workId:unrelated.id}),/ATLAS_T3_SELECTED_WORK_RESULT_MISMATCH/);
+ assert.equal(commits,1,"A valid foreign WorkRef cannot be reattached or written");
  const forged=createAtlasT3OriginalHostPorts({...owners,
   continueOriginalAcceptedResult:async()=>({
    status:"OWNER_READBACK_CONFIRMED",operationId:"atlas:t3:"+"0".repeat(64),
