@@ -4,10 +4,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
+import {createAtlasT3OriginalSourceSelection} from "../desktop/src/atlas-t3-original-source-selection.mjs";
 const read=path=>readFileSync(new URL("../"+path,import.meta.url),"utf8");
 const binding=read("desktop/src/atlas-t3-installed-host.mjs");
 const surface=read("desktop/src/atlas-react-surface.tsx");
 const t3=read("desktop/src/atlas-t3-original-host-ports.mjs");
+const selector=read("desktop/src/atlas-t3-original-source-selection.mjs");
 const native=read("desktop/src-tauri/src/lib.rs");
 test("T3 native continuation owner uses actual Atlas Tauri commands, not simulated Store",()=>{
  assert.match(binding,/import \{invoke as atlasNativeInvoke,isTauri\} from "@tauri-apps\/api\/core"/);
@@ -25,13 +27,15 @@ test("Installed signed D6 owner is mandatory; there is no browser-provided autho
    "atlasAuthority","hostLifecycle"])
   assert.ok(binding.includes(name),name);
  assert.match(binding,/if\(!isTauri\(\)\)die\("ATLAS_T3_INSTALLED_ATLAS_TAURI_REQUIRED"\)/);
- assert.match(binding,/selectAcceptedForWork/);
- assert.match(binding,/originalT3\.continueSelected\(source\)/);
- assert.match(binding,/originalT3\.recover\(source\)/);
+ assert.match(binding,/createAtlasT3OriginalSourceSelection\(/);
+ assert.match(selector,/selectAcceptedForWork/);
+ assert.match(selector,/originalT3\.preview\(source\)/);
+ assert.match(selector,/originalT3\.continueSelected\(source\)/);
+ assert.match(selector,/originalT3\.recover\(source\)/);
  assert.ok(binding.includes("ATLAS_T3_INSTALLED_AGENT_TASK_READBACK_INVALID"));
  assert.ok(binding.includes("ATLAS_T3_INSTALLED_D6_READBACK_INVALID"));
  assert.ok(binding.includes("ATLAS_T3_INSTALLED_D6_RECOVERY_INVALID"));
- assert.match(binding,/validateOriginalSource\(selection,requested,strictRevision\)/);
+ assert.match(selector,/originalSource\(selection,requested,strictRevision\)/);
  assert.match(binding,/originalExchange\.readReceipt\(input\)/);
  assert.match(binding,/atlasAuthority\.verifyWrite\(input\)/);
  assert.match(binding,/await invoke\("atlas_open"\)/);
@@ -45,4 +49,44 @@ test("Only compiled installed Host mounts the shared Atlas UI; standalone stays 
  const standalone=read("desktop/src/standalone.tsx");
  assert.doesNotMatch(standalone,/mountInstalledAtlasT3Surface/);
  assert.match(standalone,/<AtlasWorkspace\/>/);
+});
+
+test("Original signed D6 source selector refuses foreign WorkRef and recipient before dispatch",async()=>{
+ const workRef={projectId:"project:1",workId:"work:1",revision:"3"};
+ const source={workspace_id:"ws:original",object_id:"result:1",schema_id:"iwxa.result",revision:1};
+ const accepted=({workRef:sourceWork=workRef}={})=>({
+  acceptanceKind:"HUMAN_ACCEPTED_DRAFT",readOnly:true,workRef:sourceWork,sourceObjectRef:source,
+ });
+ let dispatches=0;
+ const signedD6={
+  preview:async()=>({status:"AVAILABLE",recipientId:"iwxa.atlas",reference:source}),
+  continueSelected:async()=>{dispatches++;return {status:"OWNER_READBACK_CONFIRMED"};},
+  recover:async()=>({status:"OUTCOME_UNKNOWN"}),
+ };
+ const wrongSource=createAtlasT3OriginalSourceSelection({
+  originalT3:signedD6,isHostActive:()=>true,
+  originalAgent:{selectAcceptedForWork:async()=>accepted({
+   workRef:{...workRef,workId:"work:other"}})},
+ });
+ await assert.rejects(wrongSource.continueOriginalAcceptedResult({workRef,context:{}}),
+  {code:"ATLAS_T3_INSTALLED_SOURCE_WORK_MISMATCH"});
+ assert.equal(dispatches,0);
+ const wrongRecipient=createAtlasT3OriginalSourceSelection({
+  originalT3:{...signedD6,preview:async()=>({status:"AVAILABLE",
+   recipientId:"not-atlas",reference:source})},
+  isHostActive:()=>true,
+  originalAgent:{selectAcceptedForWork:async()=>accepted()},
+ });
+ await assert.rejects(wrongRecipient.continueOriginalAcceptedResult({workRef,context:{}}),
+  {code:"ATLAS_T3_INSTALLED_ORIGINAL_RECIPIENT_MISMATCH"});
+ assert.equal(dispatches,0);
+ const recoverOnly=createAtlasT3OriginalSourceSelection({
+  originalT3:{...signedD6,preview:async()=>({status:"RECOVER_ONLY",
+   recipientId:"iwxa.atlas",reference:source})},
+  isHostActive:()=>true,
+  originalAgent:{selectAcceptedForWork:async()=>accepted()},
+ });
+ assert.equal((await recoverOnly.continueOriginalAcceptedResult({workRef,context:{}})).status,
+  "OUTCOME_UNKNOWN");
+ assert.equal(dispatches,0);
 });
