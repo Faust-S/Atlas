@@ -743,9 +743,48 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    }else if(result.status==="USER_CANCELLED"){
     setMessage("Получение Result отменено. Проект не изменён.");
    }else if(result.status==="OUTCOME_UNKNOWN"||result.status==="OPERATION_IN_PROGRESS"){
-    setMessage("Исход получения Result не подтверждён. Не повторяйте применение. Сначала перечитайте Atlas и восстановите квитанцию через оригинальный T3.");
+    setMessage("Исход получения Result не подтверждён. Не повторяйте применение. "+(host?.t3?.recoverSelectedResult?"Нажмите «Проверить Result» для оригинального readback.":"Проверьте квитанцию через оригинальный T3.")+" Затем перечитайте сохранённый Atlas.");
    }else{
     throw Error("Неизвестный ответ T3. Получение Result не подтверждено.");
+   }
+   setError("");
+  }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
+ };
+ // Original T3 D6 recovery performs signed readback ONLY; it never
+ // dispatches a second Agent Task or Atlas native commit. The stored Agent
+ // WorkRef can be older than the current Atlas revision after a successful
+ // Decision commit, so only Project/Work identity is matched here.
+ const recoverAtlasAgentResult=async(projectId:string,workId:string)=>{
+  if(!host?.t3?.recoverSelectedResult){
+   issue(Error("Оригинальный T3 для проверки Result не подключён."));return;
+  }
+  if(!ready||busyRef.current||dirtyRef.current||!persisted||
+     editorOpenRef.current||pendingImportOpenRef.current||
+     savedVersionsOpenRef.current||savedRefOpenRef.current){
+   issue(Error("Сохраните черновик и закройте формы перед проверкой Result."));return;
+  }
+  const started=latestSnapshot.current;
+  busyRef.current=true;setBusy(true);
+  try{
+   // Confirm the UI selection still names a real saved Atlas Work.
+   // Do NOT require the old generation: a successful D6 commit advances it.
+   const ref=createAtlasSavedRef(started,{projectId,workId},
+    {persisted:true,dirty:false}) as {projectId:string;workId:string;revision:string};
+   const result=await host.t3.recoverSelectedResult({projectId,workId});
+   if(latestSnapshot.current!==started||dirtyRef.current||editorOpenRef.current)
+    throw Error("Atlas изменился во время проверки. Перечитайте сохранённый проект.");
+   if(result?.workRef?.projectId!==ref.projectId||
+      result?.workRef?.workId!==ref.workId)
+    throw Error("Ответ T3 относится к другой работе. Результат не подтверждён.");
+   if(result.status==="OWNER_READBACK_CONFIRMED"){
+    if(typeof result.operationId!=="string"||!/^atlas:t3:[0-9a-f]{64}$/.test(result.operationId)||
+       typeof result.resultRef!=="string"||!result.resultRef.startsWith("atlas:decision:"))
+     throw Error("Квитанция оригинального T3 не подтверждена.");
+    setMessage("Квитанция Agent Result подтверждена оригинальным T3 и сохранённым Atlas. Нажмите «Перечитать сохранённое», чтобы обновить работу. Статус выполнения не менялся.");
+   }else if(result.status==="OUTCOME_UNKNOWN"||result.status==="OPERATION_IN_PROGRESS"){
+    setMessage("Квитанция Result пока не подтверждена. Повторно применять Result нельзя. Проверьте исходный Agent и оригинальный T3.");
+   }else{
+    throw Error("Неподтверждённый ответ T3 при проверке Result.");
    }
    setError("");
   }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
@@ -2339,6 +2378,10 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
          disabled={busy||dirty||!persisted||!!editor}
          onClick={()=>void receiveAtlasAgentResult(project.id,w.id)}
          title="Принятый Agent Result, original signed T3 D6 и .iwxa">Получить Result</Action>}
+        {host?.t3?.recoverSelectedResult&&<Action
+         disabled={busy||dirty||!persisted||!!editor}
+         onClick={()=>void recoverAtlasAgentResult(project.id,w.id)}
+         title="Только оригинальный T3 D6 readback; без повторного применения">Проверить Result</Action>}
         <Action disabled={busy||dirty||!persisted||!!editor} onClick={()=>showSavedReference(project.id,w.id)} title="Только сохранённая редакция">Ссылка</Action>
         <Action onClick={()=>removeWork(w.id)}>Удалить</Action></td></tr>)}</tbody></table></div>
      {project.items.length>0&&<p className="minor">Показано {Math.min(filteredWork.length,workLimit)} из {filteredWork.length} работ по фильтру; всего в проекте: {project.items.length}.</p>}
