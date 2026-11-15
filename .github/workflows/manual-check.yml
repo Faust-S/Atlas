@@ -58,7 +58,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: Faust-S/knowledge
-          ref: ae7f229d859f88092edce0825c773ecb43902bd3
+          ref: 724a199352e66faadee16ed0f71755c613bd501c
           path: t3-original
           persist-credentials: false
       - name: Qualify actual original T3 D6 with Atlas native recipient source
