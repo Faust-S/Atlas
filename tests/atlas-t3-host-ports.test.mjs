@@ -159,3 +159,31 @@ test("Embedded T3 route never falls back when native Store, Agent or project aut
  await assert.rejects(refusal.issueTask("some:project","some:work",{}),
   {code:"ATLAS_T3_U05_READ_DENIED"});
 });
+
+test("Lost original D6 reply returns recoverable UNKNOWN for the exact saved WorkRef",async()=>{
+ let saved=empty(),commits=0;
+ const p=createProject(saved,{name:"Followup"});saved=p.state;
+ const w=createItem(saved,p.id,{title:"Await signed Result"});saved=w.state;
+ const source={projectId:p.id,workId:w.id,revision:String(saved.revision)};
+ const host=createAtlasT3OriginalHostPorts({
+  invoke:async command=>{
+   if(command!=="atlas_open"){commits++;throw Error("NO_NATIVE_WRITE_EXPECTED");}
+   return {generation:"original:1",snapshot:structuredClone(saved),needsConfirmation:false};
+  },
+  authorizeCommand:async()=>true,
+  isHostActive:()=>true,authorizeAtlasProjectRead:async()=>true,
+  currentAgentContext:async()=>({actor:"original-agent"}),
+  issueOriginalAgentTask:async()=>{throw Error("NO_TASK_ISSUE");},
+  readOriginalAgentTask:async()=>{throw Error("NO_TASK_READ");},
+  findOriginalAgentTask:async()=>{throw Error("NO_TASK_LOOKUP");},
+  readOriginalAgentAccepted:async()=>{throw Error("NO_ACCEPTED_SOURCE_READ");},
+  readOriginalExchangeReceipt:async()=>{throw Error("NO_EXCHANGE_READ");},
+  verifyAtlasWrite:async()=>{throw Error("NO_ATLAS_WRITE_GRANT");},
+  continueOriginalAcceptedResult:async()=>{throw Object.assign(
+   Error("Original installed D6 acknowledgement lost"),
+   {code:"ATLAS_T3_INSTALLED_D6_OUTCOME_UNKNOWN"});},
+ });
+ const answer=await host.continueSelectedResult({projectId:p.id,workId:w.id});
+ assert.deepEqual(answer,{status:"OUTCOME_UNKNOWN",workRef:source});
+ assert.equal(commits,0,"No Atlas native commit or Task issue can be retried");
+});
