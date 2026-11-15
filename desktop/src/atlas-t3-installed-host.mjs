@@ -53,16 +53,19 @@ export async function createInstalledAtlasT3Host({
    "atlas_select_import","atlas_list_history","atlas_restore_history",
    "atlas_restore_previous"].includes(command))
    die("ATLAS_T3_INSTALLED_NATIVE_COMMAND_UNSUPPORTED");
-  if(await authorizeCommand(command,args)!==true)
-   die("ATLAS_T3_INSTALLED_NATIVE_COMMAND_DENIED");
-  // This is the REAL installed Atlas Tauri command, not a callback or
-  // simulated Store. Lost IPC after atlas_commit is outcome-unknown.
+  // The existing invokeAtlasHost() UI entry already authorizes exactly
+  // once, as do readSaved()/commitSaved() for the original recipient.
+  // Reauthorizing here would consume a one-shot owner decision twice.
+  // This low-level gateway is kept only inside trusted installed Host code.
+  // Lost atlas_commit IPC remains outcome-unknown, never automatically retried.
   const result=await atlasNativeInvoke(command,args);
   active();
   return result;
  };
  // A different application's Tauri window has no Atlas command; refuse
  // before offering any Agent/T3 actions. Validate the original Atlas schema.
+ if(await authorizeCommand("atlas_open")!==true)
+  die("ATLAS_T3_INSTALLED_NATIVE_COMMAND_DENIED");
  const head=await invoke("atlas_open");
  if(typeof head?.generation!=="string"||!head.generation||
     head.generation==="none"||head.needsConfirmation===true)
@@ -177,8 +180,7 @@ export async function createInstalledAtlasT3NativeRecipient({
   active();
   if(!["atlas_open","atlas_commit"].includes(command))
    die("ATLAS_T3_INSTALLED_NATIVE_COMMAND_UNSUPPORTED");
-  if(await authorizeCommand(command,args)!==true)
-   die("ATLAS_T3_INSTALLED_NATIVE_COMMAND_DENIED");
+  // The original store authorizes this exact command before invoking IPC.
   const result=await atlasNativeInvoke(command,args);
   active();
   return result;
