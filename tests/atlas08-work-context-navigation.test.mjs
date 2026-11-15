@@ -31,7 +31,8 @@ test("A work table return remembers every active filter and the scroll batch",()
   "setWorkSort(context.sort)","setWorkLimit(context.limit)","setWorkReturnId(workId)"]){
   assert.ok(restore.includes(line),"Missing restored work field: "+line);
  }
- assert.match(restore,/context\?\.projectId===project\.id&&context\.workId===workId&&/);
+ assert.match(restore,/context!==null&&context\.projectId===project\.id&&/);
+ assert.match(restore,/context\.workId===workId&&context\.revision===data\.revision/);
  assert.match(restore,/context\.revision===data\.revision/);
  assert.match(restore,/else setWorkQuery\(fallbackQuery\)/);
  assert.match(restore,/workNavigationContext\.current=null/);
