@@ -1885,9 +1885,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
         {(recentWorkKind==="dependency"||recentWorkKind==="adjusted")&&recentScheduleEffect&&
          <div className="atlas-work-plan-effect"
           aria-label={recentWorkKind==="adjusted"?"Последствия изменения работы":"Последствия изменения зависимости"}>
-          {recentPlanBefore?.followups.length>0&&<p className="atlas-work-correction-context"
+          {(recentPlanBefore?.followups?.length??0)>0&&<p className="atlas-work-correction-context"
            role="status">
-           Последовательные правки: {recentPlanBefore.followups.length}.
+           Последовательные правки: {recentPlanBefore?.followups?.length??0}.
            {" "}Сравнение ведётся с планом до первого изменения.
            {" "}Сейчас затронуто работ: {recentScheduleEffect.affectedTotal}.
           </p>}
