@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {atlas06VisualPortfolio} from "./fixtures/atlas06-visual-portfolio.mjs";
 import {editItem,createDecision,validate,serialize} from "../src/core.mjs";
 import {createAtlasT3NativeRecipient,createAtlasT3AgentTaskSelection,
- atlasT3DecisionSummary} from "../src/atlas-t3-native-recipient.mjs";
+ atlasT3DecisionSummary,atlasT3RecordedWorkLinks} from "../src/atlas-t3-native-recipient.mjs";
 import {readFileSync} from "node:fs";
 
 const SOURCE=Object.freeze({workspace_id:"ws:agent-personal",object_id:"result:accepted-1",
@@ -208,4 +208,23 @@ test("Existing Atlas history presents Agent/T3 links readably but does not claim
  assert.match(ui,/atlasT3DecisionSummary\(decision\.text\)\|\|decision\.text/);
  assert.match(ui,/atlasT3DecisionSummary\(entry\.text\)\|\|entry\.text/);
  assert.match(ui,/Актуальность источника и подписанные полномочия проверяются оригинальным T3/);
+});
+
+test("Original accepted Result appears on its exact WorkRef, not on unrelated Atlas works",async()=>{
+ const f=fixture(),native=f.make();
+ const ready=await native.inspect({reference:SOURCE,recipientId:"iwxa.atlas"});
+ await native.receive({operationId:ready.operationId,recipientId:"iwxa.atlas",
+  reference:SOURCE,object:SOURCE});
+ const project=f.get().projects[0],index=atlasT3RecordedWorkLinks(project);
+ const links=index.get(f.work.id)||[];
+ assert.equal(links.length,1);
+ assert.equal(links[0].taskId,"TASK:001");
+ assert.equal(links[0].resultId,"RESULT:001");
+ assert.deepEqual(links[0].sourceObjectRef,SOURCE);
+ assert.equal(index.size,1);
+ assert.equal(index.has(project.items[1].id),false);
+ const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ assert.match(ui,/const t3WorkLinks=useMemo\(\(\)=>atlasT3RecordedWorkLinks\(project\)/);
+ assert.match(ui,/Agent Result \{link\.resultId\}\. Сохранена ссылка; доступ проверяется в T3/);
+ assert.match(ui,/Ещё \{\(t3WorkLinks\.get\(w\.id\)\|\|\[\]\)\.length-2\} ссылок в истории/);
 });
