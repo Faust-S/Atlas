@@ -262,6 +262,18 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .atlas-work-draft-details ul{padding-left:16px;font-size:11px;line-height:1.5}
 .editor-panel .atlas-work-draft-invalid{flex:0 0 auto;margin:6px 0;font-size:11px;
  color:#84532b;line-height:1.4}
+/* The cumulative forecast is compact. Existing editor fields scroll, while
+   Cancel and Apply remain visible on a small Windows display. */
+.editor-panel .atlas-work-cumulative-preview{
+ flex:0 1 auto;min-height:0;max-height:min(16vh,108px);
+ overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable;
+ background:#e9f3ff;border-left:3px solid #5584c9;border-radius:5px;
+ margin:6px 0;padding:7px 9px;color:#244b74
+}
+.atlas-work-cumulative-preview strong{font-size:12px}
+.atlas-work-cumulative-preview p,.atlas-work-cumulative-preview small{
+ display:block;margin:4px 0;font-size:11px;line-height:1.4;overflow-wrap:anywhere
+}
 
 
 /* Close guard avoids a blocking browser confirm inside WebView2 close events. */
