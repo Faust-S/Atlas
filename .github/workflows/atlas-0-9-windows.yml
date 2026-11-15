@@ -91,6 +91,7 @@ jobs:
           python -m py_compile desktop/tests/installed-atlas06-connect.py
           python -m py_compile desktop/tests/installed-atlas06-visual-scale.py
           python -m py_compile desktop/tests/installed-atlas08-corrections.py
+          python -m py_compile desktop/tests/installed-atlas09-qualification.py
           if ($LASTEXITCODE -ne 0) { throw 'ATLAS09_NATIVE_WITNESS_SYNTAX_FAILED' }
 
       - name: Verify exact release-candidate installer SHA-256
@@ -109,11 +110,11 @@ jobs:
           }
           Write-Host "ATLAS09_RC_INSTALLER_SHA256_PASS $sha"
 
-      - name: Exercise installed portfolio, two work changes, explicit Save and cold restart
+      - name: Exercise installed Atlas 0.9 UI, two work changes, native Save and cold restart
         shell: pwsh
         timeout-minutes: 11
         run: |
-          python desktop/tests/installed-atlas08-corrections.py
+          python desktop/tests/installed-atlas09-qualification.py
           if ($LASTEXITCODE -ne 0) { throw 'ATLAS09_WINDOWS_USER_ROUTE_FAILED' }
 
       - name: Keep Windows screen evidence on success or failure
