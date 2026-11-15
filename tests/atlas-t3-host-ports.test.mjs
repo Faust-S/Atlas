@@ -31,6 +31,7 @@ test("Embedded original owners use only Atlas native commands for Agent Task and
   ...native,
   isHostActive:()=>true,
   authorizeAtlasProjectRead:async()=>true,
+  currentAgentContext:async()=>({owner:"trusted-installed-agent"}),
   findOriginalAgentTask:async({workRef})=>({status:"NOT_FOUND_CONFIRMED",
    projectId:workRef.projectId,workId:workRef.workId,sourceRevision:workRef.revision}),
   issueOriginalAgentTask:async({workRef})=>{
@@ -52,7 +53,7 @@ test("Embedded original owners use only Atlas native commands for Agent Task and
   })
  };
  const host=createAtlasT3OriginalHostPorts(owners);
- const issued=await host.issueTask(p.id,w.id,{workspaceId:"real-agent-workspace"});
+ const issued=await host.issueSelectedWork({projectId:p.id,workId:w.id});
  assert.deepEqual(issued.workRef,ref);
  assert.equal(issued.taskId,"TASK:external-1");
  assert.equal(agentWrites,1);
