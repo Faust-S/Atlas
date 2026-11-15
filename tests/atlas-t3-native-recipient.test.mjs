@@ -65,7 +65,7 @@ test("A human-accepted Agent Result updates only the original Atlas decision and
  assert.equal((await port.receipt(preview.operationId)).state,"COMMITTED");
  assert.equal((await port.readback(preview.operationId)).state,"PERSISTED");
  const again=f.make(); // a cold native open has no volatile idempotency state
- assert.equal((await again.inspect({reference:SOURCE,recipientId:"iwxa.atlas"})).status,"RECOVER_ONLY");
+ assert.equal((await again.inspect({reference:SOURCE,recipientId:"iwxa.atlas"})).status,"READY");
  await again.receive({operationId:preview.operationId,recipientId:"iwxa.atlas",
   reference:SOURCE,object:SOURCE});
  assert.equal(f.saves(),1);
@@ -78,7 +78,7 @@ test("Unknown native acknowledgment is recovered by original Atlas Store, never 
   reference:SOURCE,object:SOURCE}),/ACK_LOST/);
  assert.equal(f.saves(),1);
  const cold=f.make();
- assert.equal((await cold.inspect({reference:SOURCE,recipientId:"iwxa.atlas"})).status,"RECOVER_ONLY");
+ assert.equal((await cold.inspect({reference:SOURCE,recipientId:"iwxa.atlas"})).status,"READY");
  assert.equal((await cold.readback(plan.operationId)).resultRef,
   (await cold.receipt(plan.operationId)).resultRef);
  await cold.receive({operationId:plan.operationId,recipientId:"iwxa.atlas",
