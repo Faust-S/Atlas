@@ -85,3 +85,5 @@ jobs:
       - name: Verify production desktop build
         working-directory: desktop
         run: npm run build
+      - name: Confirm single dist includes importable signed T3 Host
+        run: node tests/verify-atlas09-host-dist.mjs
