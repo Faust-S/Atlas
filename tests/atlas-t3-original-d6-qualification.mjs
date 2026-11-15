@@ -12,6 +12,8 @@ import {createAtlasT3DesktopStorePort}
  from "../desktop/src/atlas-t3-store-port.mjs";
 import {createAtlasT3OriginalHostPorts}
  from "../desktop/src/atlas-t3-original-host-ports.mjs";
+import {createAtlasT3OriginalSourceSelection}
+ from "../desktop/src/atlas-t3-original-source-selection.mjs";
 
 const source=process.env.ATLAS_T3_ORIGINAL_D6_MODULE;
 if(!source)throw new Error("Original T3 D6 source path is required");
@@ -115,6 +117,16 @@ test("Original T3 signed Result -> native Atlas decision -> cold double readback
  const originalD6=make();
  const preview=await originalD6.preview(originalRef);
  assert.equal(preview.status,"AVAILABLE");
+ const selectedPurposes=[];
+ const originalSelection=createAtlasT3OriginalSourceSelection({
+  originalT3:originalD6,isHostActive:()=>true,
+  originalAgent:{selectAcceptedForWork:async({purpose,projectId,workId})=>{
+   selectedPurposes.push(purpose);
+   assert.equal(projectId,p.id);
+   assert.equal(workId,w.id);
+   return nativeOpts.readOriginalAgentAccepted(originalRef);
+  }}
+ });
  const atlasHost=createAtlasT3OriginalHostPorts({
   invoke:async(command,args)=>{
    if(command==="atlas_open"){
@@ -135,15 +147,8 @@ test("Original T3 signed Result -> native Atlas decision -> cold double readback
   readOriginalAgentTask:async()=>({status:"PERSISTED",taskId:issued.taskId,
    projectId:ref.projectId,workId:ref.workId,sourceRevision:ref.revision}),
   ...nativeOpts,
-  continueOriginalAcceptedResult:async({workRef})=>{
-   assert.deepEqual(workRef,ref);
-   return originalD6.continueSelected(originalRef);
-  },
-  recoverOriginalAcceptedResult:async({projectId,workId})=>{
-   assert.equal(projectId,p.id);
-   assert.equal(workId,w.id);
-   return make().recover(originalRef);
-  }
+  continueOriginalAcceptedResult:originalSelection.continueOriginalAcceptedResult,
+  recoverOriginalAcceptedResult:originalSelection.recoverOriginalAcceptedResult
  });
  const result=await atlasHost.continueSelectedResult({projectId:p.id,workId:w.id});
  assert.deepEqual(result.workRef,ref);
@@ -153,6 +158,7 @@ test("Original T3 signed Result -> native Atlas decision -> cold double readback
  }));
  assert.equal(nativeWrites,1);
  assert.equal(reviews,1);
+ assert.equal(selectedPurposes[0],"atlas.result.continue");
  const pSaved=snapshot.projects.find(row=>row.id===p.id);
  assert.equal(pSaved.decisions.length,1);
  assert.equal(pSaved.items.find(row=>row.id===w.id).state,"todo");
@@ -166,6 +172,7 @@ test("Original T3 signed Result -> native Atlas decision -> cold double readback
  assert.equal(recoveredThroughAtlas.status,"OWNER_READBACK_CONFIRMED");
  assert.deepEqual(recoveredThroughAtlas.workRef,ref);
  assert.equal(recoveredThroughAtlas.resultRef,result.resultRef);
+ assert.ok(selectedPurposes.includes("atlas.result.recover"));
  assert.ok(snapshot.revision>Number(ref.revision));
  nativeReceiptOutage=true;
  const uncertain=await atlasHost.recoverSelectedResult({projectId:p.id,workId:w.id});
