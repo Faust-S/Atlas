@@ -5,6 +5,7 @@ import {createRoot,type Root} from "react-dom/client";
 import {AtlasRenderBoundary,AtlasWorkspace} from "./main";
 import {isAtlasEmbeddedHost,type AtlasEmbeddedHost} from "./embedded-host";
 import css from "./style.css?inline";
+import {createInstalledAtlasT3Host} from "./atlas-t3-installed-host.mjs";
 // A ShadowRoot persists after unmount. Reuse only the one created by Atlas;
  // an unrelated host's existing shadow surface must remain untouched.
 const ownedTargets=new WeakSet<HTMLElement>();
@@ -31,4 +32,14 @@ export function mountAtlasSurface(target:HTMLElement,host:AtlasEmbeddedHost):()=
   detached=true;
   root.unmount();region.remove();style.remove();activeTargets.delete(target);
  };
+}
+
+// The compiled installed T3 Host calls this only AFTER it has connected its
+// original signed native D6 to createInstalledAtlasT3NativeRecipient. No
+// window/global injection, unsigned browser owner, alternate Store or fallback.
+export async function mountInstalledAtlasT3Surface(
+ target:HTMLElement,installedOwners:Parameters<typeof createInstalledAtlasT3Host>[0]
+):Promise<()=>void>{
+ const host=await createInstalledAtlasT3Host(installedOwners);
+ return mountAtlasSurface(target,host);
 }
