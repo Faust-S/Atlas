@@ -88,6 +88,8 @@ test("The existing work editor returns to remaining affected works without savin
  assert.match(submit,/setRecentWorkId\(nextContext\?\.workId\|\|correctedId\)/);
  assert.match(submit,/setWorkImpactOnly\(continued\.change\.affectedTotal>0\)/);
  assert.match(submit,/setWorkSort\("impact"\)/);
+ assert.match(submit,/setMessage\("Последовательные правки: "\+continued\.followups\.length/);
+ assert.match(submit,/Изменения в черновике, сохраните их на диск отдельно/);
  assert.match(ui,/Сравнение ведётся с планом до первого изменения/);
 });
 
