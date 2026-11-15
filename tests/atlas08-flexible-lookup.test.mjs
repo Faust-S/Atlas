@@ -43,3 +43,18 @@ test("Ambiguous work name never creates an automatic direct jump",()=>{
  assert.equal(portfolioSearchReason(project,"это не существует"),"");
  assert.equal(serialize(state),before);
 });
+
+test("An exact saved work title beats fuzzy substring collisions across hundreds of works",()=>{
+ const state=fixture(),project=state.projects[0],before=serialize(state);
+ // Searching for source 0 and item 20 also matches other source titles
+ // through partial tokens. The fully typed title is nonetheless unique.
+ assert.deepEqual(portfolioSearchWorkTarget(project,"Работа 0 / 20"),
+  {id:"visual-work-0-19",title:"Работа 0 / 20"});
+ assert.deepEqual(portfolioSearchWorkTarget(project,"Работа 0 / 4"),
+  {id:"visual-work-0-3",title:"Работа 0 / 4"});
+ assert.equal(portfolioSearchWorkTarget(project,"работа 0"),null);
+ const withDuplicate={...project,items:[...project.items,
+  {...project.items.find(item=>item.id==="visual-work-0-19"),id:"duplicate-work-20"}]};
+ assert.equal(portfolioSearchWorkTarget(withDuplicate,"Работа 0 / 20"),null);
+ assert.equal(serialize(state),before);
+});
