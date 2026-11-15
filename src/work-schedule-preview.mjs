@@ -10,8 +10,14 @@ const validDate=value=>{
  return Number.isFinite(date.valueOf())&&date.toISOString().slice(0,10)===value;
 };
 const late=(due,finish)=>due&&finish?finish>due:null;
+// Show the complete effect of a multi-step correction separately from
+// the effect of this one proposed change. Both use the canonical CPM.
+const cumulativeResult=(baseline,plan)=>baseline?{
+ ...scheduleChangeSummary(baseline,plan,{limit:3}),
+ beforeDays:baseline.durationDays,afterDays:plan.durationDays
+}:null;
 
-export function previewWorkScheduleEdit(project,workId,draft,beforePlan=null){
+export function previewWorkScheduleEdit(project,workId,draft,beforePlan=null,cumulativeBaseline=null){
  if(!project||!Array.isArray(project.items)||!Array.isArray(project.dependencies))
   throw Error("Проект для расчёта недоступен");
  const work=project.items.find(item=>item.id===workId);
@@ -26,7 +32,8 @@ export function previewWorkScheduleEdit(project,workId,draft,beforePlan=null){
   return {kind:"invalid",reason:"Проверьте календарную дату контрольного срока."};
  const oldEstimate=work.estimateDays??1,oldDueDate=work.dueDate??null;
  if(estimateDays===oldEstimate&&dueDate===oldDueDate)
-  return {kind:"unchanged"};
+  return {kind:"unchanged",cumulative:cumulativeResult(
+   cumulativeBaseline,beforePlan??(cumulativeBaseline?scheduleProject(project):null))};
  // Only the changed work gets a new object, all other project data are shared
  // as read-only inputs to the existing scheduler.
  const projected={...project,items:project.items.map(item=>item.id===workId?
@@ -49,6 +56,7 @@ export function previewWorkScheduleEdit(project,workId,draft,beforePlan=null){
   oldFinish:was.finishDate??null,newFinish:will.finishDate??null,
   oldFinishOffset:was.earlyFinish,newFinishOffset:will.earlyFinish,
   wasLate:late(oldDueDate,was.finishDate),willBeLate:late(dueDate,will.finishDate),
+  cumulative:cumulativeResult(cumulativeBaseline,after),
   ...effect
  };
 }
