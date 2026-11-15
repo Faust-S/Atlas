@@ -23,7 +23,11 @@ test("Native GUI test requires a read-only public discovery and explicit native 
  assert.match(installed,/click_button\("Изучить выбранную ветку"\)/);
  assert.match(installed,/wait_text\("Корневая структура"/);
  assert.match(installed,/not \(STORE\/"head\.json"\)\.exists\(\)/);
- assert.match(installed,/click_button\("Добавить в Atlas"\)/);
+ assert.match(installed,/click_button_below_fold\("Добавить в Atlas"\)/);
+ assert.match(installed,/def click_button_below_fold\(/);
+ assert.match(installed,/mouse\.scroll\(wheel_dist=-2/);
+ assert.match(installed,/control\.is_visible\(\) and control\.is_enabled\(\)/);
+ assert.match(installed,/bounds\.bottom<=viewport\.bottom-30/);
  assert.match(installed,/click_button\("Сохранить"\)/);
  assert.match(installed,/observation\["structure"\]\["commitSha"\]==observation\["branchHeads"\]\[BRANCH\]/);
  assert.match(installed,/assert second==first/);
