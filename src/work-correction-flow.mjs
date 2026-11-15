@@ -13,13 +13,17 @@ export function startWorkCorrection({projectId,workId,revision,beforePlan,afterP
 
 // Only extend a session for an actually affected work at the exact current
 // revision. An unrelated edit or a new project must start a fresh comparison.
-export function continueWorkCorrection(context,{projectId,workId,revision,nextRevision,afterPlan}){
+export function continueWorkCorrection(context,{projectId,workId,revision,nextRevision,afterPlan,
+ recordCorrection=true}){
  if(!context||context.projectId!==projectId||context.revision!==revision||
     !context.change?.affectedIds.includes(workId)||!context.baseline||
     !Number.isSafeInteger(nextRevision)||nextRevision<=revision)return null;
  return {
   ...context,revision:nextRevision,
   change:scheduleChangeSummary(context.baseline,afterPlan),
-  followups:[...new Set([...(context.followups||[]),workId])]
+  // Assignee/state-only edits advance the revision but are not schedule
+  // corrections. Keep the initial comparison without falsely counting one.
+  followups:recordCorrection?
+   [...new Set([...(context.followups||[]),workId])]:[...(context.followups||[])]
  };
 }
