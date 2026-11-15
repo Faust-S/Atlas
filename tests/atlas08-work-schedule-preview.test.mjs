@@ -73,7 +73,7 @@ test("The original inspector shows the preview before apply, with accessible com
  const css=readFileSync(new URL("../desktop/src/style.css",import.meta.url),"utf8");
  assert.match(ui,/import \{previewWorkScheduleEdit\} from "\.\.\/\.\.\/src\/work-schedule-preview\.mjs"/);
  assert.match(ui,/return previewWorkScheduleEdit\(project,editor\.action\.slice\(5\),/);
- assert.match(ui,/\[editor\.action,project,plan,fields\.estimateDays,fields\.dueDate\]/);
+ assert.match(ui,/\[editor\.action,project,plan,fields\.estimateDays,fields\.dueDate,correctionBaseline\]/);
  assert.match(ui,/aria-label="Предварительный расчёт изменения работы"/);
  assert.match(ui,/Изменения ещё не применены к черновику и не сохранены на диск/);
  const section=ui.indexOf("className=\"atlas-work-draft-preview\"");
@@ -83,6 +83,9 @@ test("The original inspector shows the preview before apply, with accessible com
  assert.match(css,/\.editor-panel \.atlas-work-draft-preview\{/);
  assert.match(css,/max-height:min\(29vh,190px\)/);
  assert.match(css,/\.editor-panel \.form-footer\{flex:0 0 auto/);
+ assert.match(ui,/aria-label="Общий итог последовательных исправлений"/);
+ assert.match(ui,/correctionBaseline=\{correctionBaseline\}/);
+ assert.match(css,/max-height:min\(16vh,108px\)/);
 });
 
 test("The preview and actual work editor produce identical effects on a large project",()=>{
@@ -110,4 +113,25 @@ test("The preview and actual work editor produce identical effects on a large pr
  assert.deepEqual(projected.affectedIds,comparison.affectedIds);
  assert.deepEqual(projected.examples,comparison.examples);
  assert.equal(serialize(snapshot),beforeState);
+});
+
+test("Two successive work changes show immediate and cumulative forecasts separately",()=>{
+ const original=fixture(),baseline=scheduleProject(original),snapshot=JSON.stringify(original);
+ const first={...original,items:original.items.map(w=>w.id==="a"?{...w,estimateDays:4}:w)};
+ const current=scheduleProject(first);
+ const draft={estimateDays:"2",dueDate:""};
+ const preview=previewWorkScheduleEdit(first,"b",draft,current,baseline);
+ assert.equal(preview.kind,"changed");
+ assert.deepEqual([preview.beforeDays,preview.afterDays],[7,6]);
+ assert.deepEqual([preview.cumulative.beforeDays,preview.cumulative.afterDays],[5,6]);
+ assert.equal(preview.movedTotal,1);
+ assert.equal(preview.cumulative.movedTotal,2);
+ const projected={...first,items:first.items.map(w=>w.id==="b"?{...w,estimateDays:2}:w)};
+ assert.deepEqual(preview.cumulative.affectedIds,
+  scheduleChangeSummary(baseline,scheduleProject(projected),{limit:3}).affectedIds);
+ const unmodified=previewWorkScheduleEdit(first,"b",
+  {estimateDays:"3",dueDate:""},current,baseline);
+ assert.equal(unmodified.kind,"unchanged");
+ assert.equal(unmodified.cumulative.afterDays,7);
+ assert.equal(JSON.stringify(original),snapshot);
 });
