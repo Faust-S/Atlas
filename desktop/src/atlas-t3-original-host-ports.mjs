@@ -8,6 +8,7 @@ import {createAtlasT3NativeRecipient,createAtlasT3AgentTaskSelection}
 export function createAtlasT3OriginalHostPorts({
  invoke,authorizeCommand,
  authorizeAtlasProjectRead,issueOriginalAgentTask,readOriginalAgentTask,
+ findOriginalAgentTask,
  readOriginalAgentAccepted,readOriginalExchangeReceipt,verifyAtlasWrite,
  isHostActive
 }={}){
@@ -16,7 +17,7 @@ export function createAtlasT3OriginalHostPorts({
  const store=createAtlasT3DesktopStorePort({invoke,authorizeCommand});
  const agent=createAtlasT3AgentTaskSelection({
   readSaved:store.readSaved,authorizeProjectRead:authorizeAtlasProjectRead,
-  issueOriginalAgentTask,readOriginalAgentTask,isHostActive
+  issueOriginalAgentTask,readOriginalAgentTask,findOriginalAgentTask,isHostActive
  });
  const atlas=createAtlasT3NativeRecipient({
   readSaved:store.readSaved,commitSaved:store.commitSaved,
