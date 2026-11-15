@@ -235,3 +235,45 @@ TypeScript/Vite PASS. Никакая установленная межпрогр
 
 Новые Project Store, Task Engine, Kernel, граф, IAM, Publisher issuer
 или формат .iwxa не создавались. `release/0.8` не изменялась.
+
+## Продолжение 15 ноября: «Получить Result» из исходной работы Atlas
+
+В Atlas 0.8 добавлена дополнительная, строго Host-подключаемая команда
+**«Получить Result»** в существующей таблице работ. В автономном
+standalone Atlas без original T3 D6 она отсутствует.
+
+Путь для установленного Host:
+1. Пользователь выбирает сохранённую работу; Atlas проверяет native
+   head/generation и точный Project/WorkRef, не заменяя грязный черновик.
+2. Оригинальный Host проверяет право чтения выбранного Project/WorkRef
+   и передаёт его original D6. Исходный Agent владеет Task/Result
+   и выбирает принятый Result; оригинальный T3 D6 владеет signed
+   Kernel read, Human Review и recovery. UI не выбирает ни
+   подписанта, ни Workspace, ни необработанный Result.
+3. После подтверждения D6 адаптер повторно открывает **оригинальный**
+   Atlas Store, сверяет receipt/readback одной Decision, исходный
+   Agent Result/Exchange и текущий grant. Поддельная квитанция,
+   чужой WorkRef или отсутствие права приводят к отказу.
+4. UI предлагает «Перечитать сохранённое», чтобы увидеть Decision
+   у исходной работы. Принятый DRAFT не меняет статус Work,
+   сроки, зависимости и не означает приёмку выполнения.
+5. Отмена, неопределённый исход или операция в процессе не
+   инициируют повторную запись. При сомнении нужен штатный
+   recovery original D6 и чтение сохранённого Atlas, не retry.
+
+Изменённые файлы:
+- `desktop/src/atlas-t3-original-host-ports.mjs`
+- `desktop/src/embedded-host.ts`
+- `desktop/src/main.tsx`
+- `tests/atlas-t3-host-ports.test.mjs`
+- `tests/atlas-t3-original-d6-qualification.mjs`
+- `tests/atlas-t3-native-recipient.test.mjs`
+
+На текущем этапе доступный original T3 D6 подключён в исходной
+квалификации с owner doubles для Agent/Kernel/Exchange/native IPC.
+Это **не** установленный signed Result от реального Agent.
+Полную версию `0.8.0` не переписывать, а изменения серии 0.8
+передавать в очередную сборку только после продуктовой приёмки.
+
+**Релизный статус:** `SOURCE_TEST_PENDING`,
+`ATLAS_T3_INSTALLED=HOLD`, `T3_READY=false`.
