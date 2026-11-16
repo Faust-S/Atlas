@@ -9,7 +9,9 @@ import {readFileSync} from "node:fs";
 const SOURCE=Object.freeze({workspace_id:"ws:agent-personal",object_id:"result:accepted-1",
  schema_id:"iwxa.result",revision:2});
 const DIGEST="a".repeat(64),ARCHIVE="b".repeat(64);
-function fixture({badExchange=false,denied=false,unaccepted=false,lostAck=false}={}){
+function fixture({badExchange=false,denied=false,unaccepted=false,lostAck=false,
+ exchangeDenied=false,grantOutage=false,malformedGrant=false,
+ ownerThrownDenial=false,commitOutageBeforeWrite=false}={}){
  let snapshot=atlas06VisualPortfolio(),generation="atlas-generation-0",saves=0,opens=0,active=true;
  const original=serialize(snapshot),project=snapshot.projects[0],work=project.items[0];
  const workRef={projectId:project.id,workId:work.id,revision:String(snapshot.revision)};
@@ -21,21 +23,27 @@ function fixture({badExchange=false,denied=false,unaccepted=false,lostAck=false}
  };
  const commitSaved=async(expected,next)=>{
   if(expected!==generation)throw Error("ATLAS_NATIVE_GENERATION_STALE");
+  if(commitOutageBeforeWrite)throw Error("ATLAS_COMMIT_TRANSPORT_UNAVAILABLE");
   validate(next);snapshot=structuredClone(next);
   generation="atlas-generation-"+(++saves);
   if(lostAck)throw Error("ACK_LOST");
   return {generation,revision:next.revision};
  };
- const writePermit=async({operationId,recipientId,workRef:w,action})=>
-  ({allowed:!denied,operationId,recipientId,
-   projectId:w.projectId,workId:w.workId,revision:w.revision});
+ const writePermit=async({operationId,recipientId,workRef:w,action})=>{
+  if(grantOutage)throw Error("OWNER_GRANT_TRANSPORT_UNAVAILABLE");
+  if(ownerThrownDenial)throw Object.assign(Error("ORIGINAL_ATLAS_OWNER_DENIAL"),
+   {code:"ORIGINAL_ATLAS_OWNER_DENIAL",outcome:"DENIED"});
+  return {allowed:malformedGrant?"false":!denied,operationId,recipientId,
+   projectId:w.projectId,workId:w.workId,revision:w.revision};
+ };
  const make=()=>createAtlasT3NativeRecipient({
   readSaved,commitSaved,isHostActive:()=>active,
   readOriginalAgentAccepted:async ref=>{
    assert.deepEqual(ref,SOURCE);return accept();
   },
   readOriginalExchangeReceipt:async args=>({
-   status:badExchange?"UNVERIFIED":"VERIFIED",recipientId:args.recipientId,
+   status:exchangeDenied?"DENIED":badExchange?"UNVERIFIED":"VERIFIED",
+   recipientId:args.recipientId,
    taskId:args.taskId,resultId:args.resultId,archiveSha256:args.archiveSha256
   }),
   verifyAtlasWrite:writePermit
@@ -298,4 +306,57 @@ test("The Atlas work UI offers signed D6 Result continuation only via installed 
  assert.ok(host.includes("continueSelectedResult:"));
  assert.ok(host.includes("recoverSelectedResult:"));
  assert.ok(ui.includes("readSavedSnapshotForReference({invoke,"));
+});
+
+test("Original Atlas authority DENIED remains explicit; missing grants never invent a denial",async()=>{
+ for(const [opts,expectedOutcome] of [
+  [{denied:true},"DENIED"],
+  [{ownerThrownDenial:true},"DENIED"],
+  [{grantOutage:true},undefined],
+  [{malformedGrant:true},undefined],
+  [{badExchange:true},undefined],
+  [{exchangeDenied:true},"DENIED"],
+  [{unaccepted:true},undefined]
+ ]){
+  const f=fixture(opts);
+  try{
+   await f.make().inspect({reference:SOURCE,recipientId:"iwxa.atlas"});
+   assert.fail("Expected original owner to refuse preview");
+  }catch(error){
+   assert.equal(error.outcome,expectedOutcome,JSON.stringify(opts));
+   assert.match(error.code||error.message,/ATLAS_T3_|ORIGINAL_ATLAS_OWNER_DENIAL/);
+  }
+  assert.equal(f.saves(),0,"A refusal cannot write Atlas");
+ }
+});
+test("Native IPC loss and lost commit ACK never gain an invented DENIED marker",async()=>{
+ for(const opts of [{commitOutageBeforeWrite:true},{lostAck:true}]){
+  const f=fixture(opts),owner=f.make();
+  const preview=await owner.inspect({reference:SOURCE,recipientId:"iwxa.atlas"});
+  let error;
+  try{
+   await owner.receive({operationId:preview.operationId,recipientId:"iwxa.atlas",
+    reference:SOURCE,object:SOURCE});
+  }catch(e){error=e;}
+  assert.ok(error,"A missing commit acknowledgement must remain explicit");
+  assert.equal(error.outcome,undefined,"IPC failure cannot become DENIED");
+  assert.equal(f.saves(),opts.lostAck?1:0);
+  const cold=f.make();
+  const receipt=await cold.receipt(preview.operationId);
+  if(opts.lostAck){
+   assert.equal(receipt?.state,"COMMITTED");
+   assert.equal((await cold.readback(preview.operationId))?.state,"PERSISTED");
+   await cold.receive({operationId:preview.operationId,recipientId:"iwxa.atlas",
+    reference:SOURCE,object:SOURCE});
+   assert.equal(f.saves(),1,"A cold receive after lost ACK is idempotent");
+  }else{
+   assert.equal(receipt,null,"An uncommitted write must not invent a receipt");
+  }
+ }
+});
+test("Original native recipient mismatch is a definitive pre-write refusal",async()=>{
+ const f=fixture(),owner=f.make();
+ await assert.rejects(owner.inspect({reference:SOURCE,recipientId:"other.product"}),
+  {code:"ATLAS_T3_RECIPIENT_MISMATCH",outcome:"DENIED"});
+ assert.equal(f.saves(),0);
 });
