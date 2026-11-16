@@ -59,7 +59,7 @@ function fixture({permission=true,invalidResult=false,ownerDenied=false,
   originalAgent:originalAbsent?{}:agent,originalExchange:exchange,
   isHostActive:()=>active
  };
- return {options,agent,exchange,workRef,selection:{projectId:p.id,workId:w.id},
+ return {options,agent,exchange,accepted,workRef,selection:{projectId:p.id,workId:w.id},
   ownerError,stats:()=>({published,recovered,agentReads,exchangeReads,lastInput}),
   changeGeneration:()=>{version="native:2";},
   setRight:x=>{writePermission=x;},stop:()=>{active=false;}};
@@ -154,4 +154,46 @@ test("The Atlas UI uses separate original publish, read-only recover, and D6 app
  assert.match(ui,/receiveAtlasAgentResult\(project\.id,w\.id\)/);
  assert.ok(!ui.includes("publishAcceptedForWork("),
   "Atlas frontend must not select/issue original T3 publication itself");
+});
+
+test("Two concurrent clicks on one saved WorkRef never publish twice",async()=>{
+ const f=fixture();
+ let release,started;
+ const entered=new Promise(resolve=>{started=resolve;});
+ const completed=new Promise(resolve=>{release=resolve;});
+ let sends=0;
+ f.agent.publishAcceptedForWork=async()=>{sends++;started();return completed;};
+ const port=createAtlasT3OriginalPublicationPort(f.options);
+ const first=port.publishSelected(f.selection);
+ await entered;
+ const second=await port.publishSelected(f.selection);
+ assert.deepEqual(second,{status:"OPERATION_IN_PROGRESS",workRef:f.workRef});
+ assert.equal(sends,1);
+ release({status:"OWNER_READBACK_CONFIRMED",operationId:OP,
+  recipientId:"iwxa.atlas",retrySafe:false,accepted:f.accepted});
+ assert.equal((await first).status,"OWNER_READBACK_CONFIRMED");
+ assert.equal(sends,1);
+});
+test("Unverified original Exchange after publication cannot masquerade as accepted Result",async()=>{
+ const f=fixture();
+ f.exchange.readReceipt=async request=>({status:"UNVERIFIED",
+  recipientId:request.recipientId,taskId:request.taskId,
+  resultId:request.resultId,archiveSha256:request.archiveSha256});
+ const port=createAtlasT3OriginalPublicationPort(f.options);
+ await assert.rejects(()=>port.publishSelected(f.selection),
+  {code:"ATLAS_T3_ORIGINAL_PUBLICATION_EXCHANGE_UNVERIFIED"});
+ assert.equal(f.stats().published,1,"No retry when original publication may be durable");
+});
+test("Host closure after original publisher dispatch reports unknown, not denial",async()=>{
+ const f=fixture();
+ const original=f.agent.publishAcceptedForWork;
+ f.agent.publishAcceptedForWork=async req=>{
+  const value=await original(req);
+  f.stop();return value;
+ };
+ const port=createAtlasT3OriginalPublicationPort(f.options);
+ const result=await port.publishSelected(f.selection);
+ assert.deepEqual(result,{status:"OUTCOME_UNKNOWN",workRef:f.workRef});
+ assert.equal(f.stats().published,1);
+ assert.equal(f.stats().exchangeReads,0);
 });
