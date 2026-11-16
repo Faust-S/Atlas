@@ -236,3 +236,42 @@ recipientId`. Исходные права и криптографические 
 ещё не подключён. До его подключения пользовательская публикация
 завершится подлинным отказом исходного владельца; Atlas не
 подменяет его фикстурой. `INSTALLED_AGENT_T3_ATLAS=HOLD`.
+
+## Граница реального установленного подключения после разработки публикации
+
+**Два независимых внешних условия пока не подтверждены**:
+
+1. **Исполняемый оригинальный T3 Publisher.** Оригинальный trusted
+   `original_t3_source_owner` Agent должен реально реализовать
+   `read_publication/publish_accepted` и
+   `read_published_for/read_published/read_receipt/read_latest_for_work`
+   с корпоративным подписантом, JIT-правами, Kernel Object/Event,
+   оригинальным `.iwxa` и отдельным адресатом `iwxa.atlas`.
+   Наличие реализованных в Agent исходных методов не заменяет эти
+   оригинальные криптографические/нативные действия.
+2. **Подлинная установленная композиция.** В `Atlas` существует
+   `createInstalledAtlasT3NativeRecipient` и
+   `createInstalledAtlasT3Host`, в едином `dist` экспортированы
+   оригинальные адаптеры, но не предъявлен установленный Host,
+   одновременно предоставляющий **настоящие** подписанные
+   `originalAgent`, `handle.nativeContinuation`,
+   `atlasAuthority` и `hostLifecycle` в **том же Atlas
+   Tauri AppHandle**. Это не URL, JSON-ответ, окно другого приложения
+   или неавторизованный браузерный мост. Нужно использовать уже
+   существующий первоначальный T3 Host и доступные механизмы
+   доверенной связи приложений, не создавать новый сервер или Store.
+
+Два условия должны быть проверены в **одном** реальном установленном
+сценарии: Task/Result в Agent 0.6 → Human Review →
+оригинальная подписанная публикация `iwxa.atlas` →
+оригинальный D6 native receive → Atlas `atlas_commit` →
+два независимых cold `atlas_open` с тем же
+`operationId/resultRef/taskId/resultId`, без второго native Apply.
+До этого `INSTALLED_AGENT_T3_ATLAS=HOLD`.
+
+Последнее исходное испытание:
+[Actions №43968095067](https://github.com/Faust-S/Atlas/actions/runs/43968095067),
+**723/723 Node PASS** (включая shutdown во время вторичного
+Agent/Exchange readback), compiled T3 Host, TypeScript/Vite,
+original D6 PASS. Windows установленного Atlas квалифицируется
+отдельно: [№43968095063](https://github.com/Faust-S/Atlas/actions/runs/43968095063).
