@@ -176,6 +176,17 @@ export function createAtlasT3NativeRecipient({
      exchange.taskId!==accepted.taskId||
      exchange.resultId!==accepted.resultId)
     fail("ATLAS_T3_ORIGINAL_EXCHANGE_UNVERIFIED");
+  // Current original T3 sender publishes exactly ONE human-accepted
+  // Result, never the whole organizational Workspace or Agent memory.
+  // A generic VERIFIED string/recipient is insufficient evidence of
+  // selective disclosure. Only the ORIGINAL signed Exchange owns this
+  // byte-level proof; Atlas independently checks its returned bindings.
+  if(exchange.originalSignatureVerified!==true||
+     exchange.archiveBytesVerified!==true||
+     exchange.originalManifestVerified!==true||
+     exchange.disclosureScope!=="ORIGINAL_RESULT_ONLY"||
+     !sameRef(exchange.selectedSourceObjectRef,ref))
+    fail("ATLAS_T3_ORIGINAL_EXCHANGE_DISCLOSURE_UNVERIFIED");
   const op=await hashOperation(ref,accepted);active();
   return {ref,accepted,op};
  }
