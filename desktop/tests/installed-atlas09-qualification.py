@@ -34,7 +34,8 @@ def qualify():
     # UIA may expose transiently untyped WebView nodes during repaint:
     # use the original raw accessibility text reader, not wrapper creation.
     displayed={name.strip() for name in route.d.visible_texts()}
-    forbidden={"Поручить Agent","Получить Result","Проверить Result"}
+    forbidden={"Поручить Agent","Опубликовать Result",
+               "Проверить публикацию","Получить Result","Проверить Result"}
     unexpected=forbidden.intersection(displayed)
     if unexpected:
         route.v.capture("atlas09-unsigned-owner-action-visible")
