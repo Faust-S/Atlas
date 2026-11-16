@@ -87,3 +87,14 @@ test("Atlas 0.9 installed signed publication is opt-in, standalone has no fake o
  assert.match(witness,/Проверить публикацию/);
  assert.match(witness,/Опубликовать Result/);
 });
+
+test("Original Agent publication failed readback is never a second signed dispatch",()=>{
+ const publication=read("desktop/src/atlas-t3-original-publication.mjs");
+ const ui=read("desktop/src/main.tsx");
+ assert.match(publication,/if\(error\?\.outcome==="DENIED"\)throw error/);
+ assert.match(publication,/if\(isHostActive\(\)!==true\)return Object\.freeze\(\{/);
+ assert.match(publication,/status:"OUTCOME_UNKNOWN",workRef/);
+ assert.match(ui,/Публикация Agent Result не подтверждена/);
+ assert.match(ui,/Не отправляйте повторно/);
+ assert.equal(ui.split("runAgentResultPublication(project.id,w.id,").length-1,2);
+});
