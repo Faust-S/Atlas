@@ -207,16 +207,17 @@ export function createAtlasT3NativeRecipient({
    resultId:state.accepted.resultId,
    archiveSha256:state.accepted.archiveSha256});
   active();
-  // Explicit false from the installed Atlas Authority is a DEFINITE refusal.
-  // A malformed / missing verdict is not an authoritative refusal and must
-  // not be confused with a definitive pre-write DENIED outcome.
-  if(verdict?.allowed===false)
+  // Explicit false from the installed Atlas Authority is DEFINITE only
+  // when its reply is bound to THIS operation, recipient and original WorkRef.
+  // A stale/malformed verdict, missing grant or timeout is never DENIED.
+  const bound=verdict?.operationId===state.op&&
+   verdict.recipientId===recipientId&&
+   verdict.projectId===state.accepted.work.projectId&&
+   verdict.workId===state.accepted.work.workId&&
+   verdict.revision===state.accepted.work.revision;
+  if(verdict?.allowed===false&&bound)
     deny("ATLAS_T3_PROJECT_WRITE_NOT_AUTHORIZED");
-  if(verdict?.allowed!==true||verdict.operationId!==state.op||
-     verdict.recipientId!==recipientId||
-     verdict.projectId!==state.accepted.work.projectId||
-     verdict.workId!==state.accepted.work.workId||
-     verdict.revision!==state.accepted.work.revision)
+  if(verdict?.allowed!==true||!bound)
     fail("ATLAS_T3_PROJECT_WRITE_NOT_AUTHORIZED");
  }
  async function inspect({reference,recipientId:to}={}){
