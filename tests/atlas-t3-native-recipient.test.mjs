@@ -11,7 +11,8 @@ const SOURCE=Object.freeze({workspace_id:"ws:agent-personal",object_id:"result:a
 const DIGEST="a".repeat(64),ARCHIVE="b".repeat(64);
 function fixture({badExchange=false,denied=false,unaccepted=false,lostAck=false,
  exchangeDenied=false,grantOutage=false,malformedGrant=false,
- ownerThrownDenial=false,commitOutageBeforeWrite=false}={}){
+ mismatchedDenial=false,ownerThrownDenial=false,
+ commitOutageBeforeWrite=false}={}){
  let snapshot=atlas06VisualPortfolio(),generation="atlas-generation-0",saves=0,opens=0,active=true;
  const original=serialize(snapshot),project=snapshot.projects[0],work=project.items[0];
  const workRef={projectId:project.id,workId:work.id,revision:String(snapshot.revision)};
@@ -33,7 +34,8 @@ function fixture({badExchange=false,denied=false,unaccepted=false,lostAck=false,
   if(grantOutage)throw Error("OWNER_GRANT_TRANSPORT_UNAVAILABLE");
   if(ownerThrownDenial)throw Object.assign(Error("ORIGINAL_ATLAS_OWNER_DENIAL"),
    {code:"ORIGINAL_ATLAS_OWNER_DENIAL",outcome:"DENIED"});
-  return {allowed:malformedGrant?"false":!denied,operationId,recipientId,
+  return {allowed:malformedGrant?"false":mismatchedDenial?false:!denied,
+   operationId:mismatchedDenial?"wrong:operation":operationId,recipientId,
    projectId:w.projectId,workId:w.workId,revision:w.revision};
  };
  const make=()=>createAtlasT3NativeRecipient({
@@ -314,6 +316,7 @@ test("Original Atlas authority DENIED remains explicit; missing grants never inv
   [{ownerThrownDenial:true},"DENIED"],
   [{grantOutage:true},undefined],
   [{malformedGrant:true},undefined],
+  [{mismatchedDenial:true},undefined],
   [{badExchange:true},undefined],
   [{exchangeDenied:true},"DENIED"],
   [{unaccepted:true},undefined]
