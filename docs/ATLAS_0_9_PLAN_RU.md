@@ -232,3 +232,61 @@ Kernel Object/Event + signed `.iwxa` и exact
 Отсутствие владельца вызывает отказ, а не фиктивный PASS.
 `INSTALLED_AGENT_T3_ATLAS=HOLD` до настоящей подписи и
 двух независимых холодных чтений именно принятого Agent Result.
+
+## Atlas 0.9: интеграция квалифицированного оригинального T3 native source publisher
+
+Дата сверки: 17.11.2026. T3 One Core исходный HEAD
+`Faust-S/knowledge@cb3843d887df1180c2f08ed8bb00c726e9b767a2`.
+Поставлена **адресная** версия original
+`native-agent-atlas-source-publisher.mjs` с методами
+`read_publication/publish_accepted/read_published_for/read_published/
+read_receipt/read_latest_for_work`, отдельным согласием и строгим
+`ORIGINAL_RESULT_ONLY` Exchange для `iwxa.atlas`.
+Исходный D6 является тем же blob `04f4e6f6`, что в
+нормативной базе `38ab0099`.
+
+Atlas 0.9 не импортирует исходного native-публикатора в браузер:
+тот использует `node:crypto` и подключается только как
+установленный оригинальный T3 owner через доверенный Agent.
+Atlas по-прежнему владеет исключительно своим
+Project/WorkRef/Decision и исходным native U05 CAS Store.
+
+`tests/atlas09-original-t3-sender-contract.mjs`
+и `.github/workflows/manual-check.yml` теперь квалифицируют
+точную актуальную публичную ревизию T3:
+оригинальный D6 recipient, весь исходный sender upstream test и
+межрепозиторное соответствие данных. В Atlas оригинальный
+`readOriginalExchangeReceipt` должен подтвердить оригинальную подпись,
+проверенный ZIP-манифест, хеш точных байтов и
+`disclosureScope:"ORIGINAL_RESULT_ONLY"` с тем же
+`selectedSourceObjectRef`. Невалидная квитанция
+отвергается **до** `atlas_commit`, без нового T3 Exchange или
+подмены ответа `DENIED`.
+
+После неизвестного ACK Atlas блокирует повторную публикацию
+**в текущем установленном Host**, предлагает отдельный
+`recoverPublicationForWork`. Только оригинальный
+`NOT_PUBLISHED_CONFIRMED` (доказанный UNISSUED в исходном T3 ledger)
+может разрешить новый пользовательский запрос. Между холодными
+сеансами долговременную идемпотентность гарантирует оригинальный
+Agent/T3, а не локальный Set Atlas.
+
+Исходная квалификация на предыдущем проверенном SHA:
+[GitHub Actions №43974423637](https://github.com/Faust-S/Atlas/actions/runs/43974423637)
+**SUCCESS**: 731/731 Atlas Node, 7/7 native T3 sender и 3/3
+cross-owner contract PASS, оригинальный D6 PASS, единый dist и
+TypeScript/Vite PASS.
+
+Для точной актуальной редакции `0f036781` одновременно
+запущены:
+[исходная №43974597833](https://github.com/Faust-S/Atlas/actions/runs/43974597833)
+и [нативная Windows №43974597961](https://github.com/Faust-S/Atlas/actions/runs/43974597961).
+Не приравнивать запущенные проверки к успешным до завершения.
+
+**Граница продукта остаётся:** публичный native T3 publisher source
+ещё не является установленным собственником живого корпоративного
+подписанта, оригинального Reconciliation, селективного .iwxa,
+зарегистрированного original Kernel Object/Event и обоих native
+recipient receipt. Полный E2E с установленным Agent 0.6, настоящей
+подписью и двумя холодными чтениями **именно подписанного Result**
+ещё не принят: `INSTALLED_AGENT_T3_ATLAS=HOLD`.
