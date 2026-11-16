@@ -294,3 +294,19 @@ test("An original receipt with a different selected Object is unverified",async(
   {code:"ATLAS_T3_ORIGINAL_PUBLICATION_DISCLOSURE_UNVERIFIED"});
  assert.equal(f.stats().published,1);
 });
+
+test("A definite original signed publication denial never manufactures an Atlas Decision",async()=>{
+ const f=fixture({ownerDenied:true});
+ let commits=0;
+ f.options.readSaved=async()=>({generation:"original:1",
+  snapshot:(await fixture().options.readSaved()).snapshot,
+  needs_confirmation:false});
+ // Publication reads original stored WorkRef; it does not commit Atlas.
+ // This additional static owner contract is asserted without dispatch.
+ const pub=readFileSync(new URL("../desktop/src/atlas-t3-original-publication.mjs",
+  import.meta.url),"utf8");
+ assert.doesNotMatch(pub,/\batlas_commit\b|\bcommitSaved\(/);
+ assert.doesNotMatch(pub,/createDecision\(/);
+ assert.match(pub,/publicationAttempts\.has\(key\)/);
+ assert.match(pub,/publicationAttempts\.delete\(key\)/);
+});
