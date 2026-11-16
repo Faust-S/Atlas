@@ -15,6 +15,8 @@ const atlas=readFileSync(new URL(
  "../desktop/src/atlas-t3-original-publication.mjs",import.meta.url),"utf8");
 const installed=readFileSync(new URL(
  "../desktop/src/atlas-t3-installed-host.mjs",import.meta.url),"utf8");
+const recipient=readFileSync(new URL(
+ "../src/atlas-t3-native-recipient.mjs",import.meta.url),"utf8");
 
 test("Atlas production routes use exact public original T3 publisher schema and recipient",()=>{
  assert.match(original,/IWXA_AGENT_T3_ORIGINAL_ATLAS_PUBLICATION\/1/);
@@ -52,4 +54,11 @@ test("Original T3 requires an isolated selected Result before original Kernel, E
  // signed publication. It delegates exact bytes to the original Agent owner.
  assert.doesNotMatch(atlas,/commitObjectGraph|publishSelectedResult|exportPackage/);
  assert.match(atlas,/originalExchange\.readReceipt\(/);
+ for(const source of [atlas,recipient]){
+  assert.match(source,/originalSignatureVerified!==true/);
+  assert.match(source,/archiveBytesVerified!==true/);
+  assert.match(source,/originalManifestVerified!==true/);
+  assert.match(source,/disclosureScope!=="ORIGINAL_RESULT_ONLY"/);
+  assert.match(source,/selectedSourceObjectRef/);
+ }
 });
