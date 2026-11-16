@@ -187,3 +187,48 @@ test("Lost original D6 reply returns recoverable UNKNOWN for the exact saved Wor
  assert.deepEqual(answer,{status:"OUTCOME_UNKNOWN",workRef:source});
  assert.equal(commits,0,"No Atlas native commit or Task issue can be retried");
 });
+
+test("Embedded original D6 Host preserves owner DENIED, and distinguishes unavailable project rights",async()=>{
+ let saved=empty(),commits=0,dispatches=0;
+ const p=createProject(saved,{name:"Original owner refusal"});saved=p.state;
+ const w=createItem(saved,p.id,{title:"Signed Result"});saved=w.state;
+ const selected={projectId:p.id,workId:w.id};
+ const ownerError=Object.assign(Error("Explicit original D6 denial"),
+  {code:"T3_D6_NATIVE_OUTCOME_UNKNOWN",outcome:"DENIED"});
+ let right=true;
+ const ports=createAtlasT3OriginalHostPorts({
+  invoke:async cmd=>{
+   if(cmd==="atlas_open")return {snapshot:structuredClone(saved),
+    generation:"atlas:native",needsConfirmation:false};
+   commits++;throw Error("NO_ATLAS_WRITE");
+  },
+  authorizeCommand:async()=>true,
+  isHostActive:()=>true,
+  currentAgentContext:async()=>({workspaceId:"original:signed"}),
+  authorizeAtlasProjectRead:async()=>right,
+  findOriginalAgentTask:async()=>{throw Error("NO_TASK_LOOKUP");},
+  issueOriginalAgentTask:async()=>{throw Error("NO_TASK_ISSUE");},
+  readOriginalAgentTask:async()=>{throw Error("NO_TASK_READ");},
+  readOriginalAgentAccepted:async()=>{throw Error("NO_SOURCE_READ");},
+  readOriginalExchangeReceipt:async()=>{throw Error("NO_EXCHANGE_READ");},
+  verifyAtlasWrite:async()=>{throw Error("NO_GRANT_READ");},
+  continueOriginalAcceptedResult:async()=>{dispatches++;throw ownerError;}
+ });
+ await assert.rejects(ports.continueSelectedResult(selected),
+  error=>error===ownerError&&error.outcome==="DENIED");
+ assert.equal(dispatches,1);
+ right=false;
+ await assert.rejects(ports.continueSelectedResult(selected),
+  {code:"ATLAS_T3_PROJECT_READ_NOT_AUTHORIZED",outcome:"DENIED"});
+ assert.equal(dispatches,1,"Denied read cannot dispatch D6");
+ right=undefined;
+ try{
+  await ports.continueSelectedResult(selected);
+  assert.fail("Missing authority must fail closed");
+ }catch(error){
+  assert.equal(error.message,"ATLAS_T3_PROJECT_READ_NOT_AUTHORIZED");
+  assert.equal(error.outcome,undefined,"Missing evidence cannot invent DENIED");
+ }
+ assert.equal(dispatches,1);
+ assert.equal(commits,0);
+});
