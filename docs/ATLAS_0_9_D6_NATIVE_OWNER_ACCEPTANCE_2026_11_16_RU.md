@@ -132,3 +132,43 @@ Kernel Object/Event, Exchange и readback. Никакой новой реали�
 Отрицательное условие финальной приёмки остаётся обязательным:
 **только** нативный установленный Atlas и исходный T3 D6
 не подтверждают наличие настоящего подписанного Agent Result.
+
+## Явное подключение существующего Agent Exchange к установленному Atlas
+
+В `desktop/src/atlas-t3-original-agent-exchange.mjs` добавлен
+`createOriginalAgentExchangeReceiptPort(originalAgent)`.
+
+Это **не новый Exchange**. Он вызывает только уже существующий
+`InstalledOriginalAgentResultOwner.readOriginalExchangeReceipt(request)`
+из `work/2026-11-16-agent06-original-t3-result-owner-d6` и возвращает
+исходный ответ без реконструкции подписи, архива или статуса.
+`outcome:"DENIED"` и исходный код при исключении остаются неизменными.
+Иные адресаты не допускаются. Если оригинальный Agent не подключён,
+адаптер отказывает, никаких статических VERIFIED-квитанций нет.
+
+Доверенная композиция уже существующего установленного T3 Host:
+
+```js
+const originalExchange=createOriginalAgentExchangeReceiptPort(originalAgent);
+const nativeContinuationOwner=await createInstalledAtlasT3NativeRecipient({
+  originalAgent,originalExchange,atlasAuthority,hostLifecycle
+});
+// ONLY the ORIGINAL T3 createWorkspaceHostRuntime accepts the owner:
+// nativeContinuationOwner, signedKernelAccess, confirmNativeContinuation.
+// The same installed trusted Host obtains handle.nativeContinuation
+// and passes it to mountInstalledAtlasT3Surface.
+```
+
+`createOriginalAgentExchangeReceiptPort`,
+`createInstalledAtlasT3NativeRecipient` и
+`mountInstalledAtlasT3Surface` экспортируются одним скомпилированным
+`installedT3Host` из существующего `dist`.
+Без настоящего оригинального T3 Publisher владельца, оригинальной
+Employee signature/Kernel Object и `iwxa.atlas` Exchange receipt
+подпись не создаётся и действие Result остаётся недоступным.
+
+Степень готовности: интерфейс типов и нативный адаптер Atlas готовы к
+подключению параллельной Agent D6 ветки. Не считаются готовыми
+установленный original Kernel/Exchange Publisher, зарегистрированный
+signed `package.export` для Atlas и независимая Windows-передача
+Agent Result → Atlas Decision → два холодных запуска.
