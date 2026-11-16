@@ -245,19 +245,48 @@ test("A successful original Agent publication cannot be reissued in one Host",as
  assert.equal((await port.recoverSelected(f.selection)).status,"OUTCOME_UNKNOWN");
  assert.equal(f.stats().published,1);
 });
-test("Explicit native Agent denial remains distinguishable and can be retried after rights change",async()=>{
+test("Original DENIED permits a new publish only after verified negative ledger readback",async()=>{
  const f=fixture({ownerDenied:true}),port=createAtlasT3OriginalPublicationPort(f.options);
  await assert.rejects(()=>port.publishSelected(f.selection),
   error=>error===f.ownerError&&error.outcome==="DENIED");
- let resends=0;
+ let resends=0,reads=0;
  f.agent.publishAcceptedForWork=async()=>{resends++;return {
   status:"NOT_PUBLISHED_CONFIRMED",operationId:OP,
   recipientId:"iwxa.atlas",retrySafe:false
  };};
+ // DENIED by itself is not a durable NON-DISPATCH receipt.
+ assert.equal((await port.publishSelected(f.selection)).status,"OUTCOME_UNKNOWN");
+ assert.equal(resends,0);
+ f.agent.recoverPublicationForWork=async()=>{
+  reads++;
+  return {status:"NOT_PUBLISHED_CONFIRMED",operationId:OP,
+   recipientId:"iwxa.atlas",retrySafe:false};
+ };
+ assert.equal((await port.recoverSelected(f.selection)).status,
+  "NOT_PUBLISHED_CONFIRMED");
+ assert.equal(reads,1,"Only original read-only recovery may clear the fence");
  assert.equal((await port.publishSelected(f.selection)).status,
   "NOT_PUBLISHED_CONFIRMED");
  assert.equal(resends,1);
 });
+test("Post-dispatch original DENIED from signed readback cannot resend in one Host",async()=>{
+ const f=fixture(),port=createAtlasT3OriginalPublicationPort(f.options);
+ const refusal=Object.assign(Error("original Exchange readback denied after write"),
+  {code:"ORIGINAL_EXCHANGE_POST_DISPATCH_READBACK_DENIED",outcome:"DENIED"});
+ let dispatches=0;
+ f.agent.publishAcceptedForWork=async()=>{dispatches++;throw refusal;};
+ await assert.rejects(()=>port.publishSelected(f.selection),
+  error=>error===refusal&&error.code===refusal.code&&error.outcome==="DENIED");
+ assert.equal(dispatches,1);
+ assert.deepEqual(await port.publishSelected(f.selection),
+  {status:"OUTCOME_UNKNOWN",workRef:f.workRef});
+ const checked=await port.recoverSelected(f.selection);
+ assert.equal(checked.status,"OUTCOME_UNKNOWN");
+ assert.equal(dispatches,1,"Neither click nor read-only recovery may re-dispatch");
+ assert.equal((await port.publishSelected(f.selection)).status,"OUTCOME_UNKNOWN");
+ assert.equal(dispatches,1);
+});
+
 test("Invalid post-publication receipt never permits a second original publish",async()=>{
  const f=fixture({invalidResult:true}),port=createAtlasT3OriginalPublicationPort(f.options);
  await assert.rejects(()=>port.publishSelected(f.selection),

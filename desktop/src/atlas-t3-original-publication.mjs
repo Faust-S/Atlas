@@ -124,12 +124,12 @@ export function createAtlasT3OriginalPublicationPort({
    let reply;
    try{reply=await originalAgent[method](request);}
    catch(error){
-    // A definite owner refusal occurred before any new dispatch. Ordinary
-    // transport errors MAY mean a signed publication was already committed.
-    if(error?.outcome==="DENIED"){
-     if(publishing)publicationAttempts.delete(key);
-     throw error;
-    }
+    // The ORIGINAL owner's DENIED must be preserved verbatim. But a DENIED
+    // can also be raised by ORIGINAL ledger/Exchange readback AFTER a native
+    // signed dispatch. It is NOT evidence that nothing was published.
+    // Keep the Host-lifetime anti-replay fence until independent read-only
+    // recovery positively proves NOT_PUBLISHED_CONFIRMED.
+    if(error?.outcome==="DENIED")throw error;
     if(publishing)return Object.freeze({status:"OUTCOME_UNKNOWN",workRef});
     throw error;
    }
