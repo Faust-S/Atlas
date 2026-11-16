@@ -1,4 +1,4 @@
-// Installed Atlas 0.8 + original T3 D6 composition, for the TRUSTED native
+// Installed Atlas 0.9 + original T3 D6 composition, for the TRUSTED native
 // product host only. No alternative Store, Kernel, signer, Exchange, Task Engine,
 // IPC server, local HTTP relay or UI-supplied original Result is created here.
 // The installed product must own the SAME Tauri AppHandle that registered
