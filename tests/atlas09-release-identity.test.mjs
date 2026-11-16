@@ -53,10 +53,14 @@ test("Atlas 0.9 signed D6 native gateway performs one owner gate per operation",
    "The original Store or authorized Atlas UI already checks the right once");
   assert.match(match[1],/atlasNativeInvoke\(command,args\)/);
  }
- assert.match(b,/if\(await authorizeCommand\("atlas_open"\)!==true\)/);
+ assert.match(b,/const openingRight=await authorizeCommand\("atlas_open"\)/);
+ assert.match(b,/if\(openingRight===false\)deny\("ATLAS_T3_INSTALLED_NATIVE_COMMAND_DENIED"\)/);
+ assert.match(b,/if\(openingRight!==true\)die\("ATLAS_T3_INSTALLED_NATIVE_COMMAND_DENIED"\)/);
  const host=read("desktop/src/embedded-host.ts");
  assert.match(host,/await host\.authorizeCommand\(selected,args\)/);
  const store=read("desktop/src/atlas-t3-store-port.mjs");
- assert.match(store,/await authorizeCommand\("atlas_open"\)/);
- assert.match(store,/await authorizeCommand\("atlas_commit",args\)/);
+ assert.match(store,/const permission=await authorizeCommand\("atlas_open"\)/);
+ assert.match(store,/const permission=await authorizeCommand\("atlas_commit",args\)/);
+ assert.match(store,/if\(permission===false\)deny\("ATLAS_T3_U05_WRITE_DENIED"\)/);
+ assert.match(store,/if\(permission!==true\)fail\("ATLAS_T3_U05_WRITE_DENIED"\)/);
 });
