@@ -60,9 +60,12 @@ export function createAtlasT3OriginalSourceSelection({
    let response;
    try{response=await originalT3.continueSelected(source);}
    catch(error){
+    // Even a simultaneous Host shutdown cannot erase a signed / native
+    // owner's explicit DENIED: the source owner already decided not to write.
+    if(error?.outcome==="DENIED")throw error;
     if(isHostActive()!==true)
      fail("ATLAS_T3_INSTALLED_D6_OUTCOME_UNKNOWN");
-    throw error; // Original signed denial is not an ACK outage.
+    throw error; // Transport failure remains unclassified / recoverable.
    }
    if(isHostActive()!==true)
     fail("ATLAS_T3_INSTALLED_D6_OUTCOME_UNKNOWN");
