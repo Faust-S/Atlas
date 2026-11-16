@@ -370,7 +370,8 @@ test("Atlas 0.9 UI distinguishes original D6 DENIED from unknown and stored Resu
  assert.ok(ui.includes("const showOriginalT3Denial="));
  assert.ok(ui.includes('verdict?.outcome!=="DENIED"'));
  assert.ok(ui.includes("Подтверждения Result нет."));
- assert.equal(ui.split("if(!showOriginalT3Denial(e))issue(e)").length-1,2);
+ assert.equal(ui.split("if(!showOriginalT3Denial(e))issue(e)").length-1,3,
+  "Publication and both original D6 routes preserve the exact DENIED");
  assert.ok(ports.includes('if(error?.outcome==="DENIED")throw error'));
  assert.ok(ui.includes('result.status==="OUTCOME_UNKNOWN"'));
  assert.ok(ui.includes('result.status==="OWNER_READBACK_CONFIRMED"'));
