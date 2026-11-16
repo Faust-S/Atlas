@@ -47,8 +47,11 @@ test("Embedded original owners use only Atlas native commands for Agent Task and
    readOnly:true,taskId:"TASK:external-1",resultId:"RES:external-1",
    acceptedDigest:"a".repeat(64),archiveSha256:"b".repeat(64)
   }),
-  readOriginalExchangeReceipt:async ({archiveSha256,recipientId,taskId,resultId})=>
-   ({status:"VERIFIED",archiveSha256,recipientId,taskId,resultId}),
+  readOriginalExchangeReceipt:async ({sourceObjectRef,archiveSha256,recipientId,taskId,resultId})=>
+   ({status:"VERIFIED",archiveSha256,recipientId,taskId,resultId,
+     originalSignatureVerified:true,archiveBytesVerified:true,
+     originalManifestVerified:true,disclosureScope:"ORIGINAL_RESULT_ONLY",
+     selectedSourceObjectRef:sourceObjectRef}),
   verifyAtlasWrite:async({operationId,recipientId,workRef})=>({
    allowed:true,operationId,recipientId,projectId:workRef.projectId,
    workId:workRef.workId,revision:workRef.revision
