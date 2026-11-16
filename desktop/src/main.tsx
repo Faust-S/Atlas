@@ -39,6 +39,7 @@ import {atlasT3DecisionSummary,atlasT3RecordedWorkLinks}
  from "../../src/atlas-t3-native-recipient.mjs";
 import {findConfirmedAtlasT3Decision} from "../../src/atlas-t3-confirmed-projection.mjs";
 import {invokeAtlasHost,type AtlasEmbeddedHost} from "./embedded-host";
+import {AtlasPersonLicense,explainAtlasPersonNativeError} from "./AtlasPersonLicense";
 
 // Show the same product version that was packaged in Tauri, without leaking
 // a previous release's branding into a development installation.
@@ -628,7 +629,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   setWorkReturnId(null);
  },[tab,ready,workReturnId,project,boardLimits]);
  const mutate=(next:Atlas,notice:string)=>{workNavigationContext.current=null;setSavedRefPreview(null);latestSnapshot.current=next;setData(next);setMessage(notice);setError("");};
- const issue=(e:unknown)=>{setError(deepFreezeError(e));setMessage("");};
+ const issue=(e:unknown)=>{setError(explainAtlasPersonNativeError(deepFreezeError(e)));setMessage("");};
  const showSavedReference=async(projectId:string,workId?:string)=>{
   if(busyRef.current||!ready||!requireClosedForm())return;
   const startedWith=latestSnapshot.current,expectedGeneration=generation;
@@ -1637,6 +1638,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
         :"Архив .iwxa переносит проекты между копиями Atlas. История сохранений в него не входит. В совместимом Admin Center архив открывается для просмотра и подготовки поручений. Для прежних версий остаётся копия JSON."}</p>
       </div>
      </details>
+     {!embedded&&<AtlasPersonLicense enabled={native}/>}
      <button disabled={!!editor} className="icon-button inspector-button" aria-label={inspector?"Скрыть инспектор":"Показать инспектор"}
       title="Инспектор" onClick={()=>setInspector(!inspector)}>◧</button>
     </div>
