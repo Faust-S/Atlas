@@ -24,8 +24,8 @@ test("T3 native continuation owner uses actual Atlas Tauri commands, not simulat
  assert.match(native,/fn atlas_commit\(/);
  assert.doesNotMatch(binding,/localStorage|indexedDB|fetch\(|new WebSocket|spawn\(/);
 });
-test("Installed signed D6 owner is mandatory; there is no browser-provided authority or fallback",()=>{
- for(const name of ["originalT3","originalAgent","originalExchange",
+test("Installed signed D6 owners are mandatory; original Agent supplies verified Exchange delegate when needed",()=>{
+ for(const name of ["originalT3","originalAgent",
    "atlasAuthority","hostLifecycle"])
   assert.ok(binding.includes(name),name);
  assert.match(binding,/if\(!isTauri\(\)\)die\("ATLAS_T3_INSTALLED_ATLAS_TAURI_REQUIRED"\)/);
@@ -38,7 +38,8 @@ test("Installed signed D6 owner is mandatory; there is no browser-provided autho
  assert.ok(binding.includes("ATLAS_T3_INSTALLED_D6_READBACK_INVALID"));
  assert.ok(binding.includes("ATLAS_T3_INSTALLED_D6_RECOVERY_INVALID"));
  assert.match(selector,/originalSource\(selection,requested,strictRevision\)/);
- assert.match(binding,/originalExchange\.readReceipt\(input\)/);
+ assert.match(binding,/exchange\.readReceipt\(input\)/);
+ assert.match(binding,/originalExchange\?\?createOriginalAgentExchangeReceiptPort\(originalAgent\)/);
  assert.match(binding,/atlasAuthority\.verifyWrite\(input\)/);
  assert.match(binding,/await invoke\("atlas_open"\)/);
  assert.match(t3,/createAtlasT3NativeRecipient/);
