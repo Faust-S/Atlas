@@ -50,14 +50,21 @@ export function createAtlasT3OriginalHostPorts({
     const saved=await store.readSaved();
     const selected=createAtlasSavedRef(saved.snapshot,{projectId,workId},
      {persisted:true,dirty:false});
-    if(await authorizeAtlasProjectRead({workRef:selected,context,
-      purpose:"atlas.work.result.selection"})!==true)
+    const projectRight=await authorizeAtlasProjectRead({workRef:selected,context,
+      purpose:"atlas.work.result.selection"});
+    if(projectRight===false)
+     throw Object.assign(Error("ATLAS_T3_PROJECT_READ_NOT_AUTHORIZED"),
+      {code:"ATLAS_T3_PROJECT_READ_NOT_AUTHORIZED",outcome:"DENIED"});
+    if(projectRight!==true)
      throw Error("ATLAS_T3_PROJECT_READ_NOT_AUTHORIZED");
     if(isHostActive()!==true)throw Error("ATLAS_T3_HOST_DISPOSED");
     let result;
     try{result=await continueOriginalAcceptedResult({workRef:selected,context});}
     catch(error){
-     // Original native write may have committed before its Host shut down.
+     // An explicit original owner refusal is final even if the error code
+     // otherwise resembles a lost ACK. Never erase its exact code/outcome.
+     if(error?.outcome==="DENIED")throw error;
+     // Native write may have committed before its Host shut down.
      // Preserve the selected SAVED WorkRef for UI read-only recovery.
      if(["ATLAS_T3_INSTALLED_D6_OUTCOME_UNKNOWN",
           "T3_D6_NATIVE_OUTCOME_UNKNOWN"].includes(error?.code))
@@ -114,8 +121,12 @@ export function createAtlasT3OriginalHostPorts({
     const saved=await store.readSaved();
     const current=createAtlasSavedRef(saved.snapshot,{projectId,workId},
      {persisted:true,dirty:false});
-    if(await authorizeAtlasProjectRead({workRef:current,context,
-      purpose:"atlas.work.result.recovery"})!==true)
+    const projectRight=await authorizeAtlasProjectRead({workRef:current,context,
+      purpose:"atlas.work.result.recovery"});
+    if(projectRight===false)
+     throw Object.assign(Error("ATLAS_T3_PROJECT_READ_NOT_AUTHORIZED"),
+      {code:"ATLAS_T3_PROJECT_READ_NOT_AUTHORIZED",outcome:"DENIED"});
+    if(projectRight!==true)
      throw Error("ATLAS_T3_PROJECT_READ_NOT_AUTHORIZED");
     if(isHostActive()!==true)throw Error("ATLAS_T3_HOST_DISPOSED");
     const result=await recoverOriginalAcceptedResult({projectId,workId,context});
