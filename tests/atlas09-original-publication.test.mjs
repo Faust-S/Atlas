@@ -213,3 +213,52 @@ test("An unconfirmed publication error tells the user to recover, never to resen
  assert.match(src,/Не отправляйте повторно/);
  assert.match(src,/Проверить публикацию/);
 });
+
+test("Lost publication ACK cannot dispatch twice within the same installed Host",async()=>{
+ const f=fixture();
+ let attempts=0,ownerNoWrite=false;
+ f.agent.publishAcceptedForWork=async()=>{attempts++;throw Error("SIGNED_ORIGINAL_ACK_LOST");};
+ const port=createAtlasT3OriginalPublicationPort(f.options);
+ assert.equal((await port.publishSelected(f.selection)).status,"OUTCOME_UNKNOWN");
+ assert.equal((await port.publishSelected(f.selection)).status,"OUTCOME_UNKNOWN");
+ assert.equal(attempts,1,"Host must not submit duplicate after possible signed write");
+ f.agent.recoverPublicationForWork=async()=>({
+  status:"NOT_PUBLISHED_CONFIRMED",operationId:OP,
+  recipientId:"iwxa.atlas",retrySafe:false
+ });
+ const absent=await port.recoverSelected(f.selection);
+ assert.equal(absent.status,"NOT_PUBLISHED_CONFIRMED");
+ // This is the only documented original Agent answer proving no prior
+ // dispatch, and the Agent's original ledger still verifies it independently.
+ assert.equal((await port.publishSelected(f.selection)).status,"OUTCOME_UNKNOWN");
+ assert.equal(attempts,2);
+});
+test("A successful original Agent publication cannot be reissued in one Host",async()=>{
+ const f=fixture(),port=createAtlasT3OriginalPublicationPort(f.options);
+ assert.equal((await port.publishSelected(f.selection)).status,
+  "OWNER_READBACK_CONFIRMED");
+ assert.equal((await port.publishSelected(f.selection)).status,"OUTCOME_UNKNOWN");
+ assert.equal(f.stats().published,1,"A confirmed signed transfer is terminal");
+ assert.equal((await port.recoverSelected(f.selection)).status,"OUTCOME_UNKNOWN");
+ assert.equal(f.stats().published,1);
+});
+test("Explicit native Agent denial remains distinguishable and can be retried after rights change",async()=>{
+ const f=fixture({ownerDenied:true}),port=createAtlasT3OriginalPublicationPort(f.options);
+ await assert.rejects(()=>port.publishSelected(f.selection),
+  error=>error===f.ownerError&&error.outcome==="DENIED");
+ let resends=0;
+ f.agent.publishAcceptedForWork=async()=>{resends++;return {
+  status:"NOT_PUBLISHED_CONFIRMED",operationId:OP,
+  recipientId:"iwxa.atlas",retrySafe:false
+ };};
+ assert.equal((await port.publishSelected(f.selection)).status,
+  "NOT_PUBLISHED_CONFIRMED");
+ assert.equal(resends,1);
+});
+test("Invalid post-publication receipt never permits a second original publish",async()=>{
+ const f=fixture({invalidResult:true}),port=createAtlasT3OriginalPublicationPort(f.options);
+ await assert.rejects(()=>port.publishSelected(f.selection),
+  {code:"ATLAS_T3_ORIGINAL_PUBLICATION_SOURCE_INVALID"});
+ assert.equal((await port.publishSelected(f.selection)).status,"OUTCOME_UNKNOWN");
+ assert.equal(f.stats().published,1,"Invalid ACK must not authorize resending");
+});
