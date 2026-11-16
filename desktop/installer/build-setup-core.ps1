@@ -193,8 +193,13 @@ try {
                 }
             } finally { $bmp.Dispose() }
         } finally { $nativeIcon.Dispose() }
-        "ATLAS_INSTALLED_EXE=$installedExe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-        "ATLAS_SETUP_CORE_PACKAGE=$outputPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+        # GitHub runner variables do not exist on an isolated local
+        # Windows profile. Installation and native qualification must be
+        # equally usable outside CI; the registry remains authoritative.
+        if ($env:GITHUB_ENV) {
+            "ATLAS_INSTALLED_EXE=$installedExe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            "ATLAS_SETUP_CORE_PACKAGE=$outputPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+        }
         Write-Host "ATLAS09_SETUP_CORE_NATIVE_INSTALL_PASS data=$($locations.dataRoot) program=$($locations.programRoot)"
     }
 } finally {
