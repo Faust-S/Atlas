@@ -23,7 +23,8 @@ const {createTrustedNativeContinuation} = await import(pathToFileURL(source).hre
 
 test("Original T3 signed Result -> native Atlas decision -> cold double readback, with no repeat",async()=>{
  let snapshot=empty(),generation="native:0",nativeWrites=0,denied=false,sourceRev=2;
- let nativeReceiptOutage=false,denyApply=false,denyReadback=false;
+ let nativeReceiptOutage=false,denyApply=false,denyReadback=false,
+  denyNativeCommit=false;
  const p=createProject(snapshot,{name:"Real enterprise workspace",type:"engineering"});
  snapshot=p.state;
  const w=createItem(snapshot,p.id,{title:"Documented equipment installation"});
@@ -46,7 +47,8 @@ test("Original T3 signed Result -> native Atlas decision -> cold double readback
   schema_id:"iwxa.result",revision:2};
  const commands=[];
  const originalStore=createAtlasT3DesktopStorePort({
-  authorizeCommand:async command=>["atlas_open","atlas_commit"].includes(command),
+  authorizeCommand:async command=>["atlas_open","atlas_commit"].includes(command)&&
+    !(denyNativeCommit&&command==="atlas_commit"),
   invoke:async(command,args)=>{
    commands.push(command);
    if(command==="atlas_open")
@@ -126,6 +128,14 @@ test("Original T3 signed Result -> native Atlas decision -> cold double readback
   {code:"ATLAS_T3_PROJECT_WRITE_NOT_AUTHORIZED",outcome:"DENIED"});
  assert.equal(nativeWrites,0,"A denied original D6 Result cannot commit Atlas");
  denyApply=false;
+ // A second ORIGINAL pre-command owner, the Atlas native authorizer,
+ // also reports a definite DENIED before invoking atlas_commit. The
+ // original signed D6 must preserve its code and prevent a write.
+ denyNativeCommit=true;
+ await assert.rejects(make({countConsent:false}).continueSelected(originalRef),
+  {code:"ATLAS_T3_U05_WRITE_DENIED",outcome:"DENIED"});
+ assert.equal(nativeWrites,0);
+ denyNativeCommit=false;
  const originalD6=make();
  const preview=await originalD6.preview(originalRef);
  assert.equal(preview.status,"AVAILABLE");
