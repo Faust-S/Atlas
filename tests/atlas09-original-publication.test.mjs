@@ -265,3 +265,32 @@ test("Invalid post-publication receipt never permits a second original publish",
  assert.equal((await port.publishSelected(f.selection)).status,"OUTCOME_UNKNOWN");
  assert.equal(f.stats().published,1,"Invalid ACK must not authorize resending");
 });
+
+test("A VERIFIED receipt disclosing unrelated Workspace data is never a published Agent Result",async()=>{
+ const f=fixture();
+ f.exchange.readReceipt=async args=>({status:"VERIFIED",
+  recipientId:"iwxa.atlas",taskId:args.taskId,resultId:args.resultId,
+  archiveSha256:args.archiveSha256,
+  originalSignatureVerified:true,archiveBytesVerified:true,
+  originalManifestVerified:true,disclosureScope:"FULL_WORKSPACE",
+  selectedSourceObjectRef:SOURCE});
+ const port=createAtlasT3OriginalPublicationPort(f.options);
+ await assert.rejects(()=>port.publishSelected(f.selection),
+  {code:"ATLAS_T3_ORIGINAL_PUBLICATION_DISCLOSURE_UNVERIFIED"});
+ assert.equal(f.stats().published,1);
+ assert.equal((await port.publishSelected(f.selection)).status,"OUTCOME_UNKNOWN");
+ assert.equal(f.stats().published,1,"Unscoped signed archive cannot trigger retry");
+});
+test("An original receipt with a different selected Object is unverified",async()=>{
+ const f=fixture();
+ f.exchange.readReceipt=async args=>({status:"VERIFIED",
+  recipientId:"iwxa.atlas",taskId:args.taskId,resultId:args.resultId,
+  archiveSha256:args.archiveSha256,
+  originalSignatureVerified:true,archiveBytesVerified:true,
+  originalManifestVerified:true,disclosureScope:"ORIGINAL_RESULT_ONLY",
+  selectedSourceObjectRef:{...SOURCE,revision:SOURCE.revision+1}});
+ const port=createAtlasT3OriginalPublicationPort(f.options);
+ await assert.rejects(()=>port.publishSelected(f.selection),
+  {code:"ATLAS_T3_ORIGINAL_PUBLICATION_DISCLOSURE_UNVERIFIED"});
+ assert.equal(f.stats().published,1);
+});
