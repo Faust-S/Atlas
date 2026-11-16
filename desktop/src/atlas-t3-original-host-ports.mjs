@@ -2,6 +2,8 @@
 // This is an adapter over installed owner ports, never a network gateway,
 // second Store, Task Engine, Publisher issuer, Kernel or Exchange.
 import {createAtlasT3DesktopStorePort} from "./atlas-t3-store-port.mjs";
+import {createAtlasT3OriginalPublicationPort}
+ from "./atlas-t3-original-publication.mjs";
 import {createAtlasSavedRef} from "../../src/project-host-port.mjs";
 import {createAtlasT3NativeRecipient,createAtlasT3AgentTaskSelection}
  from "../../src/atlas-t3-native-recipient.mjs";
@@ -12,7 +14,7 @@ export function createAtlasT3OriginalHostPorts({
  findOriginalAgentTask,currentAgentContext,continueOriginalAcceptedResult,
  recoverOriginalAcceptedResult,
  readOriginalAgentAccepted,readOriginalExchangeReceipt,verifyAtlasWrite,
- isHostActive
+ originalAgentPublisher,isHostActive
 }={}){
  // Every external owner is mandatory; no fallback to a licence check or
  // direct receipt of unverified Task/Result text from a user interface.
@@ -26,6 +28,14 @@ export function createAtlasT3OriginalHostPorts({
   readOriginalAgentAccepted,readOriginalExchangeReceipt,
   verifyAtlasWrite,isHostActive
  });
+ // The ORIGINAL installed Agent's optional signed publication source.
+ // Uses the SAME saved Atlas U05 WorkRef and existing original grant.
+ // It does not publish unless the user explicitly requests it.
+ const publication=originalAgentPublisher?createAtlasT3OriginalPublicationPort({
+  readSaved:store.readSaved,authorizeAtlasProjectRead,
+  currentAgentContext,originalAgent:originalAgentPublisher,
+  originalExchange:{readReceipt:readOriginalExchangeReceipt},isHostActive
+ }):null;
  // UI never chooses the Agent subject or grant. The trusted installed
  // owner resolves its current context for each explicit user selection.
  const issueSelectedWork=typeof currentAgentContext==="function"
@@ -165,6 +175,8 @@ export function createAtlasT3OriginalHostPorts({
   : null;
  return Object.freeze({issueTask:agent.issue,
   ...(issueSelectedWork?{issueSelectedWork}:{}),
+  ...(publication?{publishSelectedResult:publication.publishSelected,
+   recoverSelectedPublication:publication.recoverSelected}:{}),
   ...(continueSelectedResult?{continueSelectedResult}:{}),
   ...(recoverSelectedResult?{recoverSelectedResult}:{}),recipient:atlas});
 }
