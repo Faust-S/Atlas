@@ -112,3 +112,16 @@ test("Original Agent Exchange adapter feeds the existing Atlas D6 recipient and 
  assert.equal(writes,1,"No second Atlas commit during readback");
  assert.ok(agentReads>=3,"The original Agent Exchange owner is consulted on each read");
 });
+
+test("Installed Atlas uses already verified Agent Exchange reader when no separate original port is provided",()=>{
+ const installed=readFileSync(new URL("../desktop/src/atlas-t3-installed-host.mjs",
+  import.meta.url),"utf8");
+ assert.equal(installed.split(
+  "originalExchange??createOriginalAgentExchangeReceiptPort(originalAgent)"
+ ).length-1,2,"Both trusted recipient and UI Host must use the same original delegate");
+ assert.equal(installed.split(
+  "readOriginalExchangeReceipt:input=>exchange.readReceipt(input)"
+ ).length-1,2);
+ assert.doesNotMatch(installed,/originalExchange\.readReceipt\(input\)/);
+ assert.match(installed,/\[exchange,\["readReceipt"\]\]/);
+});
