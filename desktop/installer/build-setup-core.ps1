@@ -4,7 +4,9 @@
 param(
     [string]$SetupCoreRoot = "setup-core-source",
     [string]$Output = "artifacts/IWXA-Atlas-0.9.0-dev.1-Setup.exe",
-    [switch]$InstallForQualification
+    [switch]$InstallForQualification,
+    [switch]$IncludePersonConsumer,
+    [string]$PersonTrustFile = ""
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -43,11 +45,67 @@ $tree = $tree.Trim()
 if ($head -notmatch '^[0-9a-f]{40}$' -or $tree -notmatch '^[0-9a-f]{40}$') {
     throw 'ATLAS_SETUP_SOURCE_REVISION_MISSING'
 }
-$temporary = Join-Path $env:RUNNER_TEMP ('atlas-setup-' + [Guid]::NewGuid().ToString('N'))
+$scratch = if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { [IO.Path]::GetTempPath() }
+$temporary = Join-Path $scratch ('atlas-setup-' + [Guid]::NewGuid().ToString('N'))
 $payload = Join-Path $temporary 'payload'
 New-Item -ItemType Directory -Path $payload -Force | Out-Null
 try {
     Copy-Item -LiteralPath $exe -Destination (Join-Path $payload $product.entrypoint) -Force
+    if ($IncludePersonConsumer) {
+        # The privately compiled ORIGINAL T3 receiver is staged only by a
+        # local closed qualification. Never retrieve it from a public repo,
+        # accept it from an incoming .iwxa or create a second verifier.
+        $consumer = Join-Path $atlas 'desktop/src-tauri/target/release/t3/iwxa-t3-product-consumer.exe'
+        if (!(Test-Path -LiteralPath $consumer -PathType Leaf)) {
+            throw 'ATLAS_PERSON_PRIVATE_CONSUMER_NOT_STAGED'
+        }
+        $info = Get-Item -LiteralPath $consumer -Force
+        if ($info.LinkType -or $info.Length -lt 1024) {
+            throw 'ATLAS_PERSON_PRIVATE_CONSUMER_FILE_INVALID'
+        }
+        $recipient = Join-Path $payload 't3'
+        New-Item -ItemType Directory -Path $recipient -Force | Out-Null
+        $copy = Join-Path $recipient 'iwxa-t3-product-consumer.exe'
+        Copy-Item -LiteralPath $consumer -Destination $copy
+        $a = (Get-FileHash -LiteralPath $consumer -Algorithm SHA256).Hash
+        $b = (Get-FileHash -LiteralPath $copy -Algorithm SHA256).Hash
+        if ($a -ne $b) { throw 'ATLAS_PERSON_PRIVATE_CONSUMER_COPY_MISMATCH' }
+        Write-Host 'ATLAS_PERSON_ORIGINAL_T3_COMPONENT_STAGED_SHA256_PASS'
+        if ([string]::IsNullOrWhiteSpace($PersonTrustFile)) {
+            throw 'ATLAS_PERSON_OWNER_PUBLIC_TRUST_REQUIRED'
+        }
+        $trustPath = (Resolve-Path -LiteralPath $PersonTrustFile -ErrorAction Stop).Path
+        $trustInfo = Get-Item -LiteralPath $trustPath -Force
+        if ($trustInfo.LinkType -or $trustInfo.Length -lt 10 -or
+            $trustInfo.Length -gt 1048576) {
+            throw 'ATLAS_PERSON_PUBLIC_TRUST_FILE_INVALID'
+        }
+        $trustRaw = Get-Content -LiteralPath $trustPath -Raw -Encoding utf8
+        if ($trustRaw.Contains('PRIVATE KEY')) {
+            throw 'ATLAS_PERSON_PUBLIC_TRUST_CONTAINS_PRIVATE_MATERIAL'
+        }
+        $trust = $trustRaw | ConvertFrom-Json -Depth 100
+        if ($trust.policy.environment -ne 'PRODUCTION' -or
+            -not $trust.policy.keys -or -not $trust.policy.authorities -or
+            -not $trust.productLicenseIssuers) {
+            throw 'ATLAS_PERSON_OWNER_TRUST_FIELDS_INVALID'
+        }
+        $atlasIssuer = @($trust.productLicenseIssuers.PSObject.Properties |
+            Where-Object { $_.Value.environment -eq 'PRODUCTION' -and
+                $_.Value.productIds -contains 'IWXA_ATLAS' })
+        if ($atlasIssuer.Count -lt 1) {
+            throw 'ATLAS_PERSON_OWNER_TRUST_ATLAS_NOT_AUTHORIZED'
+        }
+        $trustCopy = Join-Path $recipient 'publisher-person-trust.json'
+        Copy-Item -LiteralPath $trustPath -Destination $trustCopy
+        $trustHash = (Get-FileHash -LiteralPath $trustPath -Algorithm SHA256).Hash
+        if ((Get-FileHash -LiteralPath $trustCopy -Algorithm SHA256).Hash -ne $trustHash) {
+            throw 'ATLAS_PERSON_OWNER_PUBLIC_TRUST_SHA_MISMATCH'
+        }
+        Write-Host 'ATLAS_PERSON_PUBLIC_TRUST_STAGED_SHA256_PASS'
+    } elseif (-not [string]::IsNullOrWhiteSpace($PersonTrustFile)) {
+        throw 'ATLAS_PERSON_TRUST_REQUIRES_ORIGINAL_CONSUMER'
+    }
     $stub = Join-Path $temporary 'iwxa-setup-core-stub.exe'
     & $stubBuilder -Output $stub -Icon $icon
     if ($LASTEXITCODE -ne 0 -or !(Test-Path -LiteralPath $stub -PathType Leaf)) {
