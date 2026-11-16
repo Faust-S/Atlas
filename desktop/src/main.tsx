@@ -752,6 +752,59 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    ". Подтверждения Result нет. Повторное применение не запускалось.");
   return true;
  };
+ // Publication is a SEPARATE original Agent/T3 owner operation, not D6
+ // apply. It only prepares a signed source for subsequent "Получить Result".
+ // Never reissue publication after an uncertain acknowledgement.
+ const runAgentResultPublication=async(projectId:string,workId:string,
+  mode:"publish"|"recover")=>{
+  const original=mode==="publish"?host?.t3?.publishSelectedResult:
+   host?.t3?.recoverSelectedPublication;
+  if(!original){
+   issue(Error("Оригинальный подписанный публикатор Agent/T3 не подключён."));return;
+  }
+  if(!ready||busyRef.current||dirtyRef.current||!persisted||
+     editorOpenRef.current||pendingImportOpenRef.current||
+     savedVersionsOpenRef.current||savedRefOpenRef.current){
+   issue(Error("Сохраните проект и закройте формы перед публикацией или проверкой."));return;
+  }
+  const started=latestSnapshot.current,expectedGeneration=generation;
+  busyRef.current=true;setBusy(true);
+  try{
+   const actual=await readSavedSnapshotForReference({invoke,
+    expectedGeneration,snapshot:started,signature:snapshotText,
+    readValidated:(raw:Atlas)=>deserialize(JSON.stringify(raw))});
+   const workRef=createAtlasSavedRef(actual,{projectId,workId},
+    {persisted:true,dirty:false}) as
+    {projectId:string;workId:string;revision:string};
+   if(latestSnapshot.current!==started||dirtyRef.current||editorOpenRef.current)
+    throw Error("Atlas изменился до обращения к Agent. Публикация не запускалась.");
+   const result=await original({projectId,workId});
+   if(result?.workRef?.projectId!==workRef.projectId||
+      result?.workRef?.workId!==workRef.workId||
+      result?.workRef?.revision!==workRef.revision)
+    throw Error("Agent не подтвердил исходную работу. Не повторяйте отправку.");
+   if(latestSnapshot.current!==started||dirtyRef.current||editorOpenRef.current)
+    throw Error("Atlas изменился во время публикации. Не повторяйте отправку, проверьте исходную квитанцию.");
+   if(result.status==="OWNER_READBACK_CONFIRMED"){
+    if(typeof result.operationId!=="string"||
+       !/^agent:t3:atlas:[a-f0-9]{64}$/.test(result.operationId))
+     throw Error("Публикатор не подтвердил оригинальную квитанцию. Проверьте её без повторной отправки.");
+    setMessage("Agent подтвердил подписанную публикацию Result через оригинальный T3. "+
+     "Теперь нажмите «Получить Result» для отдельного D6 и записи Atlas Decision.");
+   }else if(result.status==="NOT_PUBLISHED_CONFIRMED"){
+    setMessage("Оригинальный T3 подтвердил отсутствие публикации. "+
+     "Можно отдельно запросить «Опубликовать Result» после проверки принятия в Agent.");
+   }else if(result.status==="OUTCOME_UNKNOWN"||
+            result.status==="OPERATION_IN_PROGRESS"){
+    setMessage("Исход публикации Agent Result неизвестен. "+
+     "Не отправляйте повторно. «Проверить публикацию» читает оригинальный реестр.");
+   }else{
+    throw Error("Неизвестный ответ оригинального публикатора. Запись не подтверждена.");
+   }
+   setError("");
+  }catch(e){if(!showOriginalT3Denial(e))issue(e)}
+  finally{busyRef.current=false;setBusy(false)}
+ };
  // An original T3 D6 Host owns signed Result selection and Human consent.
  // Atlas provides only the exact saved Project/WorkRef.
  const receiveAtlasAgentResult=async(projectId:string,workId:string)=>{
