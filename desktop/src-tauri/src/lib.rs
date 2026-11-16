@@ -699,6 +699,63 @@ mod persistence_tests{
         assert_eq!(load_root(&root.0).unwrap().generation,second.generation);
         assert!(restore_root(&root.0).is_err()); // healthy state cannot be rolled back silently
     }
+    // Qualify the ORIGINAL U05 file-based Store for the exact Atlas
+    // Decision shape used by D6. This is native persistence only; it does
+    // not simulate or claim an Agent signature / T3 Exchange permission.
+    #[test]
+    fn d6_result_decision_is_durable_across_two_cold_native_opens_with_cas() {
+        let root=scratch();
+        let mut initial=snapshot(1,&["Signed Result destination"]);
+        initial["projects"][0]["items"]=serde_json::json!([{
+            "id":"work-d6", "title":"Receive Human accepted Result",
+            "state":"todo", "estimateDays":3
+        }]);
+        let first=commit_root(&root.0,"none",initial.clone()).unwrap();
+        let operation_id=format!("atlas:t3:{}", "d".repeat(64));
+        let record=serde_json::json!({
+            "schema":"T3_RESULT_LINK/1",
+            "operationId":operation_id,
+            "projectId":"project-0",
+            "workId":"work-d6",
+            "sourceRevision":"1",
+            "sourceObjectRef":{
+                "workspace_id":"workspace:original",
+                "object_id":"result:accepted",
+                "schema_id":"iwxa.result",
+                "revision":2
+            },
+            "taskId":"TASK:accepted",
+            "resultId":"RESULT:accepted",
+            "acceptedDigest":"a".repeat(64),
+            "archiveSha256":"b".repeat(64)
+        });
+        let decision_text=format!("T3_RESULT_LINK/1 {}",record);
+        let mut candidate=initial.clone();
+        candidate["revision"]=serde_json::json!(2);
+        candidate["projects"][0]["decisions"]=serde_json::json!([{
+            "id":"decision:original:d6",
+            "text":decision_text,
+            "date":"2026-11-16"
+        }]);
+        let committed=commit_root(&root.0,&first.generation,candidate.clone())
+            .expect("original U05 CAS commit of D6 Decision");
+        assert_eq!(committed.project_blocks_written,1);
+        // Drop all local materialized values between independent disk reads.
+        let first_cold=load_root(&root.0).expect("first cold native U05 read");
+        assert_eq!(first_cold.generation,committed.generation);
+        assert_eq!(first_cold.snapshot,candidate);
+        let second_cold=load_root(&root.0).expect("second cold native U05 read");
+        assert_eq!(second_cold.generation,committed.generation);
+        assert_eq!(second_cold.snapshot,first_cold.snapshot);
+        assert_eq!(second_cold.snapshot["projects"][0]["decisions"]
+            .as_array().unwrap().len(),1);
+        assert_eq!(second_cold.snapshot["projects"][0]["items"][0]["state"],"todo");
+        // A competing original writer with a stale generation cannot
+        // create a second Decision even if it replays the same payload.
+        assert!(commit_root(&root.0,&first.generation,candidate).is_err());
+        assert_eq!(load_root(&root.0).unwrap().generation,committed.generation);
+    }
+
     #[cfg(windows)]
     #[test]
     fn win32_transient_sharing_violation_keeps_atomic_commit_and_readback(){
