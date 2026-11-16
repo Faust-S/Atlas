@@ -802,8 +802,13 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     throw Error("Неизвестный ответ оригинального публикатора. Запись не подтверждена.");
    }
    setError("");
-  }catch(e){if(!showOriginalT3Denial(e))issue(e)}
-  finally{busyRef.current=false;setBusy(false)}
+  }catch(e){
+   if(!showOriginalT3Denial(e)){
+    setError(deepFreezeError(e));
+    setMessage("Публикация Agent Result не подтверждена. Не отправляйте повторно "+
+     "до проверки оригинальной квитанции через «Проверить публикацию».");
+   }
+  }finally{busyRef.current=false;setBusy(false)}
  };
  // An original T3 D6 Host owns signed Result selection and Human consent.
  // Atlas provides only the exact saved Project/WorkRef.
