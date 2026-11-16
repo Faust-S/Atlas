@@ -75,7 +75,7 @@ jobs:
         run: |
           node --check t3-original/packages/t3-core/src/t3/native-agent-atlas-source-publisher.mjs
           node --test t3-original/packages/t3-core/tests/t3-d6-native-agent-source-publisher.test.mjs
-          node --test tests/atlas09-original-t3-sender-contract.test.mjs
+          node --test tests/atlas09-original-t3-sender-contract.mjs
       - name: Checkout actual public Admin Center contract at audited revision
         uses: actions/checkout@v4
         with:
