@@ -57,17 +57,25 @@ jobs:
           node --check src/app.mjs
           node --check src/project-host-port.mjs
           node --check src/atlas-t3-native-recipient.mjs
-      - name: Checkout exact original public T3 D6 owner (no alternate Kernel)
+      - name: Checkout current qualified original public T3 D6 and signed-source publisher
         uses: actions/checkout@v4
         with:
           repository: Faust-S/knowledge
-          ref: 38ab0099104d6d17bb650b0d7b1aba9ede00fa65
+          # D6's original blob is unchanged from 38ab0099. This revision
+          # additionally contains the qualified ORIGINAL Agent-to-Atlas
+          # native source publisher, never another Kernel or Exchange.
+          ref: cb3843d887df1180c2f08ed8bb00c726e9b767a2
           path: t3-original
           persist-credentials: false
       - name: Qualify actual original T3 D6 with Atlas native recipient source
         env:
           ATLAS_T3_ORIGINAL_D6_MODULE: ${{ github.workspace }}/t3-original/packages/t3-core/src/t3/native-result-continuation.mjs
         run: node --test tests/atlas-t3-original-d6-qualification.mjs
+      - name: Qualify original T3 native Agent source-publisher and exact Atlas port contract
+        run: |
+          node --check t3-original/packages/t3-core/src/t3/native-agent-atlas-source-publisher.mjs
+          node --test t3-original/packages/t3-core/tests/t3-d6-native-agent-source-publisher.test.mjs
+          node --test tests/atlas09-original-t3-sender-contract.test.mjs
       - name: Checkout actual public Admin Center contract at audited revision
         uses: actions/checkout@v4
         with:
