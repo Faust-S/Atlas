@@ -68,3 +68,67 @@ Atlas не имеет права выдавать `selectAcceptedForWork`, `read
 Windows CI автономного Atlas проверяет действительный Tauri и Setup Core, большой проект, сохранение и холодное открытие. Успешный такой CI **не** подтверждает пункт 2–5 с Agent. Тесты Node с simulated Agent/Kernel/Exchange остаются исходной квалификацией и не объявляются установленным end-to-end.
 
 **Статус до появления реального signed Agent port:** `ATLAS_09_SOURCE_D6=QUALIFYING`, `ATLAS_NATIVE_WINDOWS=QUALIFYING`, `INSTALLED_AGENT_T3_ATLAS=HOLD`. Стабильная `release/0.8` не изменяется.
+
+## Следующее уточнение: штатный U05 command owner и настоящий Agent D6 candidate
+
+При пересборке Atlas 0.9 установленный порт
+`desktop/src/atlas-t3-store-port.mjs` теперь различает:
+
+- **`false`** от оригинального `atlasAuthority.authorizeCommand("atlas_commit",args)`
+  до входа в Tauri: `{code:"ATLAS_T3_U05_WRITE_DENIED", outcome:"DENIED"}`.
+- **`undefined`/`null`/неверный тип** исходного решения: отказ
+  от команды без достоверного `outcome:"DENIED"`.
+- **исключение после разрешения** из оригинального
+  `atlasNativeInvoke("atlas_commit",args)`: код/ошибка Tauri не переписывается.
+  Потеря ACK и конфликт CAS не доказывают отсутствие записи.
+- Аналогично для `atlas_open`: только точное `false` даёт
+  `ATLAS_T3_U05_READ_DENIED` c `outcome:"DENIED"`.
+
+Оба производственных входа в
+`desktop/src/atlas-t3-installed-host.mjs` сохраняют исходный
+трёхзначный результат авторизации, не превращая отсутствие ответа в
+`false`. Исходный D6 получает его из того же оригинального native
+Store; дополнительных command gates/Store не создаётся.
+
+Новое исходное испытание
+`tests/atlas09-native-command-authority.test.mjs`
+проверяет explicit denial, malformed decision, потерянное native ACK
+и CAS без переотправки. Квалификация оригинального D6
+`tests/atlas-t3-original-d6-qualification.mjs`
+дополнена сценарием отказа непосредственно до `atlas_commit`.
+
+### Параллельная исходная ветка Agent 0.6
+
+Проверена существующая ветка
+`Faust-S/iwxa-personal-agent@work/2026-11-16-agent06-original-t3-result-owner-d6`,
+известный HEAD `a05145f48da70623c76a50d7d9e2090e5479305b`.
+
+В ней **уже реализован** `runtime/t3_original_result_owner.py`:
+`InstalledOriginalAgentResultOwner.currentContext/findTask/issueTask/readTask/selectAcceptedForWork/readAccepted/readOriginalExchangeReceipt`,
+с проверкой оригинальных Task/Result/Human Review.
+Не следует больше утверждать, что соответствующие методы Agent не существуют
+вообще. Однако этот кандидат ещё **не** объединён с общей Agent 0.6,
+а исходный подписанный T3 publisher/Kernel/Exchange owner не установлен:
+`T3_AGENT_INSTALLED_ORIGINAL_KERNEL_EXCHANGE_OWNER_REQUIRED`.
+Поэтому исходный код Agent не является доказательством передачи между
+установленными Agent и Atlas.
+
+Agent `readOriginalExchangeReceipt(request)` уже отвечает исходному
+требуемому `originalExchange.readReceipt(request)` на уровне формы данных.
+Доверенная композиция вправе подключить именно этот существующий
+делегирующий оригинальному T3 порт, но не выдавать локальный архив
+`iwxa.personal-agent.task-result` за подписанную квитанцию.
+
+Точный оставшийся внешний контракт владельца T3:
+`publishAccepted(...recipientId:"iwxa.atlas", originalOperationId)`,
+`readPublished(operationId)`,
+`read_published_for`, `read_published`, `read_receipt`,
+`read_latest_for_work`, с original signed D1, оригинальными
+Kernel Object/Event, Exchange и readback. Никакой новой реализации
+этих механизмов в Atlas. С учётом отдельного разрешения
+`package.export` для `iwxa.atlas` существующий T3 владелец
+должен подключить их в установленный Host.
+
+Отрицательное условие финальной приёмки остаётся обязательным:
+**только** нативный установленный Atlas и исходный T3 D6
+не подтверждают наличие настоящего подписанного Agent Result.
