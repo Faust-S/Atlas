@@ -2495,6 +2495,18 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
          disabled={busy||dirty||!persisted||!!editor}
          onClick={()=>void issueAtlasAgentTask(project.id,w.id)}
          title="Только оригинальный Agent и сохранённый WorkRef">Поручить Agent</Action>}
+        {(host?.t3?.publishSelectedResult||host?.t3?.recoverSelectedPublication)&&
+         <details className="atlas-work-fact-menu">
+          <summary>Публикация</summary><div className="button-row">
+           {host?.t3?.publishSelectedResult&&<Action
+            disabled={busy||dirty||!persisted||!!editor}
+            onClick={()=>void runAgentResultPublication(project.id,w.id,"publish")}
+            title="Исходный Agent публикует принятый Result через оригинальный T3">Опубликовать Result</Action>}
+           {host?.t3?.recoverSelectedPublication&&<Action
+            disabled={busy||dirty||!persisted||!!editor}
+            onClick={()=>void runAgentResultPublication(project.id,w.id,"recover")}
+            title="Без повторной отправки: чтение оригинальной квитанции">Проверить публикацию</Action>}
+          </div></details>}
         {host?.t3?.continueSelectedResult&&<Action
          disabled={busy||dirty||!persisted||!!editor}
          onClick={()=>void receiveAtlasAgentResult(project.id,w.id)}
