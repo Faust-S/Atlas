@@ -15,6 +15,7 @@ test("Atlas 0.9 ships both entrypoints in one original Tauri dist",()=>{
  assert.match(vite,/installedT3Host:resolve\(desktopRoot,"src\/atlas-react-surface\.tsx"\)/);
  assert.match(hosted,/export async function mountInstalledAtlasT3Surface\(/);
  assert.match(hosted,/export \{createInstalledAtlasT3NativeRecipient\}/);
+ assert.match(hosted,/export \{createOriginalAgentExchangeReceiptPort\}/);
  assert.match(hosted,/await createInstalledAtlasT3Host\(installedOwners\)/);
  assert.match(ui,/IWXA Atlas 0\.9\.0 \(разработка\)/);
  assert.doesNotMatch(ui,/0\.5\.0-dev\.1|atlas-react-surface\.tsx/);
