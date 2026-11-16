@@ -318,9 +318,10 @@ export function createAtlasT3AgentTaskSelection({
    fail("ATLAS_T3_NATIVE_STORE_UNAVAILABLE");
   const ref=createAtlasSavedRef(saved.snapshot,{projectId,workId},
    {persisted:true,dirty:false});
-  if(await authorizeProjectRead({workRef:ref,context:agentContext,
-     purpose:"atlas.work.task.selection"})!==true)
-   fail("ATLAS_T3_PROJECT_READ_NOT_AUTHORIZED");
+  const grant=await authorizeProjectRead({workRef:ref,context:agentContext,
+   purpose:"atlas.work.task.selection"});
+  if(grant===false)deny("ATLAS_T3_PROJECT_READ_NOT_AUTHORIZED");
+  if(grant!==true)fail("ATLAS_T3_PROJECT_READ_NOT_AUTHORIZED");
   live();
   const key=JSON.stringify(ref);
   if(issuing.has(key))fail("ATLAS_T3_AGENT_TASK_ISSUE_IN_PROGRESS");
