@@ -169,3 +169,66 @@ Kernel/Exchange Publisher** с `publishAccepted`/оригинальным
 signed `iwxa.atlas` receipt. Наличие Agent source-кода
 не равно готовности подписанного установленного обмена. Atlas
 оставляет `INSTALLED_AGENT_T3_ATLAS=HOLD` до настоящего E2E.
+
+## Atlas 0.9: готовый потребитель оригинальной публикации Agent (17.11)
+
+### Пользовательский маршрут при подключённых исходных владельцах
+
+Сохранить исходную WorkRef → «Поручить Agent» →
+Human Review в оригинальном Agent →
+**«Публикация» → «Опубликовать Result»** (отдельный оригинальный T3
+Kernel/Exchange Publisher и согласие владельца) →
+**«Проверить публикацию»** (только `recoverPublicationForWork`, без
+повторного подписания/передачи) →
+«Получить Result» (оригинальный T3 D6, отдельный Human consent) →
+штатный `atlas_commit` добавляет `T3_RESULT_LINK/1` Decision →
+«Проверить Result» (только оригинальный D6 recover) →
+два холодных чтения оригинального Atlas U05 Store.
+
+Публикация не записывает Atlas Decision. D6 не создаёт Agent Task или
+архив. Владелец Task/Result остаётся Personal Agent; Exchange, signed
+D1 grants и оригинальные Kernel Object/Event остаются у T3;
+Project/Work/Decision и CAS хранятся в исходном Atlas.
+
+В `desktop/src/atlas-t3-original-publication.mjs` реализован
+адресный адаптер **существующих** Agent-портов
+`publishAcceptedForWork/recoverPublicationForWork`.
+Он использует сохранённый WorkRef, текущий оригинальный Agent context,
+исходный Atlas Authority и повторное чтение `atlas_open` до отправки.
+Подтверждение проверяет `readAccepted`, `readReceipt`,
+`taskId/resultId/acceptedDigest/archiveSha256/sourceObjectRef/recipientId`.
+При потерянном ACK повторная публикация автоматически НЕ выполняется.
+
+`createAtlasT3OriginalHostPorts` и
+`createInstalledAtlasT3Host` предлагают эти действия **только**
+при наличии обеих исходных Agent-функций. Старый Agent,
+неподключённый T3 и автономный установленный Atlas
+не получают фиктивных команд публикации. Подключение исходного
+`readOriginalExchangeReceipt` Agent автоматически использует
+`createOriginalAgentExchangeReceiptPort`, если отдельный доверенный
+`originalExchange` не передан; второй Exchange не создаётся.
+
+Команда `invokeAtlasHost` и оригинальный U05 Store сохраняют
+`DENIED` только для явного `false` от владельца.
+Отсутствие ответа, конкурентный CAS и потерянный IPC ACK
+не считаются доказанным отказом. Установленный Host
+не теряет точный авторитетный отказ.
+
+**Исходная квалификация:** [№43967419802](https://github.com/Faust-S/Atlas/actions/runs/43967419802),
+**720/720 Node PASS**, original T3 D6 PASS,
+TypeScript/Vite/Center/`.iwxa` и compiled one `dist` PASS.
+Windows-квалификация новых кнопок, исходного Rust U05,
+инсталляции через Setup Core и двух холодных открытий:
+[№43967419807](https://github.com/Faust-S/Atlas/actions/runs/43967419807);
+её итог следует учитывать только после завершения Actions.
+
+**Пока не принят именно межпрограммный signed E2E.**
+Для него требуется не новый код Atlas, а действительный оригинальный
+установленный T3 Publisher `read_publication/publish_accepted`,
+Kernel Object/Event + signed `.iwxa` и exact
+`recipientId:"iwxa.atlas"` в паре с оригинальным Agent 0.6
+(`work/2026-11-16-agent06-original-t3-result-owner-d6`).
+Это ещё не готово в действительном установленном Host.
+Отсутствие владельца вызывает отказ, а не фиктивный PASS.
+`INSTALLED_AGENT_T3_ATLAS=HOLD` до настоящей подписи и
+двух независимых холодных чтений именно принятого Agent Result.
