@@ -172,3 +172,67 @@ Employee signature/Kernel Object и `iwxa.atlas` Exchange receipt
 установленный original Kernel/Exchange Publisher, зарегистрированный
 signed `package.export` для Atlas и независимая Windows-передача
 Agent Result → Atlas Decision → два холодных запуска.
+
+## 17 ноября 2026: самостоятельное действие публикации Agent Result
+
+У оригинального Agent 0.6 теперь существуют два отдельных метода,
+реализованных в изолированной
+`work/2026-11-16-agent06-original-t3-result-owner-d6`:
+
+- `publishAcceptedForWork({workRef,context,recipientId:"iwxa.atlas",purpose:"atlas.result.publish"})`
+  требует **явного** пользовательского действия, проверяет оригинальный
+  Task/Result/Human Review и делегирует единственную публикацию штатному
+  оригинальному T3 Publisher с отдельным разрешением и согласованием;
+- `recoverPublicationForWork` с теми же полями только читает
+  оригинальные `operationId`/Kernel/Exchange receipt, не подписывает,
+  не запускает повторный `publish_accepted` и не создаёт Task.
+
+Atlas 0.9 принял этот контракт без нового Core или Host.
+
+`desktop/src/atlas-t3-original-publication.mjs` предоставляет оригинальным
+портам `publishSelected` и `recoverSelected` на основе
+**только сохранённого** Atlas WorkRef и текущего контекста Agent.
+Сначала используется существующий `createAtlasSavedRef`, штатное
+`authorizeAtlasProjectRead`, `readSaved` и повторная проверка поколения.
+Публикация не получает исходный `.iwxa`, Task ID, digest или
+ссылку Result из интерфейса. Все поля принадлежат оригинальному Agent.
+Подтверждение `OWNER_READBACK_CONFIRMED` принимается только после
+повторного `readAccepted` и исходного
+`originalExchange.readReceipt` с полным совпадением
+`workRef,taskId,resultId,sourceObjectRef,acceptedDigest,archiveSha256,
+recipientId`. Исходные права и криптографические подписи проверяют
+оригинальные владельцы, а не Atlas.
+
+`createAtlasT3OriginalHostPorts` подключает оба метода к тому же
+оригинальному `readSaved`/Atlas Authority.
+`createInstalledAtlasT3Host` экспортирует в `t3` пару
+`publishSelectedResult/recoverSelectedPublication` **только** если
+подключённый установленный Agent действительно имеет
+`publishAcceptedForWork/recoverPublicationForWork`. Старый Agent,
+автономный Atlas и отсутствующий подписант не получают фиктивные
+действия.
+
+В таблице работ появляется компактное меню «Публикация»:
+«Опубликовать Result» → «Проверить публикацию», а затем независимо
+«Получить Result» (оригинальный D6) → «Проверить Result».
+Это два разных момента с собственными правами и квитанциями.
+`OUTCOME_UNKNOWN` от публикации никогда не приводит к повторной
+отправке. Проверка публикации всегда вызывает оригинальный
+`recoverPublicationForWork`, не `publishAcceptedForWork`.
+
+**Регрессионные испытания:**
+`tests/atlas09-original-publication.test.mjs` проверяет привязку
+к текущей работе, отдельность публикации/D6, повторное чтение,
+потерю ACK, `DENIED`, подмену workRef, пустые права и CAS-конкуренцию.
+Исходный прогон
+[Actions №43966749225](https://github.com/Faust-S/Atlas/actions/runs/43966749225)
+**715/715 Node PASS**, original D6, TypeScript/Vite, compiled `dist`
+**PASS**.
+
+**Критически важно:** это интеграция портов существующего Agent, не
+доказательство работающей подписи T3. Оригинальный установленный
+`read_publication/publish_accepted` с действительным Kernel Object/Event,
+подписанным Exchange на адресата `iwxa.atlas` и оригинальным журналом
+ещё не подключён. До его подключения пользовательская публикация
+завершится подлинным отказом исходного владельца; Atlas не
+подменяет его фикстурой. `INSTALLED_AGENT_T3_ATLAS=HOLD`.
