@@ -17,6 +17,8 @@ assert.ok(statSync(file).size>0);
 const code=readFileSync(file,"utf8");
 assert.ok(code.includes("mountInstalledAtlasT3Surface"),
  "ATLAS09_SIGNED_T3_HOST_EXPORT_NOT_SHIPPED");
+assert.ok(code.includes("createInstalledAtlasT3NativeRecipient"),
+ "ATLAS09_ORIGINAL_D6_NATIVE_RECIPIENT_EXPORT_NOT_SHIPPED");
 assert.ok(code.includes("mountAtlasSurface"),
  "ATLAS09_ORIGINAL_ATLAS_SURFACE_NOT_SHIPPED");
 const html=readFileSync(join(root,"index.html"),"utf8");
