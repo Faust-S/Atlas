@@ -363,3 +363,15 @@ test("Original native recipient mismatch is a definitive pre-write refusal",asyn
   {code:"ATLAS_T3_RECIPIENT_MISMATCH",outcome:"DENIED"});
  assert.equal(f.saves(),0);
 });
+
+test("Atlas 0.9 UI distinguishes original D6 DENIED from unknown and stored Result",()=>{
+ const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ const ports=readFileSync(new URL("../desktop/src/atlas-t3-original-host-ports.mjs",import.meta.url),"utf8");
+ assert.ok(ui.includes("const showOriginalT3Denial="));
+ assert.ok(ui.includes('verdict?.outcome!=="DENIED"'));
+ assert.ok(ui.includes("Подтверждения Result нет."));
+ assert.equal(ui.split("if(!showOriginalT3Denial(e))issue(e)").length-1,2);
+ assert.ok(ports.includes('if(error?.outcome==="DENIED")throw error'));
+ assert.ok(ui.includes('result.status==="OUTCOME_UNKNOWN"'));
+ assert.ok(ui.includes('result.status==="OWNER_READBACK_CONFIRMED"'));
+});
