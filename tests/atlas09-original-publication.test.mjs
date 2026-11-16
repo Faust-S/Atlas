@@ -116,7 +116,7 @@ test("Foreign work, unverified source, missing grant and missing owner cannot pu
    .publishSelected(denied.selection),
   {code:"ATLAS_T3_PROJECT_READ_NOT_AUTHORIZED",outcome:"DENIED"});
  assert.equal(denied.stats().published,0);
- const unknown=fixture({permission:undefined});
+ const unknown=fixture({permission:null});
  try{
   await createAtlasT3OriginalPublicationPort(unknown.options)
    .publishSelected(unknown.selection);
@@ -129,11 +129,11 @@ test("Foreign work, unverified source, missing grant and missing owner cannot pu
 });
 test("A competing original Atlas revision is rejected before publisher dispatch",async()=>{
  const f=fixture();let reads=0;
+ const existingRead=f.options.readSaved;
  f.options.readSaved=async()=>{
   reads++;
-  return {generation:reads===1?"native:one":"native:two",
-   snapshot:(await fixture().options.readSaved()).snapshot,
-   needs_confirmation:false};
+  const original=await existingRead();
+  return {...original,generation:reads===1?"native:one":"native:two"};
  };
  const port=createAtlasT3OriginalPublicationPort(f.options);
  await assert.rejects(()=>port.publishSelected(f.selection),
