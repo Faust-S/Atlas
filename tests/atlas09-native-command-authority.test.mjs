@@ -74,3 +74,23 @@ test("Installed Atlas passes the three-valued authorization result intact",()=>{
  assert.match(store,/if\(permission===false\)deny\("ATLAS_T3_U05_WRITE_DENIED"\)/);
  assert.match(store,/if\(permission!==true\)fail\("ATLAS_T3_U05_WRITE_DENIED"\)/);
 });
+
+test("One-shot installed Atlas permission is consumed once per original U05 command",async()=>{
+ const decisions=[],native=[];
+ const port=createAtlasT3DesktopStorePort({
+  authorizeCommand:async(command,args)=>{
+   decisions.push(command);
+   return true;
+  },
+  invoke:async(command,args)=>{
+   native.push(command);
+   return command==="atlas_open"?opened:{
+    generation:"atlas:original:2",revision:snapshot.revision+1
+   };
+  }
+ });
+ assert.equal((await port.readSaved()).generation,opened.generation);
+ assert.equal((await attempt(port)).generation,"atlas:original:2");
+ assert.deepEqual(decisions,["atlas_open","atlas_commit"]);
+ assert.deepEqual(native,["atlas_open","atlas_commit"]);
+});
