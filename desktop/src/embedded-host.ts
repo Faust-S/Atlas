@@ -14,6 +14,23 @@ export interface AtlasT3SelectedTaskRoute {
  issueSelectedWork:(selection:{projectId:string;workId:string})=>
   Promise<{taskId:string;workRef:{projectId:string;workId:string;revision:string}}>;
 }
+export interface AtlasT3PublicationRoute {
+ // Explicit publication by the ORIGINAL Agent/T3 owner. This operation
+ // does not commit Atlas and requires a separate original Human consent.
+ publishSelectedResult:(selection:{projectId:string;workId:string})=>
+  Promise<{status:"OWNER_READBACK_CONFIRMED"|"OUTCOME_UNKNOWN"|
+   "NOT_PUBLISHED_CONFIRMED"|"OPERATION_IN_PROGRESS";
+   workRef:{projectId:string;workId:string;revision:string};
+   operationId?:string}>;
+}
+export interface AtlasT3PublicationRecoveryRoute {
+ // Read original publication ledger only. Never redispatch publisher.
+ recoverSelectedPublication:(selection:{projectId:string;workId:string})=>
+  Promise<{status:"OWNER_READBACK_CONFIRMED"|"OUTCOME_UNKNOWN"|
+   "NOT_PUBLISHED_CONFIRMED"|"OPERATION_IN_PROGRESS";
+   workRef:{projectId:string;workId:string;revision:string};
+   operationId?:string}>;
+}
 export interface AtlasT3SelectedResultRoute {
  // Only the original D6 Host provides this route, not the Atlas UI.
  continueSelectedResult:(selection:{projectId:string;workId:string})=>
@@ -33,8 +50,10 @@ export interface AtlasT3RecoveryRoute {
 }
 export interface AtlasEmbeddedHost {
  invoke:<T>(command:AtlasHostCommand,args?:AtlasHostArgs)=>Promise<T>;
- authorizeCommand:(command:AtlasHostCommand,args?:AtlasHostArgs)=>Promise<boolean>|boolean;
- t3?:Partial<AtlasT3SelectedTaskRoute&AtlasT3SelectedResultRoute&AtlasT3RecoveryRoute>;
+ authorizeCommand:(command:AtlasHostCommand,args?:AtlasHostArgs)=>
+  Promise<boolean|null|undefined>|boolean|null|undefined;
+ t3?:Partial<AtlasT3SelectedTaskRoute&AtlasT3PublicationRoute&
+  AtlasT3PublicationRecoveryRoute&AtlasT3SelectedResultRoute&AtlasT3RecoveryRoute>;
  // Optional original owner routes are absent in the standalone product.
  assetUrl?:string; // Host-served Atlas logo; standalone keeps its existing public asset
  onStateChange?:(value:{ready:boolean;dirty:boolean;formOpen:boolean;busy:boolean;revision:string;generation:string})=>void;
@@ -50,6 +69,12 @@ export async function invokeAtlasHost<T>(host:AtlasEmbeddedHost,command:string,a
  if(!isAtlasEmbeddedHost(host))throw Error("ATLAS_HOST_REQUIRED");
  if(!ATLAS_HOST_COMMANDS.has(command))throw Error("ATLAS_HOST_COMMAND_UNSUPPORTED");
  const selected=command as AtlasHostCommand;
- if(await host.authorizeCommand(selected,args)!==true)throw Error("ATLAS_HOST_OPERATION_DENIED");
+ const permission=await host.authorizeCommand(selected,args);
+ if(permission===false)
+  throw Object.assign(Error("ATLAS_HOST_OPERATION_DENIED"),
+   {code:"ATLAS_HOST_OPERATION_DENIED",outcome:"DENIED"});
+ if(permission!==true)
+  throw Object.assign(Error("ATLAS_HOST_OPERATION_NOT_AUTHORIZED"),
+   {code:"ATLAS_HOST_OPERATION_NOT_AUTHORIZED"});
  return host.invoke<T>(selected,args);
 }
