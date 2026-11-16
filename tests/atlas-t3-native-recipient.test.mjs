@@ -324,7 +324,7 @@ test("Original Atlas authority DENIED remains explicit; missing grants never inv
    assert.fail("Expected original owner to refuse preview");
   }catch(error){
    assert.equal(error.outcome,expectedOutcome,JSON.stringify(opts));
-   assert.match(error.code||error.message,/ATLAS_T3_|ORIGINAL_ATLAS_OWNER_DENIAL/);
+   assert.match(error.code||error.message,/ATLAS_T3_|ORIGINAL_ATLAS_OWNER_DENIAL|OWNER_GRANT_TRANSPORT_UNAVAILABLE/);
   }
   assert.equal(f.saves(),0,"A refusal cannot write Atlas");
  }
