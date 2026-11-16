@@ -155,3 +155,42 @@ test("Original D6 may commit before Host shutdown: report UNKNOWN, not a safe re
   {code:"ATLAS_T3_INSTALLED_D6_OUTCOME_UNKNOWN"});
  assert.equal(dispatches,1);
 });
+
+test("Installed original D6 DENIED survives Host shutdown, but transport does not become DENIED",async()=>{
+ const workRef={projectId:"p:authority",workId:"w:authority",revision:"4"};
+ const reference={workspace_id:"ws:signed",object_id:"result:accepted",
+  schema_id:"iwxa.result",revision:2};
+ for(const ownerIsDefinite of [true,false]){
+  let active=true,dispatches=0;
+  const originalError=Object.assign(Error("Original owner refused or connection failed"),
+   ownerIsDefinite
+    ?{code:"ATLAS_T3_PROJECT_WRITE_NOT_AUTHORIZED",outcome:"DENIED"}
+    :{code:"ORIGINAL_TAURI_COMMIT_IPC_LOST"});
+  const selector=createAtlasT3OriginalSourceSelection({
+   isHostActive:()=>active,
+   originalAgent:{selectAcceptedForWork:async()=>({
+    acceptanceKind:"HUMAN_ACCEPTED_DRAFT",readOnly:true,
+    workRef,sourceObjectRef:reference
+   })},
+   originalT3:{
+    preview:async()=>({status:"AVAILABLE",recipientId:"iwxa.atlas",reference}),
+    continueSelected:async()=>{dispatches++;active=false;throw originalError;},
+    recover:async()=>({status:"OUTCOME_UNKNOWN"})
+   }
+  });
+  try{
+   await selector.continueOriginalAcceptedResult({workRef,context:{}});
+   assert.fail("Owner must fail or report unknown");
+  }catch(error){
+   if(ownerIsDefinite){
+    assert.equal(error,originalError,"The exact original refusal must be preserved");
+    assert.equal(error.code,"ATLAS_T3_PROJECT_WRITE_NOT_AUTHORIZED");
+    assert.equal(error.outcome,"DENIED");
+   }else{
+    assert.equal(error.code,"ATLAS_T3_INSTALLED_D6_OUTCOME_UNKNOWN");
+    assert.equal(error.outcome,undefined,"Transport failure is never DENIED");
+   }
+  }
+  assert.equal(dispatches,1,"No duplicate original D6 dispatch");
+ }
+});
