@@ -120,7 +120,17 @@ export function createAtlasT3OriginalPublicationPort({
    if(isHostActive()!==true)return Object.freeze({
     status:"OUTCOME_UNKNOWN",workRef
    });
-   return await verify(reply,workRef);
+   try{return await verify(reply,workRef);}
+   catch(error){
+    // The original publication may have committed already, but this Atlas
+    // Host could have closed during independent Agent/Exchange readback.
+    // No second publication is authorized by a failed observation.
+    if(error?.outcome==="DENIED")throw error;
+    if(isHostActive()!==true)return Object.freeze({
+     status:"OUTCOME_UNKNOWN",workRef
+    });
+    throw error;
+   }
   }finally{inFlight.delete(key);}
  };
  return Object.freeze({
