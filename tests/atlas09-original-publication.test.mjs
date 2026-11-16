@@ -197,3 +197,19 @@ test("Host closure after original publisher dispatch reports unknown, not denial
  assert.equal(f.stats().published,1);
  assert.equal(f.stats().exchangeReads,0);
 });
+
+test("Host shutdown during original Agent source readback stays UNKNOWN without republishing",async()=>{
+ const f=fixture();
+ f.agent.readAccepted=async()=>{f.stop();return f.accepted;};
+ const port=createAtlasT3OriginalPublicationPort(f.options);
+ const result=await port.publishSelected(f.selection);
+ assert.deepEqual(result,{status:"OUTCOME_UNKNOWN",workRef:f.workRef});
+ assert.equal(f.stats().published,1);
+ assert.equal(f.stats().exchangeReads,0);
+});
+test("An unconfirmed publication error tells the user to recover, never to resend automatically",()=>{
+ const src=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ assert.match(src,/Публикация Agent Result не подтверждена/);
+ assert.match(src,/Не отправляйте повторно/);
+ assert.match(src,/Проверить публикацию/);
+});
