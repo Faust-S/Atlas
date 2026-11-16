@@ -48,7 +48,10 @@ function fixture({permission=true,invalidResult=false,ownerDenied=false,
   assert.equal(request.archiveSha256,accepted.archiveSha256);
   return {status:"VERIFIED",recipientId:"iwxa.atlas",
    taskId:accepted.taskId,resultId:accepted.resultId,
-   archiveSha256:accepted.archiveSha256};
+   archiveSha256:accepted.archiveSha256,
+   originalSignatureVerified:true,archiveBytesVerified:true,
+   originalManifestVerified:true,disclosureScope:"ORIGINAL_RESULT_ONLY",
+   selectedSourceObjectRef:SOURCE};
  }};
  const options={
   readSaved:async()=>({generation:version,snapshot:structuredClone(saved),
