@@ -94,3 +94,13 @@ test("One-shot installed Atlas permission is consumed once per original U05 comm
  assert.deepEqual(decisions,["atlas_open","atlas_commit"]);
  assert.deepEqual(native,["atlas_open","atlas_commit"]);
 });
+
+test("Original installed Rust U05 Store qualifies D6 link and two cold reads without a second owner",()=>{
+ const rust=readFileSync(new URL("../desktop/src-tauri/src/lib.rs",import.meta.url),"utf8");
+ assert.match(rust,/fn d6_result_decision_is_durable_across_two_cold_native_opens_with_cas\(/);
+ assert.match(rust,/commit_root\(&root\.0,&first\.generation,candidate\.clone\(\)\)/);
+ assert.match(rust,/let first_cold=load_root\(&root\.0\)/);
+ assert.match(rust,/let second_cold=load_root\(&root\.0\)/);
+ assert.match(rust,/commit_root\(&root\.0,&first\.generation,candidate\)\.is_err\(\)/);
+ assert.doesNotMatch(rust,/fn atlas_d6_store\(/);
+});
