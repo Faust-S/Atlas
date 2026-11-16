@@ -66,3 +66,24 @@ test("Atlas 0.9 signed D6 native gateway performs one owner gate per operation",
  assert.match(store,/if\(permission===false\)deny\("ATLAS_T3_U05_WRITE_DENIED"\)/);
  assert.match(store,/if\(permission!==true\)fail\("ATLAS_T3_U05_WRITE_DENIED"\)/);
 });
+
+test("Atlas 0.9 installed signed publication is opt-in, standalone has no fake owner, and command denials remain distinct",()=>{
+ const ui=read("desktop/src/main.tsx");
+ const standalone=read("desktop/src/standalone.tsx");
+ const embedded=read("desktop/src/embedded-host.ts");
+ const installed=read("desktop/src/atlas-t3-installed-host.mjs");
+ const witness=read("desktop/tests/installed-atlas09-qualification.py");
+ assert.match(ui,/runAgentResultPublication/);
+ assert.match(ui,/Опубликовать Result/);
+ assert.match(ui,/Проверить публикацию/);
+ assert.match(ui,/Получить Result/);
+ assert.doesNotMatch(standalone,/publishSelectedResult|recoverSelectedPublication/);
+ assert.match(installed,/publishAcceptedForWork","recoverPublicationForWork/);
+ assert.match(embedded,/const permission=await host\.authorizeCommand\(selected,args\)/);
+ assert.match(embedded,/if\(permission===false\)/);
+ assert.match(embedded,/outcome:"DENIED"/);
+ assert.match(embedded,/if\(permission!==true\)/);
+ assert.match(witness,/ATLAS09_TWO_COLD_INSTALLED_STORE_READBACK_PASS/);
+ assert.match(witness,/Проверить публикацию/);
+ assert.match(witness,/Опубликовать Result/);
+});
