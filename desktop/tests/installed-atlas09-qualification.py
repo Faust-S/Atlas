@@ -42,6 +42,24 @@ def qualify():
     print("ATLAS09_STANDALONE_NO_FAKE_T3_OWNER_PASS",flush=True)
     route.v.capture("atlas09-installed-readback-and-version")
 
+    # No signed Agent owner is connected on this runner: qualify ONLY the
+    # original installed U05 Store across two additional independent process
+    # launches. The draft created by the previous GUI test is intentionally
+    # discarded. Disk generation and the saved project must be unchanged.
+    expected_generation=route.d.head()
+    expected_project=route.d.saved_project(expected_generation)
+    assert expected_generation not in (None,"none"),"No original native saved head"
+    for cold_open in (1,2):
+        route.d.stop()
+        route.d.launch()
+        route.d.wait_text("Портфель проектов",45)
+        assert route.d.head()==expected_generation,(
+            f"Cold native open {cold_open} changed Atlas Store generation")
+        assert route.d.saved_project(expected_generation)==expected_project,(
+            f"Cold native open {cold_open} changed the original saved project")
+        route.v.capture(f"atlas09-native-store-cold-open-{cold_open}")
+    print("ATLAS09_TWO_COLD_INSTALLED_STORE_READBACK_PASS",flush=True)
+
 
 if __name__=="__main__":
     try:
