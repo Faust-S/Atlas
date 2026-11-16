@@ -74,3 +74,47 @@
 **SUCCESS** на `a1d3c749`: оригинальный Tauri/Setup Core, native Rust readback, установленный WebView2, сохранение большого проекта и холодный перезапуск. Для нового общего `dist` выполняется самостоятельный [Windows CI №43775526302](https://github.com/Faust-S/Atlas/actions/runs/43775526302); пока он не завершён, его результат не засчитывать.
 
 **Ограничение installed T3:** оригинальный принятый Result по-прежнему должен быть доступен через реальный Agent 0.6 `selectAcceptedForWork/readAccepted` с подписанной исходной квитанцией Exchange для `iwxa.atlas`. Передача между двумя установленными продуктами не принимается по результатам только source CI или самостоятельной установки Atlas. Приватные Actions не запускать. Стабильный `release/0.8` не менять.
+
+## Актуализация оригинального D6 38ab0099 и границы установленной приёмки
+
+16 ноября 2026 года. Исходный получатель Atlas обновлён для нормативного
+`knowledge@38ab0099104d6d17bb650b0d7b1aba9ede00fa65`.
+См. адресной контракт: [ATLAS_0_9_D6_NATIVE_OWNER_ACCEPTANCE_2026_11_16_RU.md](./ATLAS_0_9_D6_NATIVE_OWNER_ACCEPTANCE_2026_11_16_RU.md).
+
+- Реальный trusted `verifyAtlasWrite` с `allowed:false` и точным
+  binding `operationId/recipientId/Project/WorkRef/revision` возвращает
+  исходный `ATLAS_T3_PROJECT_WRITE_NOT_AUTHORIZED` с
+  `outcome:"DENIED"`. Чужое/неполное разрешение и обычные IPC ошибки
+  никогда не маркируются `DENIED`.
+- Original Exchange с явным связанным отказом также возвращает
+  определённый отказ; отсутствие подписи/квитанции остаётся
+  неподтверждённым. Отказ D1 или Atlas Authority не может исчезнуть
+  при закрытии установленного Host.
+- Неизвестный результат `atlas_commit`, потеря ACK и нативный CAS
+  не предполагают гарантированный отказ и не разрешают повторный
+  `receive`. Используется original D6 `recover` и исходное
+  native readback.
+- Двухэтапное подключение оригинального T3 получило **два**
+  публичных экспорта из одного `dist`:
+  `createInstalledAtlasT3NativeRecipient` и
+  `mountInstalledAtlasT3Surface`.
+  Standalone 0.9 без исходного владельца Agent/T3 работает
+  самостоятельно, не подделывая принятие Result.
+
+Подтверждённая исходная квалификация:
+[GitHub Actions #43927362179](https://github.com/Faust-S/Atlas/actions/runs/43927362179),
+`697/697 Node PASS`, оригинальный T3 D6 `1/1 PASS`, оригинальный
+Center, `.iwxa`, TypeScript, Vite и единый compiled `dist`.
+Нативная Windows квалификация того же кодового HEAD:
+[Actions #43927362150](https://github.com/Faust-S/Atlas/actions/runs/43927362150).
+Результат Windows не присваивать до завершения реальной проверки.
+
+**Оставшийся внешний блокер:** на проверенной общей Agent 0.6 линии
+есть локальный экспорт и ручная текстовая T3 проекция, но отсутствует
+подтверждённый установленный подписанный `selectAcceptedForWork`,
+`readAccepted` и original Exchange `readReceipt` для
+`recipientId:"iwxa.atlas"`. Их точные входы и ожидаемые ответы
+зафиксированы в документе выше. Atlas не подменяет эти порты
+тестовыми ответами в пользовательском маршруте.
+`ATLAS_T3_INSTALLED_AGENT_EXCHANGE=HOLD` до настоящего signed Result
+и двух холодных чтений установленного получателя.
