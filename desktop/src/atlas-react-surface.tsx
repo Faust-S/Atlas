@@ -6,6 +6,10 @@ import {AtlasRenderBoundary,AtlasWorkspace} from "./main";
 import {isAtlasEmbeddedHost,type AtlasEmbeddedHost} from "./embedded-host";
 import css from "./style.css?inline";
 import {createInstalledAtlasT3Host} from "./atlas-t3-installed-host.mjs";
+// Stage 1: the ORIGINAL installed T3 Workspace Host imports this native
+// recipient, registers it as nativeContinuationOwner, then passes its signed
+// D6 continuation to Stage 2. Both use the SAME Atlas Tauri Store.
+export {createInstalledAtlasT3NativeRecipient} from "./atlas-t3-installed-host.mjs";
 // A ShadowRoot persists after unmount. Reuse only the one created by Atlas;
  // an unrelated host's existing shadow surface must remain untouched.
 const ownedTargets=new WeakSet<HTMLElement>();
