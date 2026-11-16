@@ -275,3 +275,72 @@ recipientId`. Исходные права и криптографические 
 Agent/Exchange readback), compiled T3 Host, TypeScript/Vite,
 original D6 PASS. Windows установленного Atlas квалифицируется
 отдельно: [№43968095063](https://github.com/Faust-S/Atlas/actions/runs/43968095063).
+
+## 17.11.2026: квалификация оригинального T3 sender + selective Result disclosure
+
+В общем исполняемом `Faust-S/knowledge@cb3843d887df1180c2f08ed8bb00c726e9b767a2`
+(последний квалифицированный исходный кандидат на момент сверки)
+появился `packages/t3-core/src/t3/native-agent-atlas-source-publisher.mjs`:
+`createTrustedAgentAtlasSourcePublisher` с портами
+`read_publication/publish_accepted/read_published_for/read_published/
+read_receipt/read_latest_for_work`. Это **исходная sender-side
+композиция**, но не второй Kernel/Exchange/подписант/Store. Модуль
+использует `node:crypto` и должен исполняться только доверенным
+нативным T3 Host, не через Atlas браузерный интерфейс.
+
+Блоб исходного original D6 `native-result-continuation.mjs`
+сохранён **побайтово** между прежней ревизией `38ab0099` и новой
+`cb3843d8` (один Git blob SHA `04f4e6f6e59cdc3043438b9ad5aac75dc2b31ec2`).
+Atlas CI теперь берет одну закреплённую ревизию T3 для оригинального
+D6 **и** нового sender, исполняет реальный upstream
+`t3-d6-native-agent-source-publisher.test.mjs` и дополнительную
+адресную сверку контракта Atlas. Все upstream owner-заменители
+ограничены исходной проверкой; настоящий установленный подписант
+из них не следует.
+
+**Исправление получателя.** Оригинальный T3 sender для
+`recipientId:"iwxa.atlas"` требует отдельной селективной
+`ORIGINAL_RESULT_ONLY` публикации. Полная организационная
+Workspace не может быть выдана за пакет одного принятого Result.
+Поэтому получатель `src/atlas-t3-native-recipient.mjs` и
+исходный `desktop/src/atlas-t3-original-publication.mjs`
+проверяют в **настоящей** квитанции оригинального Exchange:
+
+- `originalSignatureVerified === true`;
+- `archiveBytesVerified === true`;
+- `originalManifestVerified === true`;
+- `disclosureScope === "ORIGINAL_RESULT_ONLY"`;
+- точный `selectedSourceObjectRef` исходного принятого Agent Result.
+
+Без них код возвращает
+`ATLAS_T3_ORIGINAL_EXCHANGE_DISCLOSURE_UNVERIFIED` /
+`ATLAS_T3_ORIGINAL_PUBLICATION_DISCLOSURE_UNVERIFIED`,
+не помечая техническое отсутствие подтверждения как авторитетный
+`DENIED`. До подтверждения байтов, подписи и области раскрытия
+оригинальный native Atlas `atlas_commit` запрещён. Это предотвращает
+ошибочную передачу общего архива Workspace, личных данных и любых
+невыбранных Agent Task/Result. Проверка не создаёт
+собственный криптографический парсер; исходная проверка подписи
+и ZIP принадлежит T3, Atlas принимает только проверенную
+owner-квитанцию с точным binding.
+
+**Повторные нажатия после неизвестного ACK.** В
+`desktop/src/atlas-t3-original-publication.mjs` добавлен
+ограничитель текущего Host: после возможной публикации новая
+`publishAcceptedForWork` не вызывается, пока оригинальный
+`recoverPublicationForWork` не вернёт подтверждённый
+`NOT_PUBLISHED_CONFIRMED` (из оригинального ledger).
+Даже полученная `OWNER_READBACK_CONFIRMED` не требует
+повторной отправки. Этот ограничитель **не** является вторым
+постоянным журналом; оригинальный T3 ledger и Agent остаются
+единственным источником долговременной квитанции после
+холодного перезапуска. Отрицательные тесты проверяют потерянный ACK,
+неверную область раскрытия, подменённую ссылку и отсутствие подписи.
+
+Границы приёмки не изменены: исходная квалификация
+публичного T3 sender не подтверждает установленный
+Agent/T3/Atlas с реальными original signers, D1,
+Kernel/Exchange и native delivery. Для продукта требуется
+установленный original native source owner, независимые
+подписанные квитанции и два холодных чтения конкретного Result
+из настоящего Atlas U05 Store.
