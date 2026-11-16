@@ -27,6 +27,10 @@ export function createAtlasT3OriginalPublicationPort({
     typeof originalExchange?.readReceipt!=="function")
   fail("ATLAS_T3_INSTALLED_PUBLICATION_OWNER_REQUIRED");
  const inFlight=new Set();
+ // Host-lifetime anti-replay guard. Original Agent and T3 ledger remain the
+ // durable owners across cold opens. Once a publish was potentially dispatched,
+ // the UI can ONLY recover until original ledger proves NON-DISPATCH.
+ const publicationAttempts=new Set();
  const active=()=>{if(isHostActive()!==true)
   fail("ATLAS_T3_INSTALLED_HOST_DISPOSED");};
  async function selection({projectId,workId},purpose){
@@ -100,28 +104,40 @@ export function createAtlasT3OriginalPublicationPort({
   return Object.freeze({status:"OWNER_READBACK_CONFIRMED",
    operationId:reply.operationId,workRef});
  }
- const dispatch=async(selection,method)=>{
-  const {workRef,request}=selection,key=JSON.stringify(workRef);
+ const dispatch=async(selected,method)=>{
+  const {workRef,request}=selected,key=JSON.stringify(workRef);
   if(inFlight.has(key))return Object.freeze({
    status:"OPERATION_IN_PROGRESS",workRef
   });
+  const publishing=method==="publishAcceptedForWork";
+  if(publishing&&publicationAttempts.has(key))
+   return Object.freeze({status:"OUTCOME_UNKNOWN",workRef});
   inFlight.add(key);
+  if(publishing)publicationAttempts.add(key);
   try{
    let reply;
    try{reply=await originalAgent[method](request);}
    catch(error){
-    if(error?.outcome==="DENIED")throw error;
-    // A write may have happened before the original Agent lost its ACK.
-    // NEVER reissue publish; a separate read-only recover is required.
-    if(method==="publishAcceptedForWork")
-     return Object.freeze({status:"OUTCOME_UNKNOWN",workRef});
+    // A definite owner refusal occurred before any new dispatch. Ordinary
+    // transport errors MAY mean a signed publication was already committed.
+    if(error?.outcome==="DENIED"){
+     if(publishing)publicationAttempts.delete(key);
+     throw error;
+    }
+    if(publishing)return Object.freeze({status:"OUTCOME_UNKNOWN",workRef});
     throw error;
    }
    if(isHostActive()!==true)return Object.freeze({
     status:"OUTCOME_UNKNOWN",workRef
    });
-   try{return await verify(reply,workRef);}
-   catch(error){
+   try{
+    const observed=await verify(reply,workRef);
+    // Only the ORIGINAL read-only recovery can prove no prior dispatch.
+    // A published Result remains terminal for this WorkRef in this Host.
+    if(!publishing&&observed.status==="NOT_PUBLISHED_CONFIRMED")
+     publicationAttempts.delete(key);
+    return observed;
+   }catch(error){
     // The original publication may have committed already, but this Atlas
     // Host could have closed during independent Agent/Exchange readback.
     // No second publication is authorized by a failed observation.
