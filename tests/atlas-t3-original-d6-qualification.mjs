@@ -23,7 +23,7 @@ const {createTrustedNativeContinuation} = await import(pathToFileURL(source).hre
 
 test("Original T3 signed Result -> native Atlas decision -> cold double readback, with no repeat",async()=>{
  let snapshot=empty(),generation="native:0",nativeWrites=0,denied=false,sourceRev=2;
- let nativeReceiptOutage=false;
+ let nativeReceiptOutage=false,denyApply=false,denyReadback=false;
  const p=createProject(snapshot,{name:"Real enterprise workspace",type:"engineering"});
  snapshot=p.state;
  const w=createItem(snapshot,p.id,{title:"Documented equipment installation"});
@@ -75,8 +75,10 @@ test("Original T3 signed Result -> native Atlas decision -> cold double readback
   readOriginalExchangeReceipt:async({taskId,resultId,archiveSha256,recipientId})=>({
    status:"VERIFIED",taskId,resultId,archiveSha256,recipientId
   }),
-  verifyAtlasWrite:async({operationId,recipientId,workRef})=>({
-   allowed:!denied,operationId,recipientId,projectId:workRef.projectId,
+  verifyAtlasWrite:async({operationId,recipientId,workRef,action})=>({
+   allowed:!denied&&!(denyApply&&action==="atlas.work.result.apply")&&
+    !(denyReadback&&action==="atlas.work.result.readback"),
+   operationId,recipientId,projectId:workRef.projectId,
    workId:workRef.workId,revision:workRef.revision
   })
  };
@@ -104,7 +106,7 @@ test("Original T3 signed Result -> native Atlas decision -> cold double readback
    deleted:false},relations:{incoming:[],outgoing:[]}};}
  };
  let reviews=0;
- const make=()=>{
+ const make=({countConsent=true}={})=>{
   const originalRecipient=createAtlasT3NativeRecipient(nativeOpts);
   return createTrustedNativeContinuation({
    kernel,accessForRead:async()=>access,currentWorkspace,
@@ -113,9 +115,17 @@ test("Original T3 signed Result -> native Atlas decision -> cold double readback
      if(nativeReceiptOutage)throw Error("ORIGINAL_ATLAS_RECEIPT_UNAVAILABLE");
      return originalRecipient.receipt(operationId);
     }},
-   confirmHuman:async()=>{reviews++;return true;},isHostActive:()=>true
+   confirmHuman:async()=>{if(countConsent)reviews++;return true;},isHostActive:()=>true
   });
  };
+ // Real original D6 must preserve the Atlas owner's verified pre-write
+ // refusal instead of interpreting it as a lost native ACK.
+ denyApply=true;
+ const refusedD6=make({countConsent:false});
+ await assert.rejects(refusedD6.continueSelected(originalRef),
+  {code:"ATLAS_T3_PROJECT_WRITE_NOT_AUTHORIZED",outcome:"DENIED"});
+ assert.equal(nativeWrites,0,"A denied original D6 Result cannot commit Atlas");
+ denyApply=false;
  const originalD6=make();
  const preview=await originalD6.preview(originalRef);
  assert.equal(preview.status,"AVAILABLE");
@@ -196,6 +206,13 @@ test("Original T3 signed Result -> native Atlas decision -> cold double readback
  assert.equal(nativeWrites,1);
  assert.equal(reviews,1);
  assert.equal(commands.filter(command=>command==="atlas_commit").length,1);
+ // Once a Decision exists, current Atlas JIT readback refusal is definite.
+ // The current ORIGINAL D6 must propagate it, not turn it into UNKNOWN.
+ denyReadback=true;
+ await assert.rejects(make().recover(originalRef),
+  {code:"ATLAS_T3_PROJECT_WRITE_NOT_AUTHORIZED",outcome:"DENIED"});
+ assert.equal(nativeWrites,1);
+ denyReadback=false;
  assert.ok(commands.filter(command=>command==="atlas_open").length>=3);
  // Original T3 D1 authority revocation blocks subsequent signed read.
  denied=true;
