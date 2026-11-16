@@ -15,6 +15,7 @@ import {createAtlasT3OriginalSourceSelection}
 
 const ID=/^[A-Za-z0-9][A-Za-z0-9._:/@-]{0,159}$/;
 const die=code=>{throw Object.assign(new Error(code),{code});};
+const deny=code=>{throw Object.assign(new Error(code),{code,outcome:"DENIED"});};
 const fn=(owner,name)=>typeof owner?.[name]==="function"||
  die("ATLAS_T3_INSTALLED_"+name.toUpperCase()+"_OWNER_REQUIRED");
 // Must be called from the installed native Host composition, NOT from a
@@ -45,7 +46,7 @@ export async function createInstalledAtlasT3Host({
   active();
   const result=await atlasAuthority.authorizeCommand(command,args);
   active();
-  return result===true;
+  return result;
  };
  const invoke=async(command,args)=>{
   active();
@@ -64,8 +65,9 @@ export async function createInstalledAtlasT3Host({
  };
  // A different application's Tauri window has no Atlas command; refuse
  // before offering any Agent/T3 actions. Validate the original Atlas schema.
- if(await authorizeCommand("atlas_open")!==true)
-  die("ATLAS_T3_INSTALLED_NATIVE_COMMAND_DENIED");
+ const openingRight=await authorizeCommand("atlas_open");
+ if(openingRight===false)deny("ATLAS_T3_INSTALLED_NATIVE_COMMAND_DENIED");
+ if(openingRight!==true)die("ATLAS_T3_INSTALLED_NATIVE_COMMAND_DENIED");
  const head=await invoke("atlas_open");
  if(typeof head?.generation!=="string"||!head.generation||
     head.generation==="none"||head.needsConfirmation===true)
@@ -174,7 +176,7 @@ export async function createInstalledAtlasT3NativeRecipient({
  };
  const authorizeCommand=async(command,args)=>{
   active();const ok=await atlasAuthority.authorizeCommand(command,args);
-  active();return ok===true;
+  active();return ok;
  };
  const invoke=async(command,args)=>{
   active();
