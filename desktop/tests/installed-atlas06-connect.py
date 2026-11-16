@@ -525,9 +525,61 @@ def qualify():
     print("ATLAS06_CONNECT_BRANCH_TREE_RESTART_PASS",flush=True)
     verify_refresh(second,project)
 
+def native_store_snapshot():
+    """Compare every durable native file, not just the mutable head index."""
+    if not STORE.exists():
+        return {}
+    contents={}
+    for entry in STORE.rglob("*"):
+        if entry.is_symlink():
+            raise AssertionError("PERSON09_NATIVE_STORE_SYMLINK")
+        if entry.is_file():
+            name=entry.relative_to(STORE).as_posix()
+            if name=="atlas.lock":
+                continue
+            contents[name]=hashlib.sha256(entry.read_bytes()).hexdigest()
+    return contents
+
+
+def qualify_person_unbundled_denial():
+    """A real installed feature-enforced Atlas 0.9 must fail closed without T3."""
+    if (STORE/"head.json").exists():
+        raise AssertionError("PERSON09_NEEDS_EMPTY_NATIVE_STORE")
+    if (APP.parent/"t3"/"iwxa-t3-product-consumer.exe").exists():
+        raise AssertionError("PERSON09_PRIVATE_T3_IN_PUBLIC_WINDOWS")
+    launch()
+    wait_button("Моя лицензия",60)
+    previous=native_store_snapshot()
+    click_button("Создать новый проект")
+    wait_text("Новый проект",35)
+    set_text("Название проекта","Atlas09 PERSON negative")
+    click_button("Применить к черновику")
+    wait_button("Сохранить")
+    assert native_store_snapshot()==previous,"PERSON09_DRAFT_WROTE_NATIVE_STORE"
+    click_button("Сохранить")
+    wait_text("В эту установку Atlas ещё не включён проверяющий компонент T3.",45)
+    wait_text("ATLAS_PERSON_T3_COMPONENT_NOT_BUNDLED",10)
+    assert native_store_snapshot()==previous,"PERSON09_DENIED_NATIVE_STORE_MUTATION"
+    screenshot("person09-unbundled-native-denial")
+    print("ATLAS09_PERSON_WORKSPACE_NATIVE_DENIAL_PASS",flush=True)
+    activate()
+    keyboard.send_keys("%{F4}")
+    click_button("Закрыть без сохранения",20)
+    process.wait(timeout=15)
+    launch()
+    wait_text("Портфель проектов",50)
+    assert native_store_snapshot()==previous,"PERSON09_DENIED_NATIVE_STORE_MUTATION_AFTER_RESTART"
+    if any("Atlas09 PERSON negative" in text for text in visible_texts()):
+        raise AssertionError("PERSON09_DENIED_PROJECT_REAPPEARED")
+    print("ATLAS09_PERSON_DURABLE_STORE_UNCHANGED_AND_COLD_RESTART_PASS",flush=True)
+
+
 if __name__=="__main__":
     try:
-        qualify()
+        if os.environ.get("ATLAS_PERSON_EXPECT_UNBUNDLED_DENIAL")=="1":
+            qualify_person_unbundled_denial()
+        else:
+            qualify()
     except Exception as exc:
         print("ATLAS06_CONNECT_WINDOWS_HOLD "+repr(exc),flush=True)
         screenshot("failure")
