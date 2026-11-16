@@ -25,6 +25,12 @@ fn identifier(s:&str)->bool{
     !s.is_empty()&&s.len()<=160&&s.bytes().enumerate().all(|(i,b)|
         b.is_ascii_alphanumeric()||(i>0&&b"._:/@-".contains(&b)))
 }
+// Publisher accepts .IWXA case-insensitively. The same signed package must
+// remain importable by the original Atlas PERSON Consumer on Windows.
+fn is_person_iwxa_file(path:&Path)->bool{
+    path.extension().and_then(|v|v.to_str())
+        .is_some_and(|v|v.eq_ignore_ascii_case("iwxa"))
+}
 fn root(app:&AppHandle)->Result<PathBuf,String>{
     let original=app.path().app_local_data_dir()
         .map_err(|_|"ATLAS_PERSON_LOCAL_DATA_UNAVAILABLE".to_string())?;
@@ -229,7 +235,7 @@ pub async fn atlas_person_license_import(app:AppHandle)
         .set_title("Выбрать подписанную персональную лицензию .iwxa")
         .add_filter("IWXA",&["iwxa"]).blocking_pick_file();
     let Some(FilePath::Path(path))=chosen else{return Ok(None)};
-    if path.extension().and_then(|v|v.to_str())!=Some("iwxa"){
+    if !is_person_iwxa_file(&path){
         return Err("ATLAS_PERSON_IWXA_EXTENSION_REQUIRED".into());
     }
     let meta=std::fs::symlink_metadata(&path)
@@ -289,6 +295,14 @@ pub fn require_atlas_workspace(_app:&AppHandle)->Result<(),String>{Ok(())}
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test] fn person_import_accepts_same_iwxa_extensions_as_publisher(){
+        assert!(is_person_iwxa_file(Path::new("signed.iwxa")));
+        assert!(is_person_iwxa_file(Path::new("signed.IWXA")));
+        assert!(is_person_iwxa_file(Path::new("signed.IwXa")));
+        assert!(!is_person_iwxa_file(Path::new("signed.iwxa.age")));
+        assert!(!is_person_iwxa_file(Path::new("signed.zip")));
+        assert!(!is_person_iwxa_file(Path::new("signed")));
+    }
     #[test] fn person_license_ui_matches_native_enforcement_edition(){
         assert_eq!(atlas_person_license_edition(),
             cfg!(feature="person-license-enforced"));
