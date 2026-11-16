@@ -12,6 +12,8 @@ import {createAtlasT3NativeRecipient}
  from "../../src/atlas-t3-native-recipient.mjs";
 import {createAtlasT3OriginalSourceSelection}
  from "./atlas-t3-original-source-selection.mjs";
+import {createOriginalAgentExchangeReceiptPort}
+ from "./atlas-t3-original-agent-exchange.mjs";
 
 const ID=/^[A-Za-z0-9][A-Za-z0-9._:/@-]{0,159}$/;
 const die=code=>{throw Object.assign(new Error(code),{code});};
@@ -27,11 +29,15 @@ export async function createInstalledAtlasT3Host({
  onStateChange,onSelection,onReadback,assetUrl,
 }={}){
  if(!isTauri())die("ATLAS_T3_INSTALLED_ATLAS_TAURI_REQUIRED");
+ // Prefer an explicitly installed original Exchange owner. The Agent's
+ // signed readOriginalExchangeReceipt is already a verified delegate to
+ // that SAME original T3 owner, not a new Exchange or fake receipt.
+ const exchange=originalExchange??createOriginalAgentExchangeReceiptPort(originalAgent);
  for(const [owner,methods] of [
   [originalT3,["preview","continueSelected","recover"]],
   [originalAgent,["currentContext","findTask","issueTask","readTask",
    "selectAcceptedForWork","readAccepted"]],
-  [originalExchange,["readReceipt"]],
+  [exchange,["readReceipt"]],
   [atlasAuthority,["authorizeCommand","authorizeProjectRead",
    "verifyWrite"]],
   [hostLifecycle,["isActive"]],
@@ -90,7 +96,7 @@ export async function createInstalledAtlasT3Host({
   issueOriginalAgentTask:input=>originalAgent.issueTask(input),
   readOriginalAgentTask:(id,context)=>originalAgent.readTask(id,context),
   readOriginalAgentAccepted:ref=>originalAgent.readAccepted(ref),
-  readOriginalExchangeReceipt:input=>originalExchange.readReceipt(input),
+  readOriginalExchangeReceipt:input=>exchange.readReceipt(input),
   // Never advertise publication from an older Agent that cannot recover
   // original T3's durable ledger after a lost acknowledgement.
   originalAgentPublisher:["publishAcceptedForWork","recoverPublicationForWork"]
@@ -193,9 +199,13 @@ export async function createInstalledAtlasT3NativeRecipient({
  originalAgent,originalExchange,atlasAuthority,hostLifecycle,
 }={}){
  if(!isTauri())die("ATLAS_T3_INSTALLED_ATLAS_TAURI_REQUIRED");
+ // Prefer an explicitly installed original Exchange owner. The Agent's
+ // signed readOriginalExchangeReceipt is already a verified delegate to
+ // that SAME original T3 owner, not a new Exchange or fake receipt.
+ const exchange=originalExchange??createOriginalAgentExchangeReceiptPort(originalAgent);
  for(const [owner,methods] of [
   [originalAgent,["readAccepted"]],
-  [originalExchange,["readReceipt"]],
+  [exchange,["readReceipt"]],
   [atlasAuthority,["authorizeCommand","verifyWrite"]],
   [hostLifecycle,["isActive"]],
  ])for(const method of methods)fn(owner,method);
@@ -226,7 +236,7 @@ export async function createInstalledAtlasT3NativeRecipient({
   isHostActive:()=>isTauri()&&hostLifecycle.isActive()===true,
   readSaved:store.readSaved,commitSaved:store.commitSaved,
   readOriginalAgentAccepted:ref=>originalAgent.readAccepted(ref),
-  readOriginalExchangeReceipt:input=>originalExchange.readReceipt(input),
+  readOriginalExchangeReceipt:input=>exchange.readReceipt(input),
   verifyAtlasWrite:input=>atlasAuthority.verifyWrite(input),
  });
 }
