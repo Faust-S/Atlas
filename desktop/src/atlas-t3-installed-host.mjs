@@ -91,6 +91,10 @@ export async function createInstalledAtlasT3Host({
   readOriginalAgentTask:(id,context)=>originalAgent.readTask(id,context),
   readOriginalAgentAccepted:ref=>originalAgent.readAccepted(ref),
   readOriginalExchangeReceipt:input=>originalExchange.readReceipt(input),
+  // Never advertise publication from an older Agent that cannot recover
+  // original T3's durable ledger after a lost acknowledgement.
+  originalAgentPublisher:["publishAcceptedForWork","recoverPublicationForWork"]
+   .every(method=>typeof originalAgent[method]==="function")?originalAgent:null,
   continueOriginalAcceptedResult,recoverOriginalAcceptedResult,
  });
  const issueSelectedWork=ports.issueSelectedWork;
@@ -99,7 +103,32 @@ export async function createInstalledAtlasT3Host({
  if([issueSelectedWork,continueSelectedResult,recoverSelectedResult]
     .some(value=>typeof value!=="function"))
   die("ATLAS_T3_INSTALLED_ROUTES_UNAVAILABLE");
+ const publicationAvailable=
+  typeof ports.publishSelectedResult==="function"&&
+  typeof ports.recoverSelectedPublication==="function";
+ const selectedPublication=async(operation,selection)=>{
+  const response=await operation(selection);
+  if(!response||!["OWNER_READBACK_CONFIRMED","NOT_PUBLISHED_CONFIRMED",
+      "OUTCOME_UNKNOWN","OPERATION_IN_PROGRESS"].includes(response.status)||
+     response.workRef?.projectId!==selection.projectId||
+     response.workRef?.workId!==selection.workId||
+     !/^(0|[1-9][0-9]*)$/.test(String(response.workRef?.revision)))
+   die("ATLAS_T3_INSTALLED_PUBLICATION_READBACK_INVALID");
+  if(response.status==="OWNER_READBACK_CONFIRMED"&&
+     !/^agent:t3:atlas:[a-f0-9]{64}$/.test(response.operationId??""))
+   die("ATLAS_T3_INSTALLED_PUBLICATION_RECEIPT_INVALID");
+  return Object.freeze({status:response.status,workRef:{
+   projectId:response.workRef.projectId,workId:response.workRef.workId,
+   revision:String(response.workRef.revision)},
+   ...(typeof response.operationId==="string"?{operationId:response.operationId}:{})});
+ };
  const t3=Object.freeze({
+  ...(publicationAvailable?{
+   publishSelectedResult:selection=>selectedPublication(
+    ports.publishSelectedResult,selection),
+   recoverSelectedPublication:selection=>selectedPublication(
+    ports.recoverSelectedPublication,selection)
+  }:{}),
   async issueSelectedWork(selection){
    const response=await issueSelectedWork(selection);
    if(!response||!ID.test(response.taskId??"")||
