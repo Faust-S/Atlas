@@ -118,3 +118,54 @@ Center, `.iwxa`, TypeScript, Vite и единый compiled `dist`.
 тестовыми ответами в пользовательском маршруте.
 `ATLAS_T3_INSTALLED_AGENT_EXCHANGE=HOLD` до настоящего signed Result
 и двух холодных чтений установленного получателя.
+
+## Продолжение Atlas 0.9: настоящий U05 command owner, Agent D6 и cold native Decision
+
+Текущая инженерная линия уточнила **реальные**, а не только типовые
+границы подлинной интеграции:
+
+- `desktop/src/atlas-t3-store-port.mjs` отличает явное `false`
+  исходного `authorizeCommand("atlas_open"/"atlas_commit")`
+  от отсутствующего разрешения и транспортной ошибки.
+  Только исходный утвердительный отказ получает `outcome:"DENIED"`;
+  CAS-конфликт, потерянный ACK и неопределённый IPC результат
+  никогда не помечаются как определённый отказ.
+- `desktop/src/atlas-t3-installed-host.mjs` перестал превращать
+  исходное `undefined` в `false`. Право проверяется **ровно
+  один раз**, уже в штатном нативном порту.
+- `desktop/src/atlas-t3-original-agent-exchange.mjs`
+  экспортирует `createOriginalAgentExchangeReceiptPort`: это
+  адаптер существующего
+  `InstalledOriginalAgentResultOwner.readOriginalExchangeReceipt`,
+  **не новый Exchange** и не синтетическая квитанция. Явная
+  исходная проверка адаптера через `createAtlasT3NativeRecipient`
+  охватывает `inspect/receive/receipt/readback` и два независимых
+  холодных чтения на исходной модели Atlas.
+- Оригинальный `desktop/src-tauri/src/lib.rs` получил
+  `d6_result_decision_is_durable_across_two_cold_native_opens_with_cas`.
+  Это нативная Windows квалификация файла Decision в настоящем
+  U05 Store, а не заявление, что тестовая запись является
+  подписанным результатом Agent.
+- Нормативный D6 `knowledge@38ab0099` остаётся единственным
+  маршрутом `preview`, отдельного `continueSelected` и
+  `recover`. Никаких вторых Kernel, signer, Task Engine,
+  Reconciliation, Store, Host, HTTP service и формата `.iwxa`
+  не появилось.
+
+**Исходная приёмка на `5ca07416`:**
+[Actions №43937211776](https://github.com/Faust-S/Atlas/actions/runs/43937211776)
+— 709/709 Node PASS, оригинальный D6 PASS, TypeScript, Vite,
+совместимость Center и собранный единый `dist` PASS.
+**Windows:** [№43937211767](https://github.com/Faust-S/Atlas/actions/runs/43937211767)
+— квалифицируется отдельно, не считать PASS без финального
+результата установленной Windows-проверки.
+
+В параллельной Agent ветке
+`work/2026-11-16-agent06-original-t3-result-owner-d6` уже есть
+`currentContext/findTask/issueTask/readTask/selectAcceptedForWork/
+readAccepted/readOriginalExchangeReceipt`. Их реализация зависит от
+всё ещё отсутствующего **установленного оригинального T3
+Kernel/Exchange Publisher** с `publishAccepted`/оригинальным
+signed `iwxa.atlas` receipt. Наличие Agent source-кода
+не равно готовности подписанного установленного обмена. Atlas
+оставляет `INSTALLED_AGENT_T3_ATLAS=HOLD` до настоящего E2E.
