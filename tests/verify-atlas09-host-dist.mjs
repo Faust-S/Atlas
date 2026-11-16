@@ -21,6 +21,15 @@ assert.ok(code.includes("createInstalledAtlasT3NativeRecipient"),
  "ATLAS09_ORIGINAL_D6_NATIVE_RECIPIENT_EXPORT_NOT_SHIPPED");
 assert.ok(code.includes("createOriginalAgentExchangeReceiptPort"),
  "ATLAS09_ORIGINAL_AGENT_EXCHANGE_ADAPTER_NOT_SHIPPED");
+assert.ok(code.includes("ORIGINAL_RESULT_ONLY")&&
+ code.includes("ATLAS_T3_ORIGINAL_EXCHANGE_DISCLOSURE_UNVERIFIED")&&
+ code.includes("ATLAS_T3_ORIGINAL_PUBLICATION_DISCLOSURE_UNVERIFIED"),
+ "ATLAS09_ORIGINAL_RESULT_ONLY_RECEIPT_CHECK_NOT_SHIPPED");
+// Original native source sender uses node:crypto and belongs in the T3
+// installed Host, never in an untrusted Atlas WebView bundle.
+assert.ok(!code.includes("createTrustedAgentAtlasSourcePublisher")&&
+ !code.includes("node:crypto"),
+ "ATLAS09_NATIVE_ORIGINAL_SIGNER_MUST_NOT_LOAD_IN_BROWSER");
 assert.ok(code.includes("mountAtlasSurface"),
  "ATLAS09_ORIGINAL_ATLAS_SURFACE_NOT_SHIPPED");
 const html=readFileSync(join(root,"index.html"),"utf8");
