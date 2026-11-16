@@ -9,7 +9,11 @@ import {createAtlasSavedRef} from "./project-host-port.mjs";
 const ID=/^[A-Za-z0-9][A-Za-z0-9._:/@-]{0,159}$/;
 const SHA=/^[0-9a-f]{64}$/;
 const PREFIX="T3_RESULT_LINK/1 ";
+// Explicit denials come from the trusted original owner before a native write.
+ // Validation errors, missing proofs, IPC failures and lost commit ACKs never
+ // acquire this marker merely because they use an Atlas error code.
 const fail=code=>{throw Object.assign(new Error(code),{code});};
+const deny=code=>{throw Object.assign(new Error(code),{code,outcome:"DENIED"});};
 const id=(value,code)=>typeof value==="string"&&ID.test(value)?value:fail(code);
 const sha=(value,code)=>typeof value==="string"&&SHA.test(value)?value:fail(code);
 const sameRef=(a,b)=>a?.workspace_id===b?.workspace_id&&
@@ -158,6 +162,14 @@ export function createAtlasT3NativeRecipient({
    sourceObjectRef:ref,taskId:accepted.taskId,resultId:accepted.resultId,
    archiveSha256:accepted.archiveSha256,recipientId});
   active();
+  // An explicit, correctly bound negative decision from ORIGINAL Exchange
+  // is definite. Missing, stale and malformed receipts are NOT DENIED.
+  if(exchange?.status==="DENIED"&&
+     exchange.archiveSha256===accepted.archiveSha256&&
+     exchange.recipientId===recipientId&&
+     exchange.taskId===accepted.taskId&&
+     exchange.resultId===accepted.resultId)
+    deny("ATLAS_T3_ORIGINAL_EXCHANGE_UNVERIFIED");
   if(exchange?.status!=="VERIFIED"||
      exchange.archiveSha256!==accepted.archiveSha256||
      exchange.recipientId!==recipientId||
@@ -195,6 +207,11 @@ export function createAtlasT3NativeRecipient({
    resultId:state.accepted.resultId,
    archiveSha256:state.accepted.archiveSha256});
   active();
+  // Explicit false from the installed Atlas Authority is a DEFINITE refusal.
+  // A malformed / missing verdict is not an authoritative refusal and must
+  // not be confused with a definitive pre-write DENIED outcome.
+  if(verdict?.allowed===false)
+    deny("ATLAS_T3_PROJECT_WRITE_NOT_AUTHORIZED");
   if(verdict?.allowed!==true||verdict.operationId!==state.op||
      verdict.recipientId!==recipientId||
      verdict.projectId!==state.accepted.work.projectId||
@@ -203,7 +220,7 @@ export function createAtlasT3NativeRecipient({
     fail("ATLAS_T3_PROJECT_WRITE_NOT_AUTHORIZED");
  }
  async function inspect({reference,recipientId:to}={}){
-  active();if(to!==recipientId)fail("ATLAS_T3_RECIPIENT_MISMATCH");
+  active();if(to!==recipientId)deny("ATLAS_T3_RECIPIENT_MISMATCH");
   const state=await checked(objectRef(reference));
   const saved=await load();
   const existing=findReceipt(saved.snapshot,state.op);
@@ -218,17 +235,17 @@ export function createAtlasT3NativeRecipient({
    fail("ATLAS_T3_SOURCE_REVISION_CHANGED");
   const project=saved.snapshot.projects.find(p=>p.id===r.projectId);
   if(!project?.items.some(item=>item.id===r.workId))
-   fail("ATLAS_T3_WORK_NOT_FOUND");
+   deny("ATLAS_T3_WORK_NOT_FOUND");
   await permitted(state,"atlas.work.result.preview");
   return {status:"READY",operationId:state.op,recipientId,reference:state.ref};
  }
  async function receive({operationId,recipientId:to,reference,object}={}){
-  active();if(to!==recipientId)fail("ATLAS_T3_RECIPIENT_MISMATCH");
+  active();if(to!==recipientId)deny("ATLAS_T3_RECIPIENT_MISMATCH");
   const ref=objectRef(reference);
   if(!sameRef(object,ref)||object.deleted===true)
-   fail("ATLAS_T3_ORIGINAL_OBJECT_CHANGED");
+   deny("ATLAS_T3_ORIGINAL_OBJECT_CHANGED");
   const state=await checked(ref);
-  if(operationId!==state.op)fail("ATLAS_T3_OPERATION_MISMATCH");
+  if(operationId!==state.op)deny("ATLAS_T3_OPERATION_MISMATCH");
   // Original D6 Host has just performed a fresh signed t1.getObject read.
   // Atlas separately verifies its own native write permission JIT.
   await permitted(state,"atlas.work.result.apply");
@@ -239,10 +256,10 @@ export function createAtlasT3NativeRecipient({
   }
   const r=state.accepted.work;
   if(String(before.snapshot.revision)!==r.revision)
-   fail("ATLAS_T3_SOURCE_REVISION_CHANGED");
+   deny("ATLAS_T3_SOURCE_REVISION_CHANGED");
   const project=before.snapshot.projects.find(p=>p.id===r.projectId);
   if(!project?.items.some(item=>item.id===r.workId))
-   fail("ATLAS_T3_WORK_NOT_FOUND");
+   deny("ATLAS_T3_WORK_NOT_FOUND");
   const record={
    schema:"T3_RESULT_LINK/1",operationId:state.op,
    projectId:r.projectId,workId:r.workId,sourceRevision:r.revision,
