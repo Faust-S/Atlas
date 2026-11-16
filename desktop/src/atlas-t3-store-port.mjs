@@ -4,6 +4,7 @@
 import {deserialize,serialize} from "../../src/core.mjs";
 
 const fail=code=>{throw Object.assign(new Error(code),{code});};
+const deny=code=>{throw Object.assign(new Error(code),{code,outcome:"DENIED"});};
 export function createAtlasT3DesktopStorePort({invoke,authorizeCommand}={}){
  if(typeof invoke!=="function"||typeof authorizeCommand!=="function")
   fail("ATLAS_T3_U05_TRUSTED_HOST_REQUIRED");
@@ -13,8 +14,12 @@ export function createAtlasT3DesktopStorePort({invoke,authorizeCommand}={}){
   catch{fail("ATLAS_T3_U05_SNAPSHOT_INVALID");}
  };
  const open=async()=>{
-  if(await authorizeCommand("atlas_open")!==true)
-   fail("ATLAS_T3_U05_READ_DENIED");
+  // Only the existing native Atlas command owner can decide a definite
+  // pre-command DENIED. Missing/stale authority or IPC failures do not
+  // prove a command was refused or a possible prior write was absent.
+  const permission=await authorizeCommand("atlas_open");
+  if(permission===false)deny("ATLAS_T3_U05_READ_DENIED");
+  if(permission!==true)fail("ATLAS_T3_U05_READ_DENIED");
   const result=await invoke("atlas_open");
   if(!result||typeof result.generation!=="string"||
      result.generation==="none"||result.needsConfirmation===true)
@@ -30,8 +35,11 @@ export function createAtlasT3DesktopStorePort({invoke,authorizeCommand}={}){
   // Original native atlas_commit handles writer lock, optimistic generation
   // match and atomic revision bump. Never resend on a lost acknowledgement.
   const args={expectedGeneration,snapshot:next};
-  if(await authorizeCommand("atlas_commit",args)!==true)
-   fail("ATLAS_T3_U05_WRITE_DENIED");
+  const permission=await authorizeCommand("atlas_commit",args);
+  if(permission===false)deny("ATLAS_T3_U05_WRITE_DENIED");
+  if(permission!==true)fail("ATLAS_T3_U05_WRITE_DENIED");
+  // After the call enters original Tauri, CAS/IPC/ACK errors must remain
+  // unclassified. Only original receipt/readback can resolve the write.
   return await invoke("atlas_commit",args);
  };
  return Object.freeze({readSaved:open,commitSaved:commit});
