@@ -741,6 +741,17 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   }
   return Object.freeze({status:reread.status,link});
  };
+ // A definite original owner denial is distinct from an unconfirmed
+ // native write. Never downgrade it or claim a durable Atlas Decision.
+ const showOriginalT3Denial=(error:unknown)=>{
+  const verdict=error as {code?:string;outcome?:string}|null;
+  if(verdict?.outcome!=="DENIED")return false;
+  const code=typeof verdict.code==="string"?verdict.code:"ORIGINAL_T3_DENIED";
+  setError("");
+  setMessage("Оригинальный владелец отказал в действии: "+code+
+   ". Подтверждения Result нет. Повторное применение не запускалось.");
+  return true;
+ };
  // An original T3 D6 Host owns signed Result selection and Human consent.
  // Atlas provides only the exact saved Project/WorkRef.
  const receiveAtlasAgentResult=async(projectId:string,workId:string)=>{
@@ -793,7 +804,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     throw Error("Неизвестный ответ T3. Получение Result не подтверждено.");
    }
    setError("");
-  }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
+  }catch(e){if(!showOriginalT3Denial(e))issue(e)}finally{busyRef.current=false;setBusy(false)}
  };
  // Original T3 D6 recovery performs signed readback ONLY; it never
  // dispatches a second Agent Task or Atlas native commit. The stored Agent
@@ -844,7 +855,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     throw Error("Неподтверждённый ответ T3 при проверке Result.");
    }
    setError("");
-  }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
+  }catch(e){if(!showOriginalT3Denial(e))issue(e)}finally{busyRef.current=false;setBusy(false)}
  };
  // Another product may have written the native Atlas head by an authorized T3
  // route. Explicit native reread only, never an implicit overwrite of a draft.
