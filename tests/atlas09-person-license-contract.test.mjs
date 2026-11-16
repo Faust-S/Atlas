@@ -16,7 +16,7 @@ const config=JSON.parse(read("desktop/src-tauri/tauri.conf.json"));
 test("Atlas 0.9 preserves original T3 PERSON Consumer, without a second signer or keys",()=>{
  assert.equal(pkg.version,"0.9.0-dev.1");
  assert.equal(config.version,pkg.version);
- assert.match(bridge,/iwxa-t3-product-consumer\\.exe/);
+ assert.match(bridge,/iwxa-t3-product-consumer\.exe/);
  assert.match(bridge,/person-local-authorize/);
  assert.match(bridge,/person-local-receive/);
  assert.match(bridge,/signatureVerified/);
@@ -59,5 +59,5 @@ test("Real Windows negative witness rejects Save and cold recovery without priva
  assert.match(witness,/ATLAS09_PERSON_DURABLE_STORE_UNCHANGED_AND_COLD_RESTART_PASS/);
  assert.match(witness,/native_store_snapshot\(\)==previous/);
  assert.match(witness,/click_button\("Закрыть без сохранения"/);
- assert.doesNotMatch(witness,/fake T3|mock signature|test-only IPC/);
+ assert.doesNotMatch(witness,/\bt3Mock\b|\bfakeConsumer\b|\btestOnlyInvoke\b/);
 });
