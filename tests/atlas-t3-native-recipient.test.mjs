@@ -46,7 +46,10 @@ function fixture({badExchange=false,denied=false,unaccepted=false,lostAck=false,
   readOriginalExchangeReceipt:async args=>({
    status:exchangeDenied?"DENIED":badExchange?"UNVERIFIED":"VERIFIED",
    recipientId:args.recipientId,
-   taskId:args.taskId,resultId:args.resultId,archiveSha256:args.archiveSha256
+   taskId:args.taskId,resultId:args.resultId,archiveSha256:args.archiveSha256,
+   originalSignatureVerified:true,archiveBytesVerified:true,
+   originalManifestVerified:true,disclosureScope:"ORIGINAL_RESULT_ONLY",
+   selectedSourceObjectRef:args.sourceObjectRef
   }),
   verifyAtlasWrite:writePermit
  });
