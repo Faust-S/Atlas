@@ -15,7 +15,10 @@ const request=Object.freeze({
 });
 const verified=Object.freeze({
  status:"VERIFIED",recipientId:"iwxa.atlas",taskId:request.taskId,
- resultId:request.resultId,archiveSha256:request.archiveSha256
+ resultId:request.resultId,archiveSha256:request.archiveSha256,
+ originalSignatureVerified:true,archiveBytesVerified:true,
+ originalManifestVerified:true,disclosureScope:"ORIGINAL_RESULT_ONLY",
+ selectedSourceObjectRef:ref
 });
 test("Trusted installed Agent delegates exact original Exchange request and untouched receipt",async()=>{
  const inputs=[];
