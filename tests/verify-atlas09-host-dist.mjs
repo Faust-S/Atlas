@@ -21,14 +21,32 @@ assert.ok(code.includes("createInstalledAtlasT3NativeRecipient"),
  "ATLAS09_ORIGINAL_D6_NATIVE_RECIPIENT_EXPORT_NOT_SHIPPED");
 assert.ok(code.includes("createOriginalAgentExchangeReceiptPort"),
  "ATLAS09_ORIGINAL_AGENT_EXCHANGE_ADAPTER_NOT_SHIPPED");
-assert.ok(code.includes("ORIGINAL_RESULT_ONLY")&&
- code.includes("ATLAS_T3_ORIGINAL_EXCHANGE_DISCLOSURE_UNVERIFIED")&&
- code.includes("ATLAS_T3_ORIGINAL_PUBLICATION_DISCLOSURE_UNVERIFIED"),
+// Vite can split the recipient, publication gate and shared React modules
+// into other manifest entries. Qualify the TRANSITIVE chunks imported by the
+// actual installed T3 Host, not only the single Rollup entry's text.
+const owned=new Set(),imported=[];
+const collect=key=>{
+ if(owned.has(key))return;
+ owned.add(key);
+ const item=manifest[key];
+ assert.ok(item&&typeof item.file==="string",
+  "ATLAS09_HOST_MANIFEST_IMPORT_MISSING:"+key);
+ const chunk=resolve(root,item.file);
+ assert.ok(chunk.startsWith(root.endsWith(sep)?root:root+sep));
+ imported.push(readFileSync(chunk,"utf8"));
+ for(const dependency of [...(item.imports??[]),...(item.dynamicImports??[])])
+  collect(dependency);
+};
+collect("src/atlas-react-surface.tsx");
+const delivered=imported.join("\n");
+assert.ok(delivered.includes("ORIGINAL_RESULT_ONLY")&&
+ delivered.includes("ATLAS_T3_ORIGINAL_EXCHANGE_DISCLOSURE_UNVERIFIED")&&
+ delivered.includes("ATLAS_T3_ORIGINAL_PUBLICATION_DISCLOSURE_UNVERIFIED"),
  "ATLAS09_ORIGINAL_RESULT_ONLY_RECEIPT_CHECK_NOT_SHIPPED");
-// Original native source sender uses node:crypto and belongs in the T3
-// installed Host, never in an untrusted Atlas WebView bundle.
-assert.ok(!code.includes("createTrustedAgentAtlasSourcePublisher")&&
- !code.includes("node:crypto"),
+// The original Node crypto publisher may run ONLY in the native T3 Host,
+// never inside Atlas WebView or its JavaScript dependency graph.
+assert.ok(!delivered.includes("createTrustedAgentAtlasSourcePublisher")&&
+ !delivered.includes("node:crypto"),
  "ATLAS09_NATIVE_ORIGINAL_SIGNER_MUST_NOT_LOAD_IN_BROWSER");
 assert.ok(code.includes("mountAtlasSurface"),
  "ATLAS09_ORIGINAL_ATLAS_SURFACE_NOT_SHIPPED");
