@@ -101,6 +101,12 @@ export function createAtlasT3OriginalPublicationPort({
      receipt.resultId!==accepted.resultId||
      receipt.archiveSha256!==accepted.archiveSha256)
    fail("ATLAS_T3_ORIGINAL_PUBLICATION_EXCHANGE_UNVERIFIED");
+  if(receipt.originalSignatureVerified!==true||
+     receipt.archiveBytesVerified!==true||
+     receipt.originalManifestVerified!==true||
+     receipt.disclosureScope!=="ORIGINAL_RESULT_ONLY"||
+     !sameRef(receipt.selectedSourceObjectRef,accepted.sourceObjectRef))
+   fail("ATLAS_T3_ORIGINAL_PUBLICATION_DISCLOSURE_UNVERIFIED");
   return Object.freeze({status:"OWNER_READBACK_CONFIRMED",
    operationId:reply.operationId,workRef});
  }
