@@ -12,6 +12,7 @@ const DIGEST="a".repeat(64),ARCHIVE="b".repeat(64);
 function fixture({badExchange=false,denied=false,unaccepted=false,lostAck=false,
  exchangeDenied=false,grantOutage=false,malformedGrant=false,
  mismatchedDenial=false,ownerThrownDenial=false,
+ fullWorkspace=false,unsignedReceipt=false,foreignDisclosure=false,
  commitOutageBeforeWrite=false}={}){
  let snapshot=atlas06VisualPortfolio(),generation="atlas-generation-0",saves=0,opens=0,active=true;
  const original=serialize(snapshot),project=snapshot.projects[0],work=project.items[0];
@@ -47,9 +48,11 @@ function fixture({badExchange=false,denied=false,unaccepted=false,lostAck=false,
    status:exchangeDenied?"DENIED":badExchange?"UNVERIFIED":"VERIFIED",
    recipientId:args.recipientId,
    taskId:args.taskId,resultId:args.resultId,archiveSha256:args.archiveSha256,
-   originalSignatureVerified:true,archiveBytesVerified:true,
-   originalManifestVerified:true,disclosureScope:"ORIGINAL_RESULT_ONLY",
-   selectedSourceObjectRef:args.sourceObjectRef
+   originalSignatureVerified:!unsignedReceipt,
+   archiveBytesVerified:true,originalManifestVerified:true,
+   disclosureScope:fullWorkspace?"FULL_WORKSPACE":"ORIGINAL_RESULT_ONLY",
+   selectedSourceObjectRef:foreignDisclosure?
+    {...args.sourceObjectRef,object_id:"result:foreign"}:args.sourceObjectRef
   }),
   verifyAtlasWrite:writePermit
  });
@@ -333,6 +336,18 @@ test("Original Atlas authority DENIED remains explicit; missing grants never inv
    assert.match(error.code||error.message,/ATLAS_T3_|ORIGINAL_ATLAS_OWNER_DENIAL|OWNER_GRANT_TRANSPORT_UNAVAILABLE/);
   }
   assert.equal(f.saves(),0,"A refusal cannot write Atlas");
+ }
+});
+test("Original Exchange proves signed single-Result disclosure, not full Workspace",async()=>{
+ for(const option of [{fullWorkspace:true},{unsignedReceipt:true},
+                       {foreignDisclosure:true}]){
+  const f=fixture(option);
+  await assert.rejects(
+   ()=>f.make().inspect({reference:SOURCE,recipientId:"iwxa.atlas"}),
+   error=>error?.code==="ATLAS_T3_ORIGINAL_EXCHANGE_DISCLOSURE_UNVERIFIED"&&
+    error?.outcome===undefined,
+   "A missing original proof cannot become a definite owner denial");
+  assert.equal(f.saves(),0,"Unscoped Exchange cannot reach native atlas_commit");
  }
 });
 test("Native IPC loss and lost commit ACK never gain an invented DENIED marker",async()=>{
