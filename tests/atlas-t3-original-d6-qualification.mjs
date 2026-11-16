@@ -74,8 +74,11 @@ test("Original T3 signed Result -> native Atlas decision -> cold double readback
    acceptedDigest:"a".repeat(64),archiveSha256:"b".repeat(64),
    workRef:issued.workRef,sourceObjectRef:originalRef
   }),
-  readOriginalExchangeReceipt:async({taskId,resultId,archiveSha256,recipientId})=>({
-   status:"VERIFIED",taskId,resultId,archiveSha256,recipientId
+  readOriginalExchangeReceipt:async({sourceObjectRef,taskId,resultId,archiveSha256,recipientId})=>({
+   status:"VERIFIED",taskId,resultId,archiveSha256,recipientId,
+   originalSignatureVerified:true,archiveBytesVerified:true,
+   originalManifestVerified:true,disclosureScope:"ORIGINAL_RESULT_ONLY",
+   selectedSourceObjectRef:sourceObjectRef
   }),
   verifyAtlasWrite:async({operationId,recipientId,workRef,action})=>({
    allowed:!denied&&!(denyApply&&action==="atlas.work.result.apply")&&
