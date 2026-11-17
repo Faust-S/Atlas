@@ -49,7 +49,8 @@ test("Atlas 0.9 has its own installed Windows gate and cannot publish a release"
 test("Atlas 0.9 signed D6 native gateway performs one owner gate per operation",()=>{
  const b=read("desktop/src/atlas-t3-installed-host.mjs");
  const matches=[...b.matchAll(/const invoke=async\(command,args\)=>\{([\s\S]*?)\n \};/g)];
- assert.equal(matches.length,2,"Two installed native entry points");
+ assert.equal(matches.length,3,
+  "Three trusted gateways reuse the SAME Atlas Tauri AppHandle");
  for(const match of matches){
   assert.doesNotMatch(match[1],/await authorizeCommand\(/,
    "The original Store or authorized Atlas UI already checks the right once");
