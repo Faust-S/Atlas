@@ -19,6 +19,13 @@ test("Atlas 0.9 preserves original T3 PERSON Consumer, without a second signer o
  assert.match(bridge,/iwxa-t3-product-consumer\.exe/);
  assert.match(bridge,/person-local-authorize/);
  assert.match(bridge,/person-local-receive/);
+ assert.match(bridge,/person-local-subject/);
+ assert.match(bridge,/person-local-receipt/);
+ assert.match(bridge,/person-local-status-readback/);
+ assert.match(bridge,/require_person_holder_readback/);
+ assert.match(bridge,/ATLAS_PERSON_ORIGINAL_DURABLE_READBACK_REQUIRED/);
+ assert.match(ui,/holderReceiptConfirmed!==true/);
+ assert.match(ui,/statusReadbackConfirmed!==true/);
  assert.match(bridge,/signatureVerified/);
  assert.match(bridge,/statusVerified/);
  assert.doesNotMatch(bridge,/generateKeyPair|ed25519-dalek|sign_record|private_key_pem|createSigner/);
