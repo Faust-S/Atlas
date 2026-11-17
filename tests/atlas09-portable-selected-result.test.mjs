@@ -11,7 +11,7 @@ const summary="Human-accepted selected Result summary. No Agent memory or worksp
 const summarySha=createHash("sha256").update(summary,"utf8").digest("hex");
 const archived="c".repeat(64),acceptedDigest="d".repeat(64);
 
-function originalNativeFixture({badSummaryHash=false}={}){
+function originalNativeFixture({badSummaryHash=false,legacyReferenceOnly=false,incompletePortable=false}={}){
  let saved=empty(),generation="native:0",writes=0;
  const project=createProject(saved,{name:"Original signed portable Result"});
  saved=project.state;
@@ -39,8 +39,12 @@ function originalNativeFixture({badSummaryHash=false}={}){
    originalSignatureVerified:true,archiveBytesVerified:true,
    originalManifestVerified:true,disclosureScope:"ORIGINAL_RESULT_ONLY",
    selectedSourceObjectRef:ref,
-   portableSelectedSummary:true,selectedAcceptedSummary:summary,
-   selectedSummarySha256:badSummaryHash?"0".repeat(64):summarySha
+   ...(legacyReferenceOnly?{portableSelectedSummary:false}:
+     incompletePortable?{portableSelectedSummary:false,
+       selectedAcceptedSummary:summary}:{
+       portableSelectedSummary:true,selectedAcceptedSummary:summary,
+       selectedSummarySha256:badSummaryHash?"0".repeat(64):summarySha
+     })
   }),
   verifyAtlasWrite:async({operationId,recipientId,workRef})=>({
    allowed:true,operationId,recipientId,projectId:workRef.projectId,
@@ -80,5 +84,27 @@ test("Invalid original Exchange content digest cannot trigger Atlas native write
  const f=originalNativeFixture({badSummaryHash:true});
  await assert.rejects(f.make().inspect({reference:ref,recipientId:"iwxa.atlas"}),
   {code:"ATLAS_T3_SIGNED_SELECTED_SUMMARY_HASH_MISMATCH"});
+ assert.equal(f.writes(),0);
+});
+
+test("A genuine older reference-only signed carrier still has native readback",async()=>{
+ const f=originalNativeFixture({legacyReferenceOnly:true});
+ const p=f.make(),plan=await p.inspect({reference:ref,recipientId:"iwxa.atlas"});
+ await p.receive({operationId:plan.operationId,recipientId:"iwxa.atlas",
+  reference:ref,object:ref});
+ assert.equal(f.writes(),1);
+ const recorded=f.get().projects[0].decisions.at(-1).text;
+ assert.equal(atlasT3PortableResultText(recorded),null);
+ assert.match(atlasT3DecisionSummary(recorded),/Передана только ссылка/);
+ const cold=f.make();
+ assert.equal((await cold.receipt(plan.operationId)).state,"COMMITTED");
+ assert.equal((await cold.readback(plan.operationId)).state,"PERSISTED");
+ assert.equal(f.writes(),1);
+});
+
+test("A partial new signed summary is not mistaken for a valid old link",async()=>{
+ const f=originalNativeFixture({incompletePortable:true});
+ await assert.rejects(f.make().inspect({reference:ref,recipientId:"iwxa.atlas"}),
+  {code:"ATLAS_T3_SIGNED_SELECTED_SUMMARY_UNVERIFIED"});
  assert.equal(f.writes(),0);
 });
