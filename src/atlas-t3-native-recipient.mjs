@@ -96,9 +96,12 @@ export function atlasT3DecisionSummary(text){
  if(!record)return "Повреждена запись связи Atlas с T3. Требуется проверка.";
  return "Связь с результатом Agent: работа "+record.workId+
   ", Task "+record.taskId+", Result "+record.resultId+
-  (record.portableSelectedSummary===true
-    ?". Выбранный текст Result сохранён в Atlas."
-    :". Передана только ссылка, без содержания Result.")+
+  (record.signedFileMode===true
+    ?". Подписанный файл получателем проверен и текст сохранён. "+
+     "Событие Kernel отправителя получателем не проверено."
+    :record.portableSelectedSummary===true
+      ?". Выбранный текст Result сохранён в Atlas."
+      :". Передана только ссылка, без содержания Result.")+
   " Источник и полномочия проверяются заново при использовании.";
 }
 // Read the locally saved selected text without manufacturing a current grant.
@@ -122,6 +125,7 @@ export function atlasT3RecordedWorkLinks(project){
    taskId:row.taskId,resultId:row.resultId,decisionId:decision.id,
    operationId:row.operationId,sourceObjectRef:row.sourceObjectRef,
    portableSelectedSummary:row.portableSelectedSummary===true,
+   signedFileMode:row.signedFileMode===true,
   }));
  }
  return links;
@@ -233,6 +237,8 @@ export function createAtlasT3NativeRecipient({
   return {ref,accepted,op,portable};
  }
  async function verifyPersisted(entry,saved,op,state=null){
+  if(entry.record.signedFileMode===true)
+   fail("ATLAS_T3_SIGNED_FILE_NOT_KERNEL_RECEIPT");
   // An Atlas decision is source data, not a cryptographic native receipt.
   // Rebind it to ORIGINAL accepted Agent Result and original Exchange
   // evidence every time, including after a cold Atlas/T3 Host restart.
