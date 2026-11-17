@@ -3121,6 +3121,41 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      </div>
     </section>
    </div>}
+   {signedResultPreview!==null&&<div className="atlas-close-overlay">
+    <section className="atlas-close-dialog atlas-import-dialog" role="dialog"
+     aria-modal="true" aria-labelledby="atlas-t3-signed-result-title">
+     <div className="atlas-import-body">
+      <h2 id="atlas-t3-signed-result-title">Принять подписанный Result</h2>
+      <p>Оригинальный T3 проверил подпись .iwxa, получателя, действующие полномочия и точный текст. Отдельно подтвердите запись в проект Atlas.</p>
+      <p className="minor">Проект: {data.projects.find((p:any)=>p.id===signedResultPreview.workRef.projectId)?.name||signedResultPreview.workRef.projectId}.
+       {" "}Работа: {data.projects.find((p:any)=>p.id===signedResultPreview.workRef.projectId)?.items.find((w:any)=>w.id===signedResultPreview.workRef.workId)?.title||signedResultPreview.workRef.workId}.
+       {" "}Редакция: {signedResultPreview.workRef.revision}.</p>
+      <label className="atlas-ref-label">Выбранный подписанный текст Result
+       <textarea className="atlas-ref-text" rows={6} readOnly
+        aria-label="Оригинальный подписанный текст Result"
+        value={signedResultPreview.selectedAcceptedSummary}/>
+      </label>
+      <details className="atlas-technical-details">
+       <summary>Точные SHA-256 и квитанция</summary>
+       <p className="minor">Архив: <code>{signedResultPreview.archiveSha256}</code></p>
+       <p className="minor">Текст: <code>{signedResultPreview.selectedSummarySha256}</code></p>
+       <p className="minor">Операция: <code>{signedResultPreview.operationId}</code></p>
+      </details>
+      <p className="minor">Подпись подтверждает происхождение, но не шифрует файл. Событие Kernel отправителя здесь не проверено. Получение не меняет состояние работы и её зависимости.</p>
+      {signedResultPreview.alreadyReceived&&<p>Этот Result уже сохранён в Atlas. Повторная запись не требуется.</p>}
+      {error&&<p className="error" role="alert">{error}</p>}
+      <div className="button-row">
+       {!signedResultPreview.alreadyReceived&&<Action primary
+        onClick={()=>void acceptSignedResultFile()} disabled={busy||dirty||!!editor}>
+        Подтвердить получение</Action>}
+       <Action onClick={()=>void recoverSignedResultFile()} disabled={busy||dirty||!!editor}
+        title="Только чтение квитанции, без повторной записи">
+        Проверить квитанцию</Action>
+       <Action autoFocus onClick={()=>{if(!busyRef.current)setSignedResultPreview(null)}} disabled={busy}>Закрыть</Action>
+      </div>
+     </div>
+    </section>
+   </div>}
    {pendingImport!==null&&<div className="atlas-close-overlay">
     <section className="atlas-close-dialog atlas-import-dialog" role="dialog" aria-modal="true" aria-labelledby="atlas-import-preview-title">
      <div className="atlas-import-body">
