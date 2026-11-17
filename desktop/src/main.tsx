@@ -780,8 +780,13 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     throw Error("Портфель изменился при выборе подписанного Result. Перечитайте сохранённую редакцию.");
    const p=started.projects.find((item:any)=>item.id===preview.workRef.projectId);
    if(!p||!p.items.some((item:any)=>item.id===preview.workRef.workId)||
-      String(started.revision)!==preview.workRef.revision)
+      (!preview.alreadyReceived&&String(started.revision)!==preview.workRef.revision))
     throw Error("T3 подписал Result для другой редакции проекта. Обновите Atlas перед приёмом.");
+   // The original U05 CAS advances Atlas revision after first receipt.
+   // A cold readback of the SAME already-received signed Result must remain
+   // possible even when the signed WorkRef predates that native commit.
+   // Re-applying still requires the exact earlier preview and is not offered
+   // for alreadyReceived=true.
    setSignedResultPreview({...preview,archive});
    setMessage("");setError("");
   }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
