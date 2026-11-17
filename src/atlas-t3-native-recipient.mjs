@@ -565,6 +565,35 @@ export function createAtlasT3SignedFileRecipient({
  });
 }
 
+/** Validate the shape AND actual UTF-8 content of a native ORIGINAL
+ * signed-file preview for Human Review. This is NOT a verifier of the
+ * Ed25519 signature: only the installed original T3 recipient can do that.
+ * Do not enable the UI without its trusted recipient port.
+ */
+export async function verifiedAtlasSignedFilePreview(row){
+ if(row?.status!=="SIGNED_FILE_READY"||
+    row.recipientId!=="iwxa.atlas"||
+    !/^atlas:t3:[a-f0-9]{64}$/.test(row.operationId??"")||
+    row.originalKernelEventVerified!==false||
+    typeof row.alreadyReceived!=="boolean"||
+    !SHA.test(row.archiveSha256??""))
+  fail("ATLAS_T3_SIGNED_PREVIEW_INVALID");
+ const work=workRef(row.workRef),selected=portableSummary({
+  portableSelectedSummary:true,
+  selectedAcceptedSummary:row.selectedAcceptedSummary,
+  selectedSummarySha256:row.selectedSummarySha256
+ });
+ await verifySummaryDigest(selected);
+ return Object.freeze({
+  status:"SIGNED_FILE_READY",recipientId:"iwxa.atlas",
+  operationId:row.operationId,workRef:work,
+  archiveSha256:row.archiveSha256,
+  selectedAcceptedSummary:selected.selectedAcceptedSummary,
+  selectedSummarySha256:selected.selectedSummarySha256,
+  originalKernelEventVerified:false,alreadyReceived:row.alreadyReceived
+ });
+}
+
 // A selected Atlas WorkRef may be handed to the ORIGINAL installed Agent Task
 // owner. Atlas does not create or sign a Task. The original Agent owner issues
 // the actual Task only after independently checking its own rights/Workspace.
