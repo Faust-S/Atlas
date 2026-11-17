@@ -97,8 +97,9 @@ export function atlasT3DecisionSummary(text){
  return "Связь с результатом Agent: работа "+record.workId+
   ", Task "+record.taskId+", Result "+record.resultId+
   (record.signedFileMode===true
-    ?". Подписанный файл получателем проверен и текст сохранён. "+
-     "Событие Kernel отправителя получателем не проверено."
+    ?". В Atlas сохранён текст, помеченный как полученный из подписанного файла. "+
+     "Подлинность и полномочия требуют проверки оригинальным T3; "+
+     "событие Kernel отправителя не проверено."
     :record.portableSelectedSummary===true
       ?". Выбранный текст Result сохранён в Atlas."
       :". Передана только ссылка, без содержания Result.")+
@@ -505,18 +506,27 @@ export function createAtlasT3SignedFileRecipient({
     deny("ATLAS_T3_WORK_NOT_FOUND");
    await permitted(state,"atlas.work.result.preview");
   }
+  // Preview MUST expose the exact original signed selected text for human
+  // review; a digest alone cannot support meaningful recipient consent.
   return {status:"SIGNED_FILE_READY",recipientId,operationId:state.op,
    workRef:state.accepted.work,
+   archiveSha256:state.accepted.archiveSha256,
+   selectedAcceptedSummary:state.portable.selectedAcceptedSummary,
    selectedSummarySha256:state.portable.selectedSummarySha256,
    originalKernelEventVerified:false,alreadyReceived:Boolean(existing)};
  }
  async function receiveArchive({archive,recipientId:to,operationId,
-   confirmed=false}={}){
+   confirmed=false,archiveSha256,selectedSummarySha256}={}){
   active();
   if(to!==recipientId)deny("ATLAS_T3_RECIPIENT_MISMATCH");
   if(confirmed!==true)deny("ATLAS_T3_SIGNED_FILE_HUMAN_REVIEW_REQUIRED");
   const state=await inspectOriginal(archive);
-  if(operationId!==state.op)deny("ATLAS_T3_OPERATION_MISMATCH");
+  // User must confirm the SAME original signed archive and selected text
+  // inspected immediately before the durable Atlas U05 generation-CAS.
+  if(operationId!==state.op||
+     archiveSha256!==state.accepted.archiveSha256||
+     selectedSummarySha256!==state.portable.selectedSummarySha256)
+   deny("ATLAS_T3_SIGNED_FILE_PREVIEW_CHANGED");
   await permitted(state,"atlas.work.result.apply");
   const before=await load(),existing=find(before.snapshot,state.op);
   if(existing){
