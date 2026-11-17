@@ -16,13 +16,11 @@ const fail=code=>{throw Object.assign(new Error(code),{code});};
 const deny=code=>{throw Object.assign(new Error(code),{code,outcome:"DENIED"});};
 const id=(value,code)=>typeof value==="string"&&ID.test(value)?value:fail(code);
 const sha=(value,code)=>typeof value==="string"&&SHA.test(value)?value:fail(code);
-const PORTABLE=["portableSelectedSummary","selectedAcceptedSummary",
- "selectedSummarySha256"];
+const PORTABLE_CONTENT=["selectedAcceptedSummary","selectedSummarySha256"];
 // Only the ORIGINAL Exchange verifies a carrier's signature/recipient.
 // This validates the resulting selected-content shape before native CAS.
 function portableSummary(row){
- const contentPresent=["selectedAcceptedSummary","selectedSummarySha256"]
-  .some(k=>Object.hasOwn(row??{},k));
+ const contentPresent=PORTABLE_CONTENT.some(k=>Object.hasOwn(row??{},k));
  // The updated ORIGINAL Exchange explicitly sets false when verifying a
  // genuine older reference-only carrier. That is readable, not portable.
  if(!contentPresent&&row?.portableSelectedSummary!==true)return null;
@@ -227,8 +225,7 @@ export function createAtlasT3NativeRecipient({
      !sameRef(exchange.selectedSourceObjectRef,ref))
     fail("ATLAS_T3_ORIGINAL_EXCHANGE_DISCLOSURE_UNVERIFIED");
   if(exchange.portableSelectedSummary!==true&&
-     ["selectedAcceptedSummary","selectedSummarySha256"]
-      .some(k=>Object.hasOwn(exchange,k)))
+     PORTABLE_CONTENT.some(k=>Object.hasOwn(exchange,k)))
    fail("ATLAS_T3_SIGNED_SELECTED_SUMMARY_UNVERIFIED");
   const portable=portableSummary(exchange);
   await verifySummaryDigest(portable);
