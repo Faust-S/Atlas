@@ -24,6 +24,19 @@ test("T3 native continuation owner uses actual Atlas Tauri commands, not simulat
  assert.match(native,/fn atlas_commit\(/);
  assert.doesNotMatch(binding,/localStorage|indexedDB|fetch\(|new WebSocket|spawn\(/);
 });
+test("Independent signed-file recipient mounts ORIGINAL native trust and SAME Atlas U05 without Agent",()=>{
+ assert.match(binding,/export async function createInstalledAtlasT3SignedFileRecipient\(/);
+ assert.match(binding,/originalSignedRecipient\.inspectSignedArchive\(bytes\)/);
+ assert.match(binding,/originalSignedRecipient\.readVerifiedArchive\(sha256\)/);
+ assert.match(binding,/return createAtlasT3SignedFileRecipient\(/);
+ assert.match(binding,/readSaved:store\.readSaved,commitSaved:store\.commitSaved/);
+ assert.match(binding,/await atlasNativeInvoke\(command,args\)/);
+ assert.match(surface,/createInstalledAtlasT3SignedFileRecipient/);
+ const independent=binding.slice(binding.indexOf(
+  "export async function createInstalledAtlasT3SignedFileRecipient("));
+ assert.doesNotMatch(independent,/originalAgent\.|createOriginalAgentExchangeReceiptPort\(/);
+ assert.doesNotMatch(independent,/localStorage|indexedDB|new WebSocket|fetch\(/);
+});
 test("Installed signed D6 owners are mandatory; original Agent supplies verified Exchange delegate when needed",()=>{
  for(const name of ["originalT3","originalAgent",
    "atlasAuthority","hostLifecycle"])
