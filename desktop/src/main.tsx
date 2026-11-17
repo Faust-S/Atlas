@@ -35,8 +35,8 @@ import {commitWithReadback,readSavedSnapshotForReference,readExternalAtlasUpdate
 import {projectHistoryRows} from "./history-view.mjs";
 import {sortWorkRows,firstSortedMatchingWorkId,deadlineFocusRows,filterWorkRowsByObservation} from "./work-sorting.mjs";
 import {createAtlasSavedRef} from "../../src/project-host-port.mjs";
-import {atlasT3DecisionSummary,atlasT3RecordedWorkLinks}
- from "../../src/atlas-t3-native-recipient.mjs";
+import {atlasT3DecisionSummary,atlasT3RecordedWorkLinks,
+ atlasT3PortableResultText} from "../../src/atlas-t3-native-recipient.mjs";
 import {findConfirmedAtlasT3Decision} from "../../src/atlas-t3-confirmed-projection.mjs";
 import {invokeAtlasHost,type AtlasEmbeddedHost} from "./embedded-host";
 
@@ -2441,7 +2441,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
          </small>}
         {(t3WorkLinks.get(w.id)||[]).slice(-2).map((link:any)=>
          <small key={link.decisionId} className="atlas-work-evidence-note">
-          Agent Result {link.resultId}. Сохранена ссылка; доступ проверяется в T3.
+          {link.portableSelectedSummary
+           ?<>Agent Result {link.resultId}. Выбранный текст сохранён в Atlas; доступ к источнику проверяется в T3.</>
+           :<>Agent Result {link.resultId}. Сохранена ссылка; доступ проверяется в T3.</>}
          </small>)}
         {(t3WorkLinks.get(w.id)||[]).length>2&&<small className="atlas-work-evidence-note">
          Ещё {(t3WorkLinks.get(w.id)||[]).length-2} ссылок в истории.</small>}</td>
@@ -2707,6 +2709,13 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      {history.slice(0,historyLimit).map((entry:any)=><div className="history-entry" key={entry.kind+"-"+entry.id}>
       <small>{readable(entry.at)} · {entry.kind==="decision"?"Решение":"Заявление"}{entry.source?" · "+entry.source:""}</small>
       <p>{atlasT3DecisionSummary(entry.text)||entry.text||"Без пояснения"}</p>
+      {entry.kind==="decision"&&atlasT3PortableResultText(entry.text)!==null&&
+       <details className="atlas-technical-details">
+        <summary>Показать сохранённый текст Result</summary>
+        <p style={{whiteSpace:"pre-wrap"}}>{atlasT3PortableResultText(entry.text)}</p>
+        <p className="minor">Это выбранный текст, сохранённый вместе с записью Atlas.
+         Наличие локальной копии не подтверждает текущие права источника.</p>
+       </details>}
       {entry.kind==="decision"&&atlasT3DecisionSummary(entry.text)&&
        <details className="atlas-technical-details">
         <summary>Исходная запись связи T3</summary>
