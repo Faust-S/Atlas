@@ -1083,6 +1083,11 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     if(!busyRef.current)setPendingImport(null);
     return;
    }
+   if(signedResultOpenRef.current){
+    event.preventDefault();
+    if(!busyRef.current)setSignedResultPreview(null);
+    return;
+   }
    if(savedVersionsOpenRef.current){
     // Alt+F4 first closes the history modal, never dismisses the app while
     // a selected generation is being read or restored.
@@ -1695,7 +1700,14 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    // composedPath sees Shadow DOM descendants even after event retargeting.
    if(embedded && (!rootRef.current || !event.composedPath().includes(rootRef.current)))return;
    const ctrl=event.ctrlKey||event.metaKey,code=event.code;
-   // Both the import preview and native history are modal.
+   // All signed-file decisions and project imports are modal.
+   if(signedResultPreview!==null){
+    if(event.key==="Escape"&&!busyRef.current){
+     event.preventDefault();setSignedResultPreview(null);return;
+    }
+    if(ctrl||event.key==="Escape")event.preventDefault();
+    return;
+   }
    if(pendingImport!==null){
     if(event.key==="Escape"&&!busyRef.current){
      event.preventDefault();setPendingImport(null);return;
@@ -1789,6 +1801,14 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     <div className="toolbar-actions">
      <Badge tone={editor||dirty?"warning":persisted?"good":"neutral"}>{editor?"Форма не применена":dirty?"Не сохранено":persisted?"Сохранено":"Новый портфель"}</Badge>
      <Action onClick={()=>void save()} primary disabled={!dirty||busy||!!editor} title={editor?"Сначала примените открытую форму":"Ctrl+S"}>Сохранить</Action>
+     {signedFileOwnerAvailable&&
+      <input type="file" ref={signedResultFileInput} accept=".iwxa"
+       aria-label="Выбрать подписанный Result .iwxa"
+       hidden onChange={event=>{
+        const file=event.currentTarget.files?.[0]??null;
+        event.currentTarget.value="";
+        void inspectSignedResultFile(file);
+       }}/>}
      <details ref={fileMenuRef} className="atlas-file-menu" onKeyDown={event=>{
       if(event.key==="Escape"){
        event.stopPropagation();fileMenuRef.current?.removeAttribute("open");
@@ -1807,11 +1827,18 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
         disabled={busy||dirty||!!editor||!persisted}>Сохранить копию JSON</Action>
        <Action onClick={()=>{fileMenuRef.current?.removeAttribute("open");void importJson()}}
         disabled={busy||!!editor||pendingImport!==null}>Открыть копию JSON</Action>
+       {signedFileOwnerAvailable&&<Action
+        onClick={()=>{fileMenuRef.current?.removeAttribute("open");signedResultFileInput.current?.click()}}
+        disabled={busy||dirty||!!editor||pendingImport!==null||signedResultPreview!==null||!persisted}
+        title="Только оригинальный T3 и действующие полномочия получателя">
+        Принять подписанный Result .iwxa</Action>}
        <Action onClick={()=>{fileMenuRef.current?.removeAttribute("open");void showNativeHistory()}}
         disabled={busy||dirty||!!editor||!persisted||savedVersions!==null}>История сохранений</Action>
-       <p className="atlas-file-menu-note">{embedded
-        ?"Файловый обмен .iwxa доступен в самостоятельном Atlas. Встроенный режим работает через разрешения своей программы."
-        :"Архив .iwxa переносит проекты между копиями Atlas. История сохранений в него не входит. В совместимом Admin Center архив открывается для просмотра и подготовки поручений. Для прежних версий остаётся копия JSON."}</p>
+       <p className="atlas-file-menu-note">{signedFileOwnerAvailable
+        ?"Подписанный Result принимает оригинальный T3: сначала проверка подписи и текста, затем отдельное подтверждение и сохранение в Atlas."
+        :embedded
+         ?"Файловый обмен .iwxa доступен в самостоятельном Atlas. Встроенный режим работает через разрешения своей программы."
+         :"Архив .iwxa переносит проекты между копиями Atlas. История сохранений в него не входит. В совместимом Admin Center архив открывается для просмотра и подготовки поручений. Для прежних версий остаётся копия JSON."}</p>
       </div>
      </details>
      <button disabled={!!editor} className="icon-button inspector-button" aria-label={inspector?"Скрыть инспектор":"Показать инспектор"}
