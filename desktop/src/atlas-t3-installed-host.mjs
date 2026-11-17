@@ -252,7 +252,7 @@ export async function createInstalledAtlasT3SignedFileRecipient({
 }={}){
  if(!isTauri())die("ATLAS_T3_INSTALLED_ATLAS_TAURI_REQUIRED");
  for(const [owner,methods] of [
-  [originalSignedRecipient,["inspectSignedArchive","readVerifiedArchive"]],
+  [originalSignedRecipient,["quarantineSignedArchive","readVerifiedArchive"]],
   [atlasAuthority,["authorizeCommand","verifyWrite"]],
   [hostLifecycle,["isActive"]]
  ])for(const method of methods)fn(owner,method);
@@ -278,7 +278,7 @@ export async function createInstalledAtlasT3SignedFileRecipient({
  return createAtlasT3SignedFileRecipient({
   readSaved:store.readSaved,commitSaved:store.commitSaved,
   inspectOriginalSignedFile:bytes=>
-   originalSignedRecipient.inspectSignedArchive(bytes),
+   originalSignedRecipient.quarantineSignedArchive(bytes),
   readVerifiedSignedArchive:sha256=>
    originalSignedRecipient.readVerifiedArchive(sha256),
   verifyAtlasWrite:input=>atlasAuthority.verifyWrite(input),
