@@ -10,7 +10,8 @@ type PersonView={schema:string;revision:number;productId:string;
   licenses:License[];productionActivation:false;activeSeats:0};
 type HostResult={operation:string;productionActivation:false;activeSeats:0;
   view?:PersonView;signatureVerified?:boolean;statusVerified?:boolean;
-  outcome?:string;status?:string};
+  outcome?:string;status?:string;
+  holderReceiptConfirmed?:boolean;statusReadbackConfirmed?:boolean};
 type WorkspaceAccess={operation:"PERSON_AUTHORIZE";productId:string;featureId:string;
   permitted:boolean;signatureVerified:boolean;statusVerified:boolean;
   productionActivation:false;activeSeats:0};
@@ -148,9 +149,12 @@ export function AtlasPersonLicense({enabled}:{enabled:boolean}){
      if(receipt===null)return;
      if(receipt?.operation!=="PERSON_RECEIVE"||
        receipt.productionActivation!==false||receipt.activeSeats!==0||
-       receipt.signatureVerified!==true||receipt.statusVerified!==true)
+       receipt.signatureVerified!==true||receipt.statusVerified!==true||
+       receipt.holderReceiptConfirmed!==true||
+       receipt.statusReadbackConfirmed!==true)
        throw Error("ATLAS_PERSON_IMPORT_RECEIPT_INVALID");
-     setNotice("Подпись и статус проверены T3. Лицензия сохранена на этом компьютере.");
+     setNotice("Оригинальный T3 подтвердил подписи, сохранение лицензии "+
+       "и долговременную квитанцию конкретного пакета на этом компьютере.");
      await refresh();
    }catch(e){setFailure(describe(code(e)));}
    finally{setBusy(false);}
