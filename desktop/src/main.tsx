@@ -749,6 +749,106 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   }
   return Object.freeze({status:reread.status,link});
  };
+ // Signed file review is a separate user decision from portfolio .iwxa
+ // import. It exists ONLY when the installed ORIGINAL T3 recipient has been
+ // mounted by the trusted native Atlas composition. No signer or grant in UI.
+ const inspectSignedResultFile=async(file:File|null)=>{
+  if(!file)return;
+  const inspect=host?.t3?.inspectSignedFile;
+  if(!signedFileOwnerAvailable||typeof inspect!=="function"){
+   issue(Error("Оригинальный подписанный получатель T3 не подключён."));return;
+  }
+  if(!ready||busyRef.current||dirtyRef.current||editorOpenRef.current||
+     signedResultOpenRef.current||pendingImportOpenRef.current||
+     savedVersionsOpenRef.current||savedRefOpenRef.current||!persisted){
+   issue(Error("Сначала сохраните портфель и закройте формы перед получением Result."));return;
+  }
+  if(!/\.iwxa$/i.test(file.name)||file.size<22||file.size>32*1024*1024){
+   issue(Error("Выберите подписанный .iwxa размером не более 32 МБ."));return;
+  }
+  const started=latestSnapshot.current,expectedGeneration=generation;
+  busyRef.current=true;setBusy(true);
+  try{
+   const archive=new Uint8Array(await file.arrayBuffer());
+   if(archive.byteLength!==file.size)
+    throw Error("ATLAS_T3_SELECTED_FILE_CHANGED");
+   const preview=await verifiedAtlasSignedFilePreview(
+    await inspect({archive,recipientId:"iwxa.atlas"})) as AtlasT3SignedFilePreview;
+   const savedHead=await invoke<OpenResult>("atlas_open");
+   if(savedHead.needsConfirmation||savedHead.generation!==expectedGeneration||
+      latestSnapshot.current!==started||dirtyRef.current||editorOpenRef.current)
+    throw Error("Портфель изменился при выборе подписанного Result. Перечитайте сохранённую редакцию.");
+   const p=started.projects.find((item:any)=>item.id===preview.workRef.projectId);
+   if(!p||!p.items.some((item:any)=>item.id===preview.workRef.workId)||
+      String(started.revision)!==preview.workRef.revision)
+    throw Error("T3 подписал Result для другой редакции проекта. Обновите Atlas перед приёмом.");
+   setSignedResultPreview({...preview,archive});
+   setMessage("");setError("");
+  }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
+ };
+ // Only original Reconciliation and current Atlas authorization can verify
+ // a received file. A persisted Decision alone is NEVER the current grant.
+ const verifyReceivedSignedResult=async(p:AtlasT3SignedFilePreview)=>{
+  const read=host?.t3?.readbackSignedFile;
+  if(typeof read!=="function")
+   throw Error("ATLAS_T3_SIGNED_RECEIPT_OWNER_UNAVAILABLE");
+  const receipt=await read(p.operationId);
+  if(receipt?.state!=="SIGNED_FILE_PERSISTED"||
+     receipt.recipientId!=="iwxa.atlas"||
+     receipt.operationId!==p.operationId||
+     receipt.originalKernelEventVerified!==false||
+     typeof receipt.resultRef!=="string"||
+     !receipt.resultRef.startsWith("atlas:decision:"))
+   throw Error("ATLAS_T3_SIGNED_RECEIPT_NOT_CONFIRMED");
+  await displayConfirmedAtlasResult({
+   projectId:p.workRef.projectId,workId:p.workRef.workId,
+   operationId:p.operationId,resultRef:receipt.resultRef
+  });
+  setSignedResultPreview(null);setError("");
+  setMessage("Выбранный подписанный Result сохранён в Atlas и заново прочитан из его нативного Store. "+
+   "T3 подтвердил оригинальную подпись и полномочия получателя. "+
+   "Событие Kernel отправителя на этом компьютере не проверялось.");
+ };
+ const acceptSignedResultFile=async()=>{
+  const p=signedResultPreview,apply=host?.t3?.receiveSignedFile;
+  if(!p||typeof apply!=="function"||busyRef.current)return;
+  if(dirtyRef.current||editorOpenRef.current||pendingImportOpenRef.current){
+   issue(Error("Изменения в Atlas препятствуют приёму. Сначала сохраните проект."));return;
+  }
+  if(p.alreadyReceived){
+   issue(Error("Результат уже сохранён. Применять второй раз нельзя, выберите проверку квитанции."));return;
+  }
+  busyRef.current=true;setBusy(true);
+  try{
+   await apply({
+    archive:p.archive,recipientId:"iwxa.atlas",
+    operationId:p.operationId,archiveSha256:p.archiveSha256,
+    selectedSummarySha256:p.selectedSummarySha256,confirmed:true
+   });
+   await verifyReceivedSignedResult(p);
+  }catch(e){
+   if(!showOriginalT3Denial(e)){
+    // The original U05 CAS may have committed before its reply was lost.
+    // NEVER redispatch the same signed Result from this error handler.
+    setError("Получение Result не подтверждено. Повторно применять нельзя. "+
+     "Нажмите «Проверить квитанцию» для чтения оригинального T3 и Atlas.");
+   }
+  }finally{busyRef.current=false;setBusy(false)}
+ };
+ const recoverSignedResultFile=async()=>{
+  const p=signedResultPreview;
+  if(!p||busyRef.current)return;
+  if(dirtyRef.current||editorOpenRef.current){
+   issue(Error("Сначала сохраните локальные изменения."));return;
+  }
+  busyRef.current=true;setBusy(true);
+  try{await verifyReceivedSignedResult(p)}
+  catch(e){
+   if(!showOriginalT3Denial(e))
+    setError("Независимая квитанция пока не подтверждена. "+
+     "Ничего не отправлено повторно: "+deepFreezeError(e));
+  }finally{busyRef.current=false;setBusy(false)}
+ };
  // A definite original owner denial is distinct from an unconfirmed
  // native write. Never downgrade it or claim a durable Atlas Decision.
  const showOriginalT3Denial=(error:unknown)=>{
