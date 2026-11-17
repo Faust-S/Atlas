@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import {createHash} from "node:crypto";
 import {empty,createProject,createItem,validate} from "../src/core.mjs";
 import {createAtlasT3SignedFileRecipient,createAtlasT3NativeRecipient,
- atlasT3DecisionSummary,atlasT3PortableResultText}
+ atlasT3DecisionSummary,atlasT3PortableResultText,verifiedAtlasSignedFilePreview}
  from "../src/atlas-t3-native-recipient.mjs";
 
 const sha=text=>createHash("sha256").update(text,"utf8").digest("hex");
@@ -99,6 +99,34 @@ test("one native U05 CAS survives two cold independent signed-file readbacks",as
  row.text="T3_RESULT_LINK/1 "+JSON.stringify(tainted);
  await assert.rejects(cold1.readback(plan.operationId),
   {code:"ATLAS_T3_SIGNED_FILE_PERSISTED_PROOF_CHANGED"});
+ assert.equal(f.writes(),1);
+});
+
+test("Atlas UI preview matches ORIGINAL signed text, bytes and old cold receipt",async()=>{
+ const f=fixture(),recipient=f.make();
+ const preview=await recipient.inspectArchive({archive:f.actual,recipientId:"iwxa.atlas"});
+ const rendered=await verifiedAtlasSignedFilePreview(preview);
+ assert.equal(rendered.selectedAcceptedSummary,text);
+ assert.equal(rendered.archiveSha256,sha("actual .iwxa"));
+ assert.equal(rendered.selectedSummarySha256,sha(text));
+ assert.equal(rendered.alreadyReceived,false);
+ assert.equal(rendered.originalKernelEventVerified,false);
+ for(const field of [
+  {recipientId:"foreign"}, {operationId:"agent:t3:atlas:"+sha("wrong")},
+  {originalKernelEventVerified:true}, {selectedAcceptedSummary:text+"!"},
+  {archiveSha256:"not a SHA"}, {alreadyReceived:"yes"}
+ ]){
+  await assert.rejects(verifiedAtlasSignedFilePreview({...preview,...field}),
+   /ATLAS_T3_SIGNED_PREVIEW_INVALID|ATLAS_T3_SIGNED_SELECTED_SUMMARY_HASH_MISMATCH/);
+ }
+ await recipient.receiveArchive(reviewed(preview,f.actual));
+ const cold=await f.make().inspectArchive({archive:f.actual,recipientId:"iwxa.atlas"});
+ assert.equal(cold.alreadyReceived,true);
+ assert.equal(cold.workRef.revision,preview.workRef.revision,
+  "A durable U05 Decision advances Atlas, but the original signed WorkRef does not");
+ const restored=await verifiedAtlasSignedFilePreview(cold);
+ assert.equal(restored.alreadyReceived,true);
+ assert.equal(restored.selectedAcceptedSummary,text);
  assert.equal(f.writes(),1);
 });
 
