@@ -266,14 +266,25 @@ def saved_head_or_none():
     return d.head() if (d.STORE/"head.json").exists() else None
 
 def await_saved(baseline):
+    # The first native Save must CREATE head.json; a new Setup Core profile
+    # correctly has no such file until the original Rust atlas_commit finishes.
+    # Do not fail on the first 100 ms FileNotFound, but do not mask a head
+    # that disappears after a previously persisted generation either.
     end=time.monotonic()+45
     while time.monotonic()<end:
-        now=d.head()
+        try:
+            now=d.head()
+        except FileNotFoundError:
+            if baseline is not None:
+                capture("visual-native-saved-head-disappeared")
+                raise AssertionError("Original Atlas head disappeared after native Save")
+            time.sleep(0.25)
+            continue
         if baseline is None or now["generation"]!=baseline["generation"]:
             return now
         time.sleep(0.25)
     capture("visual-native-save-timeout")
-    raise AssertionError("Synthetic .iwxa import was not saved")
+    raise AssertionError("Original Atlas native Save did not create or advance head.json within 45 seconds")
 
 def await_no_form():
     end=time.monotonic()+15
