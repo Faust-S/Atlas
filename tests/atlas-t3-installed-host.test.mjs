@@ -26,7 +26,7 @@ test("T3 native continuation owner uses actual Atlas Tauri commands, not simulat
 });
 test("Independent signed-file recipient mounts ORIGINAL native trust and SAME Atlas U05 without Agent",()=>{
  assert.match(binding,/export async function createInstalledAtlasT3SignedFileRecipient\(/);
- assert.match(binding,/originalSignedRecipient\.inspectSignedArchive\(bytes\)/);
+ assert.match(binding,/originalSignedRecipient\.quarantineSignedArchive\(bytes\)/);
  assert.match(binding,/originalSignedRecipient\.readVerifiedArchive\(sha256\)/);
  assert.match(binding,/return createAtlasT3SignedFileRecipient\(/);
  assert.match(binding,/readSaved:store\.readSaved,commitSaved:store\.commitSaved/);
