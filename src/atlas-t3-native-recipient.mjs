@@ -16,6 +16,31 @@ const fail=code=>{throw Object.assign(new Error(code),{code});};
 const deny=code=>{throw Object.assign(new Error(code),{code,outcome:"DENIED"});};
 const id=(value,code)=>typeof value==="string"&&ID.test(value)?value:fail(code);
 const sha=(value,code)=>typeof value==="string"&&SHA.test(value)?value:fail(code);
+const PORTABLE=["portableSelectedSummary","selectedAcceptedSummary",
+ "selectedSummarySha256"];
+// Only the ORIGINAL Exchange verifies a carrier's signature/recipient.
+// This validates the resulting selected-content shape before native CAS.
+function portableSummary(row){
+ const present=PORTABLE.some(k=>Object.hasOwn(row??{},k));
+ if(!present)return null; // Historical original link-only receipt.
+ const text=row.selectedAcceptedSummary;
+ if(row.portableSelectedSummary!==true||typeof text!=="string"||
+    !text.trim()||new TextEncoder().encode(text).byteLength>65536||
+    !SHA.test(row.selectedSummarySha256))
+  fail("ATLAS_T3_SIGNED_SELECTED_SUMMARY_INVALID");
+ return Object.freeze({selectedAcceptedSummary:text,
+  selectedSummarySha256:row.selectedSummarySha256});
+}
+async function verifySummaryDigest(portable){
+ if(portable===null)return;
+ if(typeof globalThis.crypto?.subtle?.digest!=="function")
+  fail("ATLAS_T3_SHA256_UNAVAILABLE");
+ const bytes=new TextEncoder().encode(portable.selectedAcceptedSummary);
+ const hashed=new Uint8Array(await globalThis.crypto.subtle.digest("SHA-256",bytes));
+ const observed=[...hashed].map(v=>v.toString(16).padStart(2,"0")).join("");
+ if(observed!==portable.selectedSummarySha256)
+  fail("ATLAS_T3_SIGNED_SELECTED_SUMMARY_HASH_MISMATCH");
+}
 const sameRef=(a,b)=>a?.workspace_id===b?.workspace_id&&
  a?.object_id===b?.object_id&&a?.schema_id===b?.schema_id&&a?.revision===b?.revision;
 const workRef=(r)=>{
@@ -57,6 +82,7 @@ const decisionRecord=(d)=>{
      !/^(0|[1-9]\d*)$/.test(String(row.sourceRevision))||
      !SHA.test(row.archiveSha256)||!SHA.test(row.acceptedDigest))return null;
   const ref=objectRef(row.sourceObjectRef);
+  portableSummary(row);
   return {...row,sourceObjectRef:ref};
  }catch{return null;}
 };
@@ -69,7 +95,16 @@ export function atlasT3DecisionSummary(text){
  if(!record)return "Повреждена запись связи Atlas с T3. Требуется проверка.";
  return "Связь с результатом Agent: работа "+record.workId+
   ", Task "+record.taskId+", Result "+record.resultId+
-  ". Источник и полномочия проверяются заново при использовании.";
+  (record.portableSelectedSummary===true
+    ?". Выбранный текст Result сохранён в Atlas."
+    :". Передана только ссылка, без содержания Result.")+
+  " Источник и полномочия проверяются заново при использовании.";
+}
+// Read the locally saved selected text without manufacturing a current grant.
+export function atlasT3PortableResultText(text){
+ const record=decisionRecord({text});
+ return record?.portableSelectedSummary===true
+  ?record.selectedAcceptedSummary:null;
 }
 // One read-only index for the EXISTING Atlas work table. Entries are source
 // references, never T3 permission decisions or claims that Work is complete.
@@ -85,6 +120,7 @@ export function atlasT3RecordedWorkLinks(project){
   links.get(row.workId).push(Object.freeze({
    taskId:row.taskId,resultId:row.resultId,decisionId:decision.id,
    operationId:row.operationId,sourceObjectRef:row.sourceObjectRef,
+   portableSelectedSummary:row.portableSelectedSummary===true,
   }));
  }
  return links;
@@ -187,8 +223,13 @@ export function createAtlasT3NativeRecipient({
      exchange.disclosureScope!=="ORIGINAL_RESULT_ONLY"||
      !sameRef(exchange.selectedSourceObjectRef,ref))
     fail("ATLAS_T3_ORIGINAL_EXCHANGE_DISCLOSURE_UNVERIFIED");
+  if(exchange.portableSelectedSummary!==true&&
+     PORTABLE.some(k=>Object.hasOwn(exchange,k)))
+   fail("ATLAS_T3_SIGNED_SELECTED_SUMMARY_UNVERIFIED");
+  const portable=portableSummary(exchange);
+  await verifySummaryDigest(portable);
   const op=await hashOperation(ref,accepted);active();
-  return {ref,accepted,op};
+  return {ref,accepted,op,portable};
  }
  async function verifyPersisted(entry,saved,op,state=null){
   // An Atlas decision is source data, not a cryptographic native receipt.
@@ -196,6 +237,15 @@ export function createAtlasT3NativeRecipient({
   // evidence every time, including after a cold Atlas/T3 Host restart.
   const verified=state??await checked(entry.record.sourceObjectRef);
   const row=entry.record,ref=verified.accepted.work;
+  const storedPortable=portableSummary(row);
+  const expectedPortable=verified.portable;
+  if((storedPortable===null)!==(expectedPortable===null)||
+     (storedPortable!==null&&
+      (storedPortable.selectedAcceptedSummary!==
+       expectedPortable.selectedAcceptedSummary||
+       storedPortable.selectedSummarySha256!==
+       expectedPortable.selectedSummarySha256)))
+   fail("ATLAS_T3_STORED_SELECTED_SUMMARY_MISMATCH");
   if(verified.op!==op||row.operationId!==op||
      !sameRef(row.sourceObjectRef,verified.ref)||
      row.projectId!==ref.projectId||row.workId!==ref.workId||
@@ -278,7 +328,9 @@ export function createAtlasT3NativeRecipient({
    sourceObjectRef:state.ref,taskId:state.accepted.taskId,
    resultId:state.accepted.resultId,
    acceptedDigest:state.accepted.acceptedDigest,
-   archiveSha256:state.accepted.archiveSha256
+   archiveSha256:state.accepted.archiveSha256,
+   ...(state.portable===null?{}:{
+     portableSelectedSummary:true,...state.portable})
   };
   // Existing Atlas decision is an owner's record of receiving the verified
   // Result reference; accepted DRAFT alone never marks Work as "done".
