@@ -24,9 +24,16 @@ const fn=(owner,name)=>typeof owner?.[name]==="function"||
 // browser global, file import or a user-supplied owner URL. The original T3
 // runtime must already have installed its signed D1 and D6 continuation.
 // originalAgent and originalExchange are the CURRENT installed owners.
+// A typed presentation adapter to the installed original signed recipient.
+// No second Store, signer or T3 Host is created by this function.
+const signedUiPorts=recipient=>Object.freeze({
+ inspectSignedFile:input=>recipient.inspectArchive(input),
+ receiveSignedFile:input=>recipient.receiveArchive(input),
+ readbackSignedFile:operationId=>recipient.readback(operationId),
+});
 export async function createInstalledAtlasT3Host({
- originalT3,originalAgent,originalExchange,atlasAuthority,hostLifecycle,
- onStateChange,onSelection,onReadback,assetUrl,
+ originalT3,originalAgent,originalExchange,originalSignedRecipient,
+ atlasAuthority,hostLifecycle,onStateChange,onSelection,onReadback,assetUrl,
 }={}){
  if(!isTauri())die("ATLAS_T3_INSTALLED_ATLAS_TAURI_REQUIRED");
  // Prefer an explicitly installed original Exchange owner. The Agent's
@@ -109,6 +116,12 @@ export async function createInstalledAtlasT3Host({
  if([issueSelectedWork,continueSelectedResult,recoverSelectedResult]
     .some(value=>typeof value!=="function"))
   die("ATLAS_T3_INSTALLED_ROUTES_UNAVAILABLE");
+ // Independent file reception is opt-in and never assumes that an Agent
+ // login or a Publisher licence grants the receiver permission.
+ const signedRecipient=originalSignedRecipient===undefined?null:
+  await createInstalledAtlasT3SignedFileRecipient({
+   originalSignedRecipient,atlasAuthority,hostLifecycle
+  });
  const publicationAvailable=
   typeof ports.publishSelectedResult==="function"&&
   typeof ports.recoverSelectedPublication==="function";
@@ -129,6 +142,7 @@ export async function createInstalledAtlasT3Host({
    ...(typeof response.operationId==="string"?{operationId:response.operationId}:{})});
  };
  const t3=Object.freeze({
+  ...(signedRecipient?signedUiPorts(signedRecipient):{}),
   ...(publicationAvailable?{
    publishSelectedResult:selection=>selectedPublication(
     ports.publishSelectedResult,selection),
@@ -283,5 +297,43 @@ export async function createInstalledAtlasT3SignedFileRecipient({
    originalSignedRecipient.readVerifiedArchive(sha256),
   verifyAtlasWrite:input=>atlasAuthority.verifyWrite(input),
   isHostActive:()=>isTauri()&&hostLifecycle.isActive()===true
+ });
+}
+
+/** Standalone original signed-file surface adapter, without an Agent runtime.
+ * The EXISTING installed original T3 recipient already verifies and retains
+ * signed bytes, while Atlas U05 owns the SAME AppHandle/Store.
+ * The adapter is not another Host, signer, Kernel, owner, or format.
+ */
+export async function createInstalledAtlasSignedFileSurfacePorts({
+ originalSignedRecipient,atlasAuthority,hostLifecycle,
+ onStateChange,onSelection,onReadback,assetUrl,
+}={}){
+ const recipient=await createInstalledAtlasT3SignedFileRecipient({
+  originalSignedRecipient,atlasAuthority,hostLifecycle
+ });
+ const active=()=>{
+  if(!isTauri()||hostLifecycle.isActive()!==true)
+   die("ATLAS_T3_INSTALLED_HOST_DISPOSED");
+ };
+ const authorizeCommand=async(command,args)=>{
+  active();const allowed=await atlasAuthority.authorizeCommand(command,args);
+  active();return allowed;
+ };
+ const invoke=async(command,args)=>{
+  active();
+  if(!["atlas_open","atlas_commit","atlas_export_json",
+    "atlas_select_import","atlas_list_history","atlas_restore_history",
+    "atlas_restore_previous"].includes(command))
+   die("ATLAS_T3_INSTALLED_NATIVE_COMMAND_UNSUPPORTED");
+  const result=await atlasNativeInvoke(command,args);
+  active();return result;
+ };
+ return Object.freeze({
+  invoke,authorizeCommand,t3:signedUiPorts(recipient),
+  ...(typeof onStateChange==="function"?{onStateChange}:{}),
+  ...(typeof onSelection==="function"?{onSelection}:{}),
+  ...(typeof onReadback==="function"?{onReadback}:{}),
+  ...(typeof assetUrl==="string"?{assetUrl}:{}),
  });
 }
