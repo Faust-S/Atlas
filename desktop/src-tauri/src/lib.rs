@@ -16,6 +16,8 @@ use tauri::{AppHandle, Manager};
 use tauri_plugin_dialog::{DialogExt, FilePath};
 use uuid::Uuid;
 
+mod person_license;
+
 const MAX_FILE: u64 = 100 * 1024 * 1024;
 const MAX_IWXA_BYTES: usize = 32 * 1024 * 1024;
 const MAX_PROJECTS: usize = 5000;
@@ -439,6 +441,7 @@ fn commit_root(root:&Path,expected_generation:&str,snapshot:Value)->Result<Write
 }
 #[tauri::command]
 fn atlas_commit(app:AppHandle,expected_generation:String,snapshot:Value)->Result<WriteResult,String>{
+    person_license::require_atlas_workspace(&app)?;
     commit_root(&path_for(&app)?,&expected_generation,snapshot)
 }
 // Recheck the native generation AFTER the file dialog returns; the user may
@@ -649,11 +652,13 @@ fn restore_history_root(
 fn atlas_restore_history(
     app: AppHandle, expected_generation: String, history_generation: String,
 ) -> Result<OpenResult, String> {
+    person_license::require_atlas_workspace(&app)?;
     restore_history_root(&path_for(&app)?, &expected_generation, &history_generation)
 }
 
 #[tauri::command]
 fn atlas_restore_previous(app:AppHandle)->Result<OpenResult,String>{
+    person_license::require_atlas_workspace(&app)?;
     restore_root(&path_for(&app)?)
 }
 
@@ -1012,7 +1017,13 @@ pub fn run(){
         .invoke_handler(tauri::generate_handler![
             atlas_open,atlas_commit,atlas_export_json,atlas_select_import,
             atlas_export_iwxa,atlas_select_iwxa,atlas_restore_previous,
-            atlas_list_history,atlas_restore_history
+            atlas_list_history,atlas_restore_history,
+            person_license::atlas_person_license_edition,
+            person_license::atlas_person_license_capabilities,
+            person_license::atlas_person_license_read,
+            person_license::atlas_person_license_enroll,
+            person_license::atlas_person_license_import,
+            person_license::atlas_person_license_workspace_access
         ])
         .run(tauri::generate_context!())
         .expect("IWXA Atlas desktop window could not be started");

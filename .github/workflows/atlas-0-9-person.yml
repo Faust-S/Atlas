@@ -1,0 +1,108 @@
+name: Atlas 0.9 PERSON integration Windows gate
+
+on:
+  push:
+    branches:
+      - work/2026-11-16-atlas09-person-license-integration
+    paths:
+      - 'desktop/src/**'
+      - 'desktop/src-tauri/**'
+      - 'desktop/installer/**'
+      - 'desktop/tests/**'
+      - 'tests/atlas09-person-license-contract.test.mjs'
+      - '.github/workflows/atlas-0-9-person.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: atlas09-person-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-and-ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Qualify PERSON bridge / original Consumer wiring
+        run: node --test tests/atlas09-person-license-contract.test.mjs
+      - name: Compile real Atlas 0.9 interface
+        working-directory: desktop
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+
+  installed-person-native-denial:
+    runs-on: windows-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build actual PERSON-enforced Atlas 0.9 EXE without any private T3
+        working-directory: desktop
+        shell: pwsh
+        run: |
+          npm ci --no-audit --no-fund
+          if ($LASTEXITCODE -ne 0) { throw 'ATLAS09_PERSON_NPM_FAILED' }
+          npm run desktop:build -- --no-bundle --features person-license-enforced
+          if ($LASTEXITCODE -ne 0) { throw 'ATLAS09_PERSON_EXE_BUILD_FAILED' }
+          cargo test --locked --features person-license-enforced --manifest-path src-tauri/Cargo.toml --lib person_license::tests:: -- --nocapture
+          if ($LASTEXITCODE -ne 0) { throw 'ATLAS09_PERSON_BRIDGE_TESTS_FAILED' }
+          if (!(Test-Path 'src-tauri/target/release/iwxa-atlas-desktop.exe')) {
+            throw 'ATLAS09_PERSON_EXE_MISSING'
+          }
+          if (Test-Path 'src-tauri/private-t3') { throw 'ATLAS09_PRIVATE_SOURCE_IN_PUBLIC_CI' }
+          if (Test-Path 'src-tauri/target/release/t3') { throw 'ATLAS09_PRIVATE_BINARY_IN_PUBLIC_CI' }
+      - name: Checkout exact approved original public Setup Core
+        uses: actions/checkout@v4
+        with:
+          repository: Faust-S/Center
+          ref: 6603a11764ff86853e5abf4d209d55f79fddd8b1
+          path: setup-core-source
+          persist-credentials: false
+      - name: Install original 0.9 Tauri through Setup Core without T3 Consumer
+        shell: pwsh
+        timeout-minutes: 9
+        run: |
+          $pin = (& git -C setup-core-source rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or $pin -ne '6603a11764ff86853e5abf4d209d55f79fddd8b1') {
+            throw 'ATLAS09_PERSON_SETUP_PIN_MISMATCH'
+          }
+          ./desktop/installer/build-setup-core.ps1 `
+            -SetupCoreRoot 'setup-core-source' `
+            -Output 'artifacts/IWXA-Atlas-0.9.0-dev.1-PERSON-NO-CONSUMER-qualification.exe' `
+            -InstallForQualification
+          if ($LASTEXITCODE -ne 0) { throw 'ATLAS09_PERSON_NATIVE_INSTALL_FAILED' }
+          if (Test-Path 'desktop/src-tauri/target/release/t3') {
+            throw 'ATLAS09_PRIVATE_T3_RESOURCE_IN_PUBLIC_INSTALL'
+          }
+      - name: UIAutomation confirms native write denial and cold restart
+        shell: pwsh
+        timeout-minutes: 12
+        env:
+          ATLAS_PERSON_EXPECT_UNBUNDLED_DENIAL: '1'
+        run: |
+          python -m pip install pywinauto==0.6.9 pillow==11.3.0
+          if ($LASTEXITCODE -ne 0) { throw 'ATLAS09_PERSON_UIA_DEPENDENCIES_FAILED' }
+          python -m py_compile desktop/tests/installed-atlas06-connect.py
+          if ($LASTEXITCODE -ne 0) { throw 'ATLAS09_PERSON_UIA_SYNTAX_FAILED' }
+          python desktop/tests/installed-atlas06-connect.py
+          if ($LASTEXITCODE -ne 0) { throw 'ATLAS09_PERSON_NATIVE_WRITE_DENIAL_FAILED' }
+          Write-Host 'ATLAS09_PERSON_NATIVE_FAIL_CLOSED_AND_COLD_RESTART_PASS_NO_PRIVATE_T3'
+      - name: Retain independent negative GUI evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas09-person-installed-native-denial
+          path: |
+            desktop/tests/visual-evidence/atlas06-connect-person09-*.png
+          if-no-files-found: ignore
+          retention-days: 3
