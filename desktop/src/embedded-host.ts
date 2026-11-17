@@ -48,12 +48,43 @@ export interface AtlasT3RecoveryRoute {
    workRef:{projectId:string;workId:string;revision:string};
    operationId?:string;resultRef?:string}>;
 }
+/** Genuine signed .iwxa delivered to an INDEPENDENT Atlas.
+ * Only the installed ORIGINAL T3 recipient supplies this route after it
+ * checked Ed25519, selected Result, current grant and its Reconciliation
+ * quarantine. The Atlas UI provides a file, never an identity or signer.
+ * It cannot replay native U05 writes after a lost acknowledgement.
+ */
+export interface AtlasT3SignedFilePreview {
+ status:"SIGNED_FILE_READY";
+ recipientId:"iwxa.atlas";
+ operationId:string;
+ workRef:{projectId:string;workId:string;revision:string};
+ archiveSha256:string;selectedSummarySha256:string;
+ selectedAcceptedSummary:string;
+ originalKernelEventVerified:false;alreadyReceived:boolean;
+}
+export interface AtlasT3SignedFileReceipt {
+ state:"SIGNED_FILE_COMMITTED"|"SIGNED_FILE_PERSISTED";
+ recipientId:"iwxa.atlas";operationId:string;
+ resultRef:string;originalKernelEventVerified:false;
+}
+export interface AtlasT3SignedFileRoute {
+ inspectSignedFile:(input:{archive:Uint8Array;recipientId:"iwxa.atlas"})=>
+  Promise<AtlasT3SignedFilePreview>;
+ receiveSignedFile:(input:{archive:Uint8Array;recipientId:"iwxa.atlas";
+  operationId:string;archiveSha256:string;selectedSummarySha256:string;
+  confirmed:true})=>Promise<void>;
+ readbackSignedFile:(operationId:string)=>
+  Promise<AtlasT3SignedFileReceipt|null>;
+}
+
 export interface AtlasEmbeddedHost {
  invoke:<T>(command:AtlasHostCommand,args?:AtlasHostArgs)=>Promise<T>;
  authorizeCommand:(command:AtlasHostCommand,args?:AtlasHostArgs)=>
   Promise<boolean|null|undefined>|boolean|null|undefined;
  t3?:Partial<AtlasT3SelectedTaskRoute&AtlasT3PublicationRoute&
-  AtlasT3PublicationRecoveryRoute&AtlasT3SelectedResultRoute&AtlasT3RecoveryRoute>;
+  AtlasT3PublicationRecoveryRoute&AtlasT3SelectedResultRoute&AtlasT3RecoveryRoute&
+  AtlasT3SignedFileRoute>;
  // Optional original owner routes are absent in the standalone product.
  assetUrl?:string; // Host-served Atlas logo; standalone keeps its existing public asset
  onStateChange?:(value:{ready:boolean;dirty:boolean;formOpen:boolean;busy:boolean;revision:string;generation:string})=>void;
