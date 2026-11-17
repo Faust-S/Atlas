@@ -21,8 +21,11 @@ const PORTABLE=["portableSelectedSummary","selectedAcceptedSummary",
 // Only the ORIGINAL Exchange verifies a carrier's signature/recipient.
 // This validates the resulting selected-content shape before native CAS.
 function portableSummary(row){
- const present=PORTABLE.some(k=>Object.hasOwn(row??{},k));
- if(!present)return null; // Historical original link-only receipt.
+ const contentPresent=["selectedAcceptedSummary","selectedSummarySha256"]
+  .some(k=>Object.hasOwn(row??{},k));
+ // The updated ORIGINAL Exchange explicitly sets false when verifying a
+ // genuine older reference-only carrier. That is readable, not portable.
+ if(!contentPresent&&row?.portableSelectedSummary!==true)return null;
  const text=row.selectedAcceptedSummary;
  if(row.portableSelectedSummary!==true||typeof text!=="string"||
     !text.trim()||new TextEncoder().encode(text).byteLength>65536||
@@ -224,7 +227,8 @@ export function createAtlasT3NativeRecipient({
      !sameRef(exchange.selectedSourceObjectRef,ref))
     fail("ATLAS_T3_ORIGINAL_EXCHANGE_DISCLOSURE_UNVERIFIED");
   if(exchange.portableSelectedSummary!==true&&
-     PORTABLE.some(k=>Object.hasOwn(exchange,k)))
+     ["selectedAcceptedSummary","selectedSummarySha256"]
+      .some(k=>Object.hasOwn(exchange,k)))
    fail("ATLAS_T3_SIGNED_SELECTED_SUMMARY_UNVERIFIED");
   const portable=portableSummary(exchange);
   await verifySummaryDigest(portable);
