@@ -8,7 +8,7 @@ import {deserialize} from "../../src/core.mjs";
 import {createAtlasT3OriginalHostPorts}
  from "./atlas-t3-original-host-ports.mjs";
 import {createAtlasT3DesktopStorePort} from "./atlas-t3-store-port.mjs";
-import {createAtlasT3NativeRecipient}
+import {createAtlasT3NativeRecipient,createAtlasT3SignedFileRecipient}
  from "../../src/atlas-t3-native-recipient.mjs";
 import {createAtlasT3OriginalSourceSelection}
  from "./atlas-t3-original-source-selection.mjs";
@@ -238,5 +238,50 @@ export async function createInstalledAtlasT3NativeRecipient({
   readOriginalAgentAccepted:ref=>originalAgent.readAccepted(ref),
   readOriginalExchangeReceipt:input=>exchange.readReceipt(input),
   verifyAtlasWrite:input=>atlasAuthority.verifyWrite(input),
+ });
+}
+
+/** Independent signed .iwxa delivery on the ORIGINAL Atlas Tauri AppHandle.
+ * Unlike createInstalledAtlasT3NativeRecipient, no Agent or sender Kernel
+ * owner is required. The separate installed ORIGINAL T3 recipient must
+ * validate and durably retain the original signed bytes before any Atlas CAS.
+ * This native composition never creates signer, grant, Exchange or Store.
+ */
+export async function createInstalledAtlasT3SignedFileRecipient({
+ originalSignedRecipient,atlasAuthority,hostLifecycle,
+}={}){
+ if(!isTauri())die("ATLAS_T3_INSTALLED_ATLAS_TAURI_REQUIRED");
+ for(const [owner,methods] of [
+  [originalSignedRecipient,["inspectSignedArchive","readVerifiedArchive"]],
+  [atlasAuthority,["authorizeCommand","verifyWrite"]],
+  [hostLifecycle,["isActive"]]
+ ])for(const method of methods)fn(owner,method);
+ const active=()=>{
+  if(!isTauri()||hostLifecycle.isActive()!==true)
+   die("ATLAS_T3_INSTALLED_HOST_DISPOSED");
+ };
+ const authorizeCommand=async(command,args)=>{
+  active();const result=await atlasAuthority.authorizeCommand(command,args);
+  active();return result;
+ };
+ const invoke=async(command,args)=>{
+  active();
+  if(!["atlas_open","atlas_commit"].includes(command))
+   die("ATLAS_T3_INSTALLED_NATIVE_COMMAND_UNSUPPORTED");
+  const result=await atlasNativeInvoke(command,args);
+  active();return result;
+ };
+ const store=createAtlasT3DesktopStorePort({invoke,authorizeCommand});
+ // The app's real native U05 head, not Agent's or a duplicate preview Store.
+ await store.readSaved();
+ active();
+ return createAtlasT3SignedFileRecipient({
+  readSaved:store.readSaved,commitSaved:store.commitSaved,
+  inspectOriginalSignedFile:bytes=>
+   originalSignedRecipient.inspectSignedArchive(bytes),
+  readVerifiedSignedArchive:sha256=>
+   originalSignedRecipient.readVerifiedArchive(sha256),
+  verifyAtlasWrite:input=>atlasAuthority.verifyWrite(input),
+  isHostActive:()=>isTauri()&&hostLifecycle.isActive()===true
  });
 }
