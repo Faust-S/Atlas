@@ -36,9 +36,11 @@ import {projectHistoryRows} from "./history-view.mjs";
 import {sortWorkRows,firstSortedMatchingWorkId,deadlineFocusRows,filterWorkRowsByObservation} from "./work-sorting.mjs";
 import {createAtlasSavedRef} from "../../src/project-host-port.mjs";
 import {atlasT3DecisionSummary,atlasT3RecordedWorkLinks,
- atlasT3PortableResultText} from "../../src/atlas-t3-native-recipient.mjs";
+ atlasT3PortableResultText,verifiedAtlasSignedFilePreview}
+ from "../../src/atlas-t3-native-recipient.mjs";
 import {findConfirmedAtlasT3Decision} from "../../src/atlas-t3-confirmed-projection.mjs";
-import {invokeAtlasHost,type AtlasEmbeddedHost} from "./embedded-host";
+import {invokeAtlasHost,type AtlasEmbeddedHost,
+ type AtlasT3SignedFilePreview} from "./embedded-host";
 
 // Show the same product version that was packaged in Tauri, without leaking
 // a previous release's branding into a development installation.
@@ -288,6 +290,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const embedded=Boolean(host);
  const rootRef=useRef<HTMLDivElement|null>(null);
  const fileMenuRef=useRef<HTMLDetailsElement|null>(null);
+ const signedResultFileInput=useRef<HTMLInputElement|null>(null);
  const viewMenuRef=useRef<HTMLDetailsElement|null>(null);
  const relationSectionRef=useRef<HTMLElement|null>(null);
  const requirementCardRef=useRef<HTMLElement|null>(null);
@@ -352,11 +355,16 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const [nativeHistoryLimit,setNativeHistoryLimit]=useState(40);
  const [selectedHistory,setSelectedHistory]=useState<HistoryEntry|null>(null);
  const [pendingImport,setPendingImport]=useState<ImportPreview|null>(null);
+ const [signedResultPreview,setSignedResultPreview]=useState<
+  (AtlasT3SignedFilePreview&{archive:Uint8Array})|null>(null);
  const [savedRefPreview,setSavedRefPreview]=useState<SavedRefPreview|null>(null);
  const [t3AgentTask,setT3AgentTask]=useState<{projectId:string;workId:string;taskId:string}|null>(null);
  const savedRefOpenRef=useRef(false);savedRefOpenRef.current=savedRefPreview!==null;
  const savedVersionsOpenRef=useRef(false);savedVersionsOpenRef.current=savedVersions!==null;
  const pendingImportOpenRef=useRef(false);pendingImportOpenRef.current=pendingImport!==null;
+ const signedResultOpenRef=useRef(false);signedResultOpenRef.current=signedResultPreview!==null;
+ const signedFileOwnerAvailable=Boolean(host?.t3?.inspectSignedFile&&
+  host?.t3?.receiveSignedFile&&host?.t3?.readbackSignedFile);
  const [resourceLimit,setResourceLimit]=useState(40);
  const [reviewLimit,setReviewLimit]=useState(20);
  const [sourceLimit,setSourceLimit]=useState(15);
