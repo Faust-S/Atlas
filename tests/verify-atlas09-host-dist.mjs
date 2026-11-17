@@ -19,6 +19,8 @@ assert.ok(code.includes("mountInstalledAtlasT3Surface"),
  "ATLAS09_SIGNED_T3_HOST_EXPORT_NOT_SHIPPED");
 assert.ok(code.includes("createInstalledAtlasT3NativeRecipient"),
  "ATLAS09_ORIGINAL_D6_NATIVE_RECIPIENT_EXPORT_NOT_SHIPPED");
+assert.ok(code.includes("createInstalledAtlasT3SignedFileRecipient"),
+ "ATLAS09_ORIGINAL_D6_SIGNED_FILE_RECIPIENT_EXPORT_NOT_SHIPPED");
 assert.ok(code.includes("createOriginalAgentExchangeReceiptPort"),
  "ATLAS09_ORIGINAL_AGENT_EXCHANGE_ADAPTER_NOT_SHIPPED");
 // Vite can split the recipient, publication gate and shared React modules
