@@ -68,7 +68,8 @@ fn run(app:&AppHandle,action:&str,extra:&[String])->Result<Value,String>{
     let root=root(app)?;
     if !["person-local-capabilities","person-local-read",
          "person-local-receive","person-local-enroll",
-         "person-local-authorize"].contains(&action)
+         "person-local-authorize","person-local-subject",
+         "person-local-receipt","person-local-status-readback"].contains(&action)
        ||extra.len()>1 || extra.iter().any(|x|x.len()>4096||x.chars().any(char::is_control)){
         return Err("ATLAS_PERSON_T3_ARGUMENTS_INVALID".into());
     }
@@ -226,6 +227,65 @@ pub async fn atlas_person_license_enroll(app:AppHandle,person_id:String)
     receipt(execute(app,"person-local-enroll",vec![person_id]).await?,
         "PERSON_ENROLLED")
 }
+// An issuer transport result is NOT installed-holder evidence. Reopen the
+// original T3 Consumer twice using its pre-enrolled DPAPI recipient and sealed
+// SubjectScopedStore; never create a second verifier or receipt journal.
+async fn require_person_holder_readback(app:&AppHandle,value:&Value)
+    ->Result<(),String>{
+    let get=|field:&str|value.get(field).and_then(Value::as_str)
+        .filter(|s|identifier(s))
+        .map(str::to_owned)
+        .ok_or_else(||"ATLAS_PERSON_ORIGINAL_OPERATION_ID_REQUIRED".to_string());
+    let kind=get("kind")?;
+    if kind!="LICENSE"&&kind!="STATUS"{
+        return Err("ATLAS_PERSON_ORIGINAL_OPERATION_KIND_INVALID".into());
+    }
+    let hash=get("packageSha256")?;
+    if hash.len()!=64||!hash.bytes().all(|b|matches!(b,b'0'..=b'9'|b'a'..=b'f')){
+        return Err("ATLAS_PERSON_ORIGINAL_PACKAGE_SHA_INVALID".into());
+    }
+    let original_subject=receipt(execute(app.clone(),"person-local-subject",
+        vec![]).await?,"PERSON_SUBJECT")?;
+    for key in ["holderId","recipientId"]{
+        if value.get(key)!=original_subject.get(key){
+            return Err("ATLAS_PERSON_ORIGINAL_RECIPIENT_MISMATCH".into());
+        }
+    }
+    let query=serde_json::json!({
+        "kind":kind,"operationId":get("operationId")?,
+        "packageSha256":hash,"holderId":get("holderId")?,
+        "recipientId":get("recipientId")?
+    });
+    let encoded=serde_json::to_string(&query)
+        .map_err(|_|"ATLAS_PERSON_OPERATION_QUERY_INVALID".to_string())?;
+    let saved=receipt(execute(app.clone(),"person-local-receipt",
+        vec![encoded.clone()]).await?,"PERSON_RECEIPT")?;
+    let state=receipt(execute(app.clone(),"person-local-status-readback",
+        vec![encoded]).await?,"PERSON_STATUS_READBACK")?;
+    for proof in [&saved,&state]{
+        if proof.get("found")!=Some(&Value::Bool(true))||
+           ["kind","operationId","packageSha256","holderId","recipientId"]
+             .iter().any(|key|proof.get(*key)!=query.get(*key))||
+           proof.get("licenseId")!=value.get("licenseId")||
+           proof.get("sequence")!=value.get("sequence"){
+            return Err("ATLAS_PERSON_ORIGINAL_RECEIPT_BINDING_INVALID".into());
+        }
+    }
+    let floor=state.get("statusSequenceFloor").and_then(Value::as_u64)
+        .ok_or("ATLAS_PERSON_ORIGINAL_FLOOR_REQUIRED")?;
+    let sequence=value.get("sequence").and_then(Value::as_u64)
+        .ok_or("ATLAS_PERSON_ORIGINAL_SEQUENCE_REQUIRED")?;
+    if saved.get("state").and_then(Value::as_str)!=Some("COMMITTED")||
+       state.get("persisted")!=Some(&Value::Bool(true))||
+       state.get("signatureVerified")!=Some(&Value::Bool(true))||
+       state.get("statusVerified")!=Some(&Value::Bool(true))||
+       floor<sequence||
+       saved.get("statusPayloadDigest")!=state.get("statusPayloadDigest")||
+       saved.get("issuerAuthorityId")!=state.get("issuerAuthorityId"){
+        return Err("ATLAS_PERSON_ORIGINAL_DURABLE_READBACK_REQUIRED".into());
+    }
+    Ok(())
+}
 #[tauri::command]
 pub async fn atlas_person_license_import(app:AppHandle)
     ->Result<Option<Value>,String>{
@@ -244,12 +304,18 @@ pub async fn atlas_person_license_import(app:AppHandle)
         return Err("ATLAS_PERSON_IWXA_SIZE_OR_TYPE_INVALID".into());
     }
     let file=path.to_str().ok_or("ATLAS_PERSON_IWXA_PATH_INVALID")?.to_owned();
-    let result=receipt(execute(app,"person-local-receive",vec![file]).await?,
+    let result=receipt(execute(app.clone(),"person-local-receive",vec![file]).await?,
         "PERSON_RECEIVE")?;
     if result.get("signatureVerified")!=Some(&Value::Bool(true))||
        result.get("statusVerified")!=Some(&Value::Bool(true))||
        !result.get("revision").and_then(Value::as_u64).is_some(){
         return Err("ATLAS_PERSON_T3_SIGNATURE_READBACK_REQUIRED".into());
+    }
+    require_person_holder_readback(&app,&result).await?;
+    let mut result=result;
+    if let Value::Object(ref mut fields)=result{
+        fields.insert("holderReceiptConfirmed".into(),Value::Bool(true));
+        fields.insert("statusReadbackConfirmed".into(),Value::Bool(true));
     }
     Ok(Some(result))
 }
