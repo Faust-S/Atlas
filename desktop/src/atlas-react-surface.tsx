@@ -5,7 +5,8 @@ import {createRoot,type Root} from "react-dom/client";
 import {AtlasRenderBoundary,AtlasWorkspace} from "./main";
 import {isAtlasEmbeddedHost,type AtlasEmbeddedHost} from "./embedded-host";
 import css from "./style.css?inline";
-import {createInstalledAtlasT3Host} from "./atlas-t3-installed-host.mjs";
+import {createInstalledAtlasT3Host,createInstalledAtlasSignedFileSurfacePorts}
+ from "./atlas-t3-installed-host.mjs";
 // Stage 1: the ORIGINAL installed T3 Workspace Host imports this native
 // recipient, registers it as nativeContinuationOwner, then passes its signed
 // D6 continuation to Stage 2. Both use the SAME Atlas Tauri Store.
@@ -47,5 +48,17 @@ export async function mountInstalledAtlasT3Surface(
  target:HTMLElement,installedOwners:Parameters<typeof createInstalledAtlasT3Host>[0]
 ):Promise<()=>void>{
  const host=await createInstalledAtlasT3Host(installedOwners);
+ return mountAtlasSurface(target,host);
+}
+
+/** Install the EXISTING Atlas React surface with its actual AppHandle and
+ * an ORIGINAL T3 signed-file recipient, without an Agent on this PC.
+ * The trusted native Atlas composition calls this instead of standalone.tsx;
+ * never mount a second root over an already-running Atlas window.
+ */
+export async function mountInstalledAtlasSignedFileSurface(
+ target:HTMLElement,owners:Parameters<typeof createInstalledAtlasSignedFileSurfacePorts>[0]
+):Promise<()=>void>{
+ const host=await createInstalledAtlasSignedFileSurfacePorts(owners);
  return mountAtlasSurface(target,host);
 }
