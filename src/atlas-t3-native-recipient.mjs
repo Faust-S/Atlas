@@ -357,6 +357,204 @@ export function createAtlasT3NativeRecipient({
  });
 }
 
+/** Incoming ORIGINAL signed .iwxa when Agent is NOT installed here.
+ * Only the original T3 recipient verifies Ed25519, current grant, and
+ * persists original signed bytes in its EXISTING Reconciliation Store.
+ * Atlas writes a Decision into its EXISTING U05 native generation-CAS.
+ * A signed file NEVER masquerades as a reread of sender Kernel Object/Event.
+ */
+export function createAtlasT3SignedFileRecipient({
+ readSaved,commitSaved,inspectOriginalSignedFile,
+ readVerifiedSignedArchive,verifyAtlasWrite,isHostActive,
+}={}){
+ if([readSaved,commitSaved,inspectOriginalSignedFile,
+   readVerifiedSignedArchive,verifyAtlasWrite,isHostActive]
+     .some(fn=>typeof fn!=="function"))
+  fail("ATLAS_T3_ORIGINAL_SIGNED_FILE_OWNER_REQUIRED");
+ const recipientId="iwxa.atlas";
+ const active=()=>{if(isHostActive()!==true)
+  fail("ATLAS_T3_SIGNED_FILE_HOST_DISPOSED");};
+ async function load(){
+  active();const saved=await readSaved();active();
+  if(typeof saved?.generation!=="string"||!saved.generation||
+    saved.needs_confirmation===true)
+   fail("ATLAS_T3_NATIVE_STORE_UNAVAILABLE");
+  validate(saved.snapshot);return saved;
+ }
+ async function proven(row){
+  active();
+  if(row?.status!=="ORIGINAL_SIGNED_SELECTED_RESULT_VERIFIED"||
+     row.recipientId!==recipientId||
+     row.signatureVerified!==true||row.archiveBytesVerified!==true||
+     row.originalManifestVerified!==true||row.recipientGrantVerified!==true||
+     row.originalKernelEventVerified!==false||
+     row.disclosureScope!=="ORIGINAL_RESULT_ONLY"||
+     row.portableSelectedSummary!==true||
+     !/^agent:t3:atlas:[a-f0-9]{64}$/.test(row.operationId??""))
+   fail("ATLAS_T3_ORIGINAL_SIGNED_FILE_VERIFICATION_REQUIRED");
+  const ref=objectRef(row.sourceObjectRef),work=workRef(row.workRef);
+  const portable=portableSummary(row);
+  if(!portable)fail("ATLAS_T3_ORIGINAL_SIGNED_FILE_CONTENT_REQUIRED");
+  await verifySummaryDigest(portable);active();
+  const accepted={
+   work,taskId:id(row.taskId,"ATLAS_T3_ORIGINAL_TASK_REQUIRED"),
+   resultId:id(row.resultId,"ATLAS_T3_ORIGINAL_RESULT_REQUIRED"),
+   acceptedDigest:sha(row.acceptedDigest,"ATLAS_T3_RESULT_DIGEST_REQUIRED"),
+   archiveSha256:sha(row.archiveSha256,"ATLAS_T3_ARCHIVE_DIGEST_REQUIRED")
+  };
+  const originalProofKeyId=id(row.proofKeyId,"ATLAS_T3_SIGNED_KEY_REQUIRED");
+  const op=await hashOperation(ref,accepted);active();
+  return {ref,accepted,op,portable,
+   sourceOperationId:row.operationId,originalProofKeyId};
+ }
+ const identical=(a,b)=>a.op===b.op&&
+  a.sourceOperationId===b.sourceOperationId&&
+  a.originalProofKeyId===b.originalProofKeyId&&
+  a.portable.selectedAcceptedSummary===b.portable.selectedAcceptedSummary&&
+  a.portable.selectedSummarySha256===b.portable.selectedSummarySha256;
+ async function inspectOriginal(archive){
+  active();const original=await inspectOriginalSignedFile(archive);active();
+  const state=await proven(original);
+  // Native original T3 must have durably quarantined exactly these signed
+  // bytes BEFORE Atlas is allowed to write a derived Result Decision.
+  const cold=await proven(await readVerifiedSignedArchive(
+   state.accepted.archiveSha256));
+  if(!identical(state,cold))
+   fail("ATLAS_T3_ORIGINAL_SIGNED_FILE_STORAGE_CHANGED");
+  return state;
+ }
+ async function permitted(state,action){
+  active();const decision=await verifyAtlasWrite({
+   operationId:state.op,action,recipientId,workRef:state.accepted.work,
+   sourceObjectRef:state.ref,taskId:state.accepted.taskId,
+   resultId:state.accepted.resultId,
+   archiveSha256:state.accepted.archiveSha256
+  });active();
+  const w=state.accepted.work;
+  const bound=decision?.operationId===state.op&&
+   decision.recipientId===recipientId&&decision.projectId===w.projectId&&
+   decision.workId===w.workId&&String(decision.revision)===w.revision;
+  if(decision?.allowed===false&&bound)
+   deny("ATLAS_T3_PROJECT_WRITE_NOT_AUTHORIZED");
+  if(decision?.allowed!==true||!bound)
+   fail("ATLAS_T3_PROJECT_WRITE_NOT_AUTHORIZED");
+ }
+ function find(snapshot,op){
+  const seen=[];
+  for(const p of snapshot.projects)for(const decision of p.decisions){
+   const tagged=typeof decision.text==="string"&&
+    decision.text.startsWith(PREFIX);
+   const row=decisionRecord(decision);
+   if(tagged&&!row)fail("ATLAS_T3_MALFORMED_LINK_HOLD");
+   if(row?.operationId===op){
+    if(row.projectId!==p.id)fail("ATLAS_T3_RECEIPT_CROSS_PROJECT");
+    seen.push({row,decisionId:decision.id});
+   }
+  }
+  if(seen.length>1)fail("ATLAS_T3_DUPLICATE_PERSISTED_RECEIPT");
+  return seen[0]??null;
+ }
+ async function verifyExisting(entry,saved,state=null){
+  const row=entry.row;
+  if(row.signedFileMode!==true)
+   fail("ATLAS_T3_SIGNED_FILE_NOT_KERNEL_RECEIPT");
+  const confirmed=state??await proven(
+   await readVerifiedSignedArchive(row.archiveSha256));
+  active();
+  const w=confirmed.accepted.work;
+  if(row.operationId!==confirmed.op||
+    row.sourceOperationId!==confirmed.sourceOperationId||
+    row.originalProofKeyId!==confirmed.originalProofKeyId||
+    !sameRef(row.sourceObjectRef,confirmed.ref)||
+    row.projectId!==w.projectId||row.workId!==w.workId||
+    String(row.sourceRevision)!==w.revision||
+    row.taskId!==confirmed.accepted.taskId||
+    row.resultId!==confirmed.accepted.resultId||
+    row.acceptedDigest!==confirmed.accepted.acceptedDigest||
+    row.archiveSha256!==confirmed.accepted.archiveSha256||
+    row.portableSelectedSummary!==true||
+    row.selectedAcceptedSummary!==confirmed.portable.selectedAcceptedSummary||
+    row.selectedSummarySha256!==confirmed.portable.selectedSummarySha256||
+    row.originalKernelEventVerified!==false||
+    !(saved.snapshot.revision>Number(w.revision)))
+   fail("ATLAS_T3_SIGNED_FILE_PERSISTED_PROOF_CHANGED");
+  await permitted(confirmed,"atlas.work.result.readback");
+  return confirmed;
+ }
+ async function receiptFor(op,state){
+  id(op,"ATLAS_T3_OPERATION_ID_INVALID");
+  const saved=await load(),entry=find(saved.snapshot,op);
+  if(!entry)return null;
+  await verifyExisting(entry,saved);
+  return {state,recipientId,operationId:op,
+   reference:entry.row.sourceObjectRef,
+   resultRef:"atlas:decision:"+entry.decisionId,
+   originalKernelEventVerified:false};
+ }
+ async function inspectArchive({archive,recipientId:to}={}){
+  if(to!==recipientId)deny("ATLAS_T3_RECIPIENT_MISMATCH");
+  const state=await inspectOriginal(archive),saved=await load();
+  const existing=find(saved.snapshot,state.op);
+  if(existing)await verifyExisting(existing,saved,state);
+  else{
+   const w=state.accepted.work;
+   if(String(saved.snapshot.revision)!==w.revision)
+    deny("ATLAS_T3_SOURCE_REVISION_CHANGED");
+   const project=saved.snapshot.projects.find(p=>p.id===w.projectId);
+   if(!project?.items.some(item=>item.id===w.workId))
+    deny("ATLAS_T3_WORK_NOT_FOUND");
+   await permitted(state,"atlas.work.result.preview");
+  }
+  return {status:"SIGNED_FILE_READY",recipientId,operationId:state.op,
+   workRef:state.accepted.work,
+   selectedSummarySha256:state.portable.selectedSummarySha256,
+   originalKernelEventVerified:false,alreadyReceived:Boolean(existing)};
+ }
+ async function receiveArchive({archive,recipientId:to,operationId,
+   confirmed=false}={}){
+  active();
+  if(to!==recipientId)deny("ATLAS_T3_RECIPIENT_MISMATCH");
+  if(confirmed!==true)deny("ATLAS_T3_SIGNED_FILE_HUMAN_REVIEW_REQUIRED");
+  const state=await inspectOriginal(archive);
+  if(operationId!==state.op)deny("ATLAS_T3_OPERATION_MISMATCH");
+  await permitted(state,"atlas.work.result.apply");
+  const before=await load(),existing=find(before.snapshot,state.op);
+  if(existing){
+   await verifyExisting(existing,before,state);
+   return; // Exactly one original native CAS; no resend after lost ACK.
+  }
+  const w=state.accepted.work;
+  if(String(before.snapshot.revision)!==w.revision)
+   deny("ATLAS_T3_SOURCE_REVISION_CHANGED");
+  const project=before.snapshot.projects.find(p=>p.id===w.projectId);
+  if(!project?.items.some(item=>item.id===w.workId))
+   deny("ATLAS_T3_WORK_NOT_FOUND");
+  const record={
+   schema:"T3_RESULT_LINK/1",operationId:state.op,
+   signedFileMode:true,originalKernelEventVerified:false,
+   sourceOperationId:state.sourceOperationId,
+   originalProofKeyId:state.originalProofKeyId,
+   projectId:w.projectId,workId:w.workId,sourceRevision:w.revision,
+   sourceObjectRef:state.ref,taskId:state.accepted.taskId,
+   resultId:state.accepted.resultId,
+   acceptedDigest:state.accepted.acceptedDigest,
+   archiveSha256:state.accepted.archiveSha256,
+   portableSelectedSummary:true,...state.portable
+  };
+  const next=createDecision(before.snapshot,w.projectId,
+   PREFIX+JSON.stringify(record));
+  await commitSaved(before.generation,next);
+  active();
+  const observed=await load(),entry=find(observed.snapshot,state.op);
+  if(!entry)fail("ATLAS_T3_SIGNED_FILE_READBACK_UNCONFIRMED");
+  await verifyExisting(entry,observed,state);
+ }
+ return Object.freeze({recipientId,inspectArchive,receiveArchive,
+  receipt:op=>receiptFor(op,"SIGNED_FILE_COMMITTED"),
+  readback:op=>receiptFor(op,"SIGNED_FILE_PERSISTED")
+ });
+}
+
 // A selected Atlas WorkRef may be handed to the ORIGINAL installed Agent Task
 // owner. Atlas does not create or sign a Task. The original Agent owner issues
 // the actual Task only after independently checking its own rights/Workspace.
