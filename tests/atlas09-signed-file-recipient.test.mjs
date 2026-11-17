@@ -85,7 +85,7 @@ test("one native U05 CAS survives two cold independent signed-file readbacks",as
  assert.equal(f.writes(),1);
  const row=f.read().projects[0].decisions.at(-1);
  assert.equal(atlasT3PortableResultText(row.text),text);
- assert.match(atlasT3DecisionSummary(row.text),/Событие Kernel отправителя/);
+ assert.match(atlasT3DecisionSummary(row.text),/событие Kernel отправителя/);
  const cold1=f.make(),cold2=f.make();
  assert.equal((await cold1.receipt(plan.operationId)).state,"SIGNED_FILE_COMMITTED");
  const seen=await cold2.readback(plan.operationId);
