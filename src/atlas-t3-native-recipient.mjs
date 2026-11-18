@@ -459,9 +459,14 @@ export function createAtlasT3SignedFileRecipient({
   const row=entry.row;
   if(row.signedFileMode!==true)
    fail("ATLAS_T3_SIGNED_FILE_NOT_KERNEL_RECEIPT");
-  const confirmed=state??await proven(
+  // Do not reuse a grant verified BEFORE native CAS. The original
+  // recipient must check its signed archive and CURRENT grant after the
+  // write, including recovery from a lost IPC acknowledgement.
+  const confirmed=await proven(
    await readVerifiedSignedArchive(row.archiveSha256));
   active();
+  if(state!==null&&!identical(state,confirmed))
+   fail("ATLAS_T3_ORIGINAL_SIGNED_FILE_STORAGE_CHANGED");
   const w=confirmed.accepted.work;
   if(row.operationId!==confirmed.op||
     row.sourceOperationId!==confirmed.sourceOperationId||
