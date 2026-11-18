@@ -13,8 +13,8 @@ const text="Original Human-accepted selected Result, portable in one signed file
 const ref=Object.freeze({workspace_id:"ws:original",object_id:"result:original",
  schema_id:"iwxa.agent.accepted-result",revision:1});
 function fixture({weakSignature=false,badDigest=false,missingStoredArchive=false,
- lostAck=false}={}){
- let snapshot=empty(),generation="u05:initial",writes=0,authorized=true;
+ lostAck=false,rejectBeforeWrite=false,revokeAfterWrite=false}={}){
+ let snapshot=empty(),generation="u05:initial",writes=0,attempts=0,authorized=true;
  const project=createProject(snapshot,{name:"Independent Atlas signed-file receipt"});
  snapshot=project.state;
  const item=createItem(snapshot,project.id,{title:"Receive original result"});
@@ -39,8 +39,11 @@ function fixture({weakSignature=false,badDigest=false,missingStoredArchive=false
   readSaved:async()=>({generation,snapshot:structuredClone(snapshot),
    needs_confirmation:false}),
   commitSaved:async(expected,next)=>{
+   attempts++;
    assert.equal(expected,generation,"Only original Atlas generation CAS");
+   if(rejectBeforeWrite)throw Error("NATIVE_COMMIT_ACK_LOST_BEFORE_WRITE");
    validate(next);snapshot=structuredClone(next);generation="u05:"+(++writes);
+   if(revokeAfterWrite)authorized=false;
    if(lostAck)throw Error("NATIVE_COMMIT_ACK_LOST");
    return {generation,revision:next.revision};
   },
@@ -59,7 +62,7 @@ function fixture({weakSignature=false,badDigest=false,missingStoredArchive=false
   })
  });
  return {make,actual,original,read:()=>snapshot,
-  writes:()=>writes,revoke:()=>{authorized=false;}};
+  writes:()=>writes,attempts:()=>attempts,revoke:()=>{authorized=false;}};
 }
 
 const reviewed=(plan,archive)=>({
@@ -140,16 +143,38 @@ test("true original recipient grant recheck required on every cold read",async()
  assert.equal(f.writes(),1);
 });
 
-test("unknown native write ACK is read-only recoverable, never re-applied",async()=>{
+test("unknown native write ACK is recovered by independent readback, without a second commit",async()=>{
  const f=fixture({lostAck:true}),owner=f.make();
  const ready=await owner.inspectArchive({archive:f.actual,recipientId:"iwxa.atlas"});
- await assert.rejects(owner.receiveArchive(reviewed(ready,f.actual)),
-  /NATIVE_COMMIT_ACK_LOST/);
+ // The original U05 Store committed, then lost its response. The owner
+ // may read that head, but must NEVER dispatch a second atlas_commit.
+ await owner.receiveArchive(reviewed(ready,f.actual));
  assert.equal(f.writes(),1);
+ assert.equal(f.attempts(),1);
  assert.equal((await f.make().readback(ready.operationId)).state,
   "SIGNED_FILE_PERSISTED");
  await f.make().receiveArchive(reviewed(ready,f.actual));
+ assert.equal(f.attempts(),1,"Cold second receive is an existing receipt read");
  assert.equal(f.writes(),1);
+});
+
+test("native commit failure before any write stays unknown and is never retried",async()=>{
+ const f=fixture({rejectBeforeWrite:true}),owner=f.make();
+ const ready=await owner.inspectArchive({archive:f.actual,recipientId:"iwxa.atlas"});
+ await assert.rejects(owner.receiveArchive(reviewed(ready,f.actual)),
+  /NATIVE_COMMIT_ACK_LOST_BEFORE_WRITE/);
+ assert.equal(f.attempts(),1,"Only one original U05 dispatch");
+ assert.equal(f.writes(),0);
+ assert.equal(await f.make().readback(ready.operationId),null);
+});
+
+test("revoked original grant after lost write ACK cannot become a verified success",async()=>{
+ const f=fixture({lostAck:true,revokeAfterWrite:true}),owner=f.make();
+ const ready=await owner.inspectArchive({archive:f.actual,recipientId:"iwxa.atlas"});
+ await assert.rejects(owner.receiveArchive(reviewed(ready,f.actual)),
+  /ORIGINAL_RECIPIENT_GRANT_REVOKED/);
+ assert.equal(f.attempts(),1);
+ assert.equal(f.writes(),1,"Native CAS happened, but no current grant for readback");
 });
 
 test("Human recipient consent binds original archive and exact selected text",async()=>{
