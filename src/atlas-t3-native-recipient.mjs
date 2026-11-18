@@ -553,10 +553,22 @@ export function createAtlasT3SignedFileRecipient({
   };
   const next=createDecision(before.snapshot,w.projectId,
    PREFIX+JSON.stringify(record));
-  await commitSaved(before.generation,next);
+  let lostCommitAck=false,commitFailure;
+  try{await commitSaved(before.generation,next);}
+  catch(error){
+   // A known original owner denial cannot be promoted to an uncertain
+   // native commit. Only unknown native IPC outcomes permit READBACK.
+   if(error?.outcome==="DENIED")throw error;
+   lostCommitAck=true;commitFailure=error;
+  }
   active();
+  // Do not resend atlas_commit after an unknown ACK. The ORIGINAL U05 head
+  // is the only authority capable of confirming whether it committed.
   const observed=await load(),entry=find(observed.snapshot,state.op);
-  if(!entry)fail("ATLAS_T3_SIGNED_FILE_READBACK_UNCONFIRMED");
+  if(!entry){
+   if(lostCommitAck)throw commitFailure;
+   fail("ATLAS_T3_SIGNED_FILE_READBACK_UNCONFIRMED");
+  }
   await verifyExisting(entry,observed,state);
  }
  return Object.freeze({recipientId,inspectArchive,receiveArchive,
