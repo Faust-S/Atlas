@@ -42,6 +42,12 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Verify original signed-file recipient and lost-ACK UI state
+        shell: pwsh
+        run: |
+          node --test tests/atlas09-dist-source.test.mjs tests/atlas09-signed-file-recipient.test.mjs tests/atlas09-t3-confirmed-readback.test.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'ATLAS09_SIGNED_RECEIVER_SOURCE_REGRESSION' }
+
       - name: Build original Atlas Tauri application without an alternate installer
         working-directory: desktop
         shell: pwsh
