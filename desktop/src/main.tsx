@@ -357,6 +357,10 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const [pendingImport,setPendingImport]=useState<ImportPreview|null>(null);
  const [signedResultPreview,setSignedResultPreview]=useState<
   (AtlasT3SignedFilePreview&{archive:Uint8Array})|null>(null);
+ // Never redispatch the same selected file after a possibly committed native CAS.
+ // The original recipient and Atlas can still recover via readback.
+ const [signedFileDispatchAttempted,setSignedFileDispatchAttempted]=useState(false);
+ const signedFileDispatchAttemptedRef=useRef(false);
  const [savedRefPreview,setSavedRefPreview]=useState<SavedRefPreview|null>(null);
  const [t3AgentTask,setT3AgentTask]=useState<{projectId:string;workId:string;taskId:string}|null>(null);
  const savedRefOpenRef=useRef(false);savedRefOpenRef.current=savedRefPreview!==null;
@@ -787,6 +791,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    // possible even when the signed WorkRef predates that native commit.
    // Re-applying still requires the exact earlier preview and is not offered
    // for alreadyReceived=true.
+   // A new original signature/grant check is the only path to fresh review.
+   signedFileDispatchAttemptedRef.current=false;
+   setSignedFileDispatchAttempted(false);
    setSignedResultPreview({...preview,archive});
    setMessage("");setError("");
   }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
@@ -816,7 +823,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  };
  const acceptSignedResultFile=async()=>{
   const p=signedResultPreview,apply=host?.t3?.receiveSignedFile;
-  if(!p||typeof apply!=="function"||busyRef.current)return;
+  if(!p||typeof apply!=="function"||busyRef.current||
+     signedFileDispatchAttemptedRef.current)return;
   if(dirtyRef.current||editorOpenRef.current||pendingImportOpenRef.current){
    issue(Error("Изменения в Atlas препятствуют приёму. Сначала сохраните проект."));return;
   }
@@ -824,6 +832,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    issue(Error("Результат уже сохранён. Применять второй раз нельзя, выберите проверку квитанции."));return;
   }
   busyRef.current=true;setBusy(true);
+  // Block repeat BEFORE native dispatch, including lost ACK and an owner deny.
+  signedFileDispatchAttemptedRef.current=true;
+  setSignedFileDispatchAttempted(true);
   try{
    await apply({
     archive:p.archive,recipientId:"iwxa.atlas",
@@ -3148,10 +3159,12 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       </details>
       <p className="minor">Подпись подтверждает происхождение, но не шифрует файл. Событие Kernel отправителя здесь не проверено. Получение не меняет состояние работы и её зависимости.</p>
       {signedResultPreview.alreadyReceived&&<p>Этот Result уже сохранён в Atlas. Повторная запись не требуется.</p>}
+      {signedFileDispatchAttempted&&!signedResultPreview.alreadyReceived&&
+       <p role="status">Операция отправлена один раз. Повторное применение заблокировано: проверьте квитанцию без новой записи.</p>}
       {error&&<p className="error" role="alert">{error}</p>}
       <div className="button-row">
        {!signedResultPreview.alreadyReceived&&<Action primary
-        onClick={()=>void acceptSignedResultFile()} disabled={busy||dirty||!!editor}>
+        onClick={()=>void acceptSignedResultFile()} disabled={busy||dirty||!!editor||signedFileDispatchAttempted}>
         Подтвердить получение</Action>}
        <Action onClick={()=>void recoverSignedResultFile()} disabled={busy||dirty||!!editor}
         title="Только чтение квитанции, без повторной записи">
