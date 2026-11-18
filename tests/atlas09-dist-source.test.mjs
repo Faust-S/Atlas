@@ -36,3 +36,21 @@ test("Atlas 0.9 ships both entrypoints in one original Tauri dist",()=>{
  assert.equal(tauri.build.frontendDist,"../dist");
  assert.equal(tauri.version,"0.9.0-dev.1");
 });
+
+test("Atlas D6 UI never retries a native signed-file CAS after an uncertain answer",()=>{
+ const ui=read("desktop/src/main.tsx");
+ const preview=ui.split(" const inspectSignedResultFile=async(file:File|null)=>{")[1]?.split(" const verifyReceivedSignedResult=async(")[0];
+ const apply=ui.split(" const acceptSignedResultFile=async()=>{")[1]?.split(" const recoverSignedResultFile=async()=>{")[0];
+ const recover=ui.split(" const recoverSignedResultFile=async()=>{")[1]?.split(" const showOriginalT3Denial=")[0];
+ assert.ok(preview&&apply&&recover,"Three actual original recipient UI routes must exist");
+ assert.match(preview,/signedFileDispatchAttemptedRef\.current=false;\s*setSignedFileDispatchAttempted\(false\);\s*setSignedResultPreview\(/);
+ assert.match(apply,/signedFileDispatchAttemptedRef\.current\)return;/);
+ assert.match(apply,/signedFileDispatchAttemptedRef\.current=true;\s*setSignedFileDispatchAttempted\(true\);/);
+ assert.ok(apply.indexOf("signedFileDispatchAttemptedRef.current=true;") <
+   apply.indexOf("await apply({"),"Lock operation BEFORE the first native commit");
+ assert.doesNotMatch(apply,/setSignedFileDispatchAttempted\(false\)/);
+ assert.doesNotMatch(recover,/receiveSignedFile|await apply\(/,
+  "Readback cannot write or retry original T3 publication");
+ assert.match(ui,/disabled=\{busy\|\|dirty\|\|!!editor\|\|signedFileDispatchAttempted\}/);
+ assert.match(ui,/Повторное применение заблокировано/);
+});
