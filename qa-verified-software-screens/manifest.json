@@ -1,0 +1,13 @@
+{
+  "schema": "IWXA_AUTHENTIC_WINDOWS_SCREENSHOT/1",
+  "product": "Atlas 0.9 Windows installed",
+  "product_owner_sha": "19ea3d228c585a1c50e749632c2f2df1a71c7c33",
+  "windows_run": 44612742339,
+  "original_image_sha256": "123a5819233089cc8a313a81b10c83709dc36a9e08a153c2ca0e33f9f5bcdfe5",
+  "webp_image_sha256": "67e4bcbbe5addd84406220c9131fbccd02857b0243900c116bfe7dc936202e35",
+  "width": 804,
+  "height": 644,
+  "source_path": "atlas06-connect-visual-atlas09-installed-readback-and-version.png",
+  "captured_from": "genuine installed Windows GUI, no generation",
+  "modification": "crop real native window bounds; WebP encode only"
+}
