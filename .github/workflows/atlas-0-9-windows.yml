@@ -3,7 +3,7 @@ name: IWXA Atlas 0.9 development Windows qualification
 on:
   push:
     branches:
-      - work/2026-11-16-atlas-0-9-t3
+      - work/2026-11-19-software-capture-atlas09
     paths:
       - '.github/workflows/atlas-0-9-windows.yml'
       - 'desktop/tests/installed-atlas08-corrections.py'
@@ -27,7 +27,7 @@ concurrency:
 
 jobs:
   installed-atlas09:
-    if: github.ref_name == 'work/2026-11-16-atlas-0-9-t3'
+    if: github.ref_name == 'work/2026-11-19-software-capture-atlas09'
     runs-on: windows-latest
     timeout-minutes: 40
     steps:
