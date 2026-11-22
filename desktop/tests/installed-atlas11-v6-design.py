@@ -171,8 +171,26 @@ def qualify():
     d.activate()
     print("ATLAS11_NATIVE_GANTT_ROUTE_AND_COMPACT_BAR_PASS",flush=True)
 
-    # Display a dock alongside the central Gantt at 820x650, not covering it.
-    click_named("Показать инспектор","Button")
+    # The Gantt opens a real Work in the split inspector, not a separate
+    # synthetic form. Editing and closing an untouched form must restore the
+    # same Work context without a Native Store write.
+    selected_bar=gantt_bars_within_window()[0]
+    selected_label=str(selected_bar.window_text() or "")
+    assert selected_label.startswith("Открыть работу ")
+    d.activate()
+    selected_bar.click_input()
+    d.wait_text("Изменить работу",25)
+    d.wait_text("Календарь работы",25)
+    v.capture("atlas11-v6-work-inspector-from-gantt-820")
+    click_named("Изменить работу","Button")
+    d.wait_text("Изменение данных",25)
+    click_named("Закрыть редактор","Button")
+    d.wait_text("Изменить работу",25)
+    d.wait_text("Календарь работы",25)
+    assert d.head()==saved,"Read-only Work selection or cancelled editor wrote to Native Store"
+    print("ATLAS11_NATIVE_WORK_INSPECTOR_EDITOR_RETURN_PASS",flush=True)
+
+    # The dock is in the same plane as Gantt at 820x650, not an overlay.
     d.wait_text("Инспектор",20)
     d.window().set_focus()
     bounds=win32gui.GetWindowRect(d.handle)
