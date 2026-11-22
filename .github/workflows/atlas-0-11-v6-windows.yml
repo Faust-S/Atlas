@@ -92,3 +92,12 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'ATLAS11_NATIVE_SCRIPT_SYNTAX' }
           python desktop/tests/installed-atlas11-v6-design.py
           if ($LASTEXITCODE -ne 0) { throw 'ATLAS11_NATIVE_V6_USER_ROUTE_FAIL' }
+
+      - name: Upload installed Atlas UI evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas11-v6-native-evidence-${{ github.run_id }}
+          path: desktop/tests/visual-evidence/*.png
+          if-no-files-found: warn
+          retention-days: 14
