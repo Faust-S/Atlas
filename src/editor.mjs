@@ -399,7 +399,7 @@ export function editorSpec(project,action,snapshot=null){
    ". Если убрать привязку, сама работа, сроки, этап и зависимости сохранятся.");
   return {title:"Работа: "+item.title,
    ...(hints.length?{hint:hints.join(" ")}:{}),
-   fields:[field("title","Название работы","text",item.title),choice("stageId","Этап",stageOptions(project),item.stageId||"",false),field("dueDate","Срок работы","date",item.dueDate||"",false),choice("state","Состояние",workOptions,item.state),choice("priority","Приоритет",[option("low","Низкий"),option("normal","Обычный"),option("high","Высокий"),option("critical","Критический")],item.priority),field("assignee","Ответственный","text",item.assignee,false),field("estimateDays","Плановая длительность, дней","number",String(item.estimateDays??1)),...workDurationFields(snapshot,item),choice("resourceId","Плановый ресурс",resourceChoiceOptions(snapshot),item.resourceId||"",false),field("allocationPct","Доля ресурса, %","number",String(item.allocationPct??100)),choice("targetId",additional.length?"Основное ожидаемое требование":"Связать с ожидаемым результатом",optionalTargets(project),item.targetIds?.[0]||"",false),
+   fields:[field("title","Название работы","text",item.title),choice("stageId","Этап",stageOptions(project),item.stageId||"",false),field("dueDate","Срок работы","date",item.dueDate||"",false),choice("state","Состояние",workOptions,item.state),choice("priority","Приоритет",[option("low","Низкий"),option("normal","Обычный"),option("high","Высокий"),option("critical","Критический")],item.priority),field("assignee","Ответственный","text",item.assignee,false),field("estimateDays","Плановая длительность, дней","number",String(item.estimateDays??1)),...workDurationFields(snapshot,item),field("actualStartDate","Фактическое начало (введено пользователем)","date",item.actualStartDate||"",false),field("actualFinishDate","Фактическое завершение (введено пользователем)","date",item.actualFinishDate||"",false),choice("resourceId","Плановый ресурс",resourceChoiceOptions(snapshot),item.resourceId||"",false),field("allocationPct","Доля ресурса, %","number",String(item.allocationPct??100)),choice("targetId",additional.length?"Основное ожидаемое требование":"Связать с ожидаемым результатом",optionalTargets(project),item.targetIds?.[0]||"",false),
    ...(item.sourceId?[choice("sourceLink","Связь с источником",[
     option("keep","Оставить привязку"),option("remove","Убрать привязку")],"keep")]:[])]};
  }
@@ -618,6 +618,7 @@ export function applyEditor(snapshot,projectId,action,input){
   const selected=get("targetId"),rest=(item.targetIds||[]).slice(1);
   const targetIds=[...(selected?[selected]:[]),...rest.filter(link=>link!==selected)];
   return {state:editItem(snapshot,projectId,id,{title:get("title"),stageId:get("stageId")||null,dueDate:get("dueDate")||null,state:get("state"),priority:get("priority"),assignee:get("assignee"),estimateDays:integer("estimateDays"),...workDurationPatch(get,item),
+   actualStartDate:get("actualStartDate")||null,actualFinishDate:get("actualFinishDate")||null,
    resourceId:get("resourceId"),allocationPct:percentage("allocationPct"),targetIds,
    ...(sourceLink==="remove"?{sourceId:null}:{})})};
  }
