@@ -186,6 +186,12 @@ test('working-week preview puts the result first, supports full work search, and
  assert.match(block,/aria-label="Поиск по работам календарного сценария"/);
  assert.match(block,/Все работы \(/);
  assert.match(block,/Показать ещё работы/);
+ assert.match(block,/aria-label="Закрыть календарный сценарий"/);
+ assert.match(block,/setWorkingScenarioOpen\(false\);workingToggleRef\.current\?\.focus\(\)/);
+ assert.match(ts,/ref=\{workingToggleRef\}/);
+ const style=readFileSync(new URL('../desktop/src/style.css',import.meta.url),'utf8');
+ assert.match(style,/\.atlas-working-scenario\{scroll-margin-top:146px\}/);
+ assert.match(style,/\.atlas-working-scenario-footer\{position:sticky;bottom:0/);
  assert.match(ts,/setExpanded\(false\);onOpenWork\(row\.id\)/);
  assert.doesNotMatch(block,/nativeInvoke\(|\.save\(|localStorage|setData\(/,
   'A hypothetical calendar scenario must never write to authoritative storage');
