@@ -323,27 +323,6 @@ export function ProjectGantt({schedule,projectStart,recordedStart,projectDue,por
    </p>}
   {!recordedStart&&projectStart&&unavailableOrigins.length===0&&<p className="atlas-schedule-warning" role="status">Начало {projectStart} вычислено по межпроектным зависимостям, но ещё не записано как дата начала проекта.</p>}
   {!projectStart&&<p className="minor">Начальная дата не задана: на оси показаны относительные дни, не календарные даты.</p>}
-  <div className="atlas-gantt-scroller" role="region" aria-label="График работ с прокруткой" tabIndex={0}>
-   <div className="atlas-gantt-axis">
-    <strong className="atlas-gantt-name">Работа</strong><div className="atlas-gantt-track atlas-gantt-scale">
-     {guide('axis')}{view.ticks.map((tick:any)=><span key={tick.day} className="atlas-gantt-tick" style={{left:tick.positionPct+'%'}}>{tick.label}</span>)}
-    </div><strong>Дл.</strong>
-   </div>
-   {displayed.map((row:any)=><div className="atlas-gantt-row" key={row.id}>
-    <button className="atlas-gantt-work" title={row.title} onClick={()=>{setExpanded(false);onOpenWork(row.id)}}>{trim(row.title,65)}
-     <small>{statusName[row.state]||row.state}{row.critical?' · критическая':''}</small>
-     {row.missedDeadline&&<small className="atlas-gantt-work-overdue">
-      Расчётный финиш позже срока {row.dueDate}</small>}</button>
-    <div className="atlas-gantt-track">
-     {guide(row.id)}
-     {row.visible&&<button type="button" onClick={()=>{setExpanded(false);onOpenWork(row.id)}}
-      title={row.title+' · '+row.dateStart+' → '+row.dateFinish+' · '+ganttDurationLabel(row)+' · '+(statusName[row.state]||row.state)+(row.missedDeadline?' · Расчётный финиш позже срока '+row.dueDate:'')}
-      aria-label={'Открыть работу '+row.title}
-      className={'atlas-gantt-bar'+(row.isMilestone?' is-milestone':'')+(row.critical?' is-critical':'')+(row.state==='done'?' is-done':'')+(row.state==='blocked'?' is-blocked':'')}
-      style={{left:row.leftPct+'%',width:row.isMilestone?'10px':Math.max(0.45,row.widthPct)+'%'}}/>}
-    </div><span className="atlas-gantt-days">{ganttDurationLabel(row)}</span>
-   </div>)}
-  </div>
   {workingScenarioOpen&&<section id="atlas-working-week-preview" className="atlas-working-scenario"
    ref={workingPanelRef} aria-label="Необязательное сравнение рабочих календарей">
    {workingScenario.error&&<p className="atlas-schedule-warning" role="alert">Ошибка календаря: {workingScenario.error}</p>}
@@ -536,6 +515,27 @@ export function ProjectGantt({schedule,projectStart,recordedStart,projectDue,por
     </button>
    </div>
   </section>}
+  <div className="atlas-gantt-scroller" role="region" aria-label="График работ с прокруткой" tabIndex={0}>
+   <div className="atlas-gantt-axis">
+    <strong className="atlas-gantt-name">Работа</strong><div className="atlas-gantt-track atlas-gantt-scale">
+     {guide('axis')}{view.ticks.map((tick:any)=><span key={tick.day} className="atlas-gantt-tick" style={{left:tick.positionPct+'%'}}>{tick.label}</span>)}
+    </div><strong>Дл.</strong>
+   </div>
+   {displayed.map((row:any)=><div className="atlas-gantt-row" key={row.id}>
+    <button className="atlas-gantt-work" title={row.title} onClick={()=>{setExpanded(false);onOpenWork(row.id)}}>{trim(row.title,65)}
+     <small>{statusName[row.state]||row.state}{row.critical?' · критическая':''}</small>
+     {row.missedDeadline&&<small className="atlas-gantt-work-overdue">
+      Расчётный финиш позже срока {row.dueDate}</small>}</button>
+    <div className="atlas-gantt-track">
+     {guide(row.id)}
+     {row.visible&&<button type="button" onClick={()=>{setExpanded(false);onOpenWork(row.id)}}
+      title={row.title+' · '+row.dateStart+' → '+row.dateFinish+' · '+ganttDurationLabel(row)+' · '+(statusName[row.state]||row.state)+(row.missedDeadline?' · Расчётный финиш позже срока '+row.dueDate:'')}
+      aria-label={'Открыть работу '+row.title}
+      className={'atlas-gantt-bar'+(row.isMilestone?' is-milestone':'')+(row.critical?' is-critical':'')+(row.state==='done'?' is-done':'')+(row.state==='blocked'?' is-blocked':'')}
+      style={{left:row.leftPct+'%',width:row.isMilestone?'10px':Math.max(0.45,row.widthPct)+'%'}}/>}
+    </div><span className="atlas-gantt-days">{ganttDurationLabel(row)}</span>
+   </div>)}
+  </div>
   <div className="atlas-gantt-key" aria-label="Условные обозначения"><span><i className="key-normal"/>Плановая работа</span>
    <span><i className="key-critical"/>Критический путь</span><span><i className="key-done"/>Заявлено выполнение</span>
    <span><i className="key-milestone"/>Работа 0 дней</span>{view.deadline&&<span><i className="key-deadline"/>Контрольный срок</span>}</div>

@@ -326,8 +326,10 @@ test('Atlas 0.10 shows Gantt work bars before optional scenario and legend',()=>
  const timeline=ts.indexOf('className="atlas-gantt-scroller"');
  const scenario=ts.indexOf('id="atlas-working-week-preview"');
  const legend=ts.indexOf('className="atlas-gantt-key"');
- assert.ok(timeline>0&&scenario>timeline&&legend>scenario,
-  'The timeline must be rendered before secondary scenario and legend');
+ assert.ok(scenario>0&&timeline>scenario&&legend>timeline,
+  'Only an explicitly opened calendar scenario may precede Gantt bars');
+ assert.match(ts,/workingScenarioOpen&&<section id="atlas-working-week-preview"/);
+ assert.match(ts,/setWorkingScenarioOpen\(value=>!value\)/);
  assert.match(ts,/ref=\{workingToggleRef\}/);
  assert.match(ts,/aria-controls="atlas-working-week-preview"/);
  assert.match(ts,/scale!=='fit'&&<>/);
