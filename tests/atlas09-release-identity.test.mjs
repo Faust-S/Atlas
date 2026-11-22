@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 const read=path=>readFileSync(new URL("../"+path,import.meta.url),"utf8");
 
-test("Atlas 0.9 is a separate development build with one original data namespace",()=>{
+test("Atlas 0.10 reuses original Atlas identity without a second data namespace",()=>{
  const pkg=JSON.parse(read("desktop/package.json"));
  const lock=JSON.parse(read("desktop/package-lock.json"));
  const tauri=JSON.parse(read("desktop/src-tauri/tauri.conf.json"));
@@ -12,7 +12,7 @@ test("Atlas 0.9 is a separate development build with one original data namespace
  const rustLock=read("desktop/src-tauri/Cargo.lock");
  const setup=read("desktop/installer/build-setup-core.ps1");
  for(const version of [pkg.version,lock.version,lock.packages[""].version,
-  tauri.version,profile.version])assert.equal(version,"0.9.0-dev.1");
+  tauri.version,profile.version])assert.equal(version,"0.10.0-dev.1");
  assert.match(cargo,/name = "iwxa-atlas-desktop"\nversion = "0\.9\.0-dev\.1"/);
  assert.match(rustLock,/name = "iwxa-atlas-desktop"\nversion = "0\.9\.0-dev\.1"/);
  assert.match(setup,/IWXA-Atlas-0\.9\.0-dev\.1-Setup\.exe/);
