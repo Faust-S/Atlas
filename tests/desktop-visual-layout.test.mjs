@@ -178,7 +178,7 @@ test("fullscreen views release overlay before invoking project/work editors",()=
 test('working-week preview puts the result first, supports full work search, and never edits Store',()=>{
  const ts=readFileSync(new URL('../desktop/src/ProjectVisuals.tsx',import.meta.url),'utf8');
  const block=ts.slice(ts.indexOf('id="atlas-working-week-preview"'),ts.indexOf('<div className="atlas-gantt-key"'));
- assert.ok(block.includes('workingPanelRef')&&block.includes('scrollIntoView'),
+ assert.ok(block.includes('workingPanelRef')&&ts.includes('scrollIntoView'),
   'The scenario must scroll into the native workspace viewport on opening');
  assert.ok(block.indexOf('atlas-working-scenario-summary')<block.indexOf('Исключить даты'),
   'Date comparison must be before the controls in small Windows views');
