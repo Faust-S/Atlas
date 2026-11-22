@@ -13,7 +13,7 @@ test("Current Atlas development product uses the Setup Core profile and does not
  assert.equal(product.display_name,"IWXA Atlas");
  assert.equal(product.architecture,"windows-x64");
  assert.equal(product.data_namespace,tauri.identifier);
- assert.equal(product.version,"0.10.0-dev.1");
+ assert.equal(product.version,"0.10.0");
  assert.equal(product.version,tauri.version);
  assert.equal(product.entrypoint,"iwxa-atlas-desktop.exe");
  assert.deepEqual(product.requirements,["webview2-evergreen"]);
