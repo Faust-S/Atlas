@@ -61,7 +61,9 @@ test("R3 keyboard and sidebar navigation allow untouched forms, block changed fi
  const handlers=ui.slice(ui.indexOf(" const key=(event:KeyboardEvent)=>"),ui.indexOf('window.addEventListener("keydown",key)'));
  assert.equal((handlers.match(/if\(!requireClosedForm\(\)\)return/g)||[]).length,3);
  assert.doesNotMatch(handlers,/if\(editorOpenRef\.current\)\{issue\(Error\("Сначала примените или закройте/);
- assert.match(ui,/onClick=\{\(\)=>selectProject\(null\)\}/);
+ assert.match(ui,/const goPortfolio=\(\)=>\{\s*if\(!requireClosedForm\(\)\)return;selectProject\(null\)/);
+ assert.match(ui,/onClick=\{embedded\?\(\)=>selectProject\(null\):goPortfolio\}/);
+ assert.match(ui,/const goHome=\(\)=>\{\s*if\(!requireClosedForm\(\)\)return/);
 });
 
 test("R3 compact Windows layout exposes an inspector drawer without covering startup workspace",()=>{
