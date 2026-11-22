@@ -65,6 +65,28 @@ def qualify():
     assert d.saved_project(original_head)==original_project
     v.capture("atlas10-working-week-holiday-exception-installed")
 
+    # Switch one displayed work from hypothetical staffed days to continuous
+    # elapsed days. Pick an actual visible row via Windows UIA, not a test ID
+    # or hidden browser DOM. Confirm both mode changes and no native writes.
+    controls=[str(button.window_text() or "")
+              for button in d.window().descendants(control_type="Button")]
+    choices=[name for name in controls if name.startswith("Операция ") and
+             ": по рабочим дням. Переключить длительность" in name]
+    assert choices,"Native calendar scenario did not expose per-work duration modes"
+    original_mode_label=choices[0]
+    v.find_control(original_mode_label,types={"Button"},scroll=True).click_input()
+    continuous_label=original_mode_label.replace(
+        ": по рабочим дням. Переключить длительность",
+        ": без выходных. Переключить длительность")
+    d.wait_text("Непрерывных операций: 1",35)
+    v.find_control(continuous_label,types={"Button"},scroll=True)
+    assert d.head()==original_head and d.saved_project(original_head)==original_project,(
+        "Selecting a continuous operation changed the native Atlas Store")
+    v.capture("atlas10-mixed-calendar-continuous-work-installed")
+    v.find_control(continuous_label,types={"Button"},scroll=True).click_input()
+    d.wait_text("Непрерывных операций: 0",35)
+    print("ATLAS10_NATIVE_CONTINUOUS_WORK_TOGGLE_PASS",flush=True)
+
     # Reproduce the compact laptop layout: the old top toggle could be
     # scrolled behind the sticky tabs after the user edited a holiday.
     import win32gui
