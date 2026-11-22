@@ -30,6 +30,7 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
  const [workingShowAll,setWorkingShowAll]=useState(false);
  const [workingLimit,setWorkingLimit]=useState(12);
  const workingPanelRef=useRef<HTMLElement|null>(null);
+ const workingToggleRef=useRef<HTMLButtonElement|null>(null);
  useEffect(()=>{
   if(workingScenarioOpen)workingPanelRef.current?.scrollIntoView({behavior:'auto',block:'start'});
  },[workingScenarioOpen]);
@@ -142,7 +143,7 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
   {(shiftDays!=null&&shiftDays>0)&&<p className="atlas-schedule-warning">Из-за связей с другими проектами расчётное начало сдвинулось на +{shiftDays} дн.: {portfolioStart||'нет расчётной даты'}. График ниже по-прежнему показывает даты от запланированного начала. Для переноса работ нужно отдельно изменить план.</p>}
   {!projectStart&&<p className="minor">Начальная дата не задана: на оси показаны относительные дни, не календарные даты.</p>}
   <div className="atlas-gantt-tools">
-   <button type="button" className="action-button" aria-expanded={workingScenarioOpen}
+   <button type="button" ref={workingToggleRef} className="action-button" aria-expanded={workingScenarioOpen}
     aria-controls="atlas-working-week-preview"
     onClick={()=>setWorkingScenarioOpen(value=>!value)}>
     {workingScenarioOpen?'Скрыть сценарий':'Сценарий: рабочая неделя'}
@@ -213,6 +214,13 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
    </>}
    {workingScenario.result?.available&&!workingScenario.result.rows.length&&
     <p className="minor">Для сравнения нужно добавить хотя бы одну работу.</p>}
+   <div className="atlas-working-scenario-footer">
+    <span>Предварительный расчёт без изменения проекта.</span>
+    <button type="button" className="action-button" aria-label="Закрыть календарный сценарий"
+     onClick={()=>{setWorkingScenarioOpen(false);workingToggleRef.current?.focus()}}>
+     Закрыть сценарий
+    </button>
+   </div>
   </section>}
   <div className="atlas-gantt-key" aria-label="Условные обозначения"><span><i className="key-normal"/>Плановая работа</span>
    <span><i className="key-critical"/>Критический путь</span><span><i className="key-done"/>Заявлено выполнение</span>
