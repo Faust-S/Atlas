@@ -168,7 +168,10 @@ test("fullscreen views release overlay before invoking project/work editors",()=
  const ts=readFileSync(new URL("../desktop/src/ProjectVisuals.tsx",import.meta.url),"utf8");
  assert.match(ts,/onClick=\{\(\)=>\{setExpanded\(false\);onEditDates\(\)\}\}/);
  assert.match(ts,/onClick=\{\(\)=>\{setExpanded\(false\);onOpenProject\(origin\.id\)\}\}/);
- assert.equal((ts.match(/setExpanded\(false\);onOpenWork\(row\.id\)/g)||[]).length,2);
+ assert.equal((ts.match(/setExpanded\(false\);onOpenWork\(row\.id\)/g)||[]).length,3,
+  "Gantt and optional preview each release fullscreen before opening a work");
+ assert.match(ts,/Сценарий: рабочая неделя/);
+ assert.match(ts,/previewWorkingWeek/);
  assert.match(ts,/setExpanded\(false\);onOpenWork\(node\.id\)/);
 });
 
