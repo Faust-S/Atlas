@@ -1,12 +1,14 @@
 import React,{useEffect,useMemo,useState} from "react";
+import {inspectorWorkContext} from "./inspector-work-context.mjs";
 
 type Kind="project"|"work"|"source"|"baseline";
 type Tab={key:string;kind:Kind;id:string};
 type Props={
  project:any|null;snapshot:any;plan:any;forecast:any;dirty:boolean;
+ comparison:any|null;deadlineRisks:Map<string,any>;onSelectBaseline:(id:string)=>void;
  saved:boolean;workRequest:{id:string;serial:number}|null;
  onClose:()=>void;onEditWork:(id:string)=>void;onEditProject:()=>void;
- onOpenTab:(tab:"overview"|"work"|"timeline"|"graph"|"reality"|"sources")=>void;
+ onOpenTab:(tab:"overview"|"work"|"timeline"|"graph"|"reality"|"sources"|"history")=>void;
  onSave:()=>void;canSave:boolean;
 };
 const kindLabel:Record<Kind,string>={project:"Проект",work:"Работа",source:"Источник",baseline:"Контрольный план"};
@@ -14,7 +16,8 @@ const format=(value:string|null|undefined)=>value||"Не указано";
 const workStatuses:Record<string,string>={
  todo:"Запланирована",in_progress:"В работе",blocked:"Заблокирована",done:"Выполнена (заявлено)"
 };
-export function AtlasInspectorPreview({project,snapshot,plan,forecast,dirty,saved,workRequest,
+export function AtlasInspectorPreview({project,snapshot,plan,forecast,comparison,
+ deadlineRisks,onSelectBaseline,dirty,saved,workRequest,
  onClose,onEditWork,onEditProject,onOpenTab,onSave,canSave}:Props){
  const defaultId=project?.id??"portfolio";
  const [tabs,setTabs]=useState<Tab[]>([{key:"project:"+defaultId,kind:"project",id:defaultId}]);
@@ -39,14 +42,18 @@ export function AtlasInspectorPreview({project,snapshot,plan,forecast,dirty,save
   setTabs(next);
   if(active===key)setActive(next[0].key);
  };
- const work=shown?.kind==="work"?project?.items.find((w:any)=>w.id===shown.id):null;
+ const facts=useMemo(()=>project&&shown?.kind==="work"?
+  inspectorWorkContext(project,plan,shown.id,{
+   comparison,deadlineRisks,resources:snapshot.resources??[]
+  }):null,[project,plan,shown?.kind,shown?.id,comparison,deadlineRisks,snapshot.resources]);
+ const work=facts?.work??null;
+ const workPlan=facts?.row??null;
+ const predecessors=facts?.predecessors??[];
+ const successors=facts?.successors??[];
+ const sourceOfWork=facts?.source??null;
+ const resourceOfWork=facts?.resource??null;
  const source=shown?.kind==="source"?project?.sources.find((s:any)=>s.id===shown.id):null;
  const baseline=shown?.kind==="baseline"?project?.planBaselines?.find((b:any)=>b.id===shown.id):null;
- const workPlan=work?plan?.rows?.find((r:any)=>r.id===work.id):null;
- const predecessors=work&&project?project.dependencies.filter((d:any)=>d.to===work.id):[];
- const successors=work&&project?project.dependencies.filter((d:any)=>d.from===work.id):[];
- const sourceOfWork=work?.sourceId?project?.sources?.find((s:any)=>s.id===work.sourceId):null;
- const resourceOfWork=work?.resourceId?snapshot.resources?.find((r:any)=>r.id===work.resourceId):null;
  const title=(tab:Tab)=>{
   if(tab.kind==="work")return project?.items.find((w:any)=>w.id===tab.id)?.title||"Работа";
   if(tab.kind==="source")return project?.sources.find((s:any)=>s.id===tab.id)?.locator||"Источник";
@@ -109,21 +116,84 @@ export function AtlasInspectorPreview({project,snapshot,plan,forecast,dirty,save
       <p>Расчётное начало: {format(workPlan?.startDate)}</p>
       <p>Расчётный финиш: {format(workPlan?.finishDate)}</p>
       <p>Контрольный срок: {format(work.dueDate)}</p>
-      <p>Факт начала: {format(work.actualStartDate)}</p>
-      <p>Факт завершения: {format(work.actualFinishDate)}</p>
+      <p>Запас по CPM: {workPlan?.floatDays==null?"Не определён":workPlan.floatDays+" дн."}</p>
+      <p>{workPlan?.critical?"Работа находится на критическом пути.":"Критический путь рассчитывается по действующему календарю."}</p>
+      <p>Факт начала (введён): {format(work.actualStartDate)}</p>
+      <p>Факт завершения (введён): {format(work.actualFinishDate)}</p>
      </section>
+     <section className="atlas-v6-preview-card" aria-label="Контрольный план выбранной работы">
+      <strong>Исходный план и текущий прогноз</strong>
+      {(project.planBaselines??[]).length>0?<>
+       <label className="atlas-v6-baseline-picker">Контрольная редакция
+        <select aria-label="Контрольный план работы"
+         value={facts?.baseline?.id??""}
+         onChange={event=>onSelectBaseline(event.target.value)}>
+         {(project.planBaselines??[]).map((b:any)=>
+          <option key={b.id} value={b.id}>{b.name}</option>)}
+        </select>
+       </label>
+       {facts?.baselineRow?<div className="atlas-v6-baseline-comparison">
+        <p>По исходному плану: {format(facts.baselineRow.referenceStart)} – {format(facts.baselineRow.referenceFinish)}</p>
+        <p>Текущий прогноз: {format(facts.baselineRow.forecastStart)} – {format(facts.baselineRow.forecastFinish)}</p>
+        <p>Изменение финиша: {facts.baselineRow.shiftDays===null?"Не определено":
+         (facts.baselineRow.shiftDays>0?"+":"")+facts.baselineRow.shiftDays+" дн."}</p>
+        <p>Фактическое завершение относительно плана: {facts.baselineRow.actualShiftDays===null?"Не введено":
+         (facts.baselineRow.actualShiftDays>0?"+":"")+facts.baselineRow.actualShiftDays+" дн."}</p>
+        {facts.baselineRow.reasons.length>0?<div className="atlas-v6-inspector-reasons">
+         <strong>Зафиксированные отличия</strong>
+         {facts.baselineRow.reasons.map((reason:string)=><p key={reason}>{reason}</p>)}
+        </div>:<p>В исходных параметрах работы отличий нет.</p>}
+       </div>:<p>Для выбранной работы сравнение пока недоступно.</p>}
+       <button type="button" className="atlas-v6-preview-link" onClick={()=>onOpenTab("reality")}>
+        Полное сравнение плана и факта
+       </button>
+      </>:<><p>Контрольный план проекта ещё не зафиксирован.</p>
+       <button type="button" className="atlas-v6-preview-link" onClick={()=>onOpenTab("reality")}>
+        Зафиксировать исходный план
+       </button></>}
+     </section>
+     {facts?.deadline&&<section className="atlas-v6-preview-card" aria-label="Факторы расчётной просрочки">
+      <strong>Факторы расчётной просрочки</strong>
+      <p>Плановый финиш позже контрольного срока на {facts.deadline.daysLate} дн.</p>
+      {facts.deadline.calendarWaitDays>0&&<p>Ожидание рабочих дат по календарю: {facts.deadline.calendarWaitDays} дн.</p>}
+      {(facts.deadline.drivers??[]).map((driver:any)=><button type="button"
+       className="atlas-v6-preview-link" key={driver.id} onClick={()=>open("work",driver.id)}>
+        {driver.title}</button>)}
+      {facts.deadline.hiddenDrivers>0&&<p>Остальных ограничивающих работ: {facts.deadline.hiddenDrivers}.</p>}
+      <small>Это объяснение календарного прогноза, а не подтверждение причины фактического отклонения.</small>
+     </section>}
      <section className="atlas-v6-preview-card"><strong>Зависимости</strong>
       <p>Предшественники: {predecessors.length}. Последующие работы: {successors.length}.</p>
-      {predecessors.slice(0,6).map((d:any)=><button type="button" className="atlas-v6-preview-link" key={"p"+d.from}
-       onClick={()=>open("work",d.from)}>{project.items.find((w:any)=>w.id===d.from)?.title||"Работа"}</button>)}
-      {successors.slice(0,6).map((d:any)=><button type="button" className="atlas-v6-preview-link" key={"s"+d.to}
-       onClick={()=>open("work",d.to)}>→ {project.items.find((w:any)=>w.id===d.to)?.title||"Работа"}</button>)}
+      {predecessors.slice(0,6).map((linked:any)=><button type="button" className="atlas-v6-preview-link"
+       key={"p"+linked.id} onClick={()=>open("work",linked.id)}>
+       ← {linked.title}</button>)}
+      {successors.slice(0,6).map((linked:any)=><button type="button" className="atlas-v6-preview-link"
+       key={"s"+linked.id} onClick={()=>open("work",linked.id)}>
+       → {linked.title}</button>)}
+      {predecessors.length+successors.length>12&&<p>Остальные связи доступны в полном графе.</p>}
      </section>
      <section className="atlas-v6-preview-card"><strong>Ответственность и происхождение</strong>
       <p>Ответственный: {work.assignee||"Не указан"}</p>
       <p>Плановый ресурс: {resourceOfWork?.label||"Не назначен"}</p>
       {sourceOfWork?<button type="button" className="atlas-v6-preview-link" onClick={()=>open("source",sourceOfWork.id)}>
        Источник: {sourceOfWork.locator}</button>:<p>Источник не привязан.</p>}
+     </section>
+     <section className="atlas-v6-preview-card" aria-label="Связанные решения и наблюдения">
+      <strong>Решения и наблюдения</strong>
+      {facts?.relatedChange&&<p>Изменение «{facts.relatedChange.title}», состояние: {facts.relatedChange.status}.</p>}
+      {(facts?.history??[]).length>0?
+       <>{facts.history.slice(0,6).map((record:any)=>
+        <div className="atlas-v6-inspector-history" key={record.kind+":"+record.id}>
+         <small>{record.kind==="decision"?"Решение по изменению":
+          record.scope==="work"?"Наблюдение по работе":"Наблюдение по общей цели"}
+          {" · "}{format(record.at?.slice(0,10))}</small>
+         <p>{record.text||"Запись без пояснения"}</p>
+         {record.source&&<small>Источник: {record.source}</small>}
+        </div>)}
+        {facts.history.length>6&&<p>Других связанных записей: {facts.history.length-6}.</p>}</>:
+       <p>Для этой работы пока нет явно связанных решений и наблюдений.</p>}
+      <button type="button" className="atlas-v6-preview-link" onClick={()=>onOpenTab("history")}>
+       Открыть полную историю проекта</button>
      </section>
     </>:<p>Работа больше не существует в текущей редакции.</p>}
    </div>}
