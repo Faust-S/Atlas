@@ -28,10 +28,14 @@ const calendarDates=(dates,label)=>{
   new Set(dates).size!==dates.length)throw Error("Invalid "+label);
  return [...dates].sort();
 };
-function normalizedCalendarDraft(data,itemIds,{allowMissingWork=false}={}){
- if(!data||typeof data!=="object"||Array.isArray(data)||
-  typeof data.name!=="string"||!data.name.trim()||data.name.trim().length>120)
-  throw Error("Invalid calendar draft name");
+/**
+ * Shared LOCAL Atlas-portfolio work calendars. A recorded source is only
+ * provenance supplied by the user; it is not verified or approved by Admin.
+ * Each revision is a separate immutable entry, never modified in place.
+ */
+function normalizedCalendarRules(data){
+ if(!data||typeof data!=="object"||Array.isArray(data))
+  throw Error("Invalid calendar rules");
  const weekdays=data.weekdays;
  if(!Array.isArray(weekdays)||weekdays.length<1||weekdays.length>7||
    new Set(weekdays).size!==weekdays.length||
@@ -39,9 +43,38 @@ function normalizedCalendarDraft(data,itemIds,{allowMissingWork=false}={}){
   throw Error("Invalid calendar weekdays");
  const excludedDates=calendarDates(data.excludedDates??[],"calendar excluded dates");
  const additionalWorkingDates=calendarDates(data.additionalWorkingDates??[],
-   "calendar additional working dates");
+  "calendar additional working dates");
  if(additionalWorkingDates.some(day=>excludedDates.includes(day)))
   throw Error("Conflicting calendar date");
+ return {weekdays:[...weekdays].sort((a,b)=>a-b),
+  excludedDates,additionalWorkingDates};
+}
+const sourceKinds=new Set(["entered_by_user","document_reference"]);
+function normalizedCalendarSource(source){
+ if(!source||typeof source!=="object"||Array.isArray(source)||
+    !sourceKinds.has(source.kind))throw Error("Invalid calendar source");
+ if(source.kind==="entered_by_user"){
+  if(source.reference!==null&&source.reference!==undefined)
+   throw Error("Invalid user-entered calendar source reference");
+  return {kind:source.kind,reference:null};
+ }
+ if(typeof source.reference!=="string"||
+    !source.reference.trim()||source.reference.trim().length>320)
+  throw Error("Invalid calendar document source reference");
+ return {kind:source.kind,reference:source.reference.trim()};
+}
+function calendarBasis(value){
+ if(!value||typeof value!=="object"||Array.isArray(value)||
+  typeof value.id!=="string"||!value.id||value.id.length>128||
+  !Number.isSafeInteger(value.version)||value.version<1)
+  throw Error("Invalid calendar source revision");
+ return {id:value.id,version:value.version};
+}
+function normalizedCalendarDraft(data,itemIds,{allowMissingWork=false}={}){
+ if(!data||typeof data!=="object"||Array.isArray(data)||
+  typeof data.name!=="string"||!data.name.trim()||data.name.trim().length>120)
+  throw Error("Invalid calendar draft name");
+ const rules=normalizedCalendarRules(data);
  const modeByWork=data.modeByWork??{};
  if(!modeByWork||typeof modeByWork!=="object"||Array.isArray(modeByWork)||
   Object.keys(modeByWork).length>5000)
@@ -50,10 +83,57 @@ function normalizedCalendarDraft(data,itemIds,{allowMissingWork=false}={}){
  if(modes.some(([id,mode])=>(!allowMissingWork&&!itemIds.has(id))||
   !["elapsed_days","working_days"].includes(mode)))
   throw Error("Invalid calendar draft work modes");
- return {name:data.name.trim(),weekdays:[...weekdays].sort((a,b)=>a-b),
-  excludedDates,additionalWorkingDates,
-  modeByWork:Object.fromEntries(modes.sort(([a],[b])=>a.localeCompare(b)))};
+ return {name:data.name.trim(),...rules,
+  modeByWork:Object.fromEntries(modes.sort(([a],[b])=>a.localeCompare(b))),
+  ...(data.calendarBasis===undefined?{}:{calendarBasis:calendarBasis(data.calendarBasis)})};
 }
+function checkCalendarLibrary(s){
+ const library=s.calendarLibrary;
+ if(library===undefined)return;
+ if(!Array.isArray(library)||library.length>256)
+  throw Error("Invalid calendar library");
+ const last=new Map(),latestNames=new Set();
+ for(const def of library){
+  if(!def||typeof def.id!=="string"||!def.id||def.id.length>128||
+   !Number.isSafeInteger(def.version)||def.version<1||def.version>8||
+   typeof def.name!=="string"||!def.name.trim()||def.name!==def.name.trim()||
+   def.name.length>120||
+   typeof def.recordedAt!=="string"||!Number.isFinite(Date.parse(def.recordedAt)))
+   throw Error("Invalid calendar library entry");
+  const normalized=normalizedCalendarRules(def);
+  for(const key of ["weekdays","excludedDates","additionalWorkingDates"]){
+   if(JSON.stringify(normalized[key])!==JSON.stringify(def[key]))
+    throw Error("Non-canonical calendar library "+key);
+  }
+  const source=normalizedCalendarSource(def.source);
+  if(JSON.stringify(source)!==JSON.stringify(def.source))
+   throw Error("Non-canonical calendar library source");
+  const previous=last.get(def.id);
+  if(def.version!==(previous?.version??0)+1)
+   throw Error("Invalid calendar version history");
+  last.set(def.id,def);
+ }
+ if(last.size>32)throw Error("Calendar library limit: 32");
+ for(const latest of last.values()){
+  const name=latest.name.toLocaleLowerCase("ru-RU");
+  if(latestNames.has(name))throw Error("Duplicate calendar library name");
+  latestNames.add(name);
+ }
+}
+/** Return exact immutable revision (not the latest by accident). */
+export function workCalendarRevision(s,id,version){
+ validate(s);
+ return (s.calendarLibrary??[]).find(def=>def.id===id&&def.version===version)??null;
+}
+/** Latest revision of each locally recorded calendar, for UI projections. */
+export function latestWorkCalendars(s){
+ validate(s);
+ const latest=new Map();
+ for(const def of s.calendarLibrary??[])latest.set(def.id,def);
+ return [...latest.values()].sort((a,b)=>
+  a.name.localeCompare(b.name,"ru")||a.id.localeCompare(b.id));
+}
+
 function checkCalendarDrafts(project){
  const drafts=project.calendarDrafts;
  if(drafts===undefined)return;
@@ -85,6 +165,7 @@ function checkCalendarDrafts(project){
 export const empty=()=>({schema:SCHEMA,revision:0,projects:[]});
 export function validate(s){
  if(s?.schema!==SCHEMA||!Number.isSafeInteger(s.revision)||s.revision<0||!Array.isArray(s.projects))throw Error("Invalid Atlas snapshot");
+ checkCalendarLibrary(s);
  const resources=s.resources??[];
  if(!Array.isArray(resources)||resources.length>2000)throw Error("Invalid planning resources");
  const resourceIds=new Set(),resourceLabels=new Set();
@@ -289,6 +370,15 @@ export function upsertCalendarDraft(s,pid,input){
  if(existingId!==null&&missingCalendarDraftWorkIds(p,existingId).length)
   throw Error("В календарном варианте есть ссылки на удалённые работы. Сначала подтвердите очистку ссылок.");
  const normalized=normalizedCalendarDraft(input,known);
+ if(normalized.calendarBasis){
+  const basis=workCalendarRevision(s,normalized.calendarBasis.id,normalized.calendarBasis.version);
+  if(!basis)throw Error("Calendar source revision unavailable");
+  const snapshot=normalizedCalendarRules(normalized);
+  for(const key of ["weekdays","excludedDates","additionalWorkingDates"]){
+   if(JSON.stringify(snapshot[key])!==JSON.stringify(basis[key]))
+    throw Error("Calendar source rules have changed; use an independent scenario");
+  }
+ }
  const duplicate=(p.calendarDrafts||[]).find(d=>
   d.id!==existingId&&d.name.trim().toLocaleLowerCase("ru-RU")===
   normalized.name.toLocaleLowerCase("ru-RU"));
@@ -318,6 +408,47 @@ export function removeCalendarDraft(s,pid,id){
   const p=project(x,pid);
   p.calendarDrafts=p.calendarDrafts.filter(d=>d.id!==id);
  });
+}
+
+
+/** New independent LOCAL calendar; not an Admin-approved schedule. */
+export function createWorkCalendar(s,input){
+ validate(s);
+ const name=nonempty(input?.name,"Calendar name");
+ if(name.length>120)throw Error("Invalid calendar name");
+ const rules=normalizedCalendarRules(input);
+ const source=normalizedCalendarSource(input.source);
+ const names=new Set(latestWorkCalendars(s).map(d=>d.name.toLocaleLowerCase("ru-RU")));
+ if(names.has(name.toLocaleLowerCase("ru-RU")))throw Error("Duplicate calendar library name");
+ if(latestWorkCalendars(s).length>=32)throw Error("Calendar library limit: 32");
+ const id=uid(),now=new Date().toISOString();
+ const state=change(s,x=>{
+  x.calendarLibrary??=[];
+  x.calendarLibrary.push({id,version:1,name,...rules,source,recordedAt:now});
+ });
+ return {id,version:1,state};
+}
+/** Append a new immutable revision. A stale selection cannot silently win. */
+export function reviseWorkCalendar(s,id,expectedVersion,input){
+ validate(s);
+ if(typeof id!=="string"||!id)throw Error("Unknown calendar library item");
+ const last=latestWorkCalendars(s).find(d=>d.id===id);
+ if(!last)throw Error("Unknown calendar library item");
+ if(!Number.isSafeInteger(expectedVersion)||expectedVersion!==last.version)
+  throw Error("Stale calendar version");
+ if(last.version>=8)throw Error("Calendar revision limit: 8");
+ const name=nonempty(input?.name,"Calendar name");
+ if(name.length>120)throw Error("Invalid calendar name");
+ if(latestWorkCalendars(s).some(d=>d.id!==id&&
+  d.name.toLocaleLowerCase("ru-RU")===name.toLocaleLowerCase("ru-RU")))
+  throw Error("Duplicate calendar library name");
+ const rules=normalizedCalendarRules(input);
+ const source=normalizedCalendarSource(input.source);
+ const now=new Date().toISOString();
+ const state=change(s,x=>x.calendarLibrary.push({
+  id,version:last.version+1,name,...rules,source,recordedAt:now
+ }));
+ return {id,version:last.version+1,state};
 }
 
 export function createStage(s,pid,name){const id=uid();return {id,state:change(s,x=>project(x,pid).stages.push({id,name:nonempty(name,"Stage name"),status:"planned",dueDate:null}))}}
