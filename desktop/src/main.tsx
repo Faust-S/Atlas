@@ -334,6 +334,15 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  // Standalone v6 chrome; embedded T3 keeps its already-qualified host surface.
  const [homeOpen,setHomeOpen]=useState(()=>!host);
  const [settingsOpen,setSettingsOpen]=useState(false);
+ const [portfolioJump,setPortfolioJump]=useState<"resources"|"ecosystem"|"review"|null>(null);
+ useEffect(()=>{
+  if(embedded||active!==null||homeOpen||settingsOpen||!portfolioJump)return;
+  const destination=rootRef.current?.querySelector<HTMLElement>("#atlas-portfolio-"+portfolioJump);
+  if(!destination)return;
+  destination.scrollIntoView({block:"start",behavior:"auto"});
+  destination.focus({preventScroll:true});
+  setPortfolioJump(null);
+ },[embedded,active,homeOpen,settingsOpen,portfolioJump]);
  const [settingsSection,setSettingsSection]=useState<"appearance"|"data">("appearance");
  const [navPanelOpen,setNavPanelOpen]=useState(()=>Boolean(host)||window.innerWidth>=1030);
  // Preserve a useful central workspace on compact Windows even after resize.
@@ -1731,7 +1740,12 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   if(!requireClosedForm())return;selectProject(null);setHomeOpen(true);setSettingsOpen(false);
  };
  const goPortfolio=()=>{
-  if(!requireClosedForm())return;selectProject(null);setHomeOpen(false);setSettingsOpen(false);
+  if(!requireClosedForm())return;
+  selectProject(null);setHomeOpen(false);setSettingsOpen(false);setPortfolioJump(null);
+ };
+ const goPortfolioSection=(section:"resources"|"ecosystem"|"review")=>{
+  if(!requireClosedForm())return;
+  selectProject(null);setHomeOpen(false);setSettingsOpen(false);setPortfolioJump(section);
  };
  const goSettings=()=>{
   if(!requireClosedForm())return;
@@ -1754,7 +1768,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   setHomeOpen(false);setSettingsOpen(false);view(id);
  };
  const goResources=()=>{
-  if(project)goProjectTab("resources");else goPortfolio();
+  if(project)goProjectTab("resources");else goPortfolioSection("resources");
  };
  const goSources=()=>{
   if(project)goProjectTab("sources");else goPortfolio();
@@ -2078,11 +2092,12 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      onPortfolio={goPortfolio} onNewProject={()=>openEditor("new")}
      onConnect={()=>{goPortfolio();startConnection();}}
      onOpenProject={(id,target="overview")=>openProjectTab(id,target)}
-     onResources={goPortfolio}
+     onResources={goResources}
      onCalendar={()=>project?goProjectTab("timeline"):data.projects.length?
        openProjectTab(data.projects[0].id,"timeline"):goPortfolio()}
-     onReview={()=>reviewRows.length?openProjectTab(reviewRows[0].projectId,"changes"):goPortfolio()}
-     onEcosystem={goPortfolio} onHistory={id=>openProjectTab(id,"history")}/>:
+     onReview={()=>reviewRows.length?openProjectTab(reviewRows[0].projectId,"changes"):goPortfolioSection("review")}
+     onEcosystem={()=>goPortfolioSection("ecosystem")}
+     onHistory={id=>openProjectTab(id,"history")}/>:
    <>
     <div className="page-heading"><div><small>Ваше рабочее пространство</small><h1>Портфель проектов</h1>
       <p>Что должно быть, что известно и какие решения влияют на планы.</p>
@@ -2240,7 +2255,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      {filtered.length>0&&<p className="minor">Показано {Math.min(filtered.length,portfolioLimit)} из {filtered.length} проектов по текущему поиску.</p>}
      {filtered.length>portfolioLimit&&<Action onClick={()=>setPortfolioLimit(n=>Math.min(filtered.length,n+150))}>Показать ещё проекты</Action>}
     </section>
-    <section className="surface">
+    <section id="atlas-portfolio-review" tabIndex={-1} className="surface">
      <div className="section-heading"><div><h2>Решения и изменения по новым фактам</h2><p>От перепроверки Git SHA до предложения и отдельного применения утверждённого плана. Новые факты сами план не меняют.</p></div></div>
      {reviewRows.slice(0,reviewLimit).map((r:any,i:number)=>
       <div className="attention-row" key={r.projectId+"-"+i}><div><strong>{r.projectName}</strong><small>{r.targetTitle||"Пересмотр плана"} · {planReviewStatus[r.state]||r.state}{r.proposal?" · «"+r.proposal.title+"»":""}</small></div>
@@ -2255,7 +2270,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      {reviewRows.length>reviewLimit&&<Action onClick={()=>setReviewLimit(n=>Math.min(reviewRows.length,n+20))}>Показать ещё решения ({reviewRows.length-reviewLimit})</Action>}
      {!reviewRows.length&&<p className="minor">Сейчас нет открытых пересмотров и заявок по перепроверенным Git-ревизиям. Это не подтверждение завершения проектов.</p>}
     </section>
-    <section className="surface">
+    <section id="atlas-portfolio-resources" tabIndex={-1} className="surface">
      <div className="section-heading"><div><h2>Плановые ресурсы</h2><p>Ресурсы объединяются только по явному назначению, не по имени человека.</p></div>
       <Action onClick={()=>openEditor("resource-new")}>＋ Плановый ресурс</Action></div>
      {resources.people.length?<div className="table-scroll"><table><thead><tr><th>Ресурс</th><th>Мощность</th><th>Максимум</th><th>Выше мощности</th><th>Вне доступности</th><th></th></tr></thead><tbody>
@@ -2265,7 +2280,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      {resources.people.length>0&&<p className="minor">Показано {Math.min(resourceLimit,resources.people.length)} из {resources.people.length} ресурсов.</p>}
      {resources.people.length>resourceLimit&&<Action onClick={()=>setResourceLimit(n=>Math.min(resources.people.length,n+40))}>Показать ещё ресурсы</Action>}
     </section>
-    <section className="surface atlas-ecosystem-overview" aria-label="Карта разработки по проектам и GitHub">
+    <section id="atlas-portfolio-ecosystem" tabIndex={-1} className="surface atlas-ecosystem-overview" aria-label="Карта разработки по проектам и GitHub">
      <div className="section-heading"><div><h2>Карта разработки</h2>
       <p>Продукты, источники и открытые вопросы в одном портфеле. Зелёная сборка не означает принятую поставку.</p></div></div>
      <div className="summary-line">
