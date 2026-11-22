@@ -19,6 +19,7 @@ on:
       - 'desktop/src-tauri/**'
       - 'desktop/tests/installed-atlas11-*.py'
       - 'tests/fixtures/**'
+      - 'tests/verify-atlas09-host-dist.mjs'
       - 'src/**'
   workflow_dispatch:
 
