@@ -3,7 +3,8 @@ import atlasPackage from "../package.json";
 import {invoke as nativeInvoke,isTauri} from "@tauri-apps/api/core";
 import {getCurrentWindow} from "@tauri-apps/api/window";
 import {empty,deserialize,serialize,editItem,removeStage,removeItem,disconnect,
- upsertCalendarDraft,removeCalendarDraft,removeProject as dropProject} from "../../src/core.mjs";
+ upsertCalendarDraft,removeCalendarDraft,resolveCalendarDraftMissingWorkRefs,
+ removeProject as dropProject} from "../../src/core.mjs";
 import {removePortfolioLink} from "../../src/portfolio.mjs";
 import {editorSpec,applyEditor,editorSelectionFields,filterWorkPickerOptions,PROJECT_TYPE_LABELS} from "../../src/editor.mjs";
 import {compareProject,decideChange} from "../../src/trace.mjs";
@@ -2719,6 +2720,19 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
          mutate(result,"Календарный вариант удалён из черновика. Для записи на диск нажмите «Сохранить».");
          return true;
         }catch(error){issue(error);return false}
+       }}
+       onRepairCalendarDraft={id=>{
+        if(busyRef.current||!ready||!requireClosedForm())return null;
+        if(!confirmAction("Удалить только недействительные ссылки календарного варианта? "+
+          "Сам вариант и существующие работы останутся на месте."))return null;
+        try{
+         const fixed=resolveCalendarDraftMissingWorkRefs(latestSnapshot.current,project.id,id);
+         if(fixed.removed.length){
+          mutate(fixed.state,"Ссылки на удалённые работы очищены в черновике. "+
+           "Запишите новую редакцию штатной командой «Сохранить».");
+         }
+         return fixed.removed.length;
+        }catch(error){issue(error);return null}
        }}
        onOpenProject={id=>selectProject(id)}
        onEditDates={()=>openEditor("dates")} onOpenWork={id=>openEditor("work:"+id)}/>:
