@@ -12,13 +12,14 @@ type SavedCalendarScenario=CalendarScenarioInput&{id:string;version:number;baseR
 const statusName:Record<string,string>={todo:'Запланировано',in_progress:'В работе',blocked:'Заблокировано',done:'Выполнено (заявлено)'};
 const trim=(value:string,max=110)=>value.length>max?value.slice(0,max-1)+'…':value;
 
-export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,shiftDays,projectStatus,unavailableOrigins,calendarDrafts,onSaveCalendarDraft,onRemoveCalendarDraft,onOpenWork,onOpenProject,onEditDates}:{
+export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,shiftDays,projectStatus,unavailableOrigins,calendarDrafts,onSaveCalendarDraft,onRemoveCalendarDraft,onRepairCalendarDraft,onOpenWork,onOpenProject,onEditDates}:{
  schedule:CPM;projectStart:string|null;projectDue:string|null;portfolioStart:string|null;
  shiftDays:number|null;projectStatus:string;
  unavailableOrigins:Array<{id:string;name:string;status:string}>;
  calendarDrafts:SavedCalendarScenario[];
  onSaveCalendarDraft:(draft:CalendarScenarioInput)=>string|null;
  onRemoveCalendarDraft:(id:string)=>boolean;
+ onRepairCalendarDraft:(id:string)=>number|null;
  onOpenWork:(id:string)=>void;onOpenProject:(id:string)=>void;onEditDates:()=>void
 }){
  const [scale,setScale]=useState<Mode>('fit');
@@ -68,6 +69,18 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
    return {result,error:''};
   }catch(error){return {result:null as any,error:error instanceof Error?error.message:'Неверный рабочий календарь'};}
  },[schedule,projectStart,workingScenarioOpen,weekPreset,customWeekdays,nonWorkingDates,extraWorkingDates,continuousWorkIds]);
+ const selectedCalendarDraft=calendarDrafts.find(d=>d.id===calendarDraftId);
+ const currentWorkIds=new Set(schedule.rows.map(row=>row.id));
+ const missingCalendarWorkRefs=selectedCalendarDraft?
+  Object.keys(selectedCalendarDraft.modeByWork).filter(id=>!currentWorkIds.has(id)):[];
+ const repairCalendarDraft=()=>{
+  if(!calendarDraftId||!missingCalendarWorkRefs.length)return;
+  const removed=onRepairCalendarDraft(calendarDraftId);
+  if(removed!==null){
+   setCalendarFeedback('Подтверждена очистка '+removed+' недействительных ссылок. '+
+    'Новая редакция находится в черновике. Нажмите Ctrl+S для записи на диск.');
+  }
+ };
  const loadCalendarDraft=()=>{
   const draft=calendarDrafts.find(row=>row.id===calendarDraftId);
   if(!draft){setCalendarFeedback('Выберите сохранённый вариант.');return;}
@@ -81,9 +94,17 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
    .filter(([id,unit])=>ids.has(id)&&unit==='elapsed_days').map(([id])=>[id,true])));
   setWorkingLastToggledId(null);setWorkingQuery('');setWorkingLimit(12);
   setCalendarDraftName(draft.name);
-  setCalendarFeedback('Загружен сохранённый вариант, версия '+draft.version+'. Это только сценарный расчёт.');
+  const missing=Object.keys(draft.modeByWork).filter(id=>!ids.has(id)).length;
+  setCalendarFeedback('Загружен вариант, версия '+draft.version+'. Это только сценарный расчёт.'+
+   (missing?' Есть '+missing+' ссылки на удалённые работы: они сохранены, но не участвуют в прогнозе.':''));
  };
  const saveCalendarDraft=()=>{
+  if(missingCalendarWorkRefs.length){
+   setCalendarFeedback('Сохранённый вариант содержит '+missingCalendarWorkRefs.length+
+    ' ссылки на удалённые работы. Их нельзя потерять при правке. '+
+    'Подтвердите очистку ссылок либо создайте новый вариант.');
+   return;
+  }
   if(workingScenario.error||!workingScenario.result?.calendar){
    setCalendarFeedback('Исправьте календарь перед сохранением.');return;
   }
@@ -337,6 +358,14 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
      {calendarDraftId&&<button type="button" className="action-button"
       onClick={deleteCalendarDraft}>Удалить вариант из проекта</button>}
     </div>
+    {!!missingCalendarWorkRefs.length&&<div className="atlas-schedule-warning"
+      role="alert" aria-label="Календарный вариант содержит удалённые работы">
+     В варианте сохранились ссылки на {missingCalendarWorkRefs.length} удалённых работ.
+     Пока они не исправлены, вариант доступен для чтения, но не для перезаписи.
+     <button type="button" className="action-button" onClick={repairCalendarDraft}>
+      Подтвердить очистку недействительных ссылок
+     </button>
+    </div>}
     {calendarFeedback&&<p className="minor" role="status">{calendarFeedback}</p>}
    </details>
    <div className="atlas-working-scenario-footer">
