@@ -6,17 +6,24 @@ import {previewOperationCalendars} from '../../src/working-week-scenario.mjs';
 
 type CPM={durationDays:number;rows:Array<{id:string;title:string;earlyStart:number;earlyFinish:number;durationDays:number;critical:boolean;state:string;predecessors:string[];blockedBy:string[];floatDays:number;dueDate?:string|null;finishDate?:string|null}>};
 type Mode='fit'|'30'|'90';
+type CalendarBasis={id:string;version:number};
+type WorkCalendarInput={name:string;weekdays:number[];excludedDates:string[];
+ additionalWorkingDates:string[];source:{kind:'entered_by_user'|'document_reference';reference:string|null}};
+type WorkCalendarRecord=WorkCalendarInput&CalendarBasis&{recordedAt:string};
 type CalendarScenarioInput={id?:string;name:string;weekdays:number[];excludedDates:string[];
- additionalWorkingDates:string[];modeByWork:Record<string,'elapsed_days'|'working_days'>};
+ additionalWorkingDates:string[];modeByWork:Record<string,'elapsed_days'|'working_days'>;
+ calendarBasis?:CalendarBasis};
 type SavedCalendarScenario=CalendarScenarioInput&{id:string;version:number;baseRevision:number};
 const statusName:Record<string,string>={todo:'Запланировано',in_progress:'В работе',blocked:'Заблокировано',done:'Выполнено (заявлено)'};
 const trim=(value:string,max=110)=>value.length>max?value.slice(0,max-1)+'…':value;
 
-export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,shiftDays,projectStatus,unavailableOrigins,calendarDrafts,onSaveCalendarDraft,onRemoveCalendarDraft,onRepairCalendarDraft,onOpenWork,onOpenProject,onEditDates}:{
+export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,shiftDays,projectStatus,unavailableOrigins,calendarDrafts,calendarLibrary,onRecordWorkCalendar,onSaveCalendarDraft,onRemoveCalendarDraft,onRepairCalendarDraft,onOpenWork,onOpenProject,onEditDates}:{
  schedule:CPM;projectStart:string|null;projectDue:string|null;portfolioStart:string|null;
  shiftDays:number|null;projectStatus:string;
  unavailableOrigins:Array<{id:string;name:string;status:string}>;
  calendarDrafts:SavedCalendarScenario[];
+ calendarLibrary:WorkCalendarRecord[];
+ onRecordWorkCalendar:(record:WorkCalendarInput,basis:CalendarBasis|null)=>CalendarBasis|null;
  onSaveCalendarDraft:(draft:CalendarScenarioInput)=>string|null;
  onRemoveCalendarDraft:(id:string)=>boolean;
  onRepairCalendarDraft:(id:string)=>number|null;
@@ -35,6 +42,12 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
  const [customWeekdays,setCustomWeekdays]=useState<number[]>([1,2,3,4,5]);
  const [calendarDraftId,setCalendarDraftId]=useState('');
  const [calendarDraftName,setCalendarDraftName]=useState('Рабочая неделя');
+ const [libraryCalendarKey,setLibraryCalendarKey]=useState('');
+ const [libraryCalendarName,setLibraryCalendarName]=useState('Календарь организации');
+ const [librarySourceKind,setLibrarySourceKind]=useState<'entered_by_user'|'document_reference'>('entered_by_user');
+ const [librarySourceReference,setLibrarySourceReference]=useState('');
+ const [calendarBasis,setCalendarBasis]=useState<CalendarBasis|null>(null);
+ const [libraryFeedback,setLibraryFeedback]=useState('');
  const [calendarFeedback,setCalendarFeedback]=useState('');
  const [nonWorkingDates,setNonWorkingDates]=useState('');
  const [extraWorkingDates,setExtraWorkingDates]=useState('');
@@ -69,6 +82,56 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
    return {result,error:''};
   }catch(error){return {result:null as any,error:error instanceof Error?error.message:'Неверный рабочий календарь'};}
  },[schedule,projectStart,workingScenarioOpen,weekPreset,customWeekdays,nonWorkingDates,extraWorkingDates,continuousWorkIds]);
+ const selectedLibrary=calendarLibrary.find(d=>d.id+'@'+d.version===libraryCalendarKey);
+ const latestLibraryVersions=new Map<string,number>();
+ for(const d of calendarLibrary){
+  latestLibraryVersions.set(d.id,Math.max(d.version,latestLibraryVersions.get(d.id)||0));
+ }
+ const applyCalendarRules=(draft:{weekdays:number[];excludedDates:string[];additionalWorkingDates:string[]})=>{
+  applyCalendarRules(draft);
+  setCalendarBasis(draft.calendarBasis??null);
+  setLibraryCalendarKey(draft.calendarBasis?
+   draft.calendarBasis.id+'@'+draft.calendarBasis.version:'');
+  setWorkingLimit(12);
+ };
+ const applyLibraryCalendar=()=>{
+  if(!selectedLibrary){setLibraryFeedback('Выберите редакцию календаря.');return;}
+  applyCalendarRules(selectedLibrary);
+  setCalendarBasis({id:selectedLibrary.id,version:selectedLibrary.version});
+  setLibraryCalendarName(selectedLibrary.name);
+  setLibrarySourceKind(selectedLibrary.source.kind);
+  setLibrarySourceReference(selectedLibrary.source.reference??'');
+  setLibraryFeedback('Применена редакция '+selectedLibrary.version+' к сценарию. '+
+    'Исходный план не изменён; запись в Store не выполнялась.');
+ };
+ const recordWorkCalendar=()=>{
+  if(workingScenario.error||!workingScenario.result?.calendar){
+   setLibraryFeedback('Исправьте календарные даты перед записью.');return;
+  }
+  const rules=workingScenario.result.calendar;
+  const input:WorkCalendarInput={
+   name:libraryCalendarName,weekdays:rules.weekdays,
+   excludedDates:rules.excludedDates,additionalWorkingDates:rules.additionalWorkingDates,
+   source:{kind:librarySourceKind,
+    reference:librarySourceKind==='document_reference'?librarySourceReference:null}
+  };
+  const result=onRecordWorkCalendar(input,selectedLibrary?
+   {id:selectedLibrary.id,version:selectedLibrary.version}:null);
+  if(result){
+   setLibraryCalendarKey(result.id+'@'+result.version);
+   setCalendarBasis(result);
+   setLibraryFeedback('Редакция '+result.version+' добавлена в черновик портфеля. '+
+    'Для записи на диск используйте «Сохранить» или Ctrl+S. '+
+    'Указание источника не означает официального утверждения.');
+  }else setLibraryFeedback('Календарь не добавлен. Проверьте сообщение Atlas.');
+ };
+ const pinnedCalendar=calendarBasis?
+  calendarLibrary.find(d=>d.id===calendarBasis.id&&d.version===calendarBasis.version):null;
+ const libraryRulesMatch=Boolean(pinnedCalendar&&workingScenario.result?.calendar&&
+  ['weekdays','excludedDates','additionalWorkingDates'].every(key=>
+   JSON.stringify((workingScenario.result.calendar as any)[key])===
+   JSON.stringify((pinnedCalendar as any)[key])));
+
  const selectedCalendarDraft=calendarDrafts.find(d=>d.id===calendarDraftId);
  const currentWorkIds=new Set(schedule.rows.map(row=>row.id));
  const missingCalendarWorkRefs=selectedCalendarDraft?
@@ -113,15 +176,23 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
    .filter(([id,on])=>on&&chosenIds.has(id))
    .map(([id])=>[id,'elapsed_days' as const]));
   const calendar=workingScenario.result.calendar;
+  if(calendarBasis&&!pinnedCalendar){
+   setCalendarFeedback('Связанная редакция календаря недоступна. '+
+    'Сначала выберите действительную редакцию либо создайте новый независимый вариант.');
+   return;
+  }
   const id=onSaveCalendarDraft({
    ...(calendarDraftId?{id:calendarDraftId}:{}),
    name:calendarDraftName,
    weekdays:calendar.weekdays,excludedDates:calendar.excludedDates,
-   additionalWorkingDates:calendar.additionalWorkingDates,modeByWork
+   additionalWorkingDates:calendar.additionalWorkingDates,modeByWork,
+   ...(libraryRulesMatch&&calendarBasis?{calendarBasis}:{})
   });
   if(id){
    setCalendarDraftId(id);
-   setCalendarFeedback('Вариант добавлен в черновик проекта. Нажмите Ctrl+S для записи на диск.');
+   setCalendarFeedback('Вариант добавлен в черновик проекта. Нажмите Ctrl+S для записи на диск.'+
+    (calendarBasis&&!libraryRulesMatch?
+     ' Календарные правила изменены: связь с исходной редакцией не присвоена.':''));
   }else setCalendarFeedback('Не удалось записать вариант в черновик. Проверьте сообщение Atlas.');
  };
  const deleteCalendarDraft=()=>{
@@ -288,6 +359,61 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
      <input type="text" value={extraWorkingDates} onChange={event=>{setExtraWorkingDates(event.target.value);setWorkingLimit(12)}}
       placeholder="2026-11-21" aria-label="Дополнительные рабочие даты через запятую"/>
     </label>
+   </details>
+   <details className="atlas-working-scenario-library">
+    <summary>Календари портфеля ({latestLibraryVersions.size})</summary>
+    <p className="minor">Это локальная библиотека рабочих дат для нескольких проектов.
+     Источник указывается пользователем, но Atlas не подтверждает его юридическую силу.
+     Редакции сохраняются отдельно; новая редакция не изменяет прежние сценарии.</p>
+    <div className="atlas-gantt-tools">
+     <label>Редакция календаря
+      <select aria-label="Редакция календаря портфеля" value={libraryCalendarKey}
+       onChange={event=>{setLibraryCalendarKey(event.target.value);setLibraryFeedback('');}}>
+       <option value="">Новый календарь</option>
+       {calendarLibrary.map(d=><option key={d.id+'@'+d.version} value={d.id+'@'+d.version}>
+        {d.name+' · редакция '+d.version}
+       </option>)}
+      </select>
+     </label>
+     <button type="button" className="action-button" disabled={!selectedLibrary}
+      onClick={applyLibraryCalendar}>Применить редакцию в сценарии</button>
+    </div>
+    <div className="atlas-gantt-tools">
+     <label className="atlas-working-scenario-search">Название календаря
+      <input type="text" aria-label="Название календаря портфеля"
+       value={libraryCalendarName} maxLength={120}
+       onChange={event=>setLibraryCalendarName(event.target.value)}/>
+     </label>
+     <label>Основание
+      <select aria-label="Основание календаря портфеля" value={librarySourceKind}
+       onChange={event=>setLibrarySourceKind(event.target.value as 'entered_by_user'|'document_reference')}>
+       <option value="entered_by_user">Введён пользователем</option>
+       <option value="document_reference">Указан документ</option>
+      </select>
+     </label>
+     {librarySourceKind==='document_reference'&&<label className="atlas-working-scenario-search">
+      Ссылка или реквизиты документа
+      <input type="text" aria-label="Источник календаря портфеля"
+       maxLength={320} value={librarySourceReference}
+       onChange={event=>setLibrarySourceReference(event.target.value)}/>
+     </label>}
+    </div>
+    <div className="atlas-gantt-tools">
+     <button type="button" className="action-button"
+      disabled={!!workingScenario.error||!libraryCalendarName.trim()||
+       (librarySourceKind==='document_reference'&&!librarySourceReference.trim())}
+      onClick={recordWorkCalendar}>
+      {selectedLibrary?'Создать новую редакцию календаря':'Добавить календарь в портфель'}
+     </button>
+     {selectedLibrary&&<span className="minor">После записи редакции {latestLibraryVersions.get(selectedLibrary.id)!==selectedLibrary.version?
+      'выберите последнюю редакцию для изменения':'предыдущие редакции останутся доступными'}.</span>}
+    </div>
+    {calendarBasis&&<p className="minor">
+     Основа сценария: редакция {calendarBasis.version}.
+     {libraryRulesMatch?' Правила совпадают с источником.':
+      ' Правила отличаются; при сохранении варианта ссылка на источник не присваивается.'}
+    </p>}
+    {libraryFeedback&&<p className="minor" role="status">{libraryFeedback}</p>}
    </details>
    <details className="atlas-working-scenario-saved">
     <summary>Сохранённые календарные варианты ({calendarDrafts.length})</summary>
