@@ -4,7 +4,7 @@ import {invoke as nativeInvoke,isTauri} from "@tauri-apps/api/core";
 import {getCurrentWindow} from "@tauri-apps/api/window";
 import {empty,deserialize,serialize,editItem,removeStage,removeItem,disconnect,
  upsertCalendarDraft,removeCalendarDraft,resolveCalendarDraftMissingWorkRefs,
- removeProject as dropProject} from "../../src/core.mjs";
+ createWorkCalendar,reviseWorkCalendar,removeProject as dropProject} from "../../src/core.mjs";
 import {removePortfolioLink} from "../../src/portfolio.mjs";
 import {editorSpec,applyEditor,editorSelectionFields,filterWorkPickerOptions,PROJECT_TYPE_LABELS} from "../../src/editor.mjs";
 import {compareProject,decideChange} from "../../src/trace.mjs";
@@ -2704,6 +2704,19 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
        portfolioStart={projected?.projectedStart||null} shiftDays={projected?.shiftDays??null}
        unavailableOrigins={projected?.unavailableOrigins||[]}
        calendarDrafts={project.calendarDrafts||[]}
+       calendarLibrary={data.calendarLibrary||[]}
+       onRecordWorkCalendar={(record,basis)=>{
+        if(busyRef.current||!ready||!requireClosedForm())return null;
+        try{
+         const source=latestSnapshot.current;
+         const result=basis?
+          reviseWorkCalendar(source,basis.id,basis.version,record):
+          createWorkCalendar(source,record);
+         mutate(result.state,"Календарь портфеля добавлен в черновик. "+
+          "Для записи на диск нажмите «Сохранить».");
+         return {id:result.id,version:result.version};
+        }catch(error){issue(error);return null}
+       }}
        onSaveCalendarDraft={draft=>{
         if(busyRef.current||!ready||!requireClosedForm())return null;
         try{
