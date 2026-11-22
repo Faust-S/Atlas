@@ -32,7 +32,7 @@ export function projectedFinishLabel(row){
 }
 
 // A dependency means successor may start only after the predecessor's CPM finish.
-// The estimate is calendar-day only, does not account for people/capacity/acceptance.
+// The estimate uses the canonical calendar-aware CPM, not capacity or acceptance.
 export function portfolioSchedule(snapshot) {
  const order=validatePortfolioLinks(snapshot), projects=new Map(snapshot.projects.map(p=>[p.id,p]));
  const inputs=new Map(order.map(id=>[id,[]]));
@@ -40,9 +40,9 @@ export function portfolioSchedule(snapshot) {
  const byId=new Map();
  for(const id of order){
   const p=projects.get(id),incoming=inputs.get(id);
-  const plan=scheduleProject(p);
-  const hasEstimate=p.items.length>0;
   const plannedStartDay=day(p.startDate),dueDay=day(p.dueDate);
+  const plannedPlan=scheduleProject(p,{calendarLibrary:snapshot.calendarLibrary??[]});
+  const hasEstimate=p.items.length>0;
   const parents=incoming.map(from=>byId.get(from));
   const missingParents=parents.filter(row=>row.projectedFinishDay===null);
   // A paused/cancelled predecessor cannot promise a delivery date. Preserve
@@ -59,10 +59,16 @@ export function portfolioSchedule(snapshot) {
    if(incoming.length) projectedStartDay=plannedStartDay===null?upstreamReadyDay:Math.max(plannedStartDay,upstreamReadyDay);
    else projectedStartDay=plannedStartDay;
   }
-  const projectedFinishDay=projectedStartDay!==null && hasEstimate && projectedStartDay+plan.durationDays<=MAX_DAY ?
-   projectedStartDay+plan.durationDays : null;
-  const plannedFinishDay=plannedStartDay!==null && hasEstimate && plannedStartDay+plan.durationDays<=MAX_DAY ?
-   plannedStartDay+plan.durationDays : null;
+  // Re-evaluate at the dependency-adjusted START: a Mon-Fri work can have
+  // different elapsed days when another project shifts its start to Friday.
+  // Never add the original duration to an unrelated projected calendar date.
+  const projectedPlan=projectedStartDay!==null&&hasEstimate?
+   scheduleProject(p,{calendarLibrary:snapshot.calendarLibrary??[],
+    startDate:dateOf(projectedStartDay)}):null;
+  const projectedFinishDay=projectedPlan?.estimatedFinish?
+   day(projectedPlan.estimatedFinish):null;
+  const plannedFinishDay=plannedStartDay!==null&&hasEstimate&&plannedPlan.estimatedFinish?
+   day(plannedPlan.estimatedFinish):null;
   const shiftDays=plannedStartDay!==null && projectedStartDay!==null ? projectedStartDay-plannedStartDay : null;
   const deadlineSlipDays=dueDay!==null && projectedFinishDay!==null ? Math.max(0,projectedFinishDay-dueDay) : null;
   const limitingParents=upstreamReadyDay!==null?parents.filter(row=>row.projectedFinishDay===upstreamReadyDay).map(row=>row.id):[];
@@ -87,7 +93,8 @@ export function portfolioSchedule(snapshot) {
   if(p.status==="completed")notes.push("Завершение проекта заявлено, независимая приёмка не установлена");
   byId.set(id,{
    id,name:p.name,status:p.status,declaredStart:p.startDate||null,deadline:p.dueDate||null,
-   durationDays:plan.durationDays,hasEstimate,plannedFinish:dateOf(plannedFinishDay),
+   durationDays:projectedPlan?.durationDays??plannedPlan.durationDays,hasEstimate,
+   plannedFinish:dateOf(plannedFinishDay),
    projectedStart:dateOf(projectedStartDay),projectedFinish:dateOf(projectedFinishDay),
    projectedFinishDay,upstreamReady:dateOf(upstreamReadyDay),missingParents:missingParents.map(x=>x.id),
    unavailableOrigins,
@@ -123,7 +130,7 @@ export function renderPortfolioSchedule(snapshot, escape=escapeHtml){
   '<p class="muted">Исходная дата → CPM по работам → расчётный срок с учётом зависимостей между проектами. Утверждённые изменения учитываются через связанные плановые работы; автоматического переноса сроков нет.</p>'+
   '<div class="atlas-kpis"><div><small>Расчётные сроки</small><strong>'+result.totals.dated+'</strong></div><div><small>Нужен пересмотр плана</small><strong>'+result.totals.needsReview+'</strong></div><div><small>Риск нарушения срока</small><strong>'+result.totals.deadlineRisks+'</strong></div><div><small>Недостаточно дат</small><strong>'+result.totals.unknown+'</strong></div></div>'+
   '<div class="atlas-table-scroll"><table class="atlas-table"><thead><tr><th>Проект</th><th>Начало по плану</th><th>CPM, дни</th><th>Финиш локально</th><th>Начало с зависимостями</th><th>Финиш расчётный</th><th>Контрольная дата</th><th>Отклонение</th><th>Основание</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
-  '<p class="muted">CPM: календарные дни, без ресурсного выравнивания. Оценки не подтверждают фактическое исполнение.</p></section>';
+  '<p class="muted">CPM: рабочие и календарные длительности по выбранным календарям, без ресурсного выравнивания. Оценки не подтверждают фактическое исполнение.</p></section>';
 }
 export function renderProjectSchedule(snapshot,projectId,escape=escapeHtml){
  const result=portfolioSchedule(snapshot),r=result.byId.get(projectId);
