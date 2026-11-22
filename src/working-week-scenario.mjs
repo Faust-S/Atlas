@@ -271,8 +271,11 @@ export function previewOperationCalendars(plan,{
  const lastBaselineIndex=plan.rows.length?Math.max(...plan.rows.map(row=>
   row.earlyFinish>row.earlyStart?row.earlyFinish-1:row.earlyStart)):null;
  const baselineLast=lastBaselineIndex===null?null:addCivilDays(start,lastBaselineIndex);
- const scenarioLast=rows.length?rows.reduce((latest,row)=>
-  !latest||row.completionDate&&row.completionDate>latest?row.completionDate:latest,null):null;
+ // If one branch escapes the four-digit calendar, the project finish
+ // is unknown. Returning the latest OTHER branch would be a false forecast.
+ const scenarioLast=rows.length&&rows.every(row=>row.completionDate!==null)?
+  rows.reduce((latest,row)=>
+   !latest||row.completionDate>latest?row.completionDate:latest,null):null;
  // A date outside the four-digit range is unavailable. Do not fabricate a
  // shorter date or claim "on time" for that row.
  const boundary=ends.size?Math.max(...ends.values()):null;
