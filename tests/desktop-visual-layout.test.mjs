@@ -210,6 +210,20 @@ test('Gantt exposes saved typed calendars through native project drafts without 
  const desktop=readFileSync(new URL('../desktop/src/main.tsx',import.meta.url),'utf8');
  const core=readFileSync(new URL('../src/core.mjs',import.meta.url),'utf8');
  assert.match(ui,/Сохранённые календарные варианты/);
+ assert.match(ui,/Календари портфеля/);
+ assert.match(ui,/Применить редакцию в сценарии/);
+ assert.match(ui,/Добавить календарь в портфель/);
+ assert.match(ui,/Создать новую редакцию календаря/);
+ assert.match(ui,/Указание источника не означает официального утверждения/);
+ assert.match(ui,/calendarBasis/);
+ assert.match(ui,/libraryRulesMatch/);
+ assert.match(ui,/onRecordWorkCalendar\(input,selectedLibrary/);
+ assert.match(desktop,/calendarLibrary=\{data.calendarLibrary\|\|\[\]\}/);
+ assert.match(desktop,/createWorkCalendar\(source,record\)/);
+ assert.match(desktop,/reviseWorkCalendar\(source,basis.id,basis.version,record\)/);
+ assert.match(core,/export function createWorkCalendar\(/);
+ assert.match(core,/export function reviseWorkCalendar\(/);
+ assert.match(core,/export function workCalendarRevision\(/);
  assert.ok(ui.indexOf('className="atlas-working-scenario-saved"')<
   ui.indexOf('workingScenario.result?.available&&workingScenario.result.rows.length>0'),
   "Saved variants must appear before the long scrollable work list in compact Windows");
