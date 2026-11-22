@@ -10,6 +10,7 @@ import copy
 import importlib.util
 import json
 import os
+import subprocess
 import sys
 import time
 import zipfile
@@ -124,6 +125,7 @@ def qualify():
     assert d.head()==baseline and d.saved_project(baseline)==original,(
         "Applying Work calendar bypassed explicit Save")
     d.wait_text("Работы проекта",35)
+    d.set_text("Найти работу",TITLE)
     d.wait_text("раб. дн.",35)
     v.capture("atlas10-typed-work-table-before-native-save")
     d.click_button("Сохранить")
@@ -138,6 +140,23 @@ def qualify():
     assert actual["estimateDays"]==before_work["estimateDays"]
     assert actual["durationUnit"]=="working_days" and actual["calendarBasis"]==basis
     assert saved["root"]["calendarLibrary"]==library
+    # Independent Node invocation of the existing canonical scheduler is
+    # the numerical oracle. The GUI must display those exact dates.
+    oracle=(
+        'import {scheduleProject} from "./src/planning.mjs";'
+        'let data="";for await(const part of process.stdin)data+=part;'
+        'const x=JSON.parse(data);'
+        'const plan=scheduleProject(x.project,{calendarLibrary:x.calendars});'
+        'const row=plan.rows.find(r=>r.id===x.workId);'
+        'if(!row||!row.startDate||!row.finishDate)process.exit(5);'
+        'console.log(JSON.stringify({start:row.startDate,finish:row.finishDate}));'
+    )
+    checked=subprocess.run(["node","--input-type=module","-e",oracle],
+        input=json.dumps({"project":stored,"calendars":library,"workId":WORK_ID}),
+        capture_output=True,text=True,check=True,
+        cwd=Path(__file__).resolve().parents[2])
+    expected_dates=json.loads(checked.stdout)
+    assert expected_dates["finish"]>=expected_dates["start"]
     print("ATLAS10_INSTALLED_TYPED_WORK_SAVE_READBACK_PASS",flush=True)
     v.capture("atlas10-typed-work-native-saved")
 
@@ -149,6 +168,8 @@ def qualify():
     open_work()
     d.wait_text("раб. дн.",35)
     d.wait_text("CPM:",35)
+    d.wait_text(expected_dates["start"],35)
+    d.wait_text(expected_dates["finish"],35)
     v.capture("atlas10-typed-work-native-cold-table")
     d.click_button("График")
     d.wait_text("График работ",35)
