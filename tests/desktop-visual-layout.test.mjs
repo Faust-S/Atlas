@@ -309,8 +309,9 @@ test('the installed project Gantt explains paused plans and portfolio shifts wit
  const main=readFileSync(new URL('../desktop/src/main.tsx',import.meta.url),'utf8');
  assert.match(chart,/Развёрнутый график работ/);
  assert.match(chart,/Пока проект приостановлен или отменён/);
- assert.match(chart,/Из-за связей с другими проектами расчётное начало сдвинулось/);
- assert.match(chart,/Для переноса работ нужно отдельно изменить план/);
+ assert.match(chart,/Прогноз по портфелю: начало/);
+ assert.match(chart,/Записанный план и даты проекта не изменены/);
+ assert.match(main,/recordedStart=\{project\.startDate\|\|null\}/);
  assert.doesNotMatch(chart,/Развёрнутый график CPM/);
  assert.doesNotMatch(chart,/календарный план CPM/);
  assert.doesNotMatch(chart,/исходный CPM от планового старта/);
