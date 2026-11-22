@@ -12,6 +12,9 @@ on:
       - 'desktop/tests/installed-atlas09-qualification.py'
       - 'desktop/tests/installed-atlas10-calendar-scenario.py'
       - 'desktop/tests/installed-atlas10-typed-work.py'
+      - 'desktop/tests/installed-atlas10-portfolio-forecast.py'
+      - 'tests/fixtures/atlas10-portfolio-forecast.mjs'
+      - 'src/project-schedule-view.mjs'
       - 'desktop/src/**'
       - 'desktop/vite.config.ts'
       - 'desktop/index.html'
@@ -100,6 +103,12 @@ jobs:
             throw 'ATLAS09_FIXTURE_CARRIER_FAILED'
           }
           "ATLAS06_VISUAL_IWXA=$archive" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          $shifted = Join-Path $env:RUNNER_TEMP "atlas10-portfolio-forecast.iwxa"
+          node tests/fixtures/atlas10-portfolio-forecast.mjs $shifted
+          if ($LASTEXITCODE -ne 0 -or !(Test-Path -LiteralPath $shifted)) {
+            throw "ATLAS10_PORTFOLIO_FORECAST_FIXTURE_FAILED"
+          }
+          "ATLAS10_PORTFOLIO_FORECAST_IWXA=$shifted" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Install independent native Windows accessibility driver
         shell: pwsh
@@ -113,6 +122,7 @@ jobs:
           python -m py_compile desktop/tests/installed-atlas09-qualification.py
           python -m py_compile desktop/tests/installed-atlas10-calendar-scenario.py
           python -m py_compile desktop/tests/installed-atlas10-typed-work.py
+          python -m py_compile desktop/tests/installed-atlas10-portfolio-forecast.py
           if ($LASTEXITCODE -ne 0) { throw 'ATLAS09_NATIVE_WITNESS_SYNTAX_FAILED' }
 
       - name: Verify exact release-candidate installer SHA-256
@@ -144,6 +154,13 @@ jobs:
         run: |
           python desktop/tests/installed-atlas10-typed-work.py
           if ($LASTEXITCODE -ne 0) { throw 'ATLAS10_TYPED_WORK_NATIVE_IWXA_FAILED' }
+
+      - name: Qualify installed 0.10 forecast across portfolio, Work and Gantt after cold restart
+        shell: pwsh
+        timeout-minutes: 8
+        run: |
+          python desktop/tests/installed-atlas10-portfolio-forecast.py
+          if ($LASTEXITCODE -ne 0) { throw 'ATLAS10_PORTFOLIO_FORECAST_WINDOWS_FAILED' }
 
       - name: Keep Windows screen evidence on success or failure
         if: always()
