@@ -1519,6 +1519,9 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 
 
 /* Agent-v6 contextual inspector: true split pane, selectable Work/Source/Baseline tabs. */
+.atlas-v6-preview-slot{display:flex;flex:1;flex-direction:column;min-height:0}
+.atlas-v6-preview-slot[hidden]{display:none!important}
+.atlas-v6-preview-primary-actions{margin:9px 0 13px}
 .atlas-v6-preview{display:flex;flex:1;flex-direction:column;min-height:0;margin:-16px -15px}
 .atlas-v6-dock-header{display:flex;align-items:center;justify-content:space-between;gap:9px;
  min-height:53px;padding:8px 13px 8px 17px;border-bottom:1px solid #d1deed;flex:0 0 auto}
