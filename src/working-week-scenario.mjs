@@ -84,9 +84,10 @@ export function previewWorkingWeek(plan,{startDate=null,weekdays=DEFAULT_WEEKDAY
  const dates=[];
  let daysScanned=0,skippedHolidays=0;
  let at=start;
- // With >=1 allowed weekday, this finite bound covers all 36500 offsets,
- // up to 1000 excluded calendar dates and an arbitrary non-working start.
- const maxScans=(plan.durationDays+1)*7+config.excluded.size+14;
+ // For a one-day working week EACH excluded eligible day can cost seven
+ // more civil days. Multiply the holiday allowance, not just its count.
+ // This stays bounded even for the 36,500-day maximum and 1,000 holidays.
+ const maxScans=(plan.durationDays+config.excluded.size+2)*7+7;
  while(dates.length<=plan.durationDays && daysScanned<maxScans){
   const day=new Date(at);
   const label=dateAt(at);
