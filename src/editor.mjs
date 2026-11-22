@@ -198,10 +198,10 @@ export function editorSpec(project,action,snapshot=null){
    }));
    const first=project.items[0],shown=presets[first.id];
    return {title:"Изменить работу: "+change.title,
-    hint:context+" При смене работы её поля загружаются заново, чтобы не применять параметры другой работы.",
+    hint:context+" При смене работы её поля загружаются заново. Длительность измеряется в уже записанных единицах выбранной Work: календарных или рабочих днях; редакция календаря закрепляется при создании заявки.",
     selectionPresets:{name:"itemId",values:presets},fields:[
     choice("itemId","Работа",workItems(project),first.id),
-    field("estimateDays","Новая оценка, календарных дней","number",shown.estimateDays),
+    field("estimateDays","Новая длительность в единицах выбранной работы","number",shown.estimateDays),
     field("assignee","Ответственный (имя или роль)","text",shown.assignee,false),
     choice("resourceId","Плановый ресурс",resourceChoiceOptions(snapshot),shown.resourceId,false),
     field("allocationPct","Доля ресурса на этой работе, %","number",shown.allocationPct),
