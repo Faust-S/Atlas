@@ -1063,3 +1063,26 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
    in document flow rather than pinning them to the wrong scroll root. */
 @media(max-width:760px){.atlas-work-filter-shortcut{position:static}}
 @media(max-width:560px){.atlas-compact-tabs{position:static;box-shadow:none}}
+
+/* Optional planning hypothesis: stays inside the existing Atlas blue theme.
+   No extra window or permanent panel until the user asks for comparison. */
+.atlas-working-scenario{margin:5px 0 14px;padding:12px 14px;border:1px solid #cbdaf0;
+ background:#f5f9ff;border-radius:10px;min-width:0}
+.atlas-working-scenario>.minor{margin:8px 0 10px}
+.atlas-working-scenario-dates{display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+ font-size:13px;color:#385879;max-width:100%}
+.atlas-working-scenario-dates input{width:min(310px,100%);min-height:38px;border:1px solid #c2d3e9;
+ border-radius:7px;background:#fff;color:#24405f;padding:6px 10px;font-size:13px}
+.atlas-working-scenario .summary-line{flex-wrap:wrap;gap:7px 16px;margin:8px 0}
+.atlas-working-scenario-rows{display:grid;gap:3px;max-height:225px;overflow-y:auto;
+ border-top:1px solid #dce7f3;padding-top:7px}
+.atlas-working-scenario-row{display:grid;grid-template-columns:minmax(115px,1fr) minmax(185px,1fr) 64px;
+ align-items:center;gap:8px;font-size:12px;min-width:0}
+.atlas-working-scenario-row .action-button{font-size:12px;text-align:left;white-space:normal;overflow-wrap:anywhere}
+.atlas-working-scenario-row span{overflow-wrap:anywhere}
+.atlas-working-scenario-row small{color:#4d627d;text-align:right}
+@media(max-width:680px){
+ .atlas-working-scenario-row{grid-template-columns:minmax(0,1fr);gap:3px;padding:6px 0;
+  border-bottom:1px solid #e0eaf6}
+ .atlas-working-scenario-row small{text-align:left}
+}
