@@ -106,6 +106,8 @@ def qualify():
     d.wait_text("Найдено проектов: 1",35)
     click_named("Открыть найденный проект "+v.PROJECT,"Button")
     d.wait_text("Схема проекта: каталоги, работы и этапы",35)
+    # Collapse the optional secondary navigation before opening the split dock.
+    click_named("Показать или скрыть левую панель","Button")
     # One rail navigation action must show the actual existing project Gantt.
     click_named("График работ","Button")
     d.wait_text("Сценарий: рабочая неделя",35)
