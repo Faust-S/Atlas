@@ -39,7 +39,7 @@ function daysFrom(start,days) {
  * durationDays at project level is also civil days, whereas row.durationDays
  * is a work's entered amount in its declared unit.
  */
-export function scheduleProject(p,{calendarLibrary=[],startDate=undefined}={}) {
+export function scheduleProject(p,{calendarLibrary=[],startDate=undefined,includeResourceOccupancy=false}={}) {
   if (!p || !Array.isArray(p.items) || !Array.isArray(p.dependencies))
     throw new Error('Invalid project');
   const items=p.items;
@@ -102,19 +102,41 @@ export function scheduleProject(p,{calendarLibrary=[],startDate=undefined}={}) {
     if(unit!=='elapsed_days'&&unit!=='working_days')throw Error('Invalid work duration unit');
     const ready=Math.max(0,...incoming.get(id).map(parent=>times.get(parent).earlyFinish));
     let es=ready,ef=ready;
-    if(duration>0&&unit==='elapsed_days')ef=ready+duration;
+    // Resource occupancy is an opt-in projection from this same canonical CPM,
+    // never a parallel planner. Compact ranges skip nonworking dates and cost
+    // nothing for ordinary Gantt/table scheduling calls.
+    let activeRanges=null;
+    const forResource=includeResourceOccupancy===true&&Boolean(item.resourceId);
+    if(duration>0&&unit==='elapsed_days'){
+      ef=ready+duration;
+      if(forResource)activeRanges=[[es,ef]];
+    }
     if(unit==='working_days'){
       const dates=calendarFor(item);
       if(duration>0){
         const first=lowerBound(dates,ready),last=first+duration-1;
         if(last>=dates.length)throw Error('Project schedule exceeds supported calendar horizon');
         es=dates[first];ef=dates[last]+1;
+        if(forResource){
+          // The canonical dates array already knows the pinned calendar's
+          // weekdays, exceptions and extra working dates. Compress contiguous
+          // occupied days into half-open ranges [start,end) for resource load.
+          activeRanges=[];
+          let from=dates[first],until=from+1;
+          for(let index=first+1;index<=last;index++){
+            const active=dates[index];
+            if(active===until)until++;
+            else {activeRanges.push([from,until]);from=active;until=active+1;}
+          }
+          activeRanges.push([from,until]);
+        }
       }
     }
     if(ef>MAX_DAYS)throw Error('Project schedule exceeds supported horizon');
     times.set(id,{durationDays:duration,durationUnit:unit,
       calendarBasis:unit==='working_days'?{...item.calendarBasis}:null,
-      elapsedDays:ef-es,earlyStart:es,earlyFinish:ef});
+      elapsedDays:ef-es,earlyStart:es,earlyFinish:ef,
+      ...(forResource?{activeRanges:activeRanges??[]}: {})});
     durationDays=Math.max(durationDays,ef);
   }
   for(const id of [...order].reverse()){
