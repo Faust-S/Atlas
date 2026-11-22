@@ -188,6 +188,11 @@ test('working-week preview puts the result first, supports full work search, and
  assert.match(block,/Показать ещё работы/);
  assert.match(block,/aria-pressed=\{row\.durationMode==='elapsed_days'\}/);
  assert.match(block,/Без выходных/);
+ assert.match(block,/ref=\{workingRowsRef\}/);
+ assert.match(block,/setWorkingLastToggledId\(row\.id\)/);
+ assert.match(block,/workingRowsRef\.current\?\.scrollTo\(\{top:0,behavior:'auto'\}\)/);
+ assert.match(ts,/Number\(b\.id===workingLastToggledId\)-Number\(a\.id===workingLastToggledId\)/);
+ assert.match(ts,/Number\(b\.durationMode==='elapsed_days'\)-Number\(a\.durationMode==='elapsed_days'\)/);
  assert.match(block,/Дополнительные рабочие даты/);
  assert.match(block,/aria-label="Закрыть календарный сценарий"/);
  assert.match(block,/setWorkingScenarioOpen\(false\);workingToggleRef\.current\?\.focus\(\)/);
