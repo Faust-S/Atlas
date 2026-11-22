@@ -2629,11 +2629,14 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
         {deadlineRiskDetails.has(w.id)&&<div className="atlas-work-deadline-context"
          role="group" aria-label={"Почему нарушается срок работы "+w.title}>
          <small>Отставание от контрольного срока: {deadlineRiskDetails.get(w.id)!.daysLate} дн.
-          {" "}Оценка длительности: {deadlineRiskDetails.get(w.id)!.durationDays} дн.</small>
+          {" "}Оценка длительности: {deadlineRiskDetails.get(w.id)!.durationDays} {deadlineRiskDetails.get(w.id)!.durationUnit==="working_days"?"раб. дн.":"кал. дн."}</small>
+         {deadlineRiskDetails.get(w.id)!.calendarWaitDays>0&&<small>
+          Ожидание ближайшего рабочего дня: {deadlineRiskDetails.get(w.id)!.calendarWaitDays} кал. дн.
+         </small>}
          {deadlineRiskDetails.get(w.id)!.critical&&<small>Работа на критическом пути проекта.</small>}
          {deadlineRiskDetails.get(w.id)!.drivers.length>0?
           <div className="atlas-work-deadline-drivers">
-           <small>Начало определяют предшествующие работы:</small>
+           <small>Предшественники, ограничивающие начало с учётом рабочего календаря:</small>
            {deadlineRiskDetails.get(w.id)!.drivers.map((driver:any)=>
             <button key={driver.id} type="button" className="text-link"
              aria-label={"Открыть работу, определяющую срок "+driver.title}
