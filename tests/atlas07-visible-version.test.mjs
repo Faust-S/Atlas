@@ -13,7 +13,11 @@ test("Atlas displayed version follows the packaged standalone version, not the p
  assert.match(ui,/atlasPackage\.version\.includes\("-"\)\?" \(разработка\)":""/);
  assert.match(ui,/<h1>IWXA Atlas <em>\{atlasVersionLabel\}<\/em><\/h1>/);
  assert.match(ui,/<strong>Atlas<\/strong><small>IWXA · \{atlasVersionLabel\}<\/small>/);
- assert.match(ui,/<footer className="workspace-footer"><span>IWXA Atlas \{atlasVersionLabel\}/);
+ assert.match(ui,/<AtlasSettings version=\{atlasPackage\.version\}/);
+ const settings=read("../desktop/src/AtlasSettings.tsx");
+ assert.match(settings,/Установленная версия/);
+ assert.match(settings,/>\{p\.version\}<\/span>/);
+ assert.doesNotMatch(ui,/<footer className="workspace-footer"><span>IWXA Atlas/);
  assert.doesNotMatch(ui,/0\.6\.0-dev\.1|IWXA Atlas 0\.6 · проекты хранятся/);
 });
 test("Catalog results announce a real accessibility group and Windows checks visible folder text",()=>{
