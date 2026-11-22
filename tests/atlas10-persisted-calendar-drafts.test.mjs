@@ -125,12 +125,42 @@ test("invalid imported scenario draft never reaches Store",()=>{
  const r=upsertCalendarDraft(s,pid,example());
  for(const breakIt of [
   d=>{d.weekdays=[0,0];},d=>{d.excludedDates=["tomorrow"];},
-  d=>{d.modeByWork={missing:"working_days"};},
+  d=>{d.modeByWork={missing:"invalid_mode"};},
   d=>{d.version=-1;},d=>{d.id="";},d=>{d.name="   ";}
  ]){
   const clone=structuredClone(r.state);breakIt(clone.projects[0].calendarDrafts[0]);
   assert.throws(()=>deserialize(JSON.stringify(clone)),/Invalid/);
  }
+});
+
+test("old Atlas 0.8 may leave orphan references: import preserves evidence and requires explicit repair",async()=>{
+ const {s,pid,a,b}=setup();
+ const stored=upsertCalendarDraft(s,pid,example({modeByWork:{
+  [a]:"working_days",[b]:"elapsed_days"
+ }}));
+ const legacy=structuredClone(stored.state);
+ legacy.projects[0].items=legacy.projects[0].items.filter(w=>w.id!==b);
+ legacy.revision++; // historical Atlas 0.8 work deletion preserved unknown fields
+ const before=JSON.stringify(legacy);
+ const imported=deserialize(JSON.stringify(legacy));
+ const {missingCalendarDraftWorkIds,resolveCalendarDraftMissingWorkRefs}=
+  await import("../src/core.mjs");
+ assert.equal(serialize(imported),serialize(legacy));
+ assert.equal(JSON.stringify(legacy),before);
+ assert.deepEqual(missingCalendarDraftWorkIds(imported.projects[0],stored.id),[b]);
+ assert.throws(()=>upsertCalendarDraft(imported,pid,{...example({id:stored.id})}),
+  /Сначала подтвердите очистку ссылок/);
+ const fixed=resolveCalendarDraftMissingWorkRefs(imported,pid,stored.id);
+ assert.deepEqual(fixed.removed,[b]);
+ assert.equal(fixed.state.revision,imported.revision+1);
+ assert.equal(fixed.state.projects[0].calendarDrafts[0].version,2);
+ assert.deepEqual(fixed.state.projects[0].calendarDrafts[0].modeByWork,{[a]:"working_days"});
+ assert.deepEqual(missingCalendarDraftWorkIds(fixed.state.projects[0],stored.id),[]);
+ assert.equal(serialize(imported),serialize(legacy));
+ assert.deepEqual(deserialize(serialize(fixed.state)),fixed.state);
+ const repeat=resolveCalendarDraftMissingWorkRefs(fixed.state,pid,stored.id);
+ assert.equal(repeat.state,fixed.state);
+ assert.deepEqual(repeat.removed,[]);
 });
 
 test("remove work also retires its named calendar override, not the unrelated entries",()=>{
