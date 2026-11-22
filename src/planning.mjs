@@ -2,8 +2,8 @@
  * Project scheduling view over already-owned Atlas project items.
  * Uses Marcel Klehr's MIT topological sort; does not execute tasks, alter
  * external sources or infer accepted project/release readiness.
- * All durations are elapsed calendar days. Resource leveling, working-day
- * calendars, lags, and constrained deadlines are NOT implemented.
+ * Elapsed and explicit pinned working-day durations share one CPM.
+ * Resource leveling, lags and constrained deadlines are NOT implemented.
  */
 import toposort from './vendor/toposort.mjs';
 const MAX_DAYS = 36500;
@@ -29,53 +29,124 @@ function daysFrom(start,days) {
   if(!Number.isFinite(at.getTime())||at.getUTCFullYear()>9999)return null;
   return at.toISOString().slice(0,10);
 }
-export function scheduleProject(p) {
-  if (!p || !Array.isArray(p.items) || !Array.isArray(p.dependencies)) throw new Error('Invalid project');
-  const items = p.items;
-  if (items.length > 5000) throw new Error('Project scheduling limit: 5000 work items');
-  const ids = items.map(item => item.id);
-  const set = new Set(ids);
-  if (set.size !== ids.length) throw new Error('Duplicate work item ID');
-  const edges = p.dependencies.map(e=>{
-    const a = e.from ?? e.fromId;
-    const b = e.to ?? e.toId;
-    if (!set.has(a) || !set.has(b)) throw new Error('Dependency references missing item');
-    return [a,b];
+/**
+ * The one canonical Atlas project CPM. Elapsed works and explicitly pinned
+ * working-day works share ONE topological pass, ONE date/float result and one
+ * dependency DAG. No resource-leveling or actual completion is inferred.
+ *
+ * startDate override is for the existing portfolio projected-start route.
+ * All early/late offsets are civil calendar days from this exact start;
+ * durationDays at project level is also civil days, whereas row.durationDays
+ * is a work's entered amount in its declared unit.
+ */
+export function scheduleProject(p,{calendarLibrary=[],startDate=undefined}={}) {
+  if (!p || !Array.isArray(p.items) || !Array.isArray(p.dependencies))
+    throw new Error('Invalid project');
+  const items=p.items;
+  if(items.length>5000)throw Error('Project scheduling limit: 5000 work items');
+  const ids=items.map(item=>item.id),set=new Set(ids);
+  if(set.size!==ids.length)throw Error('Duplicate work item ID');
+  const edges=p.dependencies.map(edge=>{
+    const from=edge.from??edge.fromId,to=edge.to??edge.toId;
+    if(!set.has(from)||!set.has(to))throw Error('Dependency references missing item');
+    return [from,to];
   });
-  const order = toposort.array(ids,edges);
-  const byId = new Map(items.map(item=>[item.id,item]));
-  const incoming = new Map(ids.map(id=>[id,[]]));
-  const outgoing = new Map(ids.map(id=>[id,[]]));
-  for (const [a,b] of edges) { outgoing.get(a).push(b); incoming.get(b).push(a); }
-  const times = new Map();
-  let durationDays = 0;
-  for (const id of order) {
-    const duration = plannedDuration(byId.get(id));
-    const es = Math.max(0,...incoming.get(id).map(parent=>times.get(parent).earlyFinish));
-    const ef = es + duration;
-    if (ef > MAX_DAYS) throw new Error('Project schedule exceeds supported horizon');
-    times.set(id,{durationDays:duration,earlyStart:es,earlyFinish:ef});
-    durationDays = Math.max(durationDays,ef);
+  const order=toposort.array(ids,edges);
+  const byId=new Map(items.map(item=>[item.id,item]));
+  const incoming=new Map(ids.map(id=>[id,[]]));
+  const outgoing=new Map(ids.map(id=>[id,[]]));
+  for(const [a,b] of edges){outgoing.get(a).push(b);incoming.get(b).push(a);}
+  const start=optionalStartDate(startDate===undefined?p.startDate??null:startDate);
+  const DAY=86400000;
+  const startMs=start?.getTime()??null;
+  const calendars=new Map();
+  // Indexed shared calendars, not a second graph or separate scheduling engine.
+  const catalog=new Map((calendarLibrary??[]).map(c=>[c.id+'@'+c.version,c]));
+  const lowerBound=(arr,value)=>{
+    let low=0,high=arr.length;
+    while(low<high){
+      const mid=Math.floor((low+high)/2);
+      if(arr[mid]<value)low=mid+1;else high=mid;
+    }
+    return low;
+  };
+  const calendarFor=item=>{
+    if((item.durationUnit??'elapsed_days')!=='working_days')return null;
+    if(startMs===null)throw Error('Для рабочих дней установите дату начала проекта');
+    const basis=item.calendarBasis;
+    if(!basis||typeof basis.id!=='string'||!Number.isSafeInteger(basis.version))
+      throw Error('Рабочей операции требуется редакция календаря');
+    const key=basis.id+'@'+basis.version;
+    if(calendars.has(key))return calendars.get(key);
+    const def=catalog.get(key);
+    if(!def)throw Error('Указанная редакция рабочего календаря недоступна');
+    if(!Array.isArray(def.weekdays)||!def.weekdays.length)
+      throw Error('Неверный календарь рабочих дней');
+    const allowed=new Set(def.weekdays),excluded=new Set(def.excludedDates||[]);
+    const included=new Set(def.additionalWorkingDates||[]);
+    const days=[];
+    for(let offset=0;offset<MAX_DAYS;offset++){
+      const date=daysFrom(start,offset);
+      if(!date)break;
+      const weekday=new Date(startMs+offset*DAY).getUTCDay();
+      if(!excluded.has(date)&&(allowed.has(weekday)||included.has(date)))days.push(offset);
+    }
+    calendars.set(key,days);
+    return days;
+  };
+  const times=new Map();
+  let durationDays=0;
+  for(const id of order){
+    const item=byId.get(id),duration=plannedDuration(item);
+    const unit=item.durationUnit??'elapsed_days';
+    if(unit!=='elapsed_days'&&unit!=='working_days')throw Error('Invalid work duration unit');
+    const ready=Math.max(0,...incoming.get(id).map(parent=>times.get(parent).earlyFinish));
+    let es=ready,ef=ready;
+    if(duration>0&&unit==='elapsed_days')ef=ready+duration;
+    if(unit==='working_days'){
+      const dates=calendarFor(item);
+      if(duration>0){
+        const first=lowerBound(dates,ready),last=first+duration-1;
+        if(last>=dates.length)throw Error('Project schedule exceeds supported calendar horizon');
+        es=dates[first];ef=dates[last]+1;
+      }
+    }
+    if(ef>MAX_DAYS)throw Error('Project schedule exceeds supported horizon');
+    times.set(id,{durationDays:duration,durationUnit:unit,
+      calendarBasis:unit==='working_days'?{...item.calendarBasis}:null,
+      elapsedDays:ef-es,earlyStart:es,earlyFinish:ef});
+    durationDays=Math.max(durationDays,ef);
   }
-  for (const id of [...order].reverse()) {
-    const row = times.get(id);
-    const successors = outgoing.get(id);
-    const lateFinish = successors.length ? Math.min(...successors.map(child=>times.get(child).lateStart)) : durationDays;
-    const lateStart = lateFinish-row.durationDays;
-    Object.assign(row,{lateStart,lateFinish,floatDays:lateStart-row.earlyStart,critical:lateStart===row.earlyStart});
+  for(const id of [...order].reverse()){
+    const row=times.get(id),successors=outgoing.get(id);
+    const lf=successors.length?
+      Math.min(...successors.map(child=>times.get(child).lateStart)):durationDays;
+    let ls=lf-row.durationDays;
+    if(row.durationUnit==='working_days'&&row.durationDays>0){
+      const dates=calendarFor(byId.get(id));
+      const last=lowerBound(dates,lf)-1;
+      const first=last-row.durationDays+1;
+      if(first<0)throw Error('Working-day latest start outside project calendar');
+      ls=dates[first];
+    }
+    if(row.durationDays===0)ls=lf;
+    const floatDays=ls-row.earlyStart;
+    if(floatDays<0)throw Error('Invalid calendar CPM float');
+    Object.assign(row,{lateStart:ls,lateFinish:lf,floatDays,critical:floatDays===0});
   }
-  const start = optionalStartDate(p.startDate ?? null);
-  const rows = order.map(id=>{
-    const item = byId.get(id),row=times.get(id);
-    return {id,title:item.title,state:item.state,stageId:item.stageId??null,priority:item.priority||'normal',
-       dueDate:item.dueDate??null,...row,
-      predecessors:[...incoming.get(id)],blockedBy:incoming.get(id).filter(pred=>byId.get(pred).state!=='done'),
-      startDate:daysFrom(start,row.earlyStart),finishDate:daysFrom(start,row.earlyFinish)};
+  const rows=order.map(id=>{
+    const item=byId.get(id),row=times.get(id);
+    return {id,title:item.title,state:item.state,stageId:item.stageId??null,
+      priority:item.priority||'normal',dueDate:item.dueDate??null,...row,
+      predecessors:[...incoming.get(id)],
+      blockedBy:incoming.get(id).filter(pred=>byId.get(pred).state!=='done'),
+      startDate:daysFrom(start,row.earlyStart),
+      finishDate:daysFrom(start,row.earlyFinish)};
   });
-  return {durationDays,estimatedFinish:daysFrom(start,durationDays),rows,criticalIds:rows.filter(r=>r.critical).map(r=>r.id),
-    workItems:rows.length,warning:'Calendar-day CPM estimate; not resource-leveled, not execution authority, not release acceptance'};
+  return {durationDays,estimatedFinish:daysFrom(start,durationDays),rows,
+    criticalIds:rows.filter(row=>row.critical).map(row=>row.id),workItems:rows.length,
+    warning:'Calendar-aware CPM estimate, no resource leveling, execution or release acceptance'};
 }
-
 
 /** One existing limiting link from a terminal critical chain, without asserting uniqueness.
  * This is a presentation projection over the canonical CPM, not a second scheduler.
