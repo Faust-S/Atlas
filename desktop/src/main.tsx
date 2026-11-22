@@ -17,6 +17,7 @@ import {scheduleProject,scheduleChangeSummary,scheduleDeadlineExplanations,criti
 import {previewWorkScheduleEdit} from "../../src/work-schedule-preview.mjs";
 import {startWorkCorrection,continueWorkCorrection} from "../../src/work-correction-flow.mjs";
 import {portfolioSchedule,projectedFinishLabel} from "../../src/portfolio-schedule.mjs";
+import {capturePlanBaseline,comparePlanBaseline} from "../../src/plan-baseline.mjs";
 import {projectScreenSchedule} from "../../src/project-schedule-view.mjs";
 import {portfolioResources} from "../../src/portfolio-resources.mjs";
 import {planReviewQueue,planReviewAction,planProposalAction} from "../../src/plan-review.mjs";
@@ -398,6 +399,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   ReturnType<typeof startWorkCorrection>|null
  >(null);
  const [recheckLimit,setRecheckLimit]=useState(25);
+ const [controlPlanId,setControlPlanId]=useState<string|null>(null);
+ const [controlPlanLimit,setControlPlanLimit]=useState(100);
+ const [controlPlanOnlyChanges,setControlPlanOnlyChanges]=useState(true);
  const project=data.projects.find((p:any)=>p.id===active)||null;
  const t3WorkLinks=useMemo(()=>atlasT3RecordedWorkLinks(project),[project]);
  const recentWork=recentWorkId?project?.items.find((item:any)=>item.id===recentWorkId):null;
@@ -501,6 +505,15 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const pendingWorkCount=useMemo(()=>Array.from(workLinks.values())
   .filter((entry:any)=>entry.pendingTotal>0).length,[workLinks]);
  const reality=useMemo(()=>project?compareProject(project):null,[project]);
+ const controlPlans=project?.planBaselines??[];
+ const selectedControlPlan=controlPlans.some((b:any)=>b.id===controlPlanId)?controlPlanId:null;
+ const controlPlanComparison=useMemo(()=>project&&controlPlans.length?
+  comparePlanBaseline(data,project.id,selectedControlPlan,{portfolio:dates}):null,
+  [data,project,selectedControlPlan,dates]);
+ const visibleControlPlanRows=useMemo(()=>controlPlanComparison?
+  (controlPlanOnlyChanges?controlPlanComparison.rows.filter((r:any)=>r.changed):
+   controlPlanComparison.rows).slice(0,controlPlanLimit):[],
+  [controlPlanComparison,controlPlanOnlyChanges,controlPlanLimit]);
  // This lookup is invalidated by an actual domain snapshot change, not by
  // every typed character, search filter, inspector toggle or tab switch.
  const impactByProject=useMemo(()=>{
@@ -2856,6 +2869,60 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
        </tr>)}</tbody></table></div>
       {project.dependencies.length===0&&<p className="minor">Связей пока нет. Добавьте зависимости между работами для расчёта критического пути.</p>}
      </section>}
+    {tab==="reality"&&<section className="surface atlas-control-plans" aria-label="Контрольные планы и отклонения">
+     <div className="section-heading"><div><h2>Контрольный план и исполнение</h2>
+      <p>Сохраните исходную редакцию сроков и сравнивайте её с текущим календарным прогнозом и введёнными фактическими датами. Исходный план не меняется при пересчёте.</p></div>
+      <Action disabled={busy||!!editor||!plan?.rows?.length||controlPlans.length>=8}
+       onClick={()=>{
+        if(!requireClosedForm())return;
+        const name=window.prompt("Название контрольного плана",controlPlans.length?
+         "Контрольная редакция "+(controlPlans.length+1):"Исходный план");
+        if(name===null)return;
+        try{
+         const result=capturePlanBaseline(latestSnapshot.current,project.id,{name});
+         mutate(result.state,"Контрольный план создан в черновике. Нажмите «Сохранить» для записи на диск.");
+         setControlPlanId(result.id);setControlPlanLimit(100);setControlPlanOnlyChanges(true);
+        }catch(error){issue(error)}
+       }}>Зафиксировать план</Action></div>
+     {controlPlans.length>0?<>
+      <div className="button-row">
+       <label>Редакция плана{" "}
+        <select aria-label="Контрольная редакция плана" value={controlPlanComparison?.baseline.id??""}
+         onChange={e=>{setControlPlanId(e.target.value);setControlPlanLimit(100)}}>
+         {controlPlans.map((b:any)=><option key={b.id} value={b.id}>{b.name} · {b.recordedAt.slice(0,10)}</option>)}
+        </select>
+       </label>
+       <label><input type="checkbox" checked={controlPlanOnlyChanges}
+        onChange={e=>{setControlPlanOnlyChanges(e.target.checked);setControlPlanLimit(100)}}/> Только отклонения</label>
+      </div>
+      {controlPlanComparison&&<>
+       <div className="metric-grid">
+        <Metric label="Плановый финиш" value={controlPlanComparison.baseline.forecastFinish}/>
+        <Metric label="Текущий прогноз" value={controlPlanComparison.forecastFinish??"Неизвестен"}/>
+        <Metric label="Изменение срока, дн." value={controlPlanComparison.finishShiftDays===null?"?":
+         (controlPlanComparison.finishShiftDays>0?"+":"")+controlPlanComparison.finishShiftDays}/>
+        <Metric label="Работ с отличиями" value={controlPlanComparison.totals.changed}/>
+       </div>
+       <p className="minor">Исходная редакция №{controlPlanComparison.baseline.sourceRevision}.
+        {" "}Отмеченное выполнение не заменяет подтверждение приёмки. Факт здесь вводится пользователем в карточке работы.</p>
+       <div className="table-scroll"><table aria-label="Сравнение работ с контрольным планом">
+        <thead><tr><th>Работа</th><th>Исходный финиш</th><th>Прогноз</th><th>Сдвиг</th><th>Факт завершения</th><th>Основание расхождения</th><th></th></tr></thead>
+        <tbody>{visibleControlPlanRows.map((row:any)=><tr key={row.id}>
+         <td><strong>{row.title}</strong></td>
+         <td>{row.referenceFinish??"Не входила в план"}</td>
+         <td>{row.forecastFinish??"Нет прогноза"}</td>
+         <td>{row.shiftDays===null?"Не определён":(row.shiftDays>0?"+":"")+row.shiftDays+" дн."}</td>
+         <td>{row.actualFinish??"Не указан"}</td>
+         <td>{row.reasons.join("; ")||"Без отклонений"}</td>
+         <td>{!row.removed&&<Action onClick={()=>openEditor("work:"+row.id)}>Работа</Action>}</td>
+        </tr>)}</tbody>
+       </table></div>
+       {visibleControlPlanRows.length===0&&<p className="minor">Различий для выбранного фильтра нет.</p>}
+       {(controlPlanOnlyChanges?controlPlanComparison.totals.changed:controlPlanComparison.rows.length)>visibleControlPlanRows.length&&
+        <Action onClick={()=>setControlPlanLimit(n=>n+100)}>Показать ещё 100 работ</Action>}
+      </>}
+     </>:<p className="minor">Контрольный план ещё не зафиксирован. Создайте его перед внесением изменений в сроки, чтобы сохранить точку сравнения.</p>}
+    </section>}
     {tab==="reality"&&<section className="surface"><div className="section-heading"><div><h2>Что известно о результате</h2>
      <p>Посмотрите, что подтверждено записями, какие сведения устарели и что ещё нужно проверить.</p></div>
      <div className="button-row"><Action onClick={()=>openEditor("target")}>＋ Требование</Action><Action onClick={()=>openEditor("finding")} disabled={!project.targets?.length}>＋ Наблюдение</Action></div></div>
