@@ -336,7 +336,8 @@ test('Atlas 0.10 shows Gantt work bars before optional scenario and legend',()=>
  assert.ok(ts.indexOf('ref={workingToggleRef}')<ts.indexOf('className="atlas-gantt-query"'),
   'Compact calendar/scenario controls precede search and avoid a third toolbar row');
  assert.match(css,/\.atlas-gantt-panel>\.atlas-gantt-scroller/);
- assert.match(css,/\.atlas-gantt-panel \.section-heading\{display:block;margin-bottom:6px\}/);
+ assert.match(css,/\.atlas-gantt-panel \.section-heading\{display:flex;align-items:center;justify-content:space-between;gap:5px;flex-wrap:nowrap;margin-bottom:4px\}/);
+ assert.match(css,/\.atlas-gantt-panel \.section-heading \.button-row\{[\s\S]*justify-content:flex-end;gap:4px;margin-top:0/);
  assert.match(css,/\.atlas-gantt-panel \.atlas-gantt-row\{min-height:42px\}/);
  assert.match(installed,/for width,height in \(\(1024,710\),\(820,650\)\)/);
  assert.match(installed,/types=\{"Button"\},scroll=False/);
