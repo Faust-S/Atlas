@@ -48,6 +48,8 @@ import {invokeAtlasHost,type AtlasEmbeddedHost,
 // a previous release's branding into a development installation.
 const atlasVersionLabel=atlasPackage.version.split("-")[0]+
  (atlasPackage.version.includes("-")?" (разработка)":"");
+const workDurationLabel=(work:{estimateDays?:number;durationUnit?:string})=>
+ String(work.estimateDays??1)+(work.durationUnit==="working_days"?" раб. дн.":" кал. дн.");
 type Atlas = any;
 type HistoryEntry = {generation:string;revision:number;projects:number};
 type ImportPreview = {snapshot:Atlas;originalRevision:number;expectedGeneration:string;startedWith:Atlas;summary:any;format:"json"|"iwxa"};
@@ -265,7 +267,7 @@ function EditorPanel({editor,onSubmit,onCancel,onDirtyChange,busy,project,plan,c
        {workDraftPreview.affectedTotal>workDraftPreview.examples.length&&
         <small>Показаны первые {workDraftPreview.examples.length} затронутых работ.</small>}
       </details>}
-     <small>Предварительный расчёт по календарным дням, без выравнивания ресурсов.
+     <small>Предварительный CPM учитывает календарные и рабочие дни по выбранным календарям, без выравнивания ресурсов.
       Изменения ещё не применены к черновику и не сохранены на диск.</small>
     </div>}
    {workDraftPreview?.cumulative&&
@@ -431,6 +433,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const plan=useMemo(()=>project?scheduleProject(project,{
   calendarLibrary:data.calendarLibrary??[]
  }):null,[project,data.calendarLibrary]);
+ const planRowsById=useMemo(()=>new Map<string,any>((plan?.rows||[]).map((row:any)=>[String(row.id),row])),[plan]);
  const criticalWorkIds=useMemo(()=>new Set<string>((plan?.criticalIds||[]).map(String)),[plan]);
  const criticalFocus=useMemo(()=>plan?criticalPathFocus(plan):null,[plan]);
  const graphFocusPredecessors=useMemo(()=>{
@@ -1257,7 +1260,10 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     // warning. State/assignee-only edits keep their current view.
     const scheduleFieldsChanged=previousWork&&correctedWork&&(
      (previousWork.estimateDays??1)!==(correctedWork.estimateDays??1)||
-     (previousWork.dueDate??null)!==(correctedWork.dueDate??null));
+     (previousWork.dueDate??null)!==(correctedWork.dueDate??null)||
+     (previousWork.durationUnit??"elapsed_days")!==(correctedWork.durationUnit??"elapsed_days")||
+     (previousWork.calendarBasis?.id??null)!==(correctedWork.calendarBasis?.id??null)||
+     (previousWork.calendarBasis?.version??null)!==(correctedWork.calendarBasis?.version??null));
     // Consecutive corrections must be compared with the plan before the
     // original edit. A comparison with the immediate prior revision hides
     // earlier shifts and makes an unfinished correction look completed.
@@ -1862,7 +1868,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
         ?"Подписанный Result принимает оригинальный T3: сначала проверка подписи и текста, затем отдельное подтверждение и сохранение в Atlas."
         :embedded
          ?"Файловый обмен .iwxa доступен в самостоятельном Atlas. Встроенный режим работает через разрешения своей программы."
-         :"Архив .iwxa переносит проекты между копиями Atlas. История сохранений в него не входит. В совместимом Admin Center архив открывается для просмотра и подготовки поручений. Для прежних версий остаётся копия JSON."}</p>
+         :"Архив .iwxa переносит проекты между копиями Atlas. История сохранений в него не входит. В совместимом Admin Center архив открывается для просмотра и подготовки поручений. "}</p>
       </div>
      </details>
      <button disabled={!!editor} className="icon-button inspector-button" aria-label={inspector?"Скрыть инспектор":"Показать инспектор"}
@@ -2440,7 +2446,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
            <p className="minor">В примерах показано {recentScheduleEffect.examples.length} из
             {recentScheduleEffect.affectedTotal} затронутых работ.</p>}
          </div>}
-        <p className="minor">Оценка: {recentWork.estimateDays??1} календарных дней.
+        <p className="minor">Оценка: {workDurationLabel(recentWork)}.
          {recentWork.dueDate?" Контрольный срок: "+recentWork.dueDate+".":""}</p>
         {recentPlanRow&&<p className="minor">По записанным зависимостям: {recentPlanRow.startDate?
          "начало "+recentPlanRow.startDate+", расчётный финиш "+recentPlanRow.finishDate+".":
@@ -2450,7 +2456,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
         </p>}
         {planBeforeRecent!==null&&plan&&<p className="minor">
          Продолжительность плана: было {planBeforeRecent} дн., стало {plan.durationDays} дн.
-         Расчёт по календарным дням без распределения ресурсов.</p>}
+         Календарный CPM без распределения ресурсов.</p>}
         {recentPlanRow?.finishDate&&recentWork.dueDate&&
          recentPlanRow.finishDate>recentWork.dueDate&&<p className="atlas-schedule-warning">
           Расчётный финиш позже указанного срока. Проверьте длительность и зависимости.</p>}
@@ -2606,11 +2612,17 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
          </small>)}
         {(t3WorkLinks.get(w.id)||[]).length>2&&<small className="atlas-work-evidence-note">
          Ещё {(t3WorkLinks.get(w.id)||[]).length-2} ссылок в истории.</small>}</td>
-       <td data-label="Состояние"><Badge>{workStatuses[w.state]}</Badge></td><td data-label="Длительность">{w.estimateDays??1} дн.
+       <td data-label="Состояние"><Badge>{workStatuses[w.state]}</Badge></td><td data-label="Длительность">{workDurationLabel(w)}
+        {w.durationUnit==="working_days"&&w.calendarBasis&&<small className="atlas-work-plan-dates">
+         {data.calendarLibrary?.find((calendar:any)=>calendar.id===w.calendarBasis.id&&calendar.version===w.calendarBasis.version)?.name||"Календарь недоступен"} · редакция {w.calendarBasis.version}
+        </small>}
         {criticalWorkIds.has(w.id)&&<small className="atlas-work-critical-label">Критический путь</small>}
        </td>
        <td data-label="Ответственный">{w.assignee||"Не назначен"}</td>
        <td data-label="Срок">{readable(w.dueDate)}
+        {planRowsById.has(w.id)&&<small className="atlas-work-plan-dates">
+         CPM: {planRowsById.get(w.id).startDate||"начало не задано"} → {planRowsById.get(w.id).finishDate||"финиш не определён"}
+        </small>}
         {overdueWorkFinishes.has(w.id)&&<small className="atlas-work-overdue-label">
          Расчётное окончание: {overdueWorkFinishes.get(w.id)}. Позже указанного срока.
         </small>}
@@ -2690,7 +2702,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     </section>}
     {tab==="board"&&<div className="board">
      {Object.entries(workStatuses).map(([key,title])=><section className="board-column" key={key}><h3>{String(title)} <small>{project.items.filter((w:any)=>w.state===key).length}</small></h3>
-      {project.items.filter((w:any)=>w.state===key).slice(0,boardLimits[key]||60).map((w:any)=><div className="board-card" key={w.id}><strong>{w.title}</strong><small>{w.assignee||"Нет ответственного"} · {w.estimateDays??1} дн.</small>
+      {project.items.filter((w:any)=>w.state===key).slice(0,boardLimits[key]||60).map((w:any)=><div className="board-card" key={w.id}><strong>{w.title}</strong><small>{w.assignee||"Нет ответственного"} · {workDurationLabel(w)}</small>
         <WorkDependencyHint info={workLinks.get(w.id)} onOpenWork={id=>openEditor("work:"+id)}/>
        <div className="board-actions"><select aria-label={"Состояние "+w.title} value={w.state} onChange={e=>quickWork(w.id,e.target.value)}>
         {Object.entries(workStatuses).map(([v,title])=><option key={v} value={v}>{String(title)}</option>)}</select>
