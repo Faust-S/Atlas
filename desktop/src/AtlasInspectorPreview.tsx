@@ -34,6 +34,7 @@ export function AtlasInspectorPreview({project,snapshot,plan,forecast,comparison
  const defaultId=project?.id??"portfolio";
  const [tabs,setTabs]=useState<Tab[]>([{key:"project:"+defaultId,kind:"project",id:defaultId}]);
  const [active,setActive]=useState("project:"+defaultId);
+ const [workSection,setWorkSection]=useState<"schedule"|"baseline"|"relations"|"history">("schedule");
  const shown=useMemo(()=>{
   const key=tabs.some(t=>t.key===active)?active:tabs[0]?.key;
   return tabs.find(t=>t.key===key)||null;
@@ -43,6 +44,7 @@ export function AtlasInspectorPreview({project,snapshot,plan,forecast,comparison
   setTabs(old=>old.some(tab=>tab.key===key)?old:
    [...old.slice(-(old.length>=8?7:8)),{kind,id,key}]);
   setActive(key);
+  if(kind==="work")setWorkSection("schedule");
  };
  useEffect(()=>{
   if(workRequest?.id&&project?.items?.some((w:any)=>w.id===workRequest.id))
@@ -80,7 +82,7 @@ export function AtlasInspectorPreview({project,snapshot,plan,forecast,comparison
    {tabs.map(tab=><div className={"atlas-v6-dock-tab"+(shown?.key===tab.key?" selected":"")} key={tab.key}>
     <button type="button" role="tab" aria-selected={shown?.key===tab.key}
      aria-label={kindLabel[tab.kind]+": "+title(tab)}
-     title={title(tab)} onClick={()=>setActive(tab.key)}>{title(tab)}</button>
+     title={title(tab)} onClick={()=>{setActive(tab.key);if(tab.kind==="work")setWorkSection("schedule")}}>{title(tab)}</button>
     <button type="button" className="atlas-v6-dock-tab-close" aria-label={"Закрыть "+kindLabel[tab.kind]+": "+title(tab)}
      onClick={()=>close(tab.key)}>×</button>
    </div>)}
@@ -123,7 +125,15 @@ export function AtlasInspectorPreview({project,snapshot,plan,forecast,comparison
       <button type="button" className="action-button"
        onClick={()=>onOpenTab("graph")}>Все зависимости</button>
      </div>
-     <section className="atlas-v6-preview-card"><strong>Календарь работы</strong>
+     <div className="atlas-v6-work-sections" role="tablist" aria-label="Разделы выбранной работы">
+       {([
+        ["schedule","Сроки"],["baseline","План"],["relations","Связи"],["history","История"]
+       ] as const).map(([key,label])=><button type="button" key={key} role="tab"
+        aria-selected={workSection===key} aria-label={"Инспектор: "+label.toLowerCase()}
+        className={workSection===key?"is-active":""} onClick={()=>setWorkSection(key)}>
+        {label}</button>)}
+      </div>
+      {workSection==="schedule"&&<section className="atlas-v6-preview-card"><strong>Календарь работы</strong>
       <p>Длительность: {work.estimateDays??1} {work.durationUnit==="working_days"?"рабочих":"календарных"} дн.</p>
       <p>Расчётное начало: {format(workPlan?.startDate)}</p>
       <p>Расчётный финиш: {format(workPlan?.finishDate)}</p>
@@ -133,7 +143,7 @@ export function AtlasInspectorPreview({project,snapshot,plan,forecast,comparison
       <p>Факт начала (введён): {format(work.actualStartDate)}</p>
       <p>Факт завершения (введён): {format(work.actualFinishDate)}</p>
      </section>
-     <section className="atlas-v6-preview-card" aria-label="Контрольный план выбранной работы">
+     {workSection==="baseline"&&<><section className="atlas-v6-preview-card" aria-label="Контрольный план выбранной работы">
       <strong>Исходный план и текущий прогноз</strong>
       {(project.planBaselines??[]).length>0?<>
        <label className="atlas-v6-baseline-picker">Контрольная редакция
@@ -173,8 +183,8 @@ export function AtlasInspectorPreview({project,snapshot,plan,forecast,comparison
         {driver.title}</button>)}
       {facts.deadline.hiddenDrivers>0&&<p>Остальных ограничивающих работ: {facts.deadline.hiddenDrivers}.</p>}
       <small>Это объяснение календарного прогноза, а не подтверждение причины фактического отклонения.</small>
-     </section>}
-     <section className="atlas-v6-preview-card"><strong>Зависимости</strong>
+     </section>}</>}
+     {workSection==="relations"&&<section className="atlas-v6-preview-card"><strong>Зависимости</strong>
       <p>Предшественники: {predecessors.length}. Последующие работы: {successors.length}.</p>
       {predecessors.slice(0,6).map((linked:any)=><button type="button" className="atlas-v6-preview-link"
        key={"p"+linked.id} onClick={()=>open("work",linked.id)}>
@@ -184,13 +194,13 @@ export function AtlasInspectorPreview({project,snapshot,plan,forecast,comparison
        → {linked.title}</button>)}
       {predecessors.length+successors.length>12&&<p>Остальные связи доступны в полном графе.</p>}
      </section>
-     <section className="atlas-v6-preview-card"><strong>Ответственность и происхождение</strong>
+     {workSection==="schedule"&&<section className="atlas-v6-preview-card"><strong>Ответственность и происхождение</strong>
       <p>Ответственный: {work.assignee||"Не указан"}</p>
       <p>Плановый ресурс: {resourceOfWork?.label||"Не назначен"}</p>
       {sourceOfWork?<button type="button" className="atlas-v6-preview-link" onClick={()=>open("source",sourceOfWork.id)}>
        Источник: {sourceOfWork.locator}</button>:<p>Источник не привязан.</p>}
      </section>
-     <section className="atlas-v6-preview-card" aria-label="Связанные решения и наблюдения">
+     {workSection==="history"&&<section className="atlas-v6-preview-card" aria-label="Связанные решения и наблюдения">
       <strong>Решения и наблюдения</strong>
       {facts?.relatedChange&&<p>Изменение «{facts.relatedChange.title}»: {changeStatusNames[facts.relatedChange.status]||"Не определено"}.</p>}
       {(facts?.history??[]).length>0?
@@ -206,7 +216,7 @@ export function AtlasInspectorPreview({project,snapshot,plan,forecast,comparison
        <p>Для этой работы пока нет явно связанных решений и наблюдений.</p>}
       <button type="button" className="atlas-v6-preview-link" onClick={()=>onOpenTab("history")}>
        Открыть полную историю проекта</button>
-     </section>
+     </section>}
     </>:<p>Работа больше не существует в текущей редакции.</p>}
    </div>}
    {shown?.kind==="source"&&<div className="atlas-v6-preview-view">
