@@ -3,7 +3,7 @@
 [CmdletBinding()]
 param(
     [string]$SetupCoreRoot = "setup-core-source",
-    [string]$Output = "artifacts/IWXA-Atlas-0.10.0-dev.1-Setup.exe",
+    [string]$Output = "artifacts/IWXA-Atlas-0.10.0-Setup.exe",
     [switch]$InstallForQualification
 )
 Set-StrictMode -Version Latest
