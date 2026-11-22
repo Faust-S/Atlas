@@ -210,6 +210,12 @@ test('Gantt exposes saved typed calendars through native project drafts without 
  const desktop=readFileSync(new URL('../desktop/src/main.tsx',import.meta.url),'utf8');
  const core=readFileSync(new URL('../src/core.mjs',import.meta.url),'utf8');
  assert.match(ui,/Сохранённые календарные варианты/);
+ const style=readFileSync(new URL('../desktop/src/style.css',import.meta.url),'utf8');
+ assert.match(style,/\.atlas-working-scenario\{container-type:inline-size\}/);
+ assert.match(style,/@container \(max-width:680px\)/);
+ assert.match(style,/\.atlas-working-scenario-row>\.atlas-working-scenario-mode\{/);
+ assert.match(style,/grid-column:2;grid-row:1/);
+ assert.match(style,/@media \(min-width:681px\) and \(max-width:1080px\)/);
  assert.match(ui,/Сохранить вариант в проект/);
  assert.match(ui,/Загрузить вариант/);
  assert.match(ui,/Удалить вариант из проекта/);
