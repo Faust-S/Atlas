@@ -65,9 +65,23 @@ def qualify():
     assert d.saved_project(original_head)==original_project
     v.capture("atlas10-working-week-holiday-exception-installed")
 
-    d.click_button("Скрыть сценарий")
+    # Reproduce the compact laptop layout: the old top toggle could be
+    # scrolled behind the sticky tabs after the user edited a holiday.
+    import win32gui
+    win32gui.MoveWindow(d.handle,0,0,820,650,True)
+    d.activate()
+    close=v.find_control("Закрыть календарный сценарий",
+                         types={"Button"},scroll=True)
+    bounds=win32gui.GetWindowRect(d.handle)
+    assert v.rectangle_in_workspace(close.rectangle(),bounds),(
+        "Calendar scenario close must be physically reachable at 820x650")
+    v.capture("atlas10-calendar-close-accessible-820")
+    close.click_input()
     d.wait_text("Сценарий: рабочая неделя",20)
+    assert not any("Закрыть календарный сценарий" == label for label in d.visible_texts()),(
+        "Closing the calendar scenario did not remove its own controls")
     assert d.head()==original_head and d.saved_project(original_head)==original_project
+    print("ATLAS10_INSTALLED_CALENDAR_CLOSE_820_PASS",flush=True)
     print("ATLAS10_INSTALLED_WORKING_WEEK_SCENARIO_NO_NATIVE_WRITE_PASS",flush=True)
 
 
