@@ -17,7 +17,7 @@ test("Atlas inspector shares existing live Work, Source, Baseline records and or
  assert.match(inspector,/onOpenTab\("reality"\)/);
  assert.match(inspector,/dirty\?"Черновик ещё не сохранён"/);
  assert.match(main,/<AtlasInspectorPreview key=\{project\?\.id\|\|"portfolio"\}/);
- assert.match(main,/onEditWork=\{id=>openEditor\("work:"\+id\)\}/);
+ assert.match(main,/onEditWork=\{id=>openEditor\("work:"\+id,undefined,true\)\}/);
  assert.match(main,/onSave=\{\(\)=>void save\(\)\}/);
  assert.match(main,/onClose=\{\(\)=>setInspector\(false\)\}/);
  assert.match(css,/\.atlas-v6-dock-tabs\{/);
@@ -53,6 +53,10 @@ test("Atlas 0.11 Gantt and DAG open Work in the live dock; T3 embedded retains e
  assert.match(preview,/className="atlas-v6-preview-actions atlas-v6-preview-primary-actions"/);
  assert.match(preview,/onClick=\{\(\)=>onEditWork\(work\.id\)\}>Изменить работу/);
  assert.match(css,/\.atlas-v6-preview-slot\[hidden\]\{display:none!important\}/);
+ assert.match(main,/const inspectorEditorReturnRef=useRef\(false\)/);
+ assert.match(main,/inspectorEditorReturnRef\.current=fromInspector&&!embedded/);
+ assert.match(main,/onEditProject=\{\(\)=>openEditor\("project-edit",undefined,true\)\}/);
+ assert.match(main,/if\(!returnToPreview&&\(embedded\|\|window\.innerWidth<=1220\)\)setInspector\(false\)/);
  // Keeping the preview mounted prevents loss of Work/Source/Baseline tabs after editing.
  assert.doesNotMatch(main,/editor\?<EditorPanel[\s\S]*?:\s*!embedded\?<AtlasInspectorPreview/);
 });
