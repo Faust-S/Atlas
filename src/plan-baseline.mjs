@@ -32,6 +32,11 @@ const forecastFor=(snapshot,project,portfolio)=>{
  * A control point includes portfolio-adjusted dates and the Work calendar
  * revision so later edits cannot silently rewrite the original plan.
  */
+/**
+ * @param {any} snapshot
+ * @param {string} projectId
+ * @param {{name?: string|null, recordedAt?: string}} [options]
+ */
 export function capturePlanBaseline(snapshot,projectId,{name=null,recordedAt=new Date().toISOString()}={}){
  validate(snapshot);
  const project=findProject(snapshot,projectId);
@@ -79,6 +84,12 @@ export function capturePlanBaseline(snapshot,projectId,{name=null,recordedAt=new
  * Compare one fixed historical control point with the current authoritative
  * calendar forecast and manually entered actual dates. Never infers actual
  * completion from Work.state or a T3 claim.
+ */
+/**
+ * @param {any} snapshot
+ * @param {string} projectId
+ * @param {string|null} [baselineId]
+ * @param {{portfolio?: any}} [options]
  */
 export function comparePlanBaseline(snapshot,projectId,baselineId=null,{portfolio=null}={}){
  validate(snapshot);
