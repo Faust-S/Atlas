@@ -73,7 +73,8 @@ test("The original inspector shows the preview before apply, with accessible com
  const css=readFileSync(new URL("../desktop/src/style.css",import.meta.url),"utf8");
  assert.match(ui,/import \{previewWorkScheduleEdit\} from "\.\.\/\.\.\/src\/work-schedule-preview\.mjs"/);
  assert.match(ui,/return previewWorkScheduleEdit\(project,editor\.action\.slice\(5\),/);
- assert.match(ui,/\[editor\.action,project,plan,fields\.estimateDays,fields\.dueDate,correctionBaseline\]/);
+ assert.match(ui,/\[editor\.action,project,plan,fields\.estimateDays,fields\.dueDate,/);
+ assert.match(ui,/fields\.durationUnit,fields\.calendarBasis,correctionBaseline,calendarLibrary\]/);
  assert.match(ui,/aria-label="Предварительный расчёт изменения работы"/);
  assert.match(ui,/Изменения ещё не применены к черновику и не сохранены на диск/);
  const section=ui.indexOf("className=\"atlas-work-draft-preview\"");
