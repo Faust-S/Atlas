@@ -1190,3 +1190,21 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
  position:static
 }
 .atlas-working-scenario-saved{scroll-margin-top:150px;scroll-margin-bottom:70px}
+
+/* Shared, versioned LOCAL work calendars. The existing blue Atlas style,
+   compact details and native keyboard focus remain unchanged. */
+.atlas-working-scenario-library{margin:11px 0 9px;padding:8px 10px;
+ border:1px solid #c7d8ec;border-radius:8px;background:#f1f6ff;
+ scroll-margin-top:150px;scroll-margin-bottom:70px}
+.atlas-working-scenario-library>summary{cursor:pointer;color:#21578e;
+ font-size:12px;font-weight:700}
+.atlas-working-scenario-library>.minor{margin:8px 0;color:#466386}
+.atlas-working-scenario-library>.atlas-gantt-tools{margin:8px 0;gap:7px 11px}
+.atlas-working-scenario-library select{max-width:min(340px,100%)}
+.atlas-working-scenario:has(.atlas-working-scenario-library[open])
+ .atlas-working-scenario-footer{position:static}
+@media(max-width:680px){
+ .atlas-working-scenario-library>.atlas-gantt-tools{
+  flex-direction:column;align-items:stretch}
+ .atlas-working-scenario-library .action-button{width:100%;max-width:100%}
+}
