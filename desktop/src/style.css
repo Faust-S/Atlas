@@ -1263,6 +1263,7 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 /* Atlas 0.11: native Agent v6 chrome. Scoped to standalone so the T3 host
    retains its qualified embedded surface. No independent Store or forms. */
 .atlas-embedded .atlas-v6-layout{display:contents}
+.atlas-embedded .atlas-v6-nav-scroll{display:contents}
 .app-shell.atlas-v6-shell{
  display:flex;flex-direction:column;gap:0;height:100dvh;min-height:490px;
  padding:10px;background:#172238;color:#142443;overflow:hidden
