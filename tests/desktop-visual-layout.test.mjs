@@ -205,6 +205,31 @@ test('working-week preview puts the result first, supports full work search, and
   'A hypothetical calendar scenario must never write to authoritative storage');
 });
 
+test('Gantt exposes saved typed calendars through native project drafts without changing canonical CPM',()=>{
+ const ui=readFileSync(new URL('../desktop/src/ProjectVisuals.tsx',import.meta.url),'utf8');
+ const desktop=readFileSync(new URL('../desktop/src/main.tsx',import.meta.url),'utf8');
+ const core=readFileSync(new URL('../src/core.mjs',import.meta.url),'utf8');
+ assert.match(ui,/Сохранённые календарные варианты/);
+ assert.match(ui,/Сохранить вариант в проект/);
+ assert.match(ui,/Загрузить вариант/);
+ assert.match(ui,/Удалить вариант из проекта/);
+ assert.match(ui,/onSaveCalendarDraft\(\{/);
+ assert.match(ui,/setCustomWeekdays\(\[\.\.\.draft.weekdays\]\)/);
+ assert.match(ui,/additionalWorkingDates:calendar.additionalWorkingDates,modeByWork/);
+ assert.match(ui,/Нажмите Ctrl\+S для записи на диск/);
+ assert.match(desktop,/calendarDrafts=\{project.calendarDrafts\|\|\[\]\}/);
+ assert.match(desktop,/upsertCalendarDraft\(latestSnapshot.current,project.id,draft\)/);
+ assert.match(desktop,/removeCalendarDraft\(latestSnapshot.current,project.id,id\)/);
+ assert.match(desktop,/mutate\(result.state,/);
+ assert.match(core,/export function upsertCalendarDraft\(/);
+ assert.match(core,/export function removeCalendarDraft\(/);
+ assert.equal(core.includes('export const SCHEMA="atlas.project/1"'),true);
+ assert.doesNotMatch(core,/export const SCHEMA="atlas.project\/2"/);
+ const panel=ui.slice(ui.indexOf('id="atlas-working-week-preview"'),
+  ui.indexOf('<div className="atlas-gantt-key"'));
+ assert.doesNotMatch(panel,/nativeInvoke\(|\.save\(|localStorage|setData\(/);
+});
+
 test('Gantt exposes dated work deadline overruns and can filter to the real affected work',()=>{
  const source={durationDays:4,rows:[
   {id:'on-time',title:'В срок',earlyStart:0,earlyFinish:2,dueDate:'2026-11-03',finishDate:'2026-11-03'},
