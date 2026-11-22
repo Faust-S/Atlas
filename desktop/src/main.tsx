@@ -3691,7 +3691,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      <Action onClick={()=>openEditor("dates")}>Изменить даты</Action></div>}
     <div className="inspector-block"><small>Дополнительные сведения</small>
      <p>Сведения из источника помогут проверить выполненную работу. Окончательное решение остаётся за вами.</p></div>
-   </section>}
+   </section>:null}
   </aside>}
   </div>
  </div>;
