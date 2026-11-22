@@ -28,10 +28,15 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
  const [nonWorkingDates,setNonWorkingDates]=useState('');
  const [extraWorkingDates,setExtraWorkingDates]=useState('');
  const [continuousWorkIds,setContinuousWorkIds]=useState<Record<string,boolean>>({});
+ const [workingLastToggledId,setWorkingLastToggledId]=useState<string|null>(null);
  const [workingQuery,setWorkingQuery]=useState('');
  const [workingShowAll,setWorkingShowAll]=useState(false);
  const [workingLimit,setWorkingLimit]=useState(12);
  const workingPanelRef=useRef<HTMLElement|null>(null);
+ const workingRowsRef=useRef<HTMLDivElement|null>(null);
+ useEffect(()=>{
+  if(workingLastToggledId)workingRowsRef.current?.scrollTo({top:0,behavior:'auto'});
+ },[workingLastToggledId,continuousWorkIds]);
  const workingToggleRef=useRef<HTMLButtonElement|null>(null);
  useEffect(()=>{
   if(workingScenarioOpen)workingPanelRef.current?.scrollIntoView({behavior:'auto',block:'start'});
@@ -56,17 +61,20 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
   const rows=workingScenario.result?.rows||[];
   const affected=rows.filter((row:any)=>row.shiftDays!=null&&row.shiftDays!==0);
   const selected=workingShowAll?rows:rows.filter((row:any)=>
-   row.shiftDays!=null&&row.shiftDays!==0||row.durationMode==='elapsed_days');
+   row.shiftDays!=null&&row.shiftDays!==0||
+   row.durationMode==='elapsed_days'||row.id===workingLastToggledId);
   const q=workingQuery.trim().toLocaleLowerCase('ru-RU');
   const matching=selected.filter((row:any)=>
    !q||row.title.toLocaleLowerCase('ru-RU').includes(q));
   matching.sort((a:any,b:any)=>
+   Number(b.id===workingLastToggledId)-Number(a.id===workingLastToggledId)||
+   Number(b.durationMode==='elapsed_days')-Number(a.durationMode==='elapsed_days')||
    Number(b.wouldMissDueDate)-Number(a.wouldMissDueDate)||
    Math.abs(b.shiftDays||0)-Math.abs(a.shiftDays||0)||
    Number(b.critical)-Number(a.critical)||
    a.title.localeCompare(b.title,'ru'));
   return {shifted:affected.length,matching,visible:matching.slice(0,workingLimit)};
- },[workingScenario,workingShowAll,workingQuery,workingLimit]);
+ },[workingScenario,workingShowAll,workingQuery,workingLimit,workingLastToggledId]);
  useEffect(()=>{
   if(!expanded)return;
   const close=(event:KeyboardEvent)=>{if(event.key==='Escape'){event.preventDefault();setExpanded(false)}};
@@ -211,7 +219,7 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
      <span className="minor">Рабочие дни по умолчанию. Нажмите «Рабочие дни» у технологической операции, чтобы изменить её режим.</span>
     </div>
     {!!workingDifferences.visible.length&&<div className="atlas-working-scenario-rows"
-      role="region" aria-label="Работы календарного сценария" tabIndex={0}>
+      ref={workingRowsRef} role="region" aria-label="Работы календарного сценария" tabIndex={0}>
      {workingDifferences.visible.map((row:any)=><div className="atlas-working-scenario-row" key={row.id}>
       <button type="button" className="action-button" title={row.title}
        onClick={()=>{setExpanded(false);onOpenWork(row.id)}}>{trim(row.title,65)}</button>
@@ -221,7 +229,11 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
       <button type="button" className="action-button atlas-working-scenario-mode"
        aria-pressed={row.durationMode==='elapsed_days'}
        aria-label={'Операция '+row.title+': '+(row.durationMode==='elapsed_days'?'без выходных':'по рабочим дням')+'. Переключить длительность'}
-       onClick={()=>setContinuousWorkIds(previous=>({...previous,[row.id]:!previous[row.id]}))}>
+       onClick={()=>{
+        setWorkingLastToggledId(row.id);
+        workingRowsRef.current?.scrollTo({top:0,behavior:'auto'});
+        setContinuousWorkIds(previous=>({...previous,[row.id]:!previous[row.id]}));
+       }}>
        {row.durationMode==='elapsed_days'?'Без выходных':'Рабочие дни'}
       </button>
      </div>)}
