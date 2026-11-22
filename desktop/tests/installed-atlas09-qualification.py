@@ -16,13 +16,13 @@ route=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(route)
 
 
-def qualify():
+def qualify(expected_version="0.9.0 (разработка)"):
     route.qualify()
     # Original 0.8 qualification leaves the real installed Atlas window open.
     # Prove it is now the actual 0.9 build, not an old binary in the same
     # product-data location and not a fictitious candidate identified by CI.
     observed=route.d.visible_texts()
-    required="0.9.0 (разработка)"
+    required=expected_version
     if not any(required in text for text in observed):
         route.v.capture("atlas09-installed-version-not-observed")
         raise AssertionError("Atlas 0.9 development label not observed in installed WebView2 UI")
