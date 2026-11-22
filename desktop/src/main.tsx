@@ -1710,9 +1710,16 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   }catch(e){issue(e)}
  };
  const inspectWork=(id:string)=>{
-  if(!project||!requireClosedForm())return;
+  if(!project||!project.items.some((item:any)=>item.id===id)||!requireClosedForm())return;
   setPreviewWorkRequest(previous=>({id,serial:(previous?.serial??0)+1}));
+  if(window.innerWidth<1150)setNavPanelOpen(false);
   setInspector(true);
+ };
+ // Embedded T3 retains its original direct-editor route; standalone Atlas
+ // previews the selected Work in the dock before offering edit.
+ const openWorkContext=(id:string)=>{
+  if(embedded)openEditor("work:"+id);
+  else inspectWork(id);
  };
  const quickWork=(id:string,state:string)=>{
   if(!project||!requireClosedForm()||busyRef.current)return;
@@ -3021,7 +3028,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
         }catch(error){issue(error);return null}
        }}
        onOpenProject={id=>selectProject(id)}
-       onEditDates={()=>openEditor("dates")} onOpenWork={id=>openEditor("work:"+id)}/>:
+       onEditDates={()=>openEditor("dates")} onOpenWork={openWorkContext}/>:
       <section className="surface"><Fallback message="План пока не рассчитан. Добавьте работы или проверьте зависимости."/></section>)}
     {tab==="graph"&&<section className="surface"><div className="section-heading">
       <div><h2>Зависимости работ</h2><p>Посмотрите, какие работы должны завершиться раньше и какие зависят от них. Красные линии отмечают критический путь.</p></div>
@@ -3076,7 +3083,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
         К источнику работы</button>}
       </div>}
       {plan&&<ProjectDependencyDiagram key={project.id} schedule={plan}
-       focusWorkId={graphFocusWork?.id||null} onOpenWork={id=>openEditor("work:"+id)}/>}
+       focusWorkId={graphFocusWork?.id||null} onOpenWork={openWorkContext}/>}
       <div className="table-scroll"><table><thead><tr><th>Предшествующая работа</th><th>Зависимая работа</th><th>Переход</th></tr></thead>
        <tbody>{project.dependencies.map((d:any,i:number)=><tr key={d.from+"-"+d.to+"-"+i}>
         <td>{project.items.find((w:any)=>w.id===d.from)?.title||d.from}</td>
@@ -3659,18 +3666,20 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      window.addEventListener("pointercancel",stop);
     }}/>}
 
+   {!embedded&&<div className="atlas-v6-preview-slot" hidden={Boolean(editor)}>
+    <AtlasInspectorPreview key={project?.id||"portfolio"}
+     project={project} snapshot={data} plan={plan} forecast={projected}
+     dirty={dirty} saved={persisted} workRequest={previewWorkRequest}
+     onClose={()=>setInspector(false)} onEditWork={id=>openEditor("work:"+id)}
+     onEditProject={()=>openEditor("project-edit")} onOpenTab={goProjectTab}
+     onSave={()=>void save()} canSave={dirty&&!busy&&!editor}/>
+   </div>}
    {editor?<EditorPanel key={editor.action} editor={editor} onSubmit={submit}
     onCancel={cancelEditor} onDirtyChange={changed=>{editorDirtyRef.current=changed}}
     busy={busy} project={project} plan={plannedPlan}
     calendarLibrary={data.calendarLibrary??[]}
     correctionBaseline={correctionBaseline}/>:
-   !embedded?<AtlasInspectorPreview key={project?.id||"portfolio"}
-     project={project} snapshot={data} plan={plan} forecast={projected}
-     dirty={dirty} saved={persisted} workRequest={previewWorkRequest}
-     onClose={()=>setInspector(false)} onEditWork={id=>openEditor("work:"+id)}
-     onEditProject={()=>openEditor("project-edit")} onOpenTab={goProjectTab}
-     onSave={()=>void save()} canSave={dirty&&!busy&&!editor}/>:
-   <section><div className="section-heading"><h2>Инспектор</h2><button className="icon-button" aria-label="Скрыть инспектор" onClick={()=>setInspector(false)}>×</button></div>
+   embedded?<section><div className="section-heading"><h2>Инспектор</h2><button className="icon-button" aria-label="Скрыть инспектор" onClick={()=>setInspector(false)}>×</button></div>
     <div className="inspector-block"><small>Текущий контекст</small><strong>{project?.name||"Портфель проектов"}</strong>
      <p>{project?.goal||"Выберите проект для работы с планом, доказательствами и изменениями."}</p></div>
     <div className="inspector-block"><small>Состояние данных</small><Badge tone={editor||dirty?"warning":persisted?"good":"neutral"}>{editor?"Форма не применена":dirty?"Только в памяти":persisted?"Сохранено на диск":"Ещё не сохранялся"}</Badge>
