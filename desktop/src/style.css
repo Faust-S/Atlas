@@ -1382,7 +1382,7 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .atlas-v6-shell .sidebar.atlas-v6-sidebar-collapsed~.workspace .atlas-compact-tabs{display:flex}
 .app-shell.atlas-v6-shell .inspector{
  position:relative;inset:auto;transform:none;z-index:9;flex:0 0 var(--atlas-v6-dock-width,390px);
- width:var(--atlas-v6-dock-width,390px);min-width:300px;max-width:55vw;min-height:0;
+ width:var(--atlas-v6-dock-width,390px);min-width:270px;max-width:55vw;min-height:0;
  display:flex;flex-direction:column;overflow-y:auto;padding:16px 15px 16px;
  border-left:1px solid #b8cbe3;background:linear-gradient(145deg,#f0f5fc,#e8f0fa);
  box-shadow:-10px 0 28px #18395e0a
