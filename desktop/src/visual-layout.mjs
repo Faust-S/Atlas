@@ -47,7 +47,7 @@ export function ganttViewport(schedule,{scale='fit',offset=0,startDate=null,dueD
   return {id:row.id,title:row.title,critical:!!row.critical,
    state:row.state||'todo',blockedBy:row.blockedBy||[],floatDays:row.floatDays,
    dueDate:row.dueDate??null,missedDeadline,
-   durationDays:row.durationDays??finish-start,earlyStart:start,earlyFinish:finish,
+   durationDays:row.durationDays??finish-start,durationUnit:row.durationUnit??'elapsed_days',earlyStart:start,earlyFinish:finish,
    dateStart:calendarLabel(startDate,start),dateFinish:calendarLabel(startDate,finish),
    isMilestone,visible,leftPct:left,widthPct:Math.max(0,right-left)};
  });
