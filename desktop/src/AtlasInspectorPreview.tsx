@@ -16,6 +16,18 @@ const format=(value:string|null|undefined)=>value||"Не указано";
 const workStatuses:Record<string,string>={
  todo:"Запланирована",in_progress:"В работе",blocked:"Заблокирована",done:"Выполнена (заявлено)"
 };
+const priorityNames:Record<string,string>={
+ low:"Низкий",normal:"Обычный",high:"Высокий",critical:"Критический"
+};
+const changeStatusNames:Record<string,string>={
+ proposed:"Предложено",approved:"Согласовано",in_progress:"В работе",
+ implemented:"Реализовано (заявлено)",deferred:"Отложено",rejected:"Отклонено"
+};
+const sourceTypes:Record<string,string>={
+ github:"GitHub",github_owner:"Организация GitHub",gitlab:"GitLab",forgejo:"Forgejo",
+ gitea:"Gitea",obsidian:"Obsidian",anytype:"Anytype",jira:"Jira",
+ file:"Файл",other:"Другой источник"
+};
 export function AtlasInspectorPreview({project,snapshot,plan,forecast,comparison,
  deadlineRisks,onSelectBaseline,dirty,saved,workRequest,
  onClose,onEditWork,onEditProject,onOpenTab,onSave,canSave}:Props){
@@ -104,7 +116,7 @@ export function AtlasInspectorPreview({project,snapshot,plan,forecast,comparison
    </div>}
    {shown?.kind==="work"&&<div className="atlas-v6-preview-view">
     {work?<><h2>{work.title}</h2>
-     <p>{workStatuses[work.state]||work.state}. Приоритет: {work.priority||"normal"}.</p>
+     <p>{workStatuses[work.state]||work.state}. Приоритет: {priorityNames[work.priority]||"Обычный"}.</p>
      <div className="atlas-v6-preview-actions atlas-v6-preview-primary-actions">
       <button type="button" className="action-button primary"
        onClick={()=>onEditWork(work.id)}>Изменить работу</button>
@@ -180,7 +192,7 @@ export function AtlasInspectorPreview({project,snapshot,plan,forecast,comparison
      </section>
      <section className="atlas-v6-preview-card" aria-label="Связанные решения и наблюдения">
       <strong>Решения и наблюдения</strong>
-      {facts?.relatedChange&&<p>Изменение «{facts.relatedChange.title}», состояние: {facts.relatedChange.status}.</p>}
+      {facts?.relatedChange&&<p>Изменение «{facts.relatedChange.title}»: {changeStatusNames[facts.relatedChange.status]||"Не определено"}.</p>}
       {(facts?.history??[]).length>0?
        <>{(facts?.history??[]).slice(0,6).map((record:any)=>
         <div className="atlas-v6-inspector-history" key={record.kind+":"+record.id}>
@@ -200,7 +212,7 @@ export function AtlasInspectorPreview({project,snapshot,plan,forecast,comparison
    {shown?.kind==="source"&&<div className="atlas-v6-preview-view">
     {source?<><h2>{source.locator}</h2>
      <section className="atlas-v6-preview-card"><strong>Сведения об источнике</strong>
-      <p>Тип: {source.kind}. Ветка: {format(source.branch)}.</p>
+      <p>Тип: {sourceTypes[source.kind]||"Другой источник"}. Ветка: {format(source.branch)}.</p>
       <p>Последнее наблюдение: {format(source.observedAt)}</p>
       <p>Состояние: {source.status==="ok"?"Сведения записаны":"Не подтверждено"}.</p>
      </section>
