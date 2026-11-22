@@ -34,12 +34,10 @@ export function AtlasInspectorPreview({project,snapshot,plan,forecast,dirty,save
    open("work",workRequest.id);
  },[workRequest?.serial,workRequest?.id,project?.id]);
  const close=(key:string)=>{
-  setTabs(old=>{
-   const next=old.filter(t=>t.key!==key);
-   if(active===key)setActive(next[0]?.key??"");
-   if(!next.length)onClose();
-   return next;
-  });
+  const next=tabs.filter(t=>t.key!==key);
+  if(!next.length){onClose();return;}
+  setTabs(next);
+  if(active===key)setActive(next[0].key);
  };
  const work=shown?.kind==="work"?project?.items.find((w:any)=>w.id===shown.id):null;
  const source=shown?.kind==="source"?project?.sources.find((s:any)=>s.id===shown.id):null;
