@@ -1104,3 +1104,15 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .atlas-working-scenario-search input{width:min(220px,100%);min-height:34px;
  border:1px solid #c2d3e9;border-radius:7px;background:#fff;padding:5px 8px;color:#24405f}
 .atlas-working-scenario-row small{overflow-wrap:anywhere}
+
+/* Native Windows finding, 22.11: scrolling the scenario into view hid the
+   old top toggle behind the sticky project tabs. Keep the actual result
+   below those tabs and the panel's own close action inside the viewport. */
+.atlas-working-scenario{scroll-margin-top:146px}
+.atlas-working-scenario-footer{position:sticky;bottom:0;z-index:5;
+ display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;
+ gap:7px 12px;background:#e7f1ff;border-top:1px solid #c4d9f3;
+ padding:7px 9px;margin:9px -7px -7px;border-radius:0 0 7px 7px}
+.atlas-working-scenario-footer span{font-size:11px;color:#4c6280}
+.atlas-working-scenario-footer .action-button{min-height:34px;white-space:normal}
+@media(max-width:560px){.atlas-working-scenario{scroll-margin-top:84px}}
