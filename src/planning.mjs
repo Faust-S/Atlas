@@ -176,7 +176,7 @@ export function criticalPathFocus(plan){
 /** Read-only hypothetical removal of one existing dependency.
  * Uses canonical CPM and its comparison, never alters saved project objects.
  */
-export function forecastDependencyRemoval(project,before,from,to){
+export function forecastDependencyRemoval(project,before,from,to,{calendarLibrary=[]}={}){
  if(!project||!Array.isArray(project.items)||!Array.isArray(project.dependencies)||
     !before||!Array.isArray(before.rows))throw Error("Invalid dependency removal preview");
  const index=project.dependencies.findIndex(edge=>(edge.from??edge.fromId)===from&&
@@ -186,7 +186,7 @@ export function forecastDependencyRemoval(project,before,from,to){
  // from a temporary graph only. This cannot write an Atlas draft or Store.
  const dependencies=project.dependencies.slice();
  dependencies.splice(index,1);
- const after=scheduleProject({...project,dependencies});
+ const after=scheduleProject({...project,dependencies},{calendarLibrary});
  const effect=scheduleChangeSummary(before,after);
  return {
   from,to,beforeDays:before.durationDays,afterDays:after.durationDays,
