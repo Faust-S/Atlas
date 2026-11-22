@@ -190,6 +190,7 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
   });
   if(id){
    setCalendarDraftId(id);
+   if(calendarBasis&&!libraryRulesMatch)setCalendarBasis(null);
    setCalendarFeedback('Вариант добавлен в черновик проекта. Нажмите Ctrl+S для записи на диск.'+
     (calendarBasis&&!libraryRulesMatch?
      ' Календарные правила изменены: связь с исходной редакцией не присвоена.':''));
