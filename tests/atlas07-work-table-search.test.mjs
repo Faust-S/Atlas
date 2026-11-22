@@ -296,7 +296,7 @@ test("overview critical link opens focused relations and removal reports impact 
  assert.match(section,/confirmAction\(/);
  assert.match(section,/const next=disconnect\(data,project\.id,from,to\)/);
  assert.match(section,/startWorkCorrection\(\{/);
- assert.match(section,/beforePlan:plan,afterPlan:scheduleProject\(updatedProject\)/);
+ assert.match(section,/beforePlan:plan,afterPlan:scheduleProject\(updatedProject,\{calendarLibrary:data.calendarLibrary\?\?\[\]\}\)/);
  assert.match(section,/revealWorkInTable\(to,false\)/);
  assert.doesNotMatch(section,/commitWithReadback\(|nativeInvoke\(|void save\(|fetch\(/);
 });
