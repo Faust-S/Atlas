@@ -80,6 +80,12 @@ def qualify():
     # Import through existing original native file path, not a demo array.
     click_named("Портфель","Button")
     click_named("Файл")
+    d.wait_text("Открыть архив .iwxa",20)
+    # The new File menu and the existing first-start page both advertise
+    # "Открыть архив .iwxa". Close the menu and select the visible first-use
+    # action unambiguously instead of treating duplicate accessibility names
+    # as an application failure.
+    click_named("Файл")
     click_named("Открыть архив .iwxa","Button")
     v.choose_archive()
     d.wait_text("Заменить портфель в черновике",35)
