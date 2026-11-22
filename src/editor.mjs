@@ -22,6 +22,33 @@ const choice=(name,label,items,value="",required=true)=>({name,label,type:"selec
 const field=(name,label,type="text",value="",required=true)=>({name,label,type,value:value??"",required});
 const statusOptions=[option("planned","Запланирован"),option("active","В работе"),option("paused","Приостановлен"),option("completed","Завершён (заявлено)"),option("cancelled","Отменён")];
 const workOptions=[option("todo","Запланирована"),option("in_progress","В работе"),option("blocked","Заблокирована"),option("done","Выполнена (заявлено)")];
+const durationUnitOptions=[
+ option("elapsed_days","Календарные дни (без выходных)"),
+ option("working_days","Рабочие дни (по указанному календарю)")
+];
+const workCalendarChoices=snapshot=>[
+ option("","Без календаря (только календарные дни)"),
+ ...(snapshot?.calendarLibrary??[]).map(c=>
+  option(c.id+"@"+c.version,c.name+" · редакция "+c.version))
+];
+const workDurationFields=(snapshot,item=null)=>[
+ choice("durationUnit","Как считать длительность",
+  durationUnitOptions,item?.durationUnit??"elapsed_days"),
+ choice("calendarBasis","Календарь для рабочих дней",
+  workCalendarChoices(snapshot),item?.calendarBasis?
+  item.calendarBasis.id+"@"+item.calendarBasis.version:"",false)
+];
+function workDurationPatch(get){
+ const unit=get("durationUnit")||"elapsed_days";
+ if(!["elapsed_days","working_days"].includes(unit))throw Error("Выберите единицу длительности");
+ const selected=get("calendarBasis");
+ if(unit==="elapsed_days")return {durationUnit:unit,calendarBasis:null};
+ const at=selected.lastIndexOf("@"),version=Number(selected.slice(at+1));
+ if(at<=0||!Number.isSafeInteger(version)||version<1)
+  throw Error("Выберите редакцию рабочего календаря");
+ return {durationUnit:unit,calendarBasis:{id:selected.slice(0,at),version}};
+}
+
 const changeOptions=[option("proposed","Предложено"),option("approved","Утверждено"),option("in_progress","В работе"),option("implemented","Реализовано (заявлено)"),option("deferred","Отложено"),option("rejected","Отклонено")];
 const targetOptions=p=>(p.targets||[]).map(t=>option(t.id,t.title));
 const workItems=p=>p.items.map(t=>option(t.id,t.title));
@@ -233,7 +260,8 @@ export function editorSpec(project,action,snapshot=null){
     ]:[]),
     ...(project.stages.length?[choice("stageId","Этап",stageOptions(project),"",false)]:[]),
     field("newStageName","Новый этап (необязательно)","text","",false),
-    field("estimateDays","Оценка длительности, календарных дней","number","1"),
+    field("estimateDays","Оценка длительности, дней","number","1"),
+    ...workDurationFields(snapshot),
     field("dueDate","Контрольный срок работы","date","",false),
     ...(project.items.length?[choice("predecessorId","Начать после работы",[
      option("","Без зависимости"),...workItems(project)],"",false)]:[])
@@ -243,7 +271,8 @@ export function editorSpec(project,action,snapshot=null){
    field("title","Что нужно сделать?", "text",target?"Проверить: "+target.title:""),
    choice("targetId","Связать с ожидаемым результатом",optionalTargets(project),targetId,false),
    choice("stageId","Этап",stageOptions(project),"",false),
-   field("estimateDays","Оценка длительности, календарных дней","number","1"),
+   field("estimateDays","Оценка длительности, дней","number","1"),
+   ...workDurationFields(snapshot),
    field("dueDate","Контрольный срок работы","date","",false),
    ...(project.items.length?[choice("predecessorId","Начать после работы",[
     option("","Без зависимости"),...workItems(project)],"",false)]:[]),
@@ -358,7 +387,7 @@ export function editorSpec(project,action,snapshot=null){
    ". Если убрать привязку, сама работа, сроки, этап и зависимости сохранятся.");
   return {title:"Работа: "+item.title,
    ...(hints.length?{hint:hints.join(" ")}:{}),
-   fields:[field("title","Название работы","text",item.title),choice("stageId","Этап",stageOptions(project),item.stageId||"",false),field("dueDate","Срок работы","date",item.dueDate||"",false),choice("state","Состояние",workOptions,item.state),choice("priority","Приоритет",[option("low","Низкий"),option("normal","Обычный"),option("high","Высокий"),option("critical","Критический")],item.priority),field("assignee","Ответственный","text",item.assignee,false),field("estimateDays","Плановая длительность, дней","number",String(item.estimateDays??1)),choice("resourceId","Плановый ресурс",resourceChoiceOptions(snapshot),item.resourceId||"",false),field("allocationPct","Доля ресурса, %","number",String(item.allocationPct??100)),choice("targetId",additional.length?"Основное ожидаемое требование":"Связать с ожидаемым результатом",optionalTargets(project),item.targetIds?.[0]||"",false),
+   fields:[field("title","Название работы","text",item.title),choice("stageId","Этап",stageOptions(project),item.stageId||"",false),field("dueDate","Срок работы","date",item.dueDate||"",false),choice("state","Состояние",workOptions,item.state),choice("priority","Приоритет",[option("low","Низкий"),option("normal","Обычный"),option("high","Высокий"),option("critical","Критический")],item.priority),field("assignee","Ответственный","text",item.assignee,false),field("estimateDays","Плановая длительность, дней","number",String(item.estimateDays??1)),...workDurationFields(snapshot,item),choice("resourceId","Плановый ресурс",resourceChoiceOptions(snapshot),item.resourceId||"",false),field("allocationPct","Доля ресурса, %","number",String(item.allocationPct??100)),choice("targetId",additional.length?"Основное ожидаемое требование":"Связать с ожидаемым результатом",optionalTargets(project),item.targetIds?.[0]||"",false),
    ...(item.sourceId?[choice("sourceLink","Связь с источником",[
     option("keep","Оставить привязку"),option("remove","Убрать привязку")],"keep")]:[])]};
  }
@@ -478,7 +507,8 @@ export function applyEditor(snapshot,projectId,action,input){
    resourceId:get("resourceId"),allocationPct:percentage("allocationPct")});
   // Only explicit choices affect the plan; discovery alone adds no dependency.
   const work=editItem(r.state,projectId,r.id,{
-   estimateDays:integer("estimateDays"),dueDate:get("dueDate")||null,...(origin?{
+   estimateDays:integer("estimateDays"),...workDurationPatch(get),
+   dueDate:get("dueDate")||null,...(origin?{
     sourceId:origin.sourceId,sourcePath:origin.folder,sourceRevision:origin.commitSha
    }:{})
   });
@@ -555,7 +585,8 @@ export function applyEditor(snapshot,projectId,action,input){
    throw Error("Связь с источником уже отсутствует.");
   const selected=get("targetId"),rest=(item.targetIds||[]).slice(1);
   const targetIds=[...(selected?[selected]:[]),...rest.filter(link=>link!==selected)];
-  return {state:editItem(snapshot,projectId,id,{title:get("title"),stageId:get("stageId")||null,dueDate:get("dueDate")||null,state:get("state"),priority:get("priority"),assignee:get("assignee"),estimateDays:integer("estimateDays"),resourceId:get("resourceId"),allocationPct:percentage("allocationPct"),targetIds,
+  return {state:editItem(snapshot,projectId,id,{title:get("title"),stageId:get("stageId")||null,dueDate:get("dueDate")||null,state:get("state"),priority:get("priority"),assignee:get("assignee"),estimateDays:integer("estimateDays"),...workDurationPatch(get),
+   resourceId:get("resourceId"),allocationPct:percentage("allocationPct"),targetIds,
    ...(sourceLink==="remove"?{sourceId:null}:{})})};
  }
  if(action==="risk")return {state:createRisk(snapshot,projectId,get("text"))};
