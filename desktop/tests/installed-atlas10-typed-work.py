@@ -119,18 +119,18 @@ def qualify():
     v.find_control("Открыть работу "+TITLE,types={"Button"},scroll=True).click_input()
     d.window_title_contains("Форма: Работа: "+TITLE,25)
     win32gui.MoveWindow(d.handle,0,0,820,650,True)
-    choose_second_option("Как считать длительность")
+    # One calendar selection must also switch the Work duration to working
+    # days through the ordinary installed React form; no second user action
+    # or direct Store manipulation is allowed.
     choose_second_option("Календарь для рабочих дней")
-    # The form only shows this preview after BOTH controls have actually
-    # changed React state. Retry the two real GUI selections once when Windows
-    # loses the first native select/blur event; never bypass the UI or Save.
     try:
         d.wait_text("Если применить эти значения",8)
     except AssertionError:
         print("ATLAS10_NATIVE_SELECT_NOT_COMMITTED_RETRY_ONCE",flush=True)
-        choose_second_option("Как считать длительность")
         choose_second_option("Календарь для рабочих дней")
         d.wait_text("Если применить эти значения",25)
+    d.wait_text("Указанная редакция календаря применяется при расчёте рабочих дней.",20)
+    print("ATLAS10_NATIVE_CALENDAR_AUTO_UNIT_PASS",flush=True)
     assert d.head()==baseline and d.saved_project(baseline)==original,(
         "Native Work draft preview wrote Store before Apply")
     v.capture("atlas10-typed-work-editor-820")
