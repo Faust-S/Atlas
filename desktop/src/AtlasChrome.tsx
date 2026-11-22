@@ -1,6 +1,6 @@
 import React from "react";
 
-type Glyph="home"|"portfolio"|"work"|"gantt"|"review"|"resources"|"sources"|"panel"|"back"|"forward"|"graph"|"settings";
+type Glyph="home"|"portfolio"|"work"|"gantt"|"review"|"changes"|"store"|"resources"|"sources"|"panel"|"back"|"forward"|"graph"|"settings";
 export function AtlasGlyph({name}:{name:Glyph}){
  const art:Record<Glyph,React.ReactNode>={
   home:<path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/>,
@@ -8,6 +8,8 @@ export function AtlasGlyph({name}:{name:Glyph}){
   work:<><rect x="3" y="3" width="18" height="18" rx="3"/><path d="m8 12 3 3 5-6"/></>,
   gantt:<><path d="M3 6h18M3 12h18M3 18h18"/><path d="M6 4v4M11 10v4M17 16v4"/></>,
   review:<><path d="m12 2 8 4v6c0 5-3 8-8 10-5-2-8-5-8-10V6z"/><path d="m9 12 2 2 4-4"/></>,
+  changes:<><path d="m12 2 8 4v6c0 5-3 8-8 10-5-2-8-5-8-10V6z"/><path d="M9 12h6m-3-3v6"/></>,
+  store:<><path d="M4 7a8 8 0 0 1 14-2l2 2M20 3v4h-4M20 17a8 8 0 0 1-14 2l-2-2M4 21v-4h4"/></>,
   resources:<><path d="M5 9v10h14V9H5zM9 9V6h6v3M5 13h14M11 13v2h2v-2"/></>,
   sources:<><path d="M6 2h8l5 5v14H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM14 2v6h5M8 13h8M8 17h8"/></>,
   panel:<><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/></>,
@@ -21,7 +23,7 @@ export function AtlasGlyph({name}:{name:Glyph}){
   aria-hidden="true">{art[name]}</svg>;
 }
 type ChromeProps={
- logoUrl:string; canBack:boolean;canForward:boolean; onBack:()=>void;onForward:()=>void;
+ logoUrl:string; statusLabel:string;canBack:boolean;canForward:boolean; onBack:()=>void;onForward:()=>void;
  onTogglePanel:()=>void;onToggleInspector:()=>void;inspector:boolean;
  onHome:()=>void;onPortfolio:()=>void;onGantt:()=>void;onReality:()=>void;
  onNewProject:()=>void;onNewWork:()=>void;onEditProject:()=>void;
@@ -80,12 +82,23 @@ export function AtlasChromeTopbar(props:ChromeProps){
     <button onClick={e=>c(e,props.onSettings)}>Настройки и сведения о приложении</button>
    </div></details>
   </div>
+  <div className="atlas-v6-title-right">
+   <span className="atlas-v6-save-status" role="status">{props.statusLabel}</span>
+   <button type="button" className={"atlas-v6-save-button"+(props.canSave?" is-dirty":"")}
+    disabled={!props.canSave} onClick={props.onSave} title="Ctrl+S">Сохранить</button>
+   <button type="button" className="atlas-v6-toolbar-icon atlas-v6-inspector-icon"
+    onClick={props.onToggleInspector}
+    title={props.inspector?"Скрыть инспектор":"Показать инспектор"}
+    aria-label={props.inspector?"Скрыть инспектор":"Показать инспектор"}>
+     <AtlasGlyph name="panel"/>
+   </button>
+  </div>
  </header>;
 }
 type RailProps={
  logoUrl:string;active:string;hasProject:boolean;
  onHome:()=>void;onPortfolio:()=>void;onWork:()=>void;onGantt:()=>void;onGraph:()=>void;
- onReality:()=>void;onResources:()=>void;onSources:()=>void;onSettings:()=>void;
+ onReality:()=>void;onChanges:()=>void;onStore:()=>void;onResources:()=>void;onSources:()=>void;onSettings:()=>void;
 };
 export function AtlasChromeRail(p:RailProps){
  const items:{key:string;label:string;icon:Glyph;action:()=>void;disabled?:boolean}[]=[
@@ -95,6 +108,7 @@ export function AtlasChromeRail(p:RailProps){
   {key:"timeline",label:"График работ",icon:"gantt",action:p.onGantt,disabled:!p.hasProject},
   {key:"graph",label:"Зависимости",icon:"graph",action:p.onGraph,disabled:!p.hasProject},
   {key:"reality",label:"План / факт",icon:"review",action:p.onReality,disabled:!p.hasProject},
+  {key:"changes",label:"Изменения и решения",icon:"changes",action:p.onChanges,disabled:!p.hasProject},
   {key:"resources",label:"Ресурсы",icon:"resources",action:p.onResources},
   {key:"sources",label:"Источники",icon:"sources",action:p.onSources,disabled:!p.hasProject}
  ];
@@ -106,6 +120,10 @@ export function AtlasChromeRail(p:RailProps){
    disabled={item.disabled} onClick={item.action}>
    <AtlasGlyph name={item.icon}/></button>)}
   <span className="atlas-v6-rail-spacer"/>
+  <button type="button" className={"atlas-v6-rail-btn"+(p.active==="store"?" is-active":"")}
+   aria-current={p.active==="store"?"page":undefined}
+   title="Хранилище и обмен" data-tip="Хранилище и обмен"
+   aria-label="Хранилище и обмен" onClick={p.onStore}><AtlasGlyph name="store"/></button>
   <span className="atlas-v6-rail-separator"/>
   <button className={"atlas-v6-rail-btn atlas-v6-profile"+(p.active==="settings"?" is-active":"")}
    type="button" aria-label="Настройки Atlas" data-tip="Настройки" title="Настройки"
