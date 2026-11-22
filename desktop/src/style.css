@@ -1145,3 +1145,40 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
  .atlas-working-scenario-saved>.atlas-gantt-tools{align-items:stretch;flex-direction:column}
  .atlas-working-scenario-saved .action-button{width:100%;max-width:100%}
 }
+
+/* Atlas10 native Windows defect (820x650): the *workspace* can be narrower
+   than the window. A 4-column work row clipped its mode button at the right
+   edge. Size against the panel itself, not only the OS viewport. */
+.atlas-working-scenario{container-type:inline-size}
+@container (max-width:680px){
+ .atlas-working-scenario-row{
+  grid-template-columns:minmax(0,1fr) minmax(118px,132px);
+  grid-template-rows:auto auto;
+  gap:3px 8px;
+  padding:5px 0;
+  border-bottom:1px solid #dce7f3;
+ }
+ .atlas-working-scenario-row>button:first-child{
+  grid-column:1;grid-row:1;
+  min-width:0;overflow-wrap:anywhere;
+ }
+ .atlas-working-scenario-row>.atlas-working-scenario-mode{
+  grid-column:2;grid-row:1;
+  min-width:0;width:100%;justify-self:stretch;text-align:center;
+ }
+ .atlas-working-scenario-row>span{
+  grid-column:1;grid-row:2;min-width:0;overflow-wrap:anywhere;
+ }
+ .atlas-working-scenario-row>small{
+  grid-column:2;grid-row:2;min-width:0;text-align:right;
+ }
+}
+/* Defensive fallback for an older embedded WebView without container queries.
+   A normal 820px laptop window leaves only about 475px inside the scenario. */
+@media (min-width:681px) and (max-width:1080px){
+ .atlas-working-scenario-row{grid-template-columns:minmax(0,1fr) minmax(118px,132px);grid-template-rows:auto auto;gap:3px 8px}
+ .atlas-working-scenario-row>button:first-child{grid-column:1;grid-row:1;min-width:0}
+ .atlas-working-scenario-row>.atlas-working-scenario-mode{grid-column:2;grid-row:1;min-width:0;width:100%;text-align:center}
+ .atlas-working-scenario-row>span{grid-column:1;grid-row:2;min-width:0}
+ .atlas-working-scenario-row>small{grid-column:2;grid-row:2;min-width:0;text-align:right}
+}
