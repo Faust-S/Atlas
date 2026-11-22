@@ -1545,6 +1545,17 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
  padding:13px 14px;margin:13px 0}
 .atlas-v6-preview-card>strong{font-size:12px;color:#234262}
 .atlas-v6-preview-card p{font-size:12px;line-height:1.55;color:#536d8a;margin:5px 0}
+.atlas-v6-baseline-picker{display:flex;flex-direction:column;gap:5px;margin:10px 0;font-size:11px;color:#536d8a}
+.atlas-v6-baseline-picker select{max-width:100%;width:100%;min-height:33px;padding:5px 8px;border:1px solid #c6d6ea;border-radius:8px;background:#fff;color:#284763}
+.atlas-v6-inspector-reasons{border-left:2px solid #91b5eb;margin:10px 0 4px;padding:4px 0 4px 10px}
+.atlas-v6-inspector-reasons>strong{font-size:11px;color:#37587e}
+.atlas-v6-inspector-reasons p{margin:4px 0}
+.atlas-v6-inspector-history{padding:9px 0;border-bottom:1px solid #e1e9f3}
+.atlas-v6-inspector-history:last-of-type{border-bottom:none}
+.atlas-v6-inspector-history small{display:block;font-size:10px;color:#6382a3;line-height:1.45}
+.atlas-v6-inspector-history p{overflow-wrap:anywhere;margin:5px 0}
+.atlas-v6-baseline-comparison{min-width:0}
+.atlas-v6-preview-card>small{display:block;font-size:10px;color:#6d819a;line-height:1.5;margin-top:8px}
 .atlas-v6-preview-link{display:block;margin:8px 0;color:#2c628f;background:none;border:0;
  text-align:left;text-decoration:underline;font-size:11px;overflow-wrap:anywhere}
 .atlas-v6-preview-actions{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}
