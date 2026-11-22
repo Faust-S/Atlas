@@ -14,9 +14,11 @@ const dayEvents=(group)=>{
  const events=new Map();
  const append=(day,load,count)=>{const e=events.get(day)||{load:0,count:0};e.load+=load;e.count+=count;events.set(day,e)};
  for(const w of group.work){
-  if(w.startDay!==null&&w.finishDay!==null&&w.finishDay>w.startDay){
-   append(w.startDay,w.allocationPct,1);
-   append(w.finishDay,-w.allocationPct,-1);
+  // The original CPM emits exact occupied intervals for calendar-based Work.
+  // Weekend gaps no longer create capacity load or false overload warnings.
+  for(const [from,until] of w.activeRanges??[]){
+   append(from,w.allocationPct,1);
+   append(until,-w.allocationPct,-1);
   }
  }
  const from=day(group.availableFrom),until=day(group.availableUntil);
@@ -53,7 +55,8 @@ export function portfolioResources(snapshot,{schedule=null}={}){
   if(project.status==="cancelled")continue;
   const start=day(forecast.byId.get(project.id)?.projectedStart);
   const own=scheduleProject(project,{calendarLibrary:snapshot.calendarLibrary??[],
-   startDate:start===null?project.startDate:forecast.byId.get(project.id)?.projectedStart});
+   startDate:start===null?project.startDate:forecast.byId.get(project.id)?.projectedStart,
+   includeResourceOccupancy:true});
   const items=new Map(project.items.map(x=>[x.id,x]));
   for(const planned of own.rows){
    if(planned.state==="done")continue;
@@ -65,6 +68,8 @@ export function portfolioResources(snapshot,{schedule=null}={}){
    const row={projectId:project.id,projectName:project.name,id:item.id,title:item.title,
     state:item.state,assignee:owner,resourceId,resourceLabel:linked?.label||null,
     allocationPct:item.allocationPct??100,estimateDays:planned.durationDays,
+    durationUnit:planned.durationUnit,
+    activeRanges:start===null?[]:(planned.activeRanges??[]).map(([from,until])=>[start+from,start+until]),
     startDay,finishDay,startDate:startDay===null?null:date(startDay),
     finishDate:finishDay===null?null:date(finishDay)};
    work.push(row);totals.openWork++;
@@ -79,6 +84,7 @@ export function portfolioResources(snapshot,{schedule=null}={}){
   const load=dayEvents(r);
   return {...r,projectCount:r.projects.size,itemCount:r.work.length,
    scheduledDays:r.work.reduce((n,w)=>n+w.estimateDays,0),
+   occupiedCalendarDays:r.work.reduce((n,w)=>n+w.activeRanges.reduce((total,[from,until])=>total+until-from,0),0),
    datedWork:r.work.filter(w=>w.startDay!==null).length,
    undatedWork:r.work.filter(w=>w.startDay===null).length,
    ...load};
@@ -89,7 +95,7 @@ export function portfolioResources(snapshot,{schedule=null}={}){
  totals.assignees=people.length;
  const byId=new Map(people.map(p=>[p.id,p]));
  return {people,byId,work,totals,
-  warning:"Ресурсы и мощность заданы человеком для планирования, не являются проверенной личностью, официальной доступностью или полномочием. CPM использует календарные дни без выравнивания нагрузки."};
+  warning:"Ресурсы и мощность заданы человеком для планирования, не являются проверенной личностью, официальной доступностью или полномочием. Занятость учитывает закреплённые рабочие календари и календарные операции исходного CPM; выравнивания нагрузки нет."};
 }
 export function renderPortfolioResources(snapshot,escape=esc){
  const {people,totals:t}=portfolioResources(snapshot);
@@ -129,12 +135,12 @@ export function renderProjectResources(snapshot,projectId,escape=esc){
    'По известным датам превышений нет';
   return '<tr><td><button class="atlas-plain-button" data-action="work:'+escape(w.id)+'">'+escape(w.title)+'</button></td>'+
    '<td>'+escape(w.assignee||"Не назначен")+'</td><td>'+escape(group?.label||"Не привязан")+'</td>'+
-   '<td>'+w.allocationPct+'%</td><td>'+w.estimateDays+'</td>'+
+   '<td>'+w.allocationPct+'%</td><td>'+w.estimateDays+(w.durationUnit==='working_days'?' раб. дн.':' кал. дн.')+'</td>'+ 
    '<td>'+escape(show(w.startDate))+'</td><td>'+escape(show(w.finishDate))+'</td><td>'+escape(signal)+'</td></tr>';
  }).join("");
  return '<section class="card" id="atlas-project-resources"><h2>Ресурсы работ проекта</h2>'+
   '<p class="muted">Для межпроектного сопоставления явно выберите один плановый ресурс в карточке работы. Имя ответственного остаётся отдельным текстовым полем.</p>'+
-  '<div class="atlas-table-scroll"><table class="atlas-table"><thead><tr><th>Работа</th><th>Ответственный</th><th>Ресурс</th><th>Доля</th><th>Дней</th><th>Начало CPM</th><th>Финиш CPM</th><th>Внимание</th></tr></thead><tbody>'+tr+'</tbody></table></div>'+
+  '<div class="atlas-table-scroll"><table class="atlas-table"><thead><tr><th>Работа</th><th>Ответственный</th><th>Ресурс</th><th>Доля</th><th>Длительность</th><th>Начало CPM</th><th>Финиш CPM</th><th>Внимание</th></tr></thead><tbody>'+tr+'</tbody></table></div>'+
   (rows.length>50?'<p class="muted">Показаны 50 из '+rows.length+' работ.</p>':"")+
   '<p class="muted">Прогноз не распределяет работы автоматически, не подтверждает доступность и не заменяет решение человека.</p></section>';
 }
