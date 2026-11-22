@@ -79,7 +79,7 @@ test("0.11 approved Atlas prototype exposes full rail and titlebar Save without 
  const settings=source("../desktop/src/AtlasSettings.tsx");
  const css=source("../desktop/src/style.css");
  assert.match(chrome, /label:"Изменения и решения"/);
- assert.match(chrome, /label:"Хранилище и обмен"/);
+ assert.match(chrome, /aria-label="Хранилище и обмен"/);
  assert.match(chrome, /data-tip="Хранилище и обмен"/);
  assert.match(chrome, /atlas-v6-title-right/);
  assert.match(chrome, /className=\{"atlas-v6-save-button"/);
