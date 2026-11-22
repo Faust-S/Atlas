@@ -169,7 +169,7 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
      <span>Разница: <strong>{workingScenario.result.shiftDays==null?'Не определить':
       (workingScenario.result.shiftDays>0?'+':'')+workingScenario.result.shiftDays+' дн.'}</strong></span>
      <span>Затронуто: <strong>{workingDifferences.shifted} работ</strong></span>
-     <span>Непрерывных операций: <strong>{workingScenario.result.continuousTotal}</strong></span>
+     <span>{'Непрерывных операций: '+workingScenario.result.continuousTotal}</span>
     </div>
     <p className="atlas-working-scenario-first">
      {'Первый рабочий день: '+(workingScenario.result.firstEligibleDate||'Не определён')}
