@@ -182,7 +182,9 @@ test("one calendar calculation drives Gantt, work table and portfolio; older 0.8
  const portfolio=readFileSync(new URL("../src/portfolio-schedule.mjs",import.meta.url),"utf8");
  const workflow=readFileSync(new URL("../.github/workflows/manual-check.yml",import.meta.url),"utf8");
  assert.match(core,/export function scheduleProject\(/);
- assert.match(desktop,/const plan=useMemo\(\(\)=>project\?scheduleProject\(project,\{/);
+ assert.match(desktop,/const plannedPlan=useMemo\(\(\)=>project\?scheduleProject\(project,\{/);
+ assert.match(desktop,/const plan=scheduleView\?\.display\?\?null/);
+ assert.match(desktop,/projectScreenSchedule\(project,projected,\{/);
  assert.match(desktop,/calendarLibrary:data.calendarLibrary\?\?\[\]/);
  assert.match(portfolio,/scheduleProject\(p,\{calendarLibrary:snapshot.calendarLibrary\?\?\[\]/);
  assert.match(portfolio,/startDate:dateOf\(projectedStartDay\)/);
