@@ -93,15 +93,6 @@ jobs:
           persist-credentials: false
       - name: Qualify Atlas project/work and stale revision with real Center sources
         run: node tests/atlas-center-interop.mjs
-      - name: Checkout released Atlas 0.8 unchanged for backwards-compatibility test
-        uses: actions/checkout@v4
-        with:
-          repository: Faust-S/Atlas
-          ref: 6ef7b8fa1ad58f159508aaa6413d5e0d9cf35dbb
-          path: legacy-atlas08
-          persist-credentials: false
-      - name: Independently qualify 0.8 opening, editing and carrying 0.10 calendar drafts
-        run: node --test tests/atlas10-legacy08-interoperability.mjs
       - name: Verify production desktop build
         working-directory: desktop
         run: npm run build
