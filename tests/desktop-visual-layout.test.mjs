@@ -171,7 +171,7 @@ test("fullscreen views release overlay before invoking project/work editors",()=
  assert.equal((ts.match(/setExpanded\(false\);onOpenWork\(row\.id\)/g)||[]).length,3,
   "Gantt and optional preview each release fullscreen before opening a work");
  assert.match(ts,/Сценарий: рабочая неделя/);
- assert.match(ts,/previewWorkingWeek/);
+ assert.match(ts,/previewOperationCalendars/);
  assert.match(ts,/setExpanded\(false\);onOpenWork\(node\.id\)/);
 });
 
@@ -186,6 +186,9 @@ test('working-week preview puts the result first, supports full work search, and
  assert.match(block,/aria-label="Поиск по работам календарного сценария"/);
  assert.match(block,/Все работы \(/);
  assert.match(block,/Показать ещё работы/);
+ assert.match(block,/aria-pressed=\{row\.durationMode==='elapsed_days'\}/);
+ assert.match(block,/Без выходных/);
+ assert.match(block,/Дополнительные рабочие даты/);
  assert.match(block,/aria-label="Закрыть календарный сценарий"/);
  assert.match(block,/setWorkingScenarioOpen\(false\);workingToggleRef\.current\?\.focus\(\)/);
  assert.match(ts,/ref=\{workingToggleRef\}/);
