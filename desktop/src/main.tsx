@@ -28,6 +28,9 @@ import {sourceReview,sourceFreshnessLabel} from "../../src/source-review.mjs";
 import {githubPortfolioCatalog,createProjectFromGitHubCatalog,githubPortfolioOverview,
  filterGithubPortfolioOverview} from "../../src/ecosystem.mjs";
 import {ProjectGantt,ProjectDependencyDiagram,PortfolioNetworkMap} from "./ProjectVisuals";
+import {AtlasDashboard} from "./AtlasDashboard";
+import {AtlasSettings} from "./AtlasSettings";
+import {AtlasChromeTopbar,AtlasChromeRail,AtlasGlyph} from "./AtlasChrome";
 import {ProjectConnect} from "./ProjectConnect";
 import {ProjectOrganizationGuide} from "./ProjectOrganizationGuide";
 import {projectSourcePlanWorkContext,projectWorkTableSearch} from "../../src/project-organization.mjs";
@@ -325,6 +328,19 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const [generation,setGeneration]=useState("none");
  const [active,setActive]=useState<string|null>(null),[tab,setTab]=useState<Tab>("overview");
  const [search,setSearch]=useState(""),[editor,setEditor]=useState<Editor|null>(null);
+ // Standalone v6 chrome; embedded T3 keeps its already-qualified host surface.
+ const [homeOpen,setHomeOpen]=useState(()=>!host);
+ const [settingsOpen,setSettingsOpen]=useState(false);
+ const [navPanelOpen,setNavPanelOpen]=useState(()=>Boolean(host)||window.innerWidth>=1030);
+ const [inspectorWidth,setInspectorWidth]=useState(()=>{
+  try{const n=Number(localStorage.getItem("iwxa.atlas.ui.inspector.width.v1"));
+   return Number.isFinite(n)&&n>=300&&n<=760?n:390;}catch{return 390}
+ });
+ type AtlasLocation={projectId:string|null;tab:Tab;home:boolean;settings:boolean};
+ const routeHistory=useRef<AtlasLocation[]>([]);
+ const routeCursor=useRef(-1);
+ const routeSuppress=useRef(false);
+ const [routeControls,setRouteControls]=useState({back:false,forward:false});
  const [portfolioStatus,setPortfolioStatus]=useState("all");
  const [connectOpen,setConnectOpen]=useState(false);
  const [ecosystemOwner,setEcosystemOwner]=useState("all");
@@ -1183,12 +1199,37 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   resetWorkspaceScroll();
   host?.onSelection?.({projectId:id,workId:null,revision:String(latestSnapshot.current.revision)});
   setActive(id);setTab("overview");setEditor(null);setForecastId(null);setConnectOpen(false);
+  if(id!==null){setHomeOpen(false);setSettingsOpen(false);}
   setSourceJump(null);setMapSearchReturn(null);setGraphJump(null);setWorkReturnId(null);
   setRecentWorkId(null);setRecentPlanBefore(null);setWorkImpactOnly(false);setWorkCriticalOnly(false);
   setShowProjectRelations(false);setRelationLimit(12);setRequirementJump(null);setChangeJump(null);
   if(!afterSubmit)setMessage("");
   setWorkDependencyFilter("all");setWorkDeadlineFilter("all");setWorkFilter("all");setWorkTargetFilter("all");setWorkObservationFilter("all");setWorkHistoryLimits({});setWorkQuery("");setWorkSort("title");setWorkLimit(200);setRealityLimit(8);
   setHistoryQuery("");setHistoryType("all");setHistoryLimit(120);setRecheckLimit(25);
+ };
+ // Back/forward preserve UI navigation but never bypass a pending editor.
+ useEffect(()=>{
+  if(embedded)return;
+  const place:AtlasLocation={projectId:active,tab,home:active?false:homeOpen,settings:settingsOpen};
+  if(routeSuppress.current){routeSuppress.current=false;return;}
+  const current=routeHistory.current[routeCursor.current];
+  if(current&&current.projectId===place.projectId&&current.tab===place.tab&&
+   current.home===place.home&&current.settings===place.settings)return;
+  routeHistory.current=routeHistory.current.slice(0,routeCursor.current+1);
+  routeHistory.current.push(place);
+  if(routeHistory.current.length>60)routeHistory.current.shift();
+  routeCursor.current=routeHistory.current.length-1;
+  setRouteControls({back:routeCursor.current>0,forward:false});
+ },[active,tab,homeOpen,settingsOpen,embedded]);
+ const moveRoute=(delta:-1|1)=>{
+  if(!requireClosedForm())return;
+  const next=routeCursor.current+delta;
+  if(next<0||next>=routeHistory.current.length)return;
+  const place=routeHistory.current[next];
+  routeSuppress.current=true;routeCursor.current=next;
+  selectProject(place.projectId);setTab(place.tab);
+  setHomeOpen(place.home);setSettingsOpen(place.settings);
+  setRouteControls({back:next>0,forward:next<routeHistory.current.length-1});
  };
  const openProjectTab=(id:string,tabId:Tab,changeId:string|null=null)=>{
   if(!requireClosedForm())return;
@@ -1238,7 +1279,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    const p=data.projects.find((x:any)=>x.id===projectId);
    if(!p)throw Error("Проект для решения не найден");
    resetWorkspaceScroll();
-   setActive(projectId);setTab(action.startsWith("plan-")?"changes":"reality");
+   setActive(projectId);setHomeOpen(false);setSettingsOpen(false);
+   setTab(action.startsWith("plan-")?"changes":"reality");
    setEditor({action,spec:editorSpec(p,action,data)});setInspector(true);setError("");
   }catch(e){issue(e)}
  };
@@ -1653,6 +1695,23 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   if(tabId!=="graph")setGraphJump(null);
   setTab(tabId);setEditor(null);setForecastId(null);
  };
+ const goHome=()=>{
+  if(!requireClosedForm())return;selectProject(null);setHomeOpen(true);setSettingsOpen(false);
+ };
+ const goPortfolio=()=>{
+  if(!requireClosedForm())return;selectProject(null);setHomeOpen(false);setSettingsOpen(false);
+ };
+ const goSettings=()=>{if(!requireClosedForm())return;setSettingsOpen(true)};
+ const goProjectTab=(id:Tab)=>{
+  if(!project||!requireClosedForm())return;
+  setHomeOpen(false);setSettingsOpen(false);view(id);
+ };
+ const goResources=()=>{
+  if(project)goProjectTab("resources");else goPortfolio();
+ };
+ const goSources=()=>{
+  if(project)goProjectTab("sources");else goPortfolio();
+ };
  const showPendingWorks=()=>{
   if(!project||!requireClosedForm())return;
   // Open all waiting work, not the user's last table search.
@@ -1830,13 +1889,50 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    {native&&!recovery&&!error&&<p className="minor">Открытие нативного хранилища…</p>}
   </div>
  </main>;
- return <div ref={rootRef} className={"app-shell"+(inspector?"":" no-inspector")+(editor?" editor-active":"")+(embedded?" atlas-embedded":"")+(connectOpen?" atlas-connect-focused":"")}>
-  <aside className="sidebar">
-   <div className="brand"><img className="logo-symbol" src={logoUrl} alt="" aria-hidden="true" /><div><strong>Atlas</strong><small>IWXA · {atlasVersionLabel}</small></div></div>
+ return <div ref={rootRef}
+  className={"app-shell"+(inspector?"":" no-inspector")+(editor?" editor-active":"")+
+   (embedded?" atlas-embedded":" atlas-v6-shell")+(connectOpen?" atlas-connect-focused":"")}
+  style={!embedded?{"--atlas-v6-dock-width":inspectorWidth+"px"} as React.CSSProperties:undefined}>
+  {!embedded&&<AtlasChromeTopbar logoUrl={logoUrl} canBack={routeControls.back}
+   canForward={routeControls.forward} onBack={()=>moveRoute(-1)} onForward={()=>moveRoute(1)}
+   onTogglePanel={()=>setNavPanelOpen(v=>!v)}
+   onToggleInspector={()=>setInspector(v=>!v)} inspector={inspector}
+   onHome={goHome} onPortfolio={goPortfolio} onGantt={()=>goProjectTab("timeline")}
+   onReality={()=>goProjectTab("reality")}
+   onNewProject={()=>openEditor("new")} onNewWork={()=>openEditor("item")}
+   onEditProject={()=>openEditor("project-edit")}
+   onSave={()=>void save()} canSave={dirty&&!busy&&!editor}
+   canEdit={Boolean(project)&&!busy&&!editor}
+   onExportIwxa={()=>void exportIwxa()} onImportIwxa={()=>void importIwxa()}
+   onExportJson={()=>void exportJson()} onImportJson={()=>void importJson()}
+   onHistory={()=>void showNativeHistory()}
+   canExport={!busy&&!dirty&&!editor&&persisted}
+   canImport={!busy&&!editor&&pendingImport===null}
+   onSignedFile={()=>signedResultFileInput.current?.click()}
+   signedFileAvailable={signedFileOwnerAvailable}
+   canSignedFile={!busy&&!dirty&&!editor&&persisted&&pendingImport===null&&
+    signedResultPreview===null}
+   onSettings={goSettings}/>}
+  <div className="atlas-v6-layout">
+   {!embedded&&<AtlasChromeRail logoUrl={logoUrl}
+    active={settingsOpen?"settings":!project?(homeOpen?"home":"portfolio"):tab}
+    hasProject={!!project} onHome={goHome} onPortfolio={goPortfolio}
+    onWork={()=>goProjectTab("work")} onGantt={()=>goProjectTab("timeline")}
+    onGraph={()=>goProjectTab("graph")} onReality={()=>goProjectTab("reality")}
+    onResources={goResources} onSources={goSources} onSettings={goSettings}/>}
+
+  <aside className={"sidebar"+(!embedded&&!navPanelOpen?" atlas-v6-sidebar-collapsed":"")}>
+   {embedded&&<div className="brand"><img className="logo-symbol" src={logoUrl} alt="" aria-hidden="true" /><div><strong>Atlas</strong><small>IWXA · {atlasVersionLabel}</small></div></div>}
+   {!embedded&&<label className="search atlas-v6-search"><span>⌕</span><input id="atlas-search" aria-label="Найти проект по работе, этапу или источнику"
+      placeholder="Проект, работа или источник"
+      value={search} onChange={e=>{setSearch(e.target.value);setPortfolioLimit(150);setSidebarLimit(120)}}/><kbd>Ctrl K</kbd></label>}
+   <div className="atlas-v6-nav-scroll">
    <nav className="main-nav" aria-label="Основная навигация">
+    {!embedded&&<button aria-label="Открыть главную Atlas" className={!project&&homeOpen&&!settingsOpen?"nav-current":""}
+      onClick={goHome}><AtlasGlyph name="home"/><span>Главная</span></button>}
     <button aria-label="Открыть портфель проектов" className={!active?"nav-current":""}
-      onClick={()=>selectProject(null)}>▦ <span>Портфель проектов</span><b>{data.projects.length}</b></button>
-    <button aria-label="Создать проект" onClick={()=>{selectProject(null);openEditor("new")}}>＋ <span>Создать проект</span></button>
+      onClick={embedded?()=>selectProject(null):goPortfolio}><AtlasGlyph name="portfolio"/><span>Портфель проектов</span><b>{data.projects.length}</b></button>
+    <button aria-label="Создать проект" onClick={()=>openEditor("new")}>＋ <span>Создать проект</span></button>
     <button aria-label="Подключить существующий проект" onClick={startConnection}>↗ <span>Подключить проект</span></button>
    </nav>
    <div className="sidebar-label">Мои проекты</div>
@@ -1849,13 +1945,20 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     </button>}
     {!filtered.length&&<small className="nav-hint">Проекты не найдены</small>}
    </div>
-   <div className="sidebar-foot"><div className="foot-title">{embedded?"Atlas в Personal Agent":"Мои проекты"}</div><p>{embedded?"Работайте с проектами в своём рабочем пространстве.":"Проекты хранятся на этом компьютере. Сохраняйте изменения, когда работа завершена."}</p></div>
+   {!embedded&&project&&<nav className="atlas-v6-subviews" aria-label="Разделы текущего проекта">
+    <div className="sidebar-label">Разделы проекта</div>
+    {tabs.map(item=><button key={item.key} type="button" aria-current={tab===item.key?"page":undefined}
+     className={"atlas-v6-subview"+(tab===item.key&&!settingsOpen?" selected":"")}
+     onClick={()=>goProjectTab(item.key)}>{item.title}</button>)}
+   </nav>}
+   </div>
+   <div className="sidebar-foot"><div className="foot-title">{embedded?"Atlas в Personal Agent":"Локальный портфель"}</div><p>{embedded?"Работайте с проектами в своём рабочем пространстве.":"Проекты хранятся на этом компьютере. Сохраняйте изменения, когда работа завершена."}</p></div>
   </aside>
   <main className="workspace">
    <header className="commandbar">
-    <label className="search"><span>⌕</span><input id="atlas-search" aria-label="Найти проект по работе, этапу или источнику"
+    {embedded&&<label className="search"><span>⌕</span><input id="atlas-search" aria-label="Найти проект по работе, этапу или источнику"
       placeholder="Проект, работа или источник"
-      value={search} onChange={e=>{setSearch(e.target.value);setPortfolioLimit(150);setSidebarLimit(120)}}/><kbd>Ctrl K</kbd></label>
+      value={search} onChange={e=>{setSearch(e.target.value);setPortfolioLimit(150);setSidebarLimit(120)}}/><kbd>Ctrl K</kbd></label>}
     <div className="toolbar-actions">
      <Badge tone={editor||dirty?"warning":persisted?"good":"neutral"}>{editor?"Форма не применена":dirty?"Не сохранено":persisted?"Сохранено":"Новый портфель"}</Badge>
      <Action onClick={()=>void save()} primary disabled={!dirty||busy||!!editor} title={editor?"Сначала примените открытую форму":"Ctrl+S"}>Сохранить</Action>
@@ -1905,7 +2008,26 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    </header>
    {error&&<div className="alert error" role="alert">{error}<button onClick={()=>setError("")} aria-label="Закрыть сообщение">×</button></div>}
    {message&&<div className="alert notice" role="status">{message}<button onClick={()=>setMessage("")} aria-label="Закрыть сообщение">×</button></div>}
-   {!project?<>
+   {settingsOpen&&!embedded?<AtlasSettings version={atlasPackage.version}
+    projectCount={data.projects.length}
+    workCount={data.projects.reduce((n:number,p:any)=>n+p.items.length,0)}
+    revision={data.revision} saved={persisted} dirty={dirty} native={native}
+    t3Available={signedFileOwnerAvailable} onBack={()=>setSettingsOpen(false)}
+    onSave={()=>void save()} canSave={dirty&&!busy&&!editor}
+    onExport={()=>void exportIwxa()} onImport={()=>void importIwxa()}
+    onHistory={()=>void showNativeHistory()} onPortfolio={goPortfolio}
+    canImport={!busy&&!editor&&pendingImport===null}/>:
+   !project?(homeOpen&&!embedded?
+    <AtlasDashboard data={data} dates={dates} resources={resources}
+     reviews={reviewRows} sourceQueue={sourceQueue} dirty={dirty}
+     onPortfolio={goPortfolio} onNewProject={()=>openEditor("new")}
+     onConnect={()=>{goPortfolio();startConnection();}}
+     onOpenProject={(id,target="overview")=>openProjectTab(id,target)}
+     onResources={goPortfolio}
+     onCalendar={()=>project?goProjectTab("timeline"):data.projects.length?
+       openProjectTab(data.projects[0].id,"timeline"):goPortfolio()}
+     onReview={()=>reviewRows.length?openProjectTab(reviewRows[0].projectId,"changes"):goPortfolio()}/>:
+   <>
     <div className="page-heading"><div><small>Ваше рабочее пространство</small><h1>Портфель проектов</h1>
       <p>Что должно быть, что известно и какие решения влияют на планы.</p>
       <div className="atlas-portfolio-search-feedback">
@@ -2151,8 +2273,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       {(data.portfolioLinks||[]).map((l:any)=><tr key={l.id}><td>{data.projects.find((p:any)=>p.id===l.from)?.name}</td>
        <td>{data.projects.find((p:any)=>p.id===l.to)?.name}</td><td>{l.note||"Зависимость"}</td><td><Action onClick={()=>removePortfolioDependency(l.id)}>Удалить связь</Action></td></tr>)}</tbody></table></div>}
     </section>
-   </>:<>
-    <div className="page-heading"><div><small><button className="breadcrumb" onClick={()=>selectProject(null)}>Портфель</button> / {PROJECT_TYPE_LABELS[project.type]||"Другой проект"}</small>
+   </>):<>
+    <div className="page-heading"><div><small>{PROJECT_TYPE_LABELS[project.type]||"Другой проект"}</small>
      <h1>{project.name}</h1><p>{project.goal||"Цель пока не определена"}</p></div>
      <div className="button-row"><Badge>{statuses[project.status]||project.status}</Badge><Action disabled={busy||dirty||!persisted||!!editor} onClick={()=>showSavedReference(project.id)} title="Ctrl+Alt+P · Только сохранённая редакция">Ссылка на проект</Action><Action onClick={()=>openEditor("project-edit")}>Редактировать проект</Action></div>
     </div>
@@ -3405,10 +3527,43 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      </div>
     </section>
    </div>}
-   <footer className="workspace-footer"><span>IWXA Atlas {atlasVersionLabel} · проекты хранятся на этом компьютере</span>
+   <footer className="workspace-footer"><span>Проекты хранятся на этом компьютере</span>
     <span>Вы сами решаете, какие изменения сохранить и принять.</span></footer>
   </main>
-  {inspector&&<aside className={"inspector"+(editor?" atlas-inspector-editing":"")}>
+  {inspector&&<aside className={"inspector"+(editor?" atlas-inspector-editing":"")}
+   aria-label={editor?"Редактирование данных":"Инспектор Atlas"}>
+   {!embedded&&<div className="atlas-v6-dock-grip" role="separator" tabIndex={0}
+    aria-label="Изменить ширину инспектора" aria-orientation="vertical"
+    aria-valuemin={300} aria-valuemax={760} aria-valuenow={inspectorWidth}
+    onKeyDown={event=>{
+     if(event.key!=="ArrowLeft"&&event.key!=="ArrowRight")return;
+     event.preventDefault();
+     setInspectorWidth(w=>{
+      const next=Math.max(300,Math.min(760,w+(event.key==="ArrowLeft"?20:-20)));
+      try{localStorage.setItem("iwxa.atlas.ui.inspector.width.v1",String(next))}catch{}
+      return next;
+     });
+    }}
+    onPointerDown={event=>{
+     if(event.button!==0)return;
+     event.preventDefault();
+     const start=event.clientX,initial=inspectorWidth;
+     const drag=(move:PointerEvent)=>{
+      setInspectorWidth(Math.max(300,Math.min(760,initial+start-move.clientX)));
+     };
+     const stop=(end:PointerEvent)=>{
+      const width=Math.max(300,Math.min(760,initial+start-end.clientX));
+      setInspectorWidth(width);
+      try{localStorage.setItem("iwxa.atlas.ui.inspector.width.v1",String(width))}catch{}
+      window.removeEventListener("pointermove",drag);
+      window.removeEventListener("pointerup",stop);
+      window.removeEventListener("pointercancel",stop);
+     };
+     window.addEventListener("pointermove",drag);
+     window.addEventListener("pointerup",stop);
+     window.addEventListener("pointercancel",stop);
+    }}/>}
+
    {editor?<EditorPanel key={editor.action} editor={editor} onSubmit={submit}
     onCancel={cancelEditor} onDirtyChange={changed=>{editorDirtyRef.current=changed}}
     busy={busy} project={project} plan={plannedPlan}
@@ -3428,6 +3583,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      <p>Сведения из источника помогут проверить выполненную работу. Окончательное решение остаётся за вами.</p></div>
    </section>}
   </aside>}
+  </div>
  </div>;
 }
 function AmendmentForecast({state,projectId,changeId,onApply,canApply,onError}:{
