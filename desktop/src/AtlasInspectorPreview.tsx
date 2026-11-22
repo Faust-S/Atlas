@@ -1,5 +1,5 @@
 import React,{useEffect,useMemo,useState} from "react";
-import {inspectorWorkContext} from "./inspector-work-context.mjs";
+import {inspectorWorkContext,inspectorPagedRows} from "./inspector-work-context.mjs";
 
 type Kind="project"|"work"|"source"|"baseline";
 type Tab={key:string;kind:Kind;id:string};
@@ -35,6 +35,8 @@ export function AtlasInspectorPreview({project,snapshot,plan,forecast,comparison
  const [tabs,setTabs]=useState<Tab[]>([{key:"project:"+defaultId,kind:"project",id:defaultId}]);
  const [active,setActive]=useState("project:"+defaultId);
  const [workSection,setWorkSection]=useState<"schedule"|"baseline"|"relations"|"history">("schedule");
+ const [relationPage,setRelationPage]=useState(0);
+ const [historyPage,setHistoryPage]=useState(0);
  const shown=useMemo(()=>{
   const key=tabs.some(t=>t.key===active)?active:tabs[0]?.key;
   return tabs.find(t=>t.key===key)||null;
@@ -44,7 +46,7 @@ export function AtlasInspectorPreview({project,snapshot,plan,forecast,comparison
   setTabs(old=>old.some(tab=>tab.key===key)?old:
    [...old.slice(-(old.length>=8?7:8)),{kind,id,key}]);
   setActive(key);
-  if(kind==="work")setWorkSection("schedule");
+  if(kind==="work"){setWorkSection("schedule");setRelationPage(0);setHistoryPage(0);}
  };
  useEffect(()=>{
   if(workRequest?.id&&project?.items?.some((w:any)=>w.id===workRequest.id))
@@ -64,6 +66,12 @@ export function AtlasInspectorPreview({project,snapshot,plan,forecast,comparison
  const workPlan=facts?.row??null;
  const predecessors=facts?.predecessors??[];
  const successors=facts?.successors??[];
+ const relationItems=[
+  ...predecessors.map((linked:any)=>({id:linked.id,title:linked.title,arrow:"←",kind:"predecessor"})),
+  ...successors.map((linked:any)=>({id:linked.id,title:linked.title,arrow:"→",kind:"successor"}))
+ ];
+ const relationWindow=inspectorPagedRows(relationItems,relationPage);
+ const historyWindow=inspectorPagedRows(facts?.history??[],historyPage);
  const sourceOfWork=facts?.source??null;
  const resourceOfWork=facts?.resource??null;
  const source=shown?.kind==="source"?project?.sources.find((s:any)=>s.id===shown.id):null;
@@ -82,7 +90,7 @@ export function AtlasInspectorPreview({project,snapshot,plan,forecast,comparison
    {tabs.map(tab=><div className={"atlas-v6-dock-tab"+(shown?.key===tab.key?" selected":"")} key={tab.key}>
     <button type="button" role="tab" aria-selected={shown?.key===tab.key}
      aria-label={kindLabel[tab.kind]+": "+title(tab)}
-     title={title(tab)} onClick={()=>{setActive(tab.key);if(tab.kind==="work")setWorkSection("schedule")}}>{title(tab)}</button>
+     title={title(tab)} onClick={()=>{setActive(tab.key);if(tab.kind==="work"){setWorkSection("schedule");setRelationPage(0);setHistoryPage(0)}}}>{title(tab)}</button>
     <button type="button" className="atlas-v6-dock-tab-close" aria-label={"Закрыть "+kindLabel[tab.kind]+": "+title(tab)}
      onClick={()=>close(tab.key)}>×</button>
    </div>)}
@@ -186,13 +194,19 @@ export function AtlasInspectorPreview({project,snapshot,plan,forecast,comparison
      </section>}</>}
      {workSection==="relations"&&<section className="atlas-v6-preview-card"><strong>Зависимости</strong>
       <p>Предшественники: {predecessors.length}. Последующие работы: {successors.length}.</p>
-      {predecessors.slice(0,6).map((linked:any)=><button type="button" className="atlas-v6-preview-link"
-       key={"p"+linked.id} onClick={()=>open("work",linked.id)}>
-       ← {linked.title}</button>)}
-      {successors.slice(0,6).map((linked:any)=><button type="button" className="atlas-v6-preview-link"
-       key={"s"+linked.id} onClick={()=>open("work",linked.id)}>
-       → {linked.title}</button>)}
-      {predecessors.length+successors.length>12&&<p>Остальные связи доступны в полном графе.</p>}
+      {relationItems.length===0&&<p>Для этой работы зависимости не заданы.</p>}
+      {relationWindow.items.map((linked:any)=><button type="button" className="atlas-v6-preview-link"
+       key={linked.kind+":"+linked.id} onClick={()=>open("work",linked.id)}>
+       {linked.arrow} {linked.title}</button>)}
+      {relationWindow.pages>1&&<div className="atlas-v6-inspector-pager" aria-label="Страницы связанных работ">
+       <span role="status">Связи {relationWindow.start+1}–{relationWindow.end} из {relationWindow.total}</span>
+       <button type="button" disabled={relationWindow.page===0}
+        aria-label="Предыдущие связанные работы"
+        onClick={()=>setRelationPage(relationWindow.page-1)}>Назад</button>
+       <button type="button" disabled={relationWindow.page>=relationWindow.pages-1}
+        aria-label="Следующие связанные работы"
+        onClick={()=>setRelationPage(relationWindow.page+1)}>Далее</button>
+      </div>}
      </section>}
      {workSection==="schedule"&&<section className="atlas-v6-preview-card"><strong>Ответственность и происхождение</strong>
       <p>Ответственный: {work.assignee||"Не указан"}</p>
@@ -204,7 +218,7 @@ export function AtlasInspectorPreview({project,snapshot,plan,forecast,comparison
       <strong>Решения и наблюдения</strong>
       {facts?.relatedChange&&<p>Изменение «{facts.relatedChange.title}»: {changeStatusNames[facts.relatedChange.status]||"Не определено"}.</p>}
       {(facts?.history??[]).length>0?
-       <>{(facts?.history??[]).slice(0,6).map((record:any)=>
+       <>{historyWindow.items.map((record:any)=>
         <div className="atlas-v6-inspector-history" key={record.kind+":"+record.id}>
          <small>{record.kind==="decision"?"Решение по изменению":
           record.scope==="work"?"Наблюдение по работе":"Наблюдение по общей цели"}
@@ -212,7 +226,15 @@ export function AtlasInspectorPreview({project,snapshot,plan,forecast,comparison
          <p>{record.text||"Запись без пояснения"}</p>
          {record.source&&<small>Источник: {record.source}</small>}
         </div>)}
-        {(facts?.history?.length??0)>6&&<p>Других связанных записей: {(facts?.history?.length??0)-6}.</p>}</>:
+        {historyWindow.pages>1&&<div className="atlas-v6-inspector-pager" aria-label="Страницы истории работы">
+         <span role="status">Записи {historyWindow.start+1}–{historyWindow.end} из {historyWindow.total}</span>
+         <button type="button" disabled={historyWindow.page===0}
+          aria-label="Предыдущие записи работы"
+          onClick={()=>setHistoryPage(historyWindow.page-1)}>Назад</button>
+         <button type="button" disabled={historyWindow.page>=historyWindow.pages-1}
+          aria-label="Следующие записи работы"
+          onClick={()=>setHistoryPage(historyWindow.page+1)}>Далее</button>
+        </div>}</>:
        <p>Для этой работы пока нет явно связанных решений и наблюдений.</p>}
       <button type="button" className="atlas-v6-preview-link" onClick={()=>onOpenTab("history")}>
        Открыть полную историю проекта</button>

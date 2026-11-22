@@ -55,3 +55,22 @@ export function inspectorWorkContext(project,plan,workId,{
   history
  };
 }
+
+/**
+ * Page existing inspector links and history without limiting accessible records.
+ * Read-only: no Work, Store, CPM or T3 state is modified.
+ * @param {any[]} rows
+ * @param {number} requestedPage
+ * @param {number} [pageSize]
+ */
+export function inspectorPagedRows(rows,requestedPage,pageSize=6){
+ if(!Array.isArray(rows)||!Number.isInteger(requestedPage)||requestedPage<0||
+  !Number.isInteger(pageSize)||pageSize<1)
+  throw Error("Invalid Atlas inspector page");
+ const total=rows.length;
+ const pages=Math.max(1,Math.ceil(total/pageSize));
+ const page=Math.min(requestedPage,pages-1);
+ const start=page*pageSize;
+ const end=Math.min(start+pageSize,total);
+ return {items:rows.slice(start,end),page,pages,total,start,end};
+}
