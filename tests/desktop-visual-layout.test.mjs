@@ -210,6 +210,9 @@ test('Gantt exposes saved typed calendars through native project drafts without 
  const desktop=readFileSync(new URL('../desktop/src/main.tsx',import.meta.url),'utf8');
  const core=readFileSync(new URL('../src/core.mjs',import.meta.url),'utf8');
  assert.match(ui,/Сохранённые календарные варианты/);
+ assert.ok(ui.indexOf('className="atlas-working-scenario-saved"')<
+  ui.indexOf('workingScenario.result?.available&&workingScenario.result.rows.length>0'),
+  "Saved variants must appear before the long scrollable work list in compact Windows");
  const style=readFileSync(new URL('../desktop/src/style.css',import.meta.url),'utf8');
  assert.match(style,/\.atlas-working-scenario\{container-type:inline-size\}/);
  assert.match(style,/@container \(max-width:680px\)/);
