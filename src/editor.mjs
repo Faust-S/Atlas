@@ -618,7 +618,8 @@ export function applyEditor(snapshot,projectId,action,input){
   const selected=get("targetId"),rest=(item.targetIds||[]).slice(1);
   const targetIds=[...(selected?[selected]:[]),...rest.filter(link=>link!==selected)];
   return {state:editItem(snapshot,projectId,id,{title:get("title"),stageId:get("stageId")||null,dueDate:get("dueDate")||null,state:get("state"),priority:get("priority"),assignee:get("assignee"),estimateDays:integer("estimateDays"),...workDurationPatch(get,item),
-   actualStartDate:get("actualStartDate")||null,actualFinishDate:get("actualFinishDate")||null,
+   ...(get("actualStartDate")||(item.actualStartDate??null)!==null?{actualStartDate:get("actualStartDate")||null}:{}),
+   ...(get("actualFinishDate")||(item.actualFinishDate??null)!==null?{actualFinishDate:get("actualFinishDate")||null}:{}),
    resourceId:get("resourceId"),allocationPct:percentage("allocationPct"),targetIds,
    ...(sourceLink==="remove"?{sourceId:null}:{})})};
  }
