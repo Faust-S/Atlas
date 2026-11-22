@@ -163,6 +163,57 @@ function checkCalendarDrafts(project){
  }
 }
 
+
+// Historical control plans are retained in their original calendar dates.
+// They never point at live Work objects: deleting or editing a Work cannot
+// silently rewrite an earlier human-recorded project baseline.
+function checkPlanBaselines(p){
+ const plans=p.planBaselines;
+ if(plans===undefined)return 0;
+ if(!Array.isArray(plans)||plans.length>8)throw Error("Invalid project plan baselines");
+ const ids=new Set(),names=new Set();
+ let count=0;
+ for(let index=0;index<plans.length;index++){
+  const b=plans[index];
+  if(!b||typeof b.id!=="string"||!b.id||b.id.length>128||ids.has(b.id)||
+   typeof b.name!=="string"||!b.name.trim()||b.name!==b.name.trim()||b.name.length>120||
+   !Number.isSafeInteger(b.version)||b.version!==index+1||
+   !Number.isSafeInteger(b.sourceRevision)||b.sourceRevision<0||
+   typeof b.recordedAt!=="string"||!Number.isFinite(Date.parse(b.recordedAt))||
+   new Date(b.recordedAt).toISOString()!==b.recordedAt)
+   throw Error("Invalid plan baseline identity");
+  const name=b.name.toLocaleLowerCase("ru-RU");
+  if(names.has(name))throw Error("Duplicate plan baseline name");
+  names.add(name);ids.add(b.id);
+  if(!validDate(b.projectStart)||!validDate(b.deadline)||
+   !validDate(b.forecastStart)||!b.forecastStart||
+   !validDate(b.forecastFinish)||!b.forecastFinish||
+   b.forecastStart>b.forecastFinish)
+   throw Error("Invalid plan baseline dates");
+  if(!Array.isArray(b.work)||!b.work.length||b.work.length>5000)
+   throw Error("Invalid plan baseline work");
+  count+=b.work.length;
+  const workIds=new Set();
+  for(const w of b.work){
+   if(!w||typeof w.id!=="string"||!w.id||workIds.has(w.id)||
+    typeof w.title!=="string"||!w.title.trim()||
+    !Number.isSafeInteger(w.estimateDays)||w.estimateDays<0||w.estimateDays>36500||
+    !durationUnits.has(w.durationUnit)||typeof w.critical!=="boolean"||
+    !validDate(w.startDate)||!w.startDate||!validDate(w.finishDate)||!w.finishDate||
+    w.startDate>w.finishDate||!validDate(w.dueDate)||
+    !Array.isArray(w.predecessors)||new Set(w.predecessors).size!==w.predecessors.length)
+    throw Error("Invalid plan baseline work");
+   if(w.durationUnit==="working_days")calendarBasis(w.calendarBasis);
+   else if(w.calendarBasis!==null)throw Error("Invalid plan baseline calendar basis");
+   workIds.add(w.id);
+  }
+  for(const w of b.work)
+   if(w.predecessors.some(id=>!workIds.has(id)||id===w.id))
+    throw Error("Invalid plan baseline dependencies");
+ }
+ return count;
+}
+
 export const empty=()=>({schema:SCHEMA,revision:0,projects:[]});
 export function validate(s){
  if(s?.schema!==SCHEMA||!Number.isSafeInteger(s.revision)||s.revision<0||!Array.isArray(s.projects))throw Error("Invalid Atlas snapshot");
@@ -184,6 +235,7 @@ export function validate(s){
  const validAllocation = value=>value===undefined||Number.isSafeInteger(value)&&value>=1&&value<=100;
  const validResource = value=>value==null||resourceIds.has(value);
  const ids=new Set();
+ let baselineRows=0;
  for(const p of s.projects){
   if(!p||typeof p.id!=="string"||!p.id||ids.has(p.id)||!types.has(p.type)||!statuses.has(p.status)||
      typeof p.name!=="string"||!p.name.trim()||
@@ -195,6 +247,8 @@ export function validate(s){
   for(const k of ["stages","items","dependencies","sources","risks","decisions"])if(!Array.isArray(p[k]))throw Error("Invalid "+k);
   if(!validDate(p.startDate)||!validDate(p.dueDate)||p.startDate&&p.dueDate&&p.startDate>p.dueDate)throw Error("Invalid project dates");
   checkCalendarDrafts(p);
+  baselineRows+=checkPlanBaselines(p);
+  if(baselineRows>250000)throw Error("Portfolio plan baseline row limit: 250000");
   for(const stage of p.stages)if(!stage||typeof stage.id!=="string"||!stage.id||
    typeof stage.name!=="string"||!stage.name.trim()||!statuses.has(stage.status)||!validDate(stage.dueDate))throw Error("Invalid stage");
   for(const risk of p.risks)if(!risk||typeof risk.id!=="string"||!risk.id||
@@ -212,6 +266,9 @@ export function validate(s){
      throw Error("Указанная редакция рабочего календаря недоступна");
    }else if(x.calendarBasis!==undefined&&x.calendarBasis!==null)
     throw Error("Calendar source is allowed only for working-day work");
+   if(!validDate(x.actualStartDate)||!validDate(x.actualFinishDate)||
+    x.actualStartDate&&x.actualFinishDate&&x.actualStartDate>x.actualFinishDate)
+    throw Error("Invalid work actual dates");
    if(!validDate(x.dueDate))throw Error("Invalid work dueDate");if(!validResource(x.resourceId)||!validAllocation(x.allocationPct))throw Error("Invalid work resource commitment");if(x.targetIds!==undefined&&(!Array.isArray(x.targetIds)||new Set(x.targetIds).size!==x.targetIds.length||x.targetIds.some(id=>!targetIds.has(id))))throw Error("Invalid work targetIds");if(x.changeId!=null&&!changeIds.has(x.changeId))throw Error("Invalid work changeId");
    if(x.sourcePath!==undefined||x.sourceRevision!==undefined){
     if(!x.sourceId||!validSourcePath(x.sourcePath)||
@@ -486,6 +543,8 @@ export function editItem(s,pid,id,patch){return change(s,x=>{const item=project(
  if("priority" in patch){if(!priorities.has(patch.priority))throw Error("Invalid priority");item.priority=patch.priority;}
  if("assignee" in patch)item.assignee=String(patch.assignee);
  if("dueDate" in patch)item.dueDate=patch.dueDate||null;
+ if("actualStartDate" in patch)item.actualStartDate=patch.actualStartDate||null;
+ if("actualFinishDate" in patch)item.actualFinishDate=patch.actualFinishDate||null;
  if("resourceId" in patch)item.resourceId=patch.resourceId||null;
  if("sourceId" in patch){
   const sourceId=patch.sourceId||null;
