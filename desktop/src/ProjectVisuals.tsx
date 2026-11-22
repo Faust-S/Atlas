@@ -4,7 +4,7 @@ import {portfolioNetwork} from '../../src/portfolio.mjs';
 import {projectSourcePlanSearch,projectSourcePlanWorkContext,projectSourceFolderSearch} from '../../src/project-organization.mjs';
 import {previewOperationCalendars} from '../../src/working-week-scenario.mjs';
 
-type CPM={durationDays:number;rows:Array<{id:string;title:string;earlyStart:number;earlyFinish:number;durationDays:number;critical:boolean;state:string;predecessors:string[];blockedBy:string[];floatDays:number;dueDate?:string|null;finishDate?:string|null}>};
+type CPM={durationDays:number;rows:Array<{id:string;title:string;earlyStart:number;earlyFinish:number;durationDays:number;durationUnit?:'elapsed_days'|'working_days';critical:boolean;state:string;predecessors:string[];blockedBy:string[];floatDays:number;dueDate?:string|null;finishDate?:string|null}>};
 type Mode='fit'|'30'|'90';
 type CalendarBasis={id:string;version:number};
 type WorkCalendarInput={name:string;weekdays:number[];excludedDates:string[];
@@ -16,6 +16,8 @@ type CalendarScenarioInput={id?:string;name:string;weekdays:number[];excludedDat
 type SavedCalendarScenario=CalendarScenarioInput&{id:string;version:number;baseRevision:number};
 const statusName:Record<string,string>={todo:'Запланировано',in_progress:'В работе',blocked:'Заблокировано',done:'Выполнено (заявлено)'};
 const trim=(value:string,max=110)=>value.length>max?value.slice(0,max-1)+'…':value;
+const ganttDurationLabel=(row:{durationDays:number;durationUnit?:string})=>
+ row.durationDays+(row.durationUnit==='working_days'?' раб. дн.':' кал. дн.');
 
 export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,shiftDays,projectStatus,unavailableOrigins,calendarDrafts,calendarLibrary,onRecordWorkCalendar,onSaveCalendarDraft,onRemoveCalendarDraft,onRepairCalendarDraft,onOpenWork,onOpenProject,onEditDates}:{
  schedule:CPM;projectStart:string|null;projectDue:string|null;portfolioStart:string|null;
@@ -521,11 +523,11 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
     <div className="atlas-gantt-track">
      {guide(row.id)}
      {row.visible&&<button type="button" onClick={()=>{setExpanded(false);onOpenWork(row.id)}}
-      title={row.title+' · '+row.dateStart+' → '+row.dateFinish+' · '+row.durationDays+' дн. · '+(statusName[row.state]||row.state)+(row.missedDeadline?' · Расчётный финиш позже срока '+row.dueDate:'')}
+      title={row.title+' · '+row.dateStart+' → '+row.dateFinish+' · '+ganttDurationLabel(row)+' · '+(statusName[row.state]||row.state)+(row.missedDeadline?' · Расчётный финиш позже срока '+row.dueDate:'')}
       aria-label={'Открыть работу '+row.title}
       className={'atlas-gantt-bar'+(row.isMilestone?' is-milestone':'')+(row.critical?' is-critical':'')+(row.state==='done'?' is-done':'')+(row.state==='blocked'?' is-blocked':'')}
       style={{left:row.leftPct+'%',width:row.isMilestone?'10px':Math.max(0.45,row.widthPct)+'%'}}/>}
-    </div><span className="atlas-gantt-days">{row.durationDays} дн.</span>
+    </div><span className="atlas-gantt-days">{ganttDurationLabel(row)}</span>
    </div>)}
   </div>
   {!matching.length&&<p className="minor">По выбранному фильтру работ нет.</p>}
