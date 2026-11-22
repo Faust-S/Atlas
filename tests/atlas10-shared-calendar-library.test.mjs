@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
 import {
  empty,createProject,createItem,createWorkCalendar,reviseWorkCalendar,
  latestWorkCalendars,workCalendarRevision,upsertCalendarDraft,
@@ -194,4 +195,14 @@ test("real .iwxa ZIP preserves immutable source, snapshots and linked project wi
  assert.deepEqual(restored.snapshot.projects[0].calendarDrafts[0].calendarBasis,
   {id:lib.id,version:1});
  assert.equal(restored.snapshot.schema,"atlas.project/1");
+});
+
+test("native Rust Atlas Store retains shared calendar library in original root, not a new store",()=>{
+ const native=readFileSync(new URL("../desktop/src-tauri/src/lib.rs",import.meta.url),"utf8");
+ assert.match(native,/let mut extras = obj.clone\(\);/);
+ assert.match(native,/extras.remove\("projects"\);/);
+ assert.match(native,/root:Value::Object\(extras\)/);
+ assert.match(native,/let mut data = m.root.as_object\(\)/);
+ assert.match(native,/data.insert\("projects".into\(\),Value::Array\(projects\)\)/);
+ assert.doesNotMatch(native,/atlas-calendar-store-v[0-9]/);
 });
