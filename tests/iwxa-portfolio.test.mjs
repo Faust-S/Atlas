@@ -9,7 +9,7 @@ import {createHash} from "node:crypto";
 import {desktopLoadPortfolio} from "./fixtures/desktop-portfolio-120.mjs";
 import {createRequire} from "node:module";
 const {zipSync,unzipSync,strToU8,strFromU8}=createRequire(new URL("../desktop/package.json",import.meta.url))("fflate");
-import {empty,createProject,createItem,createDecision,attach,editItem,serialize} from "../src/core.mjs";
+import {empty,createProject,createItem,createDecision,attach,editItem,serialize,upsertCalendarDraft} from "../src/core.mjs";
 import {buildIwxaPortfolio,readIwxaPortfolio,IWXA_PROFILE,IWXA_ADOPTION,
  IWXA_MAX_BYTES,toBase64,fromBase64} from "../desktop/src/iwxa-portfolio.mjs";
 const fixture=()=>{
@@ -37,6 +37,33 @@ test("IWXA 1.0 ZIP carrier roundtrip preserves Atlas work, Unicode and project I
  assert.equal(result.manifest.options.include_schemas,true);
  assert.equal(result.manifest.options.include_assets,false);
  assert.equal(toBase64(fromBase64(toBase64(archive))),toBase64(archive));
+});
+
+test("IWXA independently preserves named versioned project calendar drafts without changing legacy planning fields",async()=>{
+ const a=createProject(empty(),{name:"Production",type:"engineering"});
+ const b=createItem(a.state,a.id,{title:"Installation"});
+ const c=createItem(b.state,a.id,{title:"Continuous curing"});
+ const original=b.state.projects[0].items[0].estimateDays;
+ const saved=upsertCalendarDraft(c.state,a.id,{
+  name:"Монтаж и технологическая выдержка",
+  weekdays:[1,2,3,4,5],excludedDates:["2026-11-23"],
+  additionalWorkingDates:["2026-11-28"],
+  modeByWork:{[c.id]:"elapsed_days"}
+ });
+ const archive=await buildIwxaPortfolio(saved.state,{now:"2026-11-22T10:30:00.000Z"});
+ const raw=JSON.parse(strFromU8(unzipSync(archive)["content/objects.ndjson"]).trim());
+ const independent=raw.data.snapshot.projects[0];
+ assert.equal(independent.calendarDrafts[0].id,saved.id);
+ assert.equal(independent.calendarDrafts[0].version,1);
+ assert.equal(independent.calendarDrafts[0].modeByWork[c.id],"elapsed_days");
+ assert.equal(independent.items[0].estimateDays,original);
+ assert.equal("durationUnit" in independent.items[0],false);
+ assert.equal(raw.data.snapshot.schema,"atlas.project/1");
+ const imported=await readIwxaPortfolio(archive);
+ assert.equal(serialize(imported.snapshot),serialize(saved.state));
+ assert.equal(imported.snapshot.projects[0].items[1].id,c.id);
+ assert.equal(imported.snapshot.projects[0].calendarDrafts[0].name,
+  "Монтаж и технологическая выдержка");
 });
 
 test("A user-confirmed source folder and exact revision survive the existing .iwxa archive",async()=>{
