@@ -1,0 +1,70 @@
+"""Atlas 0.10 calendar hypothesis: real Windows WebView2 / installed Setup Core.
+
+Runs the accepted Atlas 0.9 user route on the same installed application first,
+then opens the new working-week comparison through visible UIA controls.
+This is an isolated prototype qualified against 0.9.0-dev.1 packaging;
+it is NOT an Atlas 0.10 installer or signed multi-product acceptance.
+"""
+import importlib.util
+import sys
+from pathlib import Path
+
+sys.stdout.reconfigure(encoding="utf-8",errors="replace")
+spec=importlib.util.spec_from_file_location(
+    "atlas09_installed_base",Path(__file__).with_name("installed-atlas09-qualification.py"))
+base=importlib.util.module_from_spec(spec)
+spec.loader.exec_module(base)
+
+
+def qualify():
+    base.qualify()
+    route=base.route
+    d=route.d
+    v=route.v
+
+    # The original large project and saved revisions survived two cold opens.
+    original_head=d.head()
+    original_project=d.saved_project(original_head)
+    d.wait_text("Портфель проектов",35)
+    d.click_button("Открыть портфель проектов")
+    d.wait_text("Проекты и последствия",35)
+    d.set_text("Найти проект по работе, этапу или источнику","1080 работа 5")
+    d.wait_text("Найдено проектов: 1",35)
+    v.find_control("Перейти к найденной работе "+route.FIRST_TITLE,
+                   types={"Button"},scroll=True).click_input()
+    d.wait_text("Работы проекта",35)
+    d.click_button("График")
+    d.wait_text("График работ",35)
+
+    # No hidden IPC, DOM snapshots or model substitution: actual UIA.
+    v.find_control("Сценарий: рабочая неделя",
+                   types={"Button"},scroll=True).click_input()
+    d.wait_text("По календарным оценкам:",35)
+    d.wait_text("Исключить даты",35)
+    assert d.head()==original_head,"Opening a hypothetical calendar wrote native Store"
+    assert d.saved_project(original_head)==original_project
+    v.capture("atlas10-working-week-preview-installed")
+
+    # Explicitly exclude the known project start date (10 Nov 2026, Tuesday).
+    # The hypothetical start must advance to Wednesday without editing Atlas.
+    d.set_text("Дополнительные нерабочие дни через запятую","2026-11-10")
+    d.wait_text("Начало перенесено на первый рабочий день: 2026-11-11",35)
+    assert d.head()==original_head,"Changing a calendar hypothesis wrote native Store"
+    assert d.saved_project(original_head)==original_project
+    v.capture("atlas10-working-week-holiday-exception-installed")
+
+    d.click_button("Скрыть сценарий")
+    d.wait_text("Сценарий: рабочая неделя",20)
+    assert d.head()==original_head and d.saved_project(original_head)==original_project
+    print("ATLAS10_INSTALLED_WORKING_WEEK_SCENARIO_NO_NATIVE_WRITE_PASS",flush=True)
+
+
+if __name__=="__main__":
+    try:
+        qualify()
+    except Exception as exc:
+        print("ATLAS10_INSTALLED_CALENDAR_SCENARIO_HOLD "+repr(exc),flush=True)
+        base.route.v.capture("atlas10-calendar-native-failure")
+        raise
+    finally:
+        base.route.d.stop()
