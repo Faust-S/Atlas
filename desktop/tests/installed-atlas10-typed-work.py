@@ -46,9 +46,17 @@ def choose_second_option(label):
     bounds=win32gui.GetWindowRect(d.handle)
     assert v.rectangle_in_workspace(control.rectangle(),bounds),(
         "Calendar Work select is not physically reachable: "+label)
+    # WebView2 native SELECT commits its React onChange when focus leaves.
+    # Enter may only close the popup on some Windows runners and leave the
+    # preceding durationUnit unchanged. Tab is a real physical blur/commit.
     control.click_input()
-    keyboard.send_keys("{HOME}{DOWN}{ENTER}")
-    time.sleep(0.35)
+    keyboard.send_keys("{HOME}{DOWN}{TAB}")
+    time.sleep(0.45)
+    try:
+        selected=str(control.iface_value.CurrentValue)
+    except Exception:
+        selected="<UIA value unavailable>"
+    print("ATLAS10_NATIVE_WORK_SELECTOR_COMMITTED "+label+" = "+selected,flush=True)
 
 
 def save_archive(path):
@@ -113,7 +121,16 @@ def qualify():
     win32gui.MoveWindow(d.handle,0,0,820,650,True)
     choose_second_option("Как считать длительность")
     choose_second_option("Календарь для рабочих дней")
-    d.wait_text("Если применить эти значения",35)
+    # The form only shows this preview after BOTH controls have actually
+    # changed React state. Retry the two real GUI selections once when Windows
+    # loses the first native select/blur event; never bypass the UI or Save.
+    try:
+        d.wait_text("Если применить эти значения",8)
+    except AssertionError:
+        print("ATLAS10_NATIVE_SELECT_NOT_COMMITTED_RETRY_ONCE",flush=True)
+        choose_second_option("Как считать длительность")
+        choose_second_option("Календарь для рабочих дней")
+        d.wait_text("Если применить эти значения",25)
     assert d.head()==baseline and d.saved_project(baseline)==original,(
         "Native Work draft preview wrote Store before Apply")
     v.capture("atlas10-typed-work-editor-820")
