@@ -11,6 +11,8 @@ on:
       - 'desktop/src/AtlasChrome.tsx'
       - 'desktop/src/AtlasDashboard.tsx'
       - 'desktop/src/AtlasSettings.tsx'
+      - 'desktop/src/AtlasInspectorPreview.tsx'
+      - 'desktop/src/inspector-work-context.mjs'
       - 'desktop/src/style.css'
       - 'desktop/index.html'
       - 'desktop/package.json'
