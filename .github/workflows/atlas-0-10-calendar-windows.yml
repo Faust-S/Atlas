@@ -1,4 +1,4 @@
-name: IWXA Atlas 0.10 calendar prototype Windows qualification (0.9 packaging)
+name: IWXA Atlas 0.10 installed calendar qualification
 
 on:
   push:
@@ -32,7 +32,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 40
     steps:
-      - name: Checkout exact Atlas 0.9 development revision
+      - name: Checkout exact Atlas 0.10 development revision
         uses: actions/checkout@v4
 
       - name: Set up Node 22
@@ -60,7 +60,7 @@ jobs:
           npm run desktop:build -- --no-bundle
           if ($LASTEXITCODE -ne 0) { throw 'ATLAS09_TAURI_BUILD_FAILED' }
 
-      - name: Confirm installed Atlas 0.9 packages original T3 Host in single dist
+      - name: Confirm installed Atlas 0.10 packages original T3 Host in single dist
         shell: pwsh
         run: |
           node tests/verify-atlas09-host-dist.mjs
@@ -74,7 +74,7 @@ jobs:
           path: setup-core-source
           persist-credentials: false
 
-      - name: Build, inspect and install Atlas 0.9 development via original Setup Core
+      - name: Build, inspect and install Atlas 0.10 development via original Setup Core
         shell: pwsh
         timeout-minutes: 8
         run: |
@@ -117,19 +117,19 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $exe = 'artifacts/IWXA-Atlas-0.9.0-dev.1-Setup.exe'
+          $exe = 'artifacts/IWXA-Atlas-0.10.0-dev.1-Setup.exe'
           $sumfile = $exe + '.sha256'
           if (!(Test-Path -LiteralPath $exe) -or !(Test-Path -LiteralPath $sumfile)) {
-            throw 'ATLAS09_SETUP_CORE_ARTIFACT_MISSING'
+            throw 'ATLAS10_SETUP_CORE_ARTIFACT_MISSING'
           }
           $sha = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant()
           $listed = (Get-Content -LiteralPath $sumfile -Raw).Trim()
-          if ($listed -ne ($sha + ' *IWXA-Atlas-0.9.0-dev.1-Setup.exe')) {
-            throw 'ATLAS09_INSTALLER_SHA256_MISMATCH'
+          if ($listed -ne ($sha + ' *IWXA-Atlas-0.10.0-dev.1-Setup.exe')) {
+            throw 'ATLAS10_INSTALLER_SHA256_MISMATCH'
           }
-          Write-Host "ATLAS09_RC_INSTALLER_SHA256_PASS $sha"
+          Write-Host "ATLAS10_RC_INSTALLER_SHA256_PASS $sha"
 
-      - name: Requalify installed Atlas 0.9 baseline then navigate to optional working-week scenario
+      - name: Requalify installed Atlas 0.10 baseline then navigate to optional working-week scenario
         shell: pwsh
         timeout-minutes: 11
         run: |
@@ -145,13 +145,13 @@ jobs:
           if-no-files-found: ignore
           retention-days: 5
 
-      - name: Keep Atlas 0.9 development installer (not published)
+      - name: Keep Atlas 0.10 development installer (not published)
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: atlas10-calendar-setup-core-development
           path: |
-            artifacts/IWXA-Atlas-0.9.0-dev.1-Setup.exe
-            artifacts/IWXA-Atlas-0.9.0-dev.1-Setup.exe.sha256
+            artifacts/IWXA-Atlas-0.10.0-dev.1-Setup.exe
+            artifacts/IWXA-Atlas-0.10.0-dev.1-Setup.exe.sha256
           if-no-files-found: error
           retention-days: 5
