@@ -1,0 +1,93 @@
+name: Publish accepted IWXA Atlas 0.10.0 from exact Windows-qualified SHA
+
+on:
+  push:
+    branches:
+      - release/0.10
+    paths:
+      - '.github/workflows/atlas-0-10-publish.yml'
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish-stable:
+    if: github.ref == 'refs/heads/release/0.10' && contains(github.event.head_commit.message, '[publish-release-0.10]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ACCEPTED_RUN: '45046008644'
+      ACCEPTED_SHA: '812f1ddc447fc68f99f15d14595c276b593a6159'
+    steps:
+      - name: Inspect accepted full Windows run and matching immutable SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          run_json="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$ACCEPTED_RUN")"
+          test "$(jq -r .status <<<"$run_json")" = completed
+          test "$(jq -r .conclusion <<<"$run_json")" = success
+          test "$(jq -r .head_sha <<<"$run_json")" = "$ACCEPTED_SHA"
+          test "$(jq -r .head_branch <<<"$run_json")" = 'release/0.10'
+          if gh release view v0.10.0 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "ATLAS10_RELEASE_ALREADY_EXISTS"
+            exit 1
+          fi
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v0.10.0" >/dev/null 2>&1; then
+            echo "ATLAS10_RELEASE_TAG_ALREADY_EXISTS"
+            exit 1
+          fi
+          echo "ATLAS10_EXACT_ACCEPTED_WINDOWS_SHA_PASS $ACCEPTED_SHA"
+
+      - name: Download Windows-accepted installer without rebuilding or repackaging
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p publish
+          gh run download "$ACCEPTED_RUN" --repo "$GITHUB_REPOSITORY" \
+            --name atlas10-setup-core-release-candidate --dir publish
+          test -s publish/IWXA-Atlas-0.10.0-Setup.exe
+          test -s publish/IWXA-Atlas-0.10.0-Setup.exe.sha256
+          (cd publish && sha256sum --check IWXA-Atlas-0.10.0-Setup.exe.sha256)
+          echo "ATLAS10_ACCEPTED_INSTALLER_SHA256_PASS"
+
+      - name: Publish version 0.10.0 on the accepted source SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > release-notes.txt <<'NOTES'
+          IWXA Atlas 0.10.0 for Windows x64.
+
+          Calendar-aware project planning: each Work can preserve a duration
+          in calendar or working days with an exact versioned work calendar.
+          Organisational calendars, excluded dates and extra working days,
+          readable work-table/Gantt estimates, critical-path explanations,
+          resource occupancy on actually staffed days and linked-project
+          forecast dates are supported. A forecast does not silently overwrite
+          the saved baseline; changes remain subject to explicit Save.
+
+          The same original CPM drives the Gantt, Work and multi-project
+          portfolio. The original native Store, T3 Host and .iwxa carrier
+          are retained; there is no replacement Kernel, Store or archive
+          format.
+
+          The exact source SHA passed 823 Node tests, TypeScript/Vite,
+          the original T3 integrated dist, and native Windows installation
+          through IWXA Setup Core. The installed Windows Atlas passed a
+          1,212-Work portfolio, native save/cold restart, independent .iwxa
+          import, and first-fold Gantt at 820x650 and 1024x710.
+          SHA-256 of this exact accepted installer accompanies the EXE.
+
+          Resource levelling, verified staff availability and automatic
+          approval or execution are not claimed. An Authenticode publisher
+          signature is not included.
+          NOTES
+          gh release create v0.10.0 \
+            publish/IWXA-Atlas-0.10.0-Setup.exe \
+            publish/IWXA-Atlas-0.10.0-Setup.exe.sha256 \
+            --repo "$GITHUB_REPOSITORY" --target "$ACCEPTED_SHA" \
+            --title "IWXA Atlas 0.10.0" --notes-file release-notes.txt
+          actual="$(gh release view v0.10.0 --repo "$GITHUB_REPOSITORY" --json tagName,targetCommitish -q '.targetCommitish')"
+          test "$actual" = "$ACCEPTED_SHA"
+          echo "ATLAS10_STABLE_RELEASE_PUBLISHED $ACCEPTED_SHA"
