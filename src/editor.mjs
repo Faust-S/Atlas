@@ -23,7 +23,7 @@ const field=(name,label,type="text",value="",required=true)=>({name,label,type,v
 const statusOptions=[option("planned","Запланирован"),option("active","В работе"),option("paused","Приостановлен"),option("completed","Завершён (заявлено)"),option("cancelled","Отменён")];
 const workOptions=[option("todo","Запланирована"),option("in_progress","В работе"),option("blocked","Заблокирована"),option("done","Выполнена (заявлено)")];
 const durationUnitOptions=[
- option("elapsed_days","Календарные дни (без выходных)"),
+ option("elapsed_days","Календарные дни (включая выходные)"),
  option("working_days","Рабочие дни (по указанному календарю)")
 ];
 const workCalendarChoices=snapshot=>[

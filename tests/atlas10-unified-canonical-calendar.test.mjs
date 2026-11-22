@@ -170,6 +170,9 @@ test("Work calendar and duration selects stay synchronized before any native Sav
  const r=createItem(c.state,p.pid,{title:"One staffed Work"});
  const before=serialize(r.state);
  const spec=editorSpec(r.state.projects[0],"work:"+r.id,r.state);
+ assert.equal(spec.fields.find(f=>f.name==="durationUnit").options[0].label,
+  "Календарные дни (включая выходные)",
+  "elapsed_days never means excluding weekends");
  const form=Object.fromEntries(spec.fields.map(f=>[f.name,String(f.value??"")]));
  const pinned=c.id+"@"+c.version;
  assert.equal(form.durationUnit,"elapsed_days");
