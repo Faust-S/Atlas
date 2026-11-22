@@ -143,10 +143,10 @@ function WorkDependencyHint({info,onOpenWork}:{info?:WorkLinkPreview|null;onOpen
   {later&&<span>{later}</span>}
  </div>;
 }
-function EditorPanel({editor,onSubmit,onCancel,onDirtyChange,busy,project,plan,correctionBaseline}:{
+function EditorPanel({editor,onSubmit,onCancel,onDirtyChange,busy,project,plan,correctionBaseline,calendarLibrary}:{
  editor:Editor;onSubmit:(event:React.FormEvent<HTMLFormElement>)=>void;
  onCancel:()=>void;onDirtyChange:(changed:boolean)=>void;busy:boolean;
- project:Atlas|null;plan:any|null;correctionBaseline:any|null
+ project:Atlas|null;plan:any|null;correctionBaseline:any|null;calendarLibrary:any[]
 }){
  const [fields,setFields]=useState<Record<string,string>>({});
  const [workQuery,setWorkQuery]=useState("");
@@ -161,8 +161,11 @@ function EditorPanel({editor,onSubmit,onCancel,onDirtyChange,busy,project,plan,c
   if(!editor.action.startsWith("work:")||!project||!plan||
      fields.estimateDays===undefined||fields.dueDate===undefined)return null;
   return previewWorkScheduleEdit(project,editor.action.slice(5),
-   {estimateDays:fields.estimateDays,dueDate:fields.dueDate},plan,correctionBaseline);
- },[editor.action,project,plan,fields.estimateDays,fields.dueDate,correctionBaseline]);
+   {estimateDays:fields.estimateDays,dueDate:fields.dueDate,
+    durationUnit:fields.durationUnit,calendarBasis:fields.calendarBasis},
+   plan,correctionBaseline,{calendarLibrary});
+ },[editor.action,project,plan,fields.estimateDays,fields.dueDate,
+    fields.durationUnit,fields.calendarBasis,correctionBaseline,calendarLibrary]);
  useEffect(()=>{
   setFields(Object.fromEntries(editor.spec.fields.map(f=>[f.name,String(f.value??"")])));
   setWorkQuery("");
@@ -3304,6 +3307,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    {editor?<EditorPanel key={editor.action} editor={editor} onSubmit={submit}
     onCancel={cancelEditor} onDirtyChange={changed=>{editorDirtyRef.current=changed}}
     busy={busy} project={project} plan={plan}
+    calendarLibrary={data.calendarLibrary??[]}
     correctionBaseline={correctionBaseline}/>:
    <section><div className="section-heading"><h2>Инспектор</h2><button className="icon-button" aria-label="Скрыть инспектор" onClick={()=>setInspector(false)}>×</button></div>
     <div className="inspector-block"><small>Текущий контекст</small><strong>{project?.name||"Портфель проектов"}</strong>
