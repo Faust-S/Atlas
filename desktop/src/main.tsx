@@ -226,6 +226,12 @@ function EditorPanel({editor,onSubmit,onCancel,onDirtyChange,busy,project,plan,c
        step={f.type==="number"?"1":undefined}
        value={fields[f.name]??""} onChange={event=>updateFields({...fields,[f.name]:event.target.value})}/>
     }
+    {f.name==="calendarBasis"&&fields.durationUnit==="working_days"&&
+     <small className="atlas-work-calendar-guidance" role="status" aria-live="polite">
+      {fields.calendarBasis
+       ?"Указанная редакция календаря применяется при расчёте рабочих дней."
+       :"Выберите редакцию календаря. Без неё расчёт рабочих дней нельзя сохранить."}
+     </small>}
    </label>)}
    </div>
    {workDraftPreview?.kind==="changed"&&
@@ -2558,8 +2564,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       Это поиск заявленных фактов, не независимая приёмка.
      </p>
      {scheduleView?.mode==="portfolio_forecast"&&<p className="atlas-schedule-warning" role="status">
-      Прогноз по связям портфеля: начало {scheduleView.displayStart}, исходное начало проекта {project.startDate||"не задано"}.
-      Ниже показаны расчётные даты Work для прогноза. Исходный план и сохранённые Work не изменены.
+      {"Прогноз по связям портфеля: начало "+scheduleView.displayStart+
+       ", исходное начало проекта "+(project.startDate||"не задано")+
+       ". Ниже показаны расчётные даты Work для прогноза. Исходный план и сохранённые Work не изменены."}
      </p>}
      <div className="table-scroll atlas-work-table-scroll"><table className="atlas-work-table" aria-label="Работы проекта"><thead><tr><th>Работа</th><th>Состояние</th><th>Длительность</th><th>Ответственный</th><th>Срок</th><th>Изменить</th></tr></thead>
       <tbody>{filteredWork.slice(0,workLimit).map((w:any)=><tr key={w.id}

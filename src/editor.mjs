@@ -43,6 +43,9 @@ function workDurationPatch(get,original=null){
  if(!["elapsed_days","working_days"].includes(unit))throw Error("Выберите единицу длительности");
  const selected=get("calendarBasis");
  if(unit==="elapsed_days"){
+  // A calendar is never silently ignored if an external/stale form submits
+  // inconsistent values. The native UI clears this choice on unit changes.
+  if(selected)throw Error("Календарь допускается только для рабочих дней");
   // Unrelated edits must preserve a previously implicit elapsed-day unit.
   if((original?.durationUnit??"elapsed_days")==="elapsed_days"&&!original?.calendarBasis)
    return {};
@@ -426,6 +429,26 @@ export function editorSpec(project,action,snapshot=null){
 // One select may control fields in the same form, e.g. which work item is
 // being amended. Use the selected item's own baseline/proposed values.
 export function editorSelectionFields(spec,previous,name,value){
+ // One user decision must produce one internally consistent Work duration.
+ // Choosing an exact calendar switches to working days; switching back to
+ // elapsed days clears the pinned calendar instead of silently ignoring it.
+ // This is a form-state transformation only, not a Store or CPM operation.
+ const options=spec?.fields??[];
+ const duration=options.find(field=>field.name==="durationUnit");
+ const calendar=options.find(field=>field.name==="calendarBasis");
+ if(duration&&calendar){
+  if(name==="calendarBasis"){
+   if(value==="")return {...previous,calendarBasis:"",durationUnit:"elapsed_days"};
+   if(!calendar.options?.some(option=>option.value===value))
+    throw Error("Выберите доступную редакцию рабочего календаря");
+   return {...previous,calendarBasis:value,durationUnit:"working_days"};
+  }
+  if(name==="durationUnit"){
+   if(value==="elapsed_days")return {...previous,durationUnit:value,calendarBasis:""};
+   if(value==="working_days")return {...previous,durationUnit:value};
+   throw Error("Выберите единицу длительности");
+  }
+ }
  const preset=spec?.selectionPresets;
  if(!preset||preset.name!==name)return {...previous,[name]:value};
  const fields=preset.values?.[value];

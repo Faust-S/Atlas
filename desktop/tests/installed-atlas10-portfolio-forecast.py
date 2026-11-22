@@ -58,10 +58,11 @@ def open_target_work():
 
 def check_table_and_gantt():
     open_target_work()
+    # The accessibility tree must expose the entire causal explanation
+    # as one readable sentence, not fragmented and reordered text nodes.
     d.wait_text("Прогноз по связям портфеля: начало 2026-11-20",45)
     d.wait_text("исходное начало проекта 2026-11-18",35)
-    d.wait_text("Прогноз по портфелю",35)
-    d.wait_text("2026-11-24",35)
+    d.wait_text("Прогноз по портфелю: 2026-11-20 → 2026-11-24",35)
     v.capture("atlas10-portfolio-forecast-work-table")
     print("ATLAS10_INSTALLED_PORTFOLIO_WORK_DATES_MATCH_PASS",flush=True)
     d.click_button("График")

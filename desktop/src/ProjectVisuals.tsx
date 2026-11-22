@@ -308,7 +308,12 @@ export function ProjectGantt({schedule,projectStart,recordedStart,projectDue,por
      {unavailableOrigins.length>5&&<small>И ещё {unavailableOrigins.length-5} причин в портфеле</small>}
     </div>
    </div>}
-  {(shiftDays!=null&&shiftDays>0)&&projectStart===portfolioStart&&<p className="atlas-schedule-warning" role="status">Прогноз по портфелю: начало {portfolioStart}, сдвиг на +{shiftDays} календарных дней относительно записанного начала {recordedStart||'не задано'}. График ниже показывает расчёт от прогнозной даты. Записанный план и даты проекта не изменены.</p>}
+  {(shiftDays!=null&&shiftDays>0)&&projectStart===portfolioStart&&
+   <p className="atlas-schedule-warning" role="status">
+    {'Прогноз по портфелю: начало '+portfolioStart+', сдвиг на +'+shiftDays+
+     ' календарных дней относительно записанного начала '+(recordedStart||'не задано')+
+     '. График ниже показывает расчёт от прогнозной даты. Записанный план и даты проекта не изменены.'}
+   </p>}
   {!recordedStart&&projectStart&&unavailableOrigins.length===0&&<p className="atlas-schedule-warning" role="status">Начало {projectStart} вычислено по межпроектным зависимостям, но ещё не записано как дата начала проекта.</p>}
   {!projectStart&&<p className="minor">Начальная дата не задана: на оси показаны относительные дни, не календарные даты.</p>}
   <div className="atlas-gantt-tools">

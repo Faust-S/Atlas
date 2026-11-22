@@ -5,7 +5,7 @@ import {empty,createProject,createItem,editProject,editItem,createWorkCalendar,
 import {scheduleProject,scheduleChangeSummary,scheduleDeadlineExplanations} from "../src/planning.mjs";
 import {portfolioSchedule} from "../src/portfolio-schedule.mjs";
 import {addPortfolioLink} from "../src/portfolio.mjs";
-import {editorSpec,applyEditor} from "../src/editor.mjs";
+import {editorSpec,applyEditor,editorSelectionFields} from "../src/editor.mjs";
 import {buildIwxaPortfolio,readIwxaPortfolio} from "../desktop/src/iwxa-portfolio.mjs";
 import {readFileSync} from "node:fs";
 const weekdays=[1,2,3,4,5];
@@ -165,6 +165,36 @@ test("native Work editor saves explicit duration unit and basis into existing pr
  assert.equal(reverted.durationUnit,"elapsed_days");
  assert.equal("calendarBasis" in reverted,false);
 });
+test("Work calendar and duration selects stay synchronized before any native Save",()=>{
+ const p=initial(),c=calendar(p.s);
+ const r=createItem(c.state,p.pid,{title:"One staffed Work"});
+ const before=serialize(r.state);
+ const spec=editorSpec(r.state.projects[0],"work:"+r.id,r.state);
+ const form=Object.fromEntries(spec.fields.map(f=>[f.name,String(f.value??"")]));
+ const pinned=c.id+"@"+c.version;
+ assert.equal(form.durationUnit,"elapsed_days");
+ assert.equal(form.calendarBasis,"");
+ const byCalendar=editorSelectionFields(spec,form,"calendarBasis",pinned);
+ assert.deepEqual([byCalendar.durationUnit,byCalendar.calendarBasis],
+  ["working_days",pinned],"choosing a calendar sets working units in the same form event");
+ const changed=applyEditor(r.state,p.pid,"work:"+r.id,new Map(Object.entries(byCalendar)));
+ assert.equal(changed.state.projects[0].items.find(w=>w.id===r.id).durationUnit,"working_days");
+ const asElapsed=editorSelectionFields(spec,byCalendar,"durationUnit","elapsed_days");
+ assert.deepEqual([asElapsed.durationUnit,asElapsed.calendarBasis],["elapsed_days",""]);
+ const withoutCalendar=editorSelectionFields(spec,byCalendar,"calendarBasis","");
+ assert.deepEqual([withoutCalendar.durationUnit,withoutCalendar.calendarBasis],["elapsed_days",""]);
+ const asWorking=editorSelectionFields(spec,asElapsed,"durationUnit","working_days");
+ assert.deepEqual([asWorking.durationUnit,asWorking.calendarBasis],["working_days",""]);
+ assert.throws(()=>applyEditor(r.state,p.pid,"work:"+r.id,new Map(Object.entries(asWorking))),
+  /календаря|редакцию/,"an unpinned working-day Work cannot reach the Store");
+ assert.throws(()=>editorSelectionFields(spec,form,"calendarBasis","fabricated@999"),
+  /доступную редакцию/);
+ const inconsistent={...byCalendar,durationUnit:"elapsed_days"};
+ assert.throws(()=>applyEditor(r.state,p.pid,"work:"+r.id,new Map(Object.entries(inconsistent))),
+  /Календарь допускается только/);
+ assert.equal(serialize(r.state),before,"Editor transformations cannot mutate the source portfolio");
+});
+
 test("native project and .iwxa carrier persist typed Work without a second store",async()=>{
  const {s,a}=connectedScenario();
  const reopened=deserialize(serialize(s));
