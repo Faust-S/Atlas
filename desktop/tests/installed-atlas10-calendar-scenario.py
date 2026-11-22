@@ -196,7 +196,7 @@ def qualify():
     picker.click_input()
     d.keyboard.send_keys("{DOWN}{ENTER}")
     v.find_control("Загрузить вариант",types={"Button"},scroll=True).click_input()
-    d.wait_text("Загружен сохранённый вариант, версия 1",35)
+    d.wait_text("Загружен вариант, версия 1",35)
     d.wait_text("Непрерывных операций: 1",35)
     assert d.head()==new_head and d.saved_project(new_head)==stored,(
         "Reloading the named variant wrote to native Store")
