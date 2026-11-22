@@ -36,4 +36,5 @@ test("Atlas 0.11 resizes inspector immediately by pointer and keyboard, with val
  assert.match(main,/const start=event.clientX,initial=inspectorDockWidth/);
  assert.match(main,/atlasInspectorResize\(initial,viewportWidth/);
  assert.match(css,/\.app-shell\.atlas-v6-shell \.inspector\{[\s\S]*?min-width:270px/);
+ assert.match(css,/\.atlas-v6-shell:not\(\.no-inspector\) \.atlas-gantt-panel>\.section-heading\{[\s\S]*?flex-wrap:wrap/);
 });
