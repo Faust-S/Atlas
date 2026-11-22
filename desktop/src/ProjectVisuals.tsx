@@ -2,6 +2,7 @@ import React,{useEffect,useMemo,useRef,useState} from 'react';
 import {dependencyDiagram,ganttViewport,ganttFocusOffset} from './visual-layout.mjs';
 import {portfolioNetwork} from '../../src/portfolio.mjs';
 import {projectSourcePlanSearch,projectSourcePlanWorkContext,projectSourceFolderSearch} from '../../src/project-organization.mjs';
+import {previewWorkingWeek} from '../../src/working-week-scenario.mjs';
 
 type CPM={durationDays:number;rows:Array<{id:string;title:string;earlyStart:number;earlyFinish:number;durationDays:number;critical:boolean;state:string;predecessors:string[];blockedBy:string[];floatDays:number;dueDate?:string|null;finishDate?:string|null}>};
 type Mode='fit'|'30'|'90';
@@ -22,6 +23,29 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
  const [deadlineOnly,setDeadlineOnly]=useState(false);
  const [visibleLimit,setVisibleLimit]=useState(160);
  const [expanded,setExpanded]=useState(false);
+ const [workingScenarioOpen,setWorkingScenarioOpen]=useState(false);
+ const [weekPreset,setWeekPreset]=useState<'five'|'six'>('five');
+ const [nonWorkingDates,setNonWorkingDates]=useState('');
+ const workingScenario=useMemo(()=>{
+  if(!workingScenarioOpen)return {result:null as any,error:''};
+  try{
+   const holidays=nonWorkingDates.trim()?nonWorkingDates.split(/[,;\n]+/).map(x=>x.trim()).filter(Boolean):[];
+   const result=previewWorkingWeek(schedule,{
+    startDate:projectStart,weekdays:weekPreset==='five'?[1,2,3,4,5]:[1,2,3,4,5,6],
+    holidays
+   });
+   return {result,error:''};
+  }catch(error){return {result:null as any,error:error instanceof Error?error.message:'Неверный рабочий календарь'};}
+ },[schedule,projectStart,workingScenarioOpen,weekPreset,nonWorkingDates]);
+ const workingDifferences=useMemo(()=>{
+  const rows=workingScenario.result?.rows||[];
+  return {
+   shifted:rows.filter((row:any)=>row.shiftDays!=null&&row.shiftDays!==0).length,
+   examples:rows.filter((row:any)=>row.shiftDays!=null&&(row.shiftDays!==0||row.critical))
+    .sort((a:any,b:any)=>(b.shiftDays||0)-(a.shiftDays||0)||
+     Number(b.critical)-Number(a.critical)).slice(0,8)
+  };
+ },[workingScenario]);
  useEffect(()=>{
   if(!expanded)return;
   const close=(event:KeyboardEvent)=>{if(event.key==='Escape'){event.preventDefault();setExpanded(false)}};
@@ -105,6 +129,58 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
    </div>}
   {(shiftDays!=null&&shiftDays>0)&&<p className="atlas-schedule-warning">Из-за связей с другими проектами расчётное начало сдвинулось на +{shiftDays} дн.: {portfolioStart||'нет расчётной даты'}. График ниже по-прежнему показывает даты от запланированного начала. Для переноса работ нужно отдельно изменить план.</p>}
   {!projectStart&&<p className="minor">Начальная дата не задана: на оси показаны относительные дни, не календарные даты.</p>}
+  <div className="atlas-gantt-tools">
+   <button type="button" className="action-button" aria-expanded={workingScenarioOpen}
+    aria-controls="atlas-working-week-preview"
+    onClick={()=>setWorkingScenarioOpen(value=>!value)}>
+    {workingScenarioOpen?'Скрыть сценарий':'Сценарий: рабочая неделя'}
+   </button>
+  </div>
+  {workingScenarioOpen&&<section id="atlas-working-week-preview" className="atlas-working-scenario"
+   aria-label="Необязательное сравнение рабочих календарей">
+   <div className="atlas-gantt-tools">
+    <label>Рабочие дни <select value={weekPreset} onChange={event=>setWeekPreset(event.target.value as 'five'|'six')}>
+     <option value="five">Пн–Пт</option><option value="six">Пн–Сб</option>
+    </select></label>
+    <label className="atlas-working-scenario-dates">Исключить даты
+     <input type="text" value={nonWorkingDates} onChange={event=>setNonWorkingDates(event.target.value)}
+      placeholder="2026-12-31, 2027-01-01" aria-label="Дополнительные нерабочие дни через запятую"/>
+    </label>
+   </div>
+   <p className="minor">Это только сравнение «что, если оценки означали рабочие дни»,
+    а не изменение действующего календарного плана. Результат, контрольные сроки,
+    исходные записи и график выше не меняются. Исключения задаются вручную, праздники
+    не подставляются автоматически. Завершение показано последним занятым рабочим днём,
+    а не исключительной границей основного CPM.</p>
+   {workingScenario.error&&<p className="atlas-schedule-warning" role="alert">Ошибка календаря: {workingScenario.error}</p>}
+   {workingScenario.result&&!workingScenario.result.available&&
+    <p className="minor" role="status">Для расчёта абсолютных рабочих дат сначала задайте дату начала проекта.</p>}
+   {workingScenario.result?.available&&<>
+    <div className="summary-line" role="status" aria-live="polite">
+     <span>По календарным оценкам: <strong>{workingScenario.result.projectBaselineLastDate||'Дата вне диапазона'}</strong></span>
+     <span>Сценарий: <strong>{workingScenario.result.projectScenarioLastDate||'Дата вне диапазона'}</strong></span>
+     <span>Изменение: <strong>{workingScenario.result.shiftDays==null?'Не определить':
+      (workingScenario.result.shiftDays>0?'+':'')+workingScenario.result.shiftDays+' календ. дн.'}</strong></span>
+     <span>Изменятся даты: <strong>{workingDifferences.shifted} работ</strong></span>
+    </div>
+    {workingScenario.result.startAdjusted&&<p className="minor">
+     Начало перенесено на первый рабочий день: {workingScenario.result.firstEligibleDate||'за допустимым диапазоном'}.
+    </p>}
+    {workingDifferences.examples.length>0&&<div className="atlas-working-scenario-rows" role="region"
+      aria-label="Работы с изменёнными расчётными датами">
+     {workingDifferences.examples.map((row:any)=><div className="atlas-working-scenario-row" key={row.id}>
+      <button type="button" className="action-button"
+       onClick={()=>{setExpanded(false);onOpenWork(row.id)}}>{trim(row.title,60)}</button>
+      <span>{row.baselineLastDate||'Нет даты'} → <strong>{row.completionDate||'Нет даты'}</strong></span>
+      <small>{row.shiftDays===null?'Вне диапазона':(row.shiftDays>0?'+':'')+row.shiftDays+' дн.'}</small>
+     </div>)}
+    </div>}
+    {workingDifferences.shifted>workingDifferences.examples.length&&<p className="minor">
+     Дополнительно затронуто работ: {workingDifferences.shifted-workingDifferences.examples.length}.
+     Основной график остаётся неизменным.</p>}
+    {!workingScenario.result.rows.length&&<p className="minor">Для сравнения нужно добавить хотя бы одну работу.</p>}
+   </>}
+  </section>}
   <div className="atlas-gantt-key" aria-label="Условные обозначения"><span><i className="key-normal"/>Плановая работа</span>
    <span><i className="key-critical"/>Критический путь</span><span><i className="key-done"/>Заявлено выполнение</span>
    <span><i className="key-milestone"/>Работа 0 дней</span>{view.deadline&&<span><i className="key-deadline"/>Контрольный срок</span>}</div>
