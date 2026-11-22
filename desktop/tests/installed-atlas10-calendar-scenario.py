@@ -1,9 +1,9 @@
 """Atlas 0.10 calendar hypothesis: real Windows WebView2 / installed Setup Core.
 
-Runs the accepted Atlas 0.9 user route on the same installed application first,
+Runs the accepted large-project route in the installed Atlas 0.10 first,
 then opens the new working-week comparison through visible UIA controls.
-This is an isolated prototype qualified against 0.9.0-dev.1 packaging;
-it is NOT an Atlas 0.10 installer or signed multi-product acceptance.
+Uses original Setup Core with the 0.10 development product identity; does not
+invent a second Store or certify other IWXA products.
 """
 import importlib.util
 import sys
@@ -17,7 +17,7 @@ spec.loader.exec_module(base)
 
 
 def qualify():
-    base.qualify()
+    base.qualify(expected_version="0.10.0 (разработка)")
     route=base.route
     d=route.d
     v=route.v
