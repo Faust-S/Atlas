@@ -250,7 +250,7 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
         setCustomWeekdays(previous=>event.target.checked?
          [...previous,day].sort((a,b)=>a-b):previous.filter(x=>x!==day));
        }}/>{label}</label>)}
-    </div>
+    </div>}
     <label className="atlas-working-scenario-dates">Исключить даты
      <input type="text" value={nonWorkingDates} onChange={event=>{setNonWorkingDates(event.target.value);setWorkingLimit(12)}}
       placeholder="2026-12-31, 2027-01-01" aria-label="Дополнительные нерабочие дни через запятую"/>
