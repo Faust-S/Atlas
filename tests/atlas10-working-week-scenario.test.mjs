@@ -46,6 +46,19 @@ test("explicit holidays change work dates but never modify project",()=>{
  assert.equal(s.estimatedFinish,"2026-11-23");
 });
 
+test("one-day workweek with many excluded Mondays remains bounded and correct",()=>{
+ const start="2026-11-23";
+ const holidays=Array.from({length:20},(_,i)=>{
+  const d=new Date(Date.parse(start+"T00:00:00.000Z")+i*7*86400000);
+  return d.toISOString().slice(0,10);
+ });
+ const s=scheduleProject(project(start,[["a",2]]));
+ const preview=previewWorkingWeek(s,{startDate:start,weekdays:[1],holidays});
+ assert.equal(preview.firstEligibleDate,"2027-04-12");
+ assert.equal(preview.projectScenarioLastDate,"2027-04-19");
+ assert.equal(preview.skippedHolidays,20);
+});
+
 test("Sunday project start explicitly moves to next eligible work date",()=>{
  const p=project("2026-11-22",[["a",1]]);
  const s=scheduleProject(p);
