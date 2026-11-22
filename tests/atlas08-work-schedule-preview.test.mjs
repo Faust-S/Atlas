@@ -80,7 +80,7 @@ test("The original inspector shows the preview before apply, with accessible com
  const section=ui.indexOf("className=\"atlas-work-draft-preview\"");
  const footer=ui.indexOf('className="form-footer"',section);
  assert.ok(section>0&&footer>section);
- assert.match(ui,/busy=\{busy\} project=\{project\} plan=\{plan\}/);
+ assert.match(ui,/busy=\{busy\} project=\{project\} plan=\{plannedPlan\}/);
  assert.match(css,/\.editor-panel \.atlas-work-draft-preview\{/);
  assert.match(css,/max-height:min\(29vh,190px\)/);
  assert.match(css,/\.editor-panel \.form-footer\{flex:0 0 auto/);
