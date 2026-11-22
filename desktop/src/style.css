@@ -1522,6 +1522,14 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .atlas-v6-preview-slot{display:flex;flex:1;flex-direction:column;min-height:0}
 .atlas-v6-preview-slot[hidden]{display:none!important}
 .atlas-v6-preview-primary-actions{margin:9px 0 13px}
+.atlas-v6-work-sections{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:3px;
+ background:#e7effa;padding:3px;border:1px solid #d1dff0;border-radius:9px;margin:0 0 10px}
+.atlas-v6-work-sections button{min-width:0;min-height:32px;padding:6px 3px;border:1px solid transparent;
+ border-radius:7px;background:transparent;color:#486989;font-size:11px;font-weight:600}
+.atlas-v6-work-sections button.is-active{background:#fff;border-color:#b5cbed;color:#205fba;
+ box-shadow:0 1px 4px #8fb0d727}
+.atlas-v6-work-sections button:focus-visible{outline:2px solid #2e77da;outline-offset:1px}
+
 .atlas-v6-preview{display:flex;flex:1;flex-direction:column;min-height:0;margin:-16px -15px}
 .atlas-v6-dock-header{display:flex;align-items:center;justify-content:space-between;gap:9px;
  min-height:53px;padding:8px 13px 8px 17px;border-bottom:1px solid #d1deed;flex:0 0 auto}
