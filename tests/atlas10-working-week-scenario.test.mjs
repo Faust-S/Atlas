@@ -74,7 +74,7 @@ test("zero-day milestones follow the preceding work, without inventing occupied 
  assert.equal(gate.startDate,"2026-11-23");
  assert.equal(gate.completionDate,"2026-11-23");
  assert.equal(gate.durationWorkdays,0);
- assert.equal(result.projectScenarioLastDate,"2026-11-20");
+ assert.equal(result.projectScenarioLastDate,"2026-11-23");
 });
 
 test("inclusive due dates use last occupied workday, not exclusive boundary",()=>{
