@@ -98,6 +98,12 @@ export function AtlasInspectorPreview({project,snapshot,plan,forecast,dirty,save
    {shown?.kind==="work"&&<div className="atlas-v6-preview-view">
     {work?<><h2>{work.title}</h2>
      <p>{workStatuses[work.state]||work.state}. Приоритет: {work.priority||"normal"}.</p>
+     <div className="atlas-v6-preview-actions atlas-v6-preview-primary-actions">
+      <button type="button" className="action-button primary"
+       onClick={()=>onEditWork(work.id)}>Изменить работу</button>
+      <button type="button" className="action-button"
+       onClick={()=>onOpenTab("graph")}>Все зависимости</button>
+     </div>
      <section className="atlas-v6-preview-card"><strong>Календарь работы</strong>
       <p>Длительность: {work.estimateDays??1} {work.durationUnit==="working_days"?"рабочих":"календарных"} дн.</p>
       <p>Расчётное начало: {format(workPlan?.startDate)}</p>
@@ -119,9 +125,6 @@ export function AtlasInspectorPreview({project,snapshot,plan,forecast,dirty,save
       {sourceOfWork?<button type="button" className="atlas-v6-preview-link" onClick={()=>open("source",sourceOfWork.id)}>
        Источник: {sourceOfWork.locator}</button>:<p>Источник не привязан.</p>}
      </section>
-     <div className="atlas-v6-preview-actions"><button className="action-button primary"
-      onClick={()=>onEditWork(work.id)}>Изменить работу</button>
-      <button className="action-button" onClick={()=>onOpenTab("graph")}>Все зависимости</button></div>
     </>:<p>Работа больше не существует в текущей редакции.</p>}
    </div>}
    {shown?.kind==="source"&&<div className="atlas-v6-preview-view">
