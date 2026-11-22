@@ -1218,11 +1218,42 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .atlas-gantt-panel>.atlas-schedule-warning{margin:5px 0 8px;font-size:12px;line-height:1.35}
 .atlas-gantt-panel>.atlas-gantt-scroller{max-height:min(63vh,540px)}
 @media(max-width:900px){
- .atlas-gantt-panel .section-heading{gap:5px}
- .atlas-gantt-panel .section-heading .button-row{gap:4px}
- .atlas-gantt-panel .atlas-gantt-tools{gap:5px;margin-bottom:6px}
- .atlas-gantt-panel .atlas-gantt-query input{width:148px}
- .atlas-gantt-panel .atlas-gantt-scenario-toggle{font-size:12px;padding:5px 9px}
- .atlas-gantt-panel>.atlas-schedule-warning{padding:5px 8px}
- .atlas-gantt-panel .atlas-gantt-axis{min-height:40px}
+ /* One narrow header instead of a tall three-row action stack. Keep the
+    explanatory sentence in the accessibility tree, but let the chart lead. */
+ .atlas-gantt-panel .section-heading{display:block;margin-bottom:6px}
+ .atlas-gantt-panel .section-heading h2{font-size:17px;line-height:1.2;margin:0}
+ .atlas-gantt-panel .section-heading p{
+  position:absolute;width:1px;height:1px;overflow:hidden;
+  clip-path:inset(50%);white-space:nowrap;padding:0;margin:0
+ }
+ .atlas-gantt-panel .section-heading .button-row{
+  display:flex;flex-wrap:nowrap;justify-content:flex-start;
+  gap:5px;margin-top:5px
+ }
+ .atlas-gantt-panel .section-heading .button-row .status-chip{
+  padding:3px 6px;font-size:10px;white-space:nowrap
+ }
+ .atlas-gantt-panel .section-heading .button-row .action-button{
+  min-height:30px;white-space:nowrap;padding:5px 7px;font-size:11px
+ }
+ /* Two compact toolbar rows: calendar zoom + scenario, then search/filters. */
+ .atlas-gantt-panel .atlas-gantt-tools{gap:4px;margin-bottom:5px}
+ .atlas-gantt-panel .atlas-gantt-tools label{gap:4px;font-size:11px}
+ .atlas-gantt-panel .atlas-gantt-tools select{min-height:30px;font-size:11px}
+ .atlas-gantt-panel .atlas-gantt-query input{width:135px;min-height:30px}
+ .atlas-gantt-panel .atlas-gantt-scenario-toggle{
+  min-height:30px;font-size:11px;padding:4px 6px;white-space:nowrap
+ }
+ .atlas-gantt-panel .atlas-gantt-tools .atlas-range{
+  font-size:9px;padding:3px 5px
+ }
+ .atlas-gantt-panel .atlas-gantt-tools .atlas-check{font-size:11px}
+ .atlas-gantt-panel>.atlas-schedule-warning{
+  font-size:11px;line-height:1.25;padding:4px 6px;margin:4px 0 5px
+ }
+ .atlas-gantt-panel .atlas-gantt-axis{min-height:34px}
+ .atlas-gantt-panel .atlas-gantt-axis>strong{padding:9px 7px}
+ .atlas-gantt-panel .atlas-gantt-row{min-height:42px}
+ .atlas-gantt-panel .atlas-gantt-work{padding:5px 7px;font-size:12px}
+ .atlas-gantt-panel .atlas-gantt-work small{font-size:10px;margin-top:1px}
 }

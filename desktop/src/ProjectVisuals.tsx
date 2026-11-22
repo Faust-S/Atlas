@@ -275,6 +275,11 @@ export function ProjectGantt({schedule,projectStart,recordedStart,projectDue,por
      onClick={()=>setOffset(Math.min(view.maxOffset,view.from+view.days))}>Позднее →</button>
    </>}
    <span className="atlas-range">{view.windowLabel}</span>
+   <button type="button" ref={workingToggleRef} className="action-button atlas-gantt-scenario-toggle"
+    aria-expanded={workingScenarioOpen} aria-controls="atlas-working-week-preview"
+    onClick={()=>setWorkingScenarioOpen(value=>!value)}>
+    {workingScenarioOpen?'Скрыть сценарий':'Сценарий: рабочая неделя'}
+   </button>
    <label className="atlas-gantt-query">Поиск <input type="search" value={query} onChange={e=>{setQuery(e.target.value);setMatchIndex(0);setVisibleLimit(160)}} placeholder="Название работы"/></label>
    <label className="atlas-check"><input type="checkbox" checked={criticalOnly} onChange={e=>{setCriticalOnly(e.target.checked);setMatchIndex(0);setVisibleLimit(160)}}/> Критический путь</label>
    <label className="atlas-check"><input type="checkbox" aria-label="Только работы позже контрольного срока"
@@ -291,11 +296,6 @@ export function ProjectGantt({schedule,projectStart,recordedStart,projectDue,por
      <button type="button" className="action-button" onClick={()=>focusMatch(Math.min(matchIndex,matching.length-1))}>Показать на шкале</button>
     </>}
    </div>}
-   <button type="button" ref={workingToggleRef} className="action-button atlas-gantt-scenario-toggle"
-    aria-expanded={workingScenarioOpen} aria-controls="atlas-working-week-preview"
-    onClick={()=>setWorkingScenarioOpen(value=>!value)}>
-    {workingScenarioOpen?'Скрыть сценарий':'Сценарий: рабочая неделя'}
-   </button>
   </div>
   {(projectStatus==='paused'||projectStatus==='cancelled')&&<p className="atlas-schedule-warning" role="status">
    {projectStatus==='cancelled'?'Проект отменён':'Проект приостановлен'}.
