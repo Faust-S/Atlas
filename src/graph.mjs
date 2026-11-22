@@ -1,9 +1,9 @@
 // Dependency graph and time lanes are projections, never proof of acceptance.
 import {scheduleProject} from "./planning.mjs";
 const escape=x=>String(x??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-export function renderDependencyGraph(project,{mode="all"}={}){
+export function renderDependencyGraph(project,{mode="all",calendarLibrary=[]}={}){
  if(!["all","critical","blocked"].includes(mode))throw Error("Unknown graph filter");
- const plan=scheduleProject(project);
+ const plan=scheduleProject(project,{calendarLibrary});
  const rows=plan.rows;
  if(!rows.length)return '<p class="muted">Добавьте работы, чтобы увидеть граф зависимостей.</p>';
  const relevant=rows.filter(r=>mode==="all"||mode==="critical"&&r.critical||mode==="blocked"&&(r.blockedBy.length>0||r.state==="blocked"));
@@ -44,10 +44,13 @@ export function renderDependencyGraph(project,{mode="all"}={}){
 function renderLanes(rows,duration){
  const total=Math.max(1,duration);
  return '<div class="atlas-timeline">'+rows.map(r=>{
-  const left=Math.min(100,Math.max(0,r.earlyStart/total*100)),width=Math.max(1,r.durationDays/total*100);
+  const left=Math.min(100,Math.max(0,r.earlyStart/total*100));
+  // Working-day estimates occupy every civil day between their planned
+  // start and finish. Draw the canonical CPM span, not the entered units.
+  const span=Math.max(0,r.earlyFinish-r.earlyStart),width=Math.max(1,span/total*100);
   return '<div class="atlas-timeline-row"><span title="'+escape(r.title)+'">'+escape(r.title)+'</span><div class="atlas-track"><span class="atlas-bar '+(r.critical?"critical":"")+'" style="left:'+left.toFixed(2)+'%;width:'+Math.min(width,100-left).toFixed(2)+'%" title="'+escape(r.title)+': '+r.earlyStart+'–'+r.earlyFinish+' день"></span></div><small>'+r.earlyStart+'–'+r.earlyFinish+'</small></div>';
  }).join("")+'</div>';
 }
-export function renderTimeline(project){const plan=scheduleProject(project);if(!plan.rows.length)return '<p class="muted">Для временной шкалы добавьте работы.</p>';
+export function renderTimeline(project,{calendarLibrary=[]}={}){const plan=scheduleProject(project,{calendarLibrary});if(!plan.rows.length)return '<p class="muted">Для временной шкалы добавьте работы.</p>';
  return '<p class="muted">Расчёт от даты начала проекта · '+plan.durationDays+' календарных дней · красная шкала — критический путь. Процент выполнения не выводится из графика.</p>'+renderLanes(plan.rows,plan.durationDays);
 }
