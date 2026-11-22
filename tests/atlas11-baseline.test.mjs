@@ -43,7 +43,7 @@ test("0.11 baseline stays fixed across calendar edits, dependency changes, and a
  const f=fixture();
  const captured=capturePlanBaseline(f.s,f.pid,{name:"Contract dates"});
  let s=captured.state;
- const baseline=serialize(s.projects.find(p=>p.id===f.pid).planBaselines[0]);
+ const baseline=JSON.stringify(s.projects.find(p=>p.id===f.pid).planBaselines[0]);
  s=editItem(s,f.pid,f.workId,{estimateDays:3});
  let diff=comparePlanBaseline(s,f.pid,captured.id);
  assert.equal(diff.rows[0].shiftDays,1);
@@ -54,7 +54,7 @@ test("0.11 baseline stays fixed across calendar edits, dependency changes, and a
  assert.equal(diff.rows[0].actualShiftDays,4);
  assert.equal(diff.rows[0].actualSource,"entered_by_user");
  assert.equal(diff.totals.reportedFinish,1);
- assert.equal(serialize(s.projects.find(p=>p.id===f.pid).planBaselines[0]),baseline);
+ assert.equal(JSON.stringify(s.projects.find(p=>p.id===f.pid).planBaselines[0]),baseline);
  assert.equal(diff.baseline.id,captured.id);
 });
 
