@@ -1,12 +1,13 @@
 import React,{useState} from "react";
 type SettingsProps={
+ initialSection?:"appearance"|"data"|"about";
  version:string;projectCount:number;workCount:number;revision:number;
  saved:boolean;dirty:boolean;native:boolean;t3Available:boolean;
  onBack:()=>void;onHome:()=>void;onSave:()=>void;onExport:()=>void;onImport:()=>void;
  onHistory:()=>void;onPortfolio:()=>void;canImport:boolean;canSave:boolean;
 };
 export function AtlasSettings(p:SettingsProps){
- const [section,setSection]=useState<"appearance"|"data"|"about">("appearance");
+ const [section,setSection]=useState<"appearance"|"data"|"about">(p.initialSection??"appearance");
  return <section className="atlas-v6-settings" aria-label="Настройки Atlas">
   <div className="atlas-v6-settings-head"><div><h1>Настройки</h1>
    <p>Параметры интерфейса и сведения о локальном портфеле.</p></div>
