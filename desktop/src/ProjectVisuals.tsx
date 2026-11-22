@@ -19,8 +19,8 @@ const trim=(value:string,max=110)=>value.length>max?value.slice(0,max-1)+'…':v
 const ganttDurationLabel=(row:{durationDays:number;durationUnit?:string})=>
  row.durationDays+(row.durationUnit==='working_days'?' раб. дн.':' кал. дн.');
 
-export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,shiftDays,projectStatus,unavailableOrigins,calendarDrafts,calendarLibrary,onRecordWorkCalendar,onSaveCalendarDraft,onRemoveCalendarDraft,onRepairCalendarDraft,onOpenWork,onOpenProject,onEditDates}:{
- schedule:CPM;projectStart:string|null;projectDue:string|null;portfolioStart:string|null;
+export function ProjectGantt({schedule,projectStart,recordedStart,projectDue,portfolioStart,shiftDays,projectStatus,unavailableOrigins,calendarDrafts,calendarLibrary,onRecordWorkCalendar,onSaveCalendarDraft,onRemoveCalendarDraft,onRepairCalendarDraft,onOpenWork,onOpenProject,onEditDates}:{
+ schedule:CPM;projectStart:string|null;recordedStart:string|null;projectDue:string|null;portfolioStart:string|null;
  shiftDays:number|null;projectStatus:string;
  unavailableOrigins:Array<{id:string;name:string;status:string}>;
  calendarDrafts:SavedCalendarScenario[];
@@ -305,7 +305,8 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
      {unavailableOrigins.length>5&&<small>И ещё {unavailableOrigins.length-5} причин в портфеле</small>}
     </div>
    </div>}
-  {(shiftDays!=null&&shiftDays>0)&&<p className="atlas-schedule-warning">Из-за связей с другими проектами расчётное начало сдвинулось на +{shiftDays} дн.: {portfolioStart||'нет расчётной даты'}. График ниже по-прежнему показывает даты от запланированного начала. Для переноса работ нужно отдельно изменить план.</p>}
+  {(shiftDays!=null&&shiftDays>0)&&projectStart===portfolioStart&&<p className="atlas-schedule-warning" role="status">Прогноз по портфелю: начало {portfolioStart}, сдвиг на +{shiftDays} календарных дней относительно записанного начала {recordedStart||'не задано'}. График ниже показывает расчёт от прогнозной даты. Записанный план и даты проекта не изменены.</p>}
+  {!recordedStart&&projectStart&&unavailableOrigins.length===0&&<p className="atlas-schedule-warning" role="status">Начало {projectStart} вычислено по межпроектным зависимостям, но ещё не записано как дата начала проекта.</p>}
   {!projectStart&&<p className="minor">Начальная дата не задана: на оси показаны относительные дни, не календарные даты.</p>}
   <div className="atlas-gantt-tools">
    <button type="button" ref={workingToggleRef} className="action-button" aria-expanded={workingScenarioOpen}
