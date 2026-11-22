@@ -39,7 +39,8 @@ def qualify():
     # No hidden IPC, DOM snapshots or model substitution: actual UIA.
     v.find_control("Сценарий: рабочая неделя",
                    types={"Button"},scroll=True).click_input()
-    d.wait_text("По календарным оценкам:",35)
+    d.wait_text("Календарный план:",35)
+    d.wait_text("Первый рабочий день: 2026-11-10",35)
     d.wait_text("Исключить даты",35)
     assert d.head()==original_head,"Opening a hypothetical calendar wrote native Store"
     assert d.saved_project(original_head)==original_project
@@ -48,7 +49,18 @@ def qualify():
     # Explicitly exclude the known project start date (10 Nov 2026, Tuesday).
     # The hypothetical start must advance to Wednesday without editing Atlas.
     d.set_text("Дополнительные нерабочие дни через запятую","2026-11-10")
-    d.wait_text("Начало перенесено на первый рабочий день: 2026-11-11",35)
+    # One atomic result line avoids relying on WebView2 combining adjacent
+    # text nodes into a single accessibility name.
+    try:
+        d.wait_text("Первый рабочий день: 2026-11-11",35)
+    except AssertionError:
+        observed=[s for s in d.visible_texts()
+                  if any(t in s for t in ("рабочий день","Рабочая неделя",
+                      "Ошибка календаря","Календарный план","Разница:","Затронуто"))]
+        print("ATLAS10_WORKING_CALENDAR_OBSERVED_UIA "+
+              repr(observed[:25]),flush=True)
+        v.capture("atlas10-calendar-observed-after-input")
+        raise
     assert d.head()==original_head,"Changing a calendar hypothesis wrote native Store"
     assert d.saved_project(original_head)==original_project
     v.capture("atlas10-working-week-holiday-exception-installed")
