@@ -52,7 +52,8 @@ export function portfolioResources(snapshot,{schedule=null}={}){
  for(const project of snapshot.projects){
   if(project.status==="cancelled")continue;
   const start=day(forecast.byId.get(project.id)?.projectedStart);
-  const own=scheduleProject(project);
+  const own=scheduleProject(project,{calendarLibrary:snapshot.calendarLibrary??[],
+   startDate:start===null?project.startDate:forecast.byId.get(project.id)?.projectedStart});
   const items=new Map(project.items.map(x=>[x.id,x]));
   for(const planned of own.rows){
    if(planned.state==="done")continue;
