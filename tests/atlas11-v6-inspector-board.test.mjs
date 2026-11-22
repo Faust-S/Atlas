@@ -38,3 +38,21 @@ test("dragging Board Work changes only via existing guarded editItem and explici
  assert.match(main,/onChange=\{e=>quickWork\(w\.id,e\.target\.value\)\}/);
  assert.match(main,/aria-label=\{"Просмотреть в инспекторе "\+w\.title\}/);
 });
+
+test("Atlas 0.11 Gantt and DAG open Work in the live dock; T3 embedded retains editor",()=>{
+ const main=read("../desktop/src/main.tsx");
+ const preview=read("../desktop/src/AtlasInspectorPreview.tsx");
+ const css=read("../desktop/src/style.css");
+ assert.match(main,/const openWorkContext=\(id:string\)=>\{\s*if\(embedded\)openEditor\("work:"\+id\);\s*else inspectWork\(id\)/);
+ assert.match(main,/onEditDates=\{\(\)=>openEditor\("dates"\)\} onOpenWork=\{openWorkContext\}/);
+ assert.match(main,/focusWorkId=\{graphFocusWork\?\.id\|\|null\} onOpenWork=\{openWorkContext\}/);
+ assert.match(main,/if\(!project\|\|!project\.items\.some\(\(item:any\)=>item\.id===id\)\|\|!requireClosedForm\(\)\)return/);
+ assert.match(main,/<div className="atlas-v6-preview-slot" hidden=\{Boolean\(editor\)\}>/);
+ assert.match(main,/<AtlasInspectorPreview key=\{project\?\.id\|\|"portfolio"\}/);
+ assert.match(main,/\{editor\?<EditorPanel[\s\S]*?:\s*embedded\?<section/);
+ assert.match(preview,/className="atlas-v6-preview-actions atlas-v6-preview-primary-actions"/);
+ assert.match(preview,/onClick=\{\(\)=>onEditWork\(work\.id\)\}>Изменить работу/);
+ assert.match(css,/\.atlas-v6-preview-slot\[hidden\]\{display:none!important\}/);
+ // Keeping the preview mounted prevents loss of Work/Source/Baseline tabs after editing.
+ assert.doesNotMatch(main,/editor\?<EditorPanel[\s\S]*?:\s*!embedded\?<AtlasInspectorPreview/);
+});
