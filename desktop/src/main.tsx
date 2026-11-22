@@ -1876,7 +1876,11 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     openEditor("new");return;
    }
    if(event.key==="Escape"&&editorOpenRef.current){event.preventDefault();cancelEditor();return}
-   if(ctrl&&!event.shiftKey&&code==="KeyK"){event.preventDefault();rootRef.current?.querySelector<HTMLInputElement>("#atlas-search")?.focus()}
+   if(ctrl&&!event.shiftKey&&code==="KeyK"){
+    event.preventDefault();
+    if(!embedded&&!navPanelOpen)setNavPanelOpen(true);
+    requestAnimationFrame(()=>rootRef.current?.querySelector<HTMLInputElement>("#atlas-search")?.focus());
+   }
   };
   window.addEventListener("keydown",key);return ()=>window.removeEventListener("keydown",key);
  });
@@ -2012,7 +2016,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     projectCount={data.projects.length}
     workCount={data.projects.reduce((n:number,p:any)=>n+p.items.length,0)}
     revision={data.revision} saved={persisted} dirty={dirty} native={native}
-    t3Available={signedFileOwnerAvailable} onBack={()=>setSettingsOpen(false)}
+    t3Available={signedFileOwnerAvailable} onBack={()=>setSettingsOpen(false)} onHome={goHome}
     onSave={()=>void save()} canSave={dirty&&!busy&&!editor}
     onExport={()=>void exportIwxa()} onImport={()=>void importIwxa()}
     onHistory={()=>void showNativeHistory()} onPortfolio={goPortfolio}
