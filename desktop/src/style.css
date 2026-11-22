@@ -1358,6 +1358,17 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .atlas-v6-shell .commandbar{display:flex;min-height:49px;margin-bottom:11px;padding:6px 0;
  position:sticky;top:0;z-index:8;gap:10px}
 .atlas-v6-shell .commandbar>.search{display:none}
+.atlas-v6-shell .commandbar{display:none}
+.atlas-v6-shell .workspace-footer{display:none}
+.atlas-v6-title-right{display:flex;align-items:center;gap:9px;margin-left:auto;flex-shrink:0}
+.atlas-v6-save-status{font-size:11px;color:#657d9b;white-space:nowrap}
+.atlas-v6-save-button{color:#335579;border:1px solid #b9cee9;
+ background:linear-gradient(#fff,#e9f2ff);min-height:32px;padding:7px 11px;
+ border-radius:9px;font-weight:650;font-size:12px}
+.atlas-v6-save-button.is-dirty{background:linear-gradient(105deg,#2771ed,#4e95ff);color:#fff;border-color:#3f81e8}
+.atlas-v6-save-button:hover:not(:disabled){filter:brightness(.98)}
+.atlas-v6-inspector-icon{border:1px solid #c0d0e6;background:#f4f8ff}
+
 .atlas-v6-shell .commandbar>.toolbar-actions{flex:1;justify-content:flex-end}
 .atlas-v6-shell .commandbar .atlas-file-menu{display:none}
 .atlas-v6-shell .commandbar .action-button{min-height:31px;padding:5px 10px;font-size:11px}
@@ -1482,6 +1493,11 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
  .atlas-v6-titlebar{padding:0 9px;gap:2px}
  .atlas-v6-product-title{margin:0 3px;font-size:12px}
  .atlas-v6-menu summary{padding:7px 8px;font-size:12px}
+ .atlas-v6-save-status{display:none}
+ .atlas-v6-title-right{gap:5px}
+ .atlas-v6-save-button{padding:5px 9px;min-height:30px;font-size:11px}
+ .atlas-v6-inspector-icon{width:30px;height:30px;min-width:30px}
+
  .atlas-v6-rail{width:52px;flex-basis:52px;padding:7px 0}
  .atlas-v6-rail-btn{width:40px;height:40px}
  .atlas-dash-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
