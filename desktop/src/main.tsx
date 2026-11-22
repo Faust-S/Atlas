@@ -17,6 +17,7 @@ import {scheduleProject,scheduleChangeSummary,scheduleDeadlineExplanations,criti
 import {previewWorkScheduleEdit} from "../../src/work-schedule-preview.mjs";
 import {startWorkCorrection,continueWorkCorrection} from "../../src/work-correction-flow.mjs";
 import {portfolioSchedule,projectedFinishLabel} from "../../src/portfolio-schedule.mjs";
+import {projectScreenSchedule} from "../../src/project-schedule-view.mjs";
 import {portfolioResources} from "../../src/portfolio-resources.mjs";
 import {planReviewQueue,planReviewAction,planProposalAction} from "../../src/plan-review.mjs";
 import {revisionReview,recheckAction} from "../../src/revision-review.mjs";
@@ -430,9 +431,16 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const recheckRows=useMemo(()=>active?rechecks.rows.filter((r:any)=>r.projectId===active):[],[rechecks,active]);
  const history=useMemo(()=>project?projectHistoryRows(project,{kind:historyType,query:historyQuery}):[],
   [project,historyType,historyQuery]);
- const plan=useMemo(()=>project?scheduleProject(project,{
+ const projected=active?dates.byId.get(active):null;
+ // Preserve the local plan for Work edits and show the same forecast as the
+ // portfolio on all read-only project calendar screens.
+ const plannedPlan=useMemo(()=>project?scheduleProject(project,{
   calendarLibrary:data.calendarLibrary??[]
  }):null,[project,data.calendarLibrary]);
+ const scheduleView=useMemo(()=>project?projectScreenSchedule(project,projected,{
+  calendarLibrary:data.calendarLibrary??[],plannedPlan
+ }):null,[project,projected,data.calendarLibrary,plannedPlan]);
+ const plan=scheduleView?.display??null;
  const planRowsById=useMemo(()=>new Map<string,any>((plan?.rows||[]).map((row:any)=>[String(row.id),row])),[plan]);
  const criticalWorkIds=useMemo(()=>new Set<string>((plan?.criticalIds||[]).map(String)),[plan]);
  const criticalFocus=useMemo(()=>plan?criticalPathFocus(plan):null,[plan]);
@@ -451,8 +459,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const graphRemovalPreview=useMemo(()=>{
   if(!project||!plan||!graphFocusWork||!graphSelectedPredecessor)return null;
   return forecastDependencyRemoval(project,plan,graphSelectedPredecessor.id,graphFocusWork.id,{
-   calendarLibrary:data.calendarLibrary??[]});
- },[project,plan,graphFocusWork,graphSelectedPredecessor,data.calendarLibrary]);
+   calendarLibrary:data.calendarLibrary??[],
+   startDate:scheduleView?.mode==="portfolio_forecast"?scheduleView.displayStart:undefined});
+ },[project,plan,graphFocusWork,graphSelectedPredecessor,data.calendarLibrary,scheduleView]);
  // The table and Gantt share the canonical project schedule. Keep an indexed
  // view for large projects rather than scanning 1,200+ CPM rows per work card.
  const overdueWorkFinishes=useMemo(()=>new Map<string,string>(
@@ -461,7 +470,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const deadlineRiskDetails=useMemo(()=>scheduleDeadlineExplanations(plan||{rows:[]}),[plan]);
  const overdueHighlights=useMemo(()=>project?
   deadlineFocusRows(project.items,deadlineRiskDetails):[],[project,deadlineRiskDetails]);
- const recentPlanRow=recentWork&&plan?plan.rows.find((row:any)=>row.id===recentWork.id):null;
+ const recentPlanRow=recentWork&&plannedPlan?plannedPlan.rows.find((row:any)=>row.id===recentWork.id):null;
  const planBeforeRecent=recentWork&&recentPlanBefore&&
   recentPlanBefore.workId===recentWork.id&&recentPlanBefore.revision===data.revision?
   recentPlanBefore.days:null;
@@ -566,7 +575,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   card.focus({preventScroll:true});
   setChangeJump(null);
  },[changeJump,ready,active,tab,project]);
- const projected=active?dates.byId.get(active):null;
+
  const portfolioSearchIndex=useMemo(()=>buildPortfolioSearchIndex(data.projects),[data.projects]);
  const filtered=useMemo(()=>filterPortfolioSearch(portfolioSearchIndex,{
   query:search,status:portfolioStatus}),[portfolioSearchIndex,search,portfolioStatus]);
@@ -1242,9 +1251,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    if(result.projectId)selectProject(result.projectId,true);
    if(result.workId){
     const updatedProject=result.state.projects.find((p:any)=>p.id===formProject);
-    setRecentPlanBefore(plan&&updatedProject?startWorkCorrection({
+    setRecentPlanBefore(plannedPlan&&updatedProject?startWorkCorrection({
      projectId:formProject,workId:result.workId,revision:result.state.revision,
-     beforePlan:plan,afterPlan:scheduleProject(updatedProject,{calendarLibrary:data.calendarLibrary??[]})
+     beforePlan:plannedPlan,afterPlan:scheduleProject(updatedProject,{calendarLibrary:data.calendarLibrary??[]})
     }):null);
     const isDependencyChange=editor.action.startsWith("dep-to:");
     setRecentWorkKind(isDependencyChange?"dependency":"created");
@@ -1277,9 +1286,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
        revision:data.revision,nextRevision:result.state.revision,afterPlan:updatedPlan,
        recordCorrection:Boolean(scheduleFieldsChanged)}
      ):null;
-     const nextContext=continued||(plan&&updatedPlan?startWorkCorrection({
+     const nextContext=continued||(plannedPlan&&updatedPlan?startWorkCorrection({
       projectId:formProject,workId:correctedId,revision:result.state.revision,
-      beforePlan:plan,afterPlan:updatedPlan
+      beforePlan:plannedPlan,afterPlan:updatedPlan
      }):null);
      setRecentPlanBefore(nextContext);
      setRecentWorkKind("adjusted");
@@ -1542,9 +1551,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    const next=disconnect(data,project.id,from,to);
    const updatedProject=next.projects.find((item:any)=>item.id===project.id)!;
    mutate(next,"Связь удалена из черновика. Проверьте последствия и сохраните изменение.");
-   setRecentPlanBefore(plan?startWorkCorrection({
+   setRecentPlanBefore(plannedPlan?startWorkCorrection({
     projectId:project.id,workId:to,revision:next.revision,
-    beforePlan:plan,afterPlan:scheduleProject(updatedProject,{calendarLibrary:data.calendarLibrary??[]})
+    beforePlan:plannedPlan,afterPlan:scheduleProject(updatedProject,{calendarLibrary:data.calendarLibrary??[]})
    }):null);
    setRecentWorkKind("dependency");setRecentWorkId(to);
    revealWorkInTable(to,false);
@@ -2454,9 +2463,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
          " дн. от начала проекта."}
          {recentPlanRow.predecessors.length?" Предшествующих работ: "+recentPlanRow.predecessors.length+".":""}
         </p>}
-        {planBeforeRecent!==null&&plan&&<p className="minor">
-         Продолжительность плана: было {planBeforeRecent} дн., стало {plan.durationDays} дн.
-         Календарный CPM без распределения ресурсов.</p>}
+        {planBeforeRecent!==null&&plannedPlan&&<p className="minor">
+         Продолжительность плана: было {planBeforeRecent} дн., стало {plannedPlan.durationDays} дн.
+         Локальный календарный CPM до учёта межпроектного сдвига, без распределения ресурсов.</p>}
         {recentPlanRow?.finishDate&&recentWork.dueDate&&
          recentPlanRow.finishDate>recentWork.dueDate&&<p className="atlas-schedule-warning">
           Расчётный финиш позже указанного срока. Проверьте длительность и зависимости.</p>}
@@ -2548,6 +2557,10 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       {" "}Без наблюдений по работе: {workObservationCounts.without}; завершены без наблюдений: {workObservationCounts.doneWithout}.
       Это поиск заявленных фактов, не независимая приёмка.
      </p>
+     {scheduleView?.mode==="portfolio_forecast"&&<p className="atlas-schedule-warning" role="status">
+      Прогноз по связям портфеля: начало {scheduleView.displayStart}, исходное начало проекта {project.startDate||"не задано"}.
+      Ниже показаны расчётные даты Work для прогноза. Исходный план и сохранённые Work не изменены.
+     </p>}
      <div className="table-scroll atlas-work-table-scroll"><table className="atlas-work-table" aria-label="Работы проекта"><thead><tr><th>Работа</th><th>Состояние</th><th>Длительность</th><th>Ответственный</th><th>Срок</th><th>Изменить</th></tr></thead>
       <tbody>{filteredWork.slice(0,workLimit).map((w:any)=><tr key={w.id}
         className={recentWorkId===w.id?"atlas-recent-work":undefined}>
@@ -2621,7 +2634,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
        <td data-label="Ответственный">{w.assignee||"Не назначен"}</td>
        <td data-label="Срок">{readable(w.dueDate)}
         {planRowsById.has(w.id)&&<small className="atlas-work-plan-dates">
-         CPM: {planRowsById.get(w.id).startDate||"начало не задано"} → {planRowsById.get(w.id).finishDate||"финиш не определён"}
+         {scheduleView?.mode==="portfolio_forecast"?"Прогноз по портфелю":"CPM по плану"}: {planRowsById.get(w.id).startDate||"начало не задано"} → {planRowsById.get(w.id).finishDate||"финиш не определён"}
         </small>}
         {overdueWorkFinishes.has(w.id)&&<small className="atlas-work-overdue-label">
          Расчётное окончание: {overdueWorkFinishes.get(w.id)}. Позже указанного срока.
@@ -2721,7 +2734,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     </div>}
     {tab==="timeline"&&(plan?
       <ProjectGantt key={project.id} schedule={plan}
-       projectStatus={project.status} projectStart={project.startDate||null} projectDue={project.dueDate||null}
+       projectStatus={project.status} projectStart={scheduleView?.displayStart??null}
+       recordedStart={project.startDate||null} projectDue={project.dueDate||null}
        portfolioStart={projected?.projectedStart||null} shiftDays={projected?.shiftDays??null}
        unavailableOrigins={projected?.unavailableOrigins||[]}
        calendarDrafts={project.calendarDrafts||[]}
@@ -3321,7 +3335,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   {inspector&&<aside className={"inspector"+(editor?" atlas-inspector-editing":"")}>
    {editor?<EditorPanel key={editor.action} editor={editor} onSubmit={submit}
     onCancel={cancelEditor} onDirtyChange={changed=>{editorDirtyRef.current=changed}}
-    busy={busy} project={project} plan={plan}
+    busy={busy} project={project} plan={plannedPlan}
     calendarLibrary={data.calendarLibrary??[]}
     correctionBaseline={correctionBaseline}/>:
    <section><div className="section-heading"><h2>Инспектор</h2><button className="icon-button" aria-label="Скрыть инспектор" onClick={()=>setInspector(false)}>×</button></div>
