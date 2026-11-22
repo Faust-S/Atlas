@@ -8,7 +8,7 @@ test("all project, tab and editor navigation preserves unapplied forms",()=>{
  assert.match(ui,/const requireClosedForm=\(\)=>/);
  assert.match(ui,/if\(!editorOpenRef\.current\)return true/);
  assert.match(ui,/const selectProject=\(id:string\|null,afterSubmit=false\)=>\{\s*if\(!afterSubmit&&!requireClosedForm\(\)\)return/);
- assert.match(ui,/const openEditor=\(action:string,projectId\?:string\)=>\{\s*if\(!requireClosedForm\(\)\|\|busyRef\.current\)return/);
+ assert.match(ui,/const openEditor=\(action:string,projectId\?:string,fromInspector=false\)=>\{\s*if\(!requireClosedForm\(\)\|\|busyRef\.current\)return/);
  assert.match(ui,/const openEditorFor=\(projectId:string,action:string\)=>\{\s*if\(!requireClosedForm\(\)\|\|busyRef\.current\)return/);
  assert.match(ui,/const view=\(tabId:Tab\)=>\{\s*if\(!requireClosedForm\(\)\)return/);
  assert.match(ui,/if\(result\.projectId\)selectProject\(result\.projectId,true\)/);
@@ -57,7 +57,7 @@ test("JSON preview guards a draft until human approval and native generation rec
 
 
 test("R3 keyboard and sidebar navigation allow untouched forms, block changed fields",()=>{
- assert.match(ui,/if\(!editorDirtyRef\.current\)\{\s*setEditor\(null\);\s*if\(embedded\|\|window\.innerWidth<=1220\)setInspector\(false\);\s*return true;/);
+ assert.match(ui,/if\(!editorDirtyRef\.current\)\{\s*const returnToPreview=inspectorEditorReturnRef\.current&&!embedded;\s*inspectorEditorReturnRef\.current=false;\s*setEditor\(null\);\s*if\(!returnToPreview&&\(embedded\|\|window\.innerWidth<=1220\)\)setInspector\(false\);\s*return true;/);
  const handlers=ui.slice(ui.indexOf(" const key=(event:KeyboardEvent)=>"),ui.indexOf('window.addEventListener("keydown",key)'));
  assert.equal((handlers.match(/if\(!requireClosedForm\(\)\)return/g)||[]).length,3);
  assert.doesNotMatch(handlers,/if\(editorOpenRef\.current\)\{issue\(Error\("Сначала примените или закройте/);
