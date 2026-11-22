@@ -282,13 +282,13 @@ export function resolveCalendarDraftMissingWorkRefs(s,pid,id){
 
 export function upsertCalendarDraft(s,pid,input){
  const p=project(s,pid),known=new Set(p.items.map(w=>w.id));
- const normalized=normalizedCalendarDraft(input,known);
  const existingId=input?.id??null;
  if(existingId!==null&&
    (typeof existingId!=="string"||!p.calendarDrafts?.some(d=>d.id===existingId)))
   throw Error("Unknown project calendar draft");
  if(existingId!==null&&missingCalendarDraftWorkIds(p,existingId).length)
   throw Error("В календарном варианте есть ссылки на удалённые работы. Сначала подтвердите очистку ссылок.");
+ const normalized=normalizedCalendarDraft(input,known);
  const duplicate=(p.calendarDrafts||[]).find(d=>
   d.id!==existingId&&d.name.trim().toLocaleLowerCase("ru-RU")===
   normalized.name.toLocaleLowerCase("ru-RU"));
