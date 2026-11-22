@@ -17,7 +17,8 @@ const cumulativeResult=(baseline,plan)=>baseline?{
  beforeDays:baseline.durationDays,afterDays:plan.durationDays
 }:null;
 
-export function previewWorkScheduleEdit(project,workId,draft,beforePlan=null,cumulativeBaseline=null,{calendarLibrary=[]}={}){
+export function previewWorkScheduleEdit(project,workId,draft,beforePlan=null,cumulativeBaseline=null,
+ {calendarLibrary=/** @type {any[]} */([])}={}){
  if(!project||!Array.isArray(project.items)||!Array.isArray(project.dependencies))
   throw Error("Проект для расчёта недоступен");
  const work=project.items.find(item=>item.id===workId);
