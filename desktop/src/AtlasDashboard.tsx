@@ -115,7 +115,7 @@ export function AtlasDashboard({data,dates,resources,reviews,sourceQueue,ecosyst
    case "ecosystem":return ecosystemRows.length?<div className="atlas-dash-rows">
     {ecosystemRows.slice(0,6).map((r:any)=><div className="atlas-dash-row" key={r.id}>
      <div><button className="atlas-dash-link" onClick={()=>onOpenProject(r.id)}>{r.name}</button>
-      <small>{r.repositories?.length??0} публичных репозиториев · {r.workCount??r.workTotal??0} работ
+      <small>{r.repositories?.length??0} публичных репозиториев · {r.works} работ
        · {r.sourcesMissing?"Источник не подтверждён":"Сведения проекта доступны"}</small></div>
      <button className="atlas-dash-secondary" onClick={()=>onOpenProject(r.id,"sources")}>Исходники</button>
     </div>)}
