@@ -41,8 +41,10 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
   try{
    const holidays=nonWorkingDates.trim()?nonWorkingDates.split(/[,;\n]+/).map(x=>x.trim()).filter(Boolean):[];
    const additionalWorkingDates=extraWorkingDates.trim()?extraWorkingDates.split(/[,;\n]+/).map(x=>x.trim()).filter(Boolean):[];
+   const validIds=new Set(schedule.rows.map(row=>row.id));
    const modeByWork=Object.fromEntries(Object.keys(continuousWorkIds)
-    .filter(id=>continuousWorkIds[id]).map(id=>[id,'elapsed_days']));
+    .filter(id=>continuousWorkIds[id]&&validIds.has(id))
+    .map(id=>[id,'elapsed_days']));
    const result=previewOperationCalendars(schedule,{
     startDate:projectStart,weekdays:weekPreset==='five'?[1,2,3,4,5]:[1,2,3,4,5,6],
     holidays,additionalWorkingDates,defaultMode:'working_days',modeByWork
