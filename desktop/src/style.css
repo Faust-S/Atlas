@@ -1500,3 +1500,41 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
  .atlas-v6-setting-row{align-items:flex-start;flex-wrap:wrap}
  .atlas-v6-settings-head{flex-wrap:wrap}
 }
+
+
+/* Agent-v6 contextual inspector: true split pane, selectable Work/Source/Baseline tabs. */
+.atlas-v6-preview{display:flex;flex:1;flex-direction:column;min-height:0;margin:-16px -15px}
+.atlas-v6-dock-header{display:flex;align-items:center;justify-content:space-between;gap:9px;
+ min-height:53px;padding:8px 13px 8px 17px;border-bottom:1px solid #d1deed;flex:0 0 auto}
+.atlas-v6-dock-header strong{display:block;font-size:13px;color:#203953}
+.atlas-v6-dock-header small{display:block;color:#7187a5;font-size:10px}
+.atlas-v6-dock-header .icon-button{font-size:18px}
+.atlas-v6-dock-tabs{display:flex;gap:4px;padding:5px 9px;overflow-x:auto;flex:0 0 auto;
+ background:#e6edf7;border-bottom:1px solid #dce5f2;min-height:43px;scrollbar-width:thin}
+.atlas-v6-dock-tab{display:flex;align-items:center;flex:0 0 auto;max-width:215px;border:1px solid transparent;border-radius:8px}
+.atlas-v6-dock-tab.selected{background:#fff;border-color:#abc4e7;box-shadow:0 2px 6px #7ca0d420}
+.atlas-v6-dock-tab>button:first-child{overflow:hidden;text-overflow:ellipsis;max-width:150px;
+ white-space:nowrap;background:none;border:0;padding:7px 8px 7px 10px;text-align:left;
+ font-size:11px;color:#4d6581}
+.atlas-v6-dock-tab.selected>button:first-child{font-weight:650;color:#1f497b}
+.atlas-v6-dock-tab-close{color:#6380a1;border:0;background:none;font-size:15px;padding:5px}
+.atlas-v6-preview-body{flex:1;min-height:0;overflow-y:auto;padding:18px 17px 24px;
+ scrollbar-color:#b9c8dc transparent}
+.atlas-v6-preview-view h2{font-size:18px;margin:0 0 8px;color:#203952;overflow-wrap:anywhere}
+.atlas-v6-preview-view>p{font-size:12px;color:#536d8a;line-height:1.5}
+.atlas-v6-preview-card{border:1px solid #d8e5f3;background:#fff;border-radius:11px;
+ padding:13px 14px;margin:13px 0}
+.atlas-v6-preview-card>strong{font-size:12px;color:#234262}
+.atlas-v6-preview-card p{font-size:12px;line-height:1.55;color:#536d8a;margin:5px 0}
+.atlas-v6-preview-link{display:block;margin:8px 0;color:#2c628f;background:none;border:0;
+ text-align:left;text-decoration:underline;font-size:11px;overflow-wrap:anywhere}
+.atlas-v6-preview-actions{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}
+.atlas-v6-preview-actions .action-button{font-size:11px;min-height:32px;padding:7px 10px}
+.atlas-v6-preview-footer{display:flex;align-items:center;justify-content:space-between;gap:8px;
+ padding:9px 14px;border-top:1px solid #d4e2f2;background:#eaf2fb;flex:0 0 auto}
+.atlas-v6-preview-footer span{color:#738eac;font-size:10px}
+.atlas-v6-preview-footer button{font-size:11px;padding:5px 9px;min-height:30px}
+.atlas-v6-shell .atlas-v6-row-preview{font-size:10px;font-weight:500;margin-left:8px;white-space:nowrap}
+.atlas-v6-shell .board-card.is-dragging{opacity:.5}
+.atlas-v6-shell .board-column.atlas-v6-board-drop-target{border-style:dashed;border-color:#91add4}
+.atlas-v6-shell .board-card[draggable=true]{cursor:grab}
