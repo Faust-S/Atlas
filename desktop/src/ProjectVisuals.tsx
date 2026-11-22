@@ -6,13 +6,19 @@ import {previewOperationCalendars} from '../../src/working-week-scenario.mjs';
 
 type CPM={durationDays:number;rows:Array<{id:string;title:string;earlyStart:number;earlyFinish:number;durationDays:number;critical:boolean;state:string;predecessors:string[];blockedBy:string[];floatDays:number;dueDate?:string|null;finishDate?:string|null}>};
 type Mode='fit'|'30'|'90';
+type CalendarScenarioInput={id?:string;name:string;weekdays:number[];excludedDates:string[];
+ additionalWorkingDates:string[];modeByWork:Record<string,'elapsed_days'|'working_days'>};
+type SavedCalendarScenario=CalendarScenarioInput&{id:string;version:number;baseRevision:number};
 const statusName:Record<string,string>={todo:'Запланировано',in_progress:'В работе',blocked:'Заблокировано',done:'Выполнено (заявлено)'};
 const trim=(value:string,max=110)=>value.length>max?value.slice(0,max-1)+'…':value;
 
-export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,shiftDays,projectStatus,unavailableOrigins,onOpenWork,onOpenProject,onEditDates}:{
+export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,shiftDays,projectStatus,unavailableOrigins,calendarDrafts,onSaveCalendarDraft,onRemoveCalendarDraft,onOpenWork,onOpenProject,onEditDates}:{
  schedule:CPM;projectStart:string|null;projectDue:string|null;portfolioStart:string|null;
  shiftDays:number|null;projectStatus:string;
  unavailableOrigins:Array<{id:string;name:string;status:string}>;
+ calendarDrafts:SavedCalendarScenario[];
+ onSaveCalendarDraft:(draft:CalendarScenarioInput)=>string|null;
+ onRemoveCalendarDraft:(id:string)=>boolean;
  onOpenWork:(id:string)=>void;onOpenProject:(id:string)=>void;onEditDates:()=>void
 }){
  const [scale,setScale]=useState<Mode>('fit');
@@ -24,7 +30,11 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
  const [visibleLimit,setVisibleLimit]=useState(160);
  const [expanded,setExpanded]=useState(false);
  const [workingScenarioOpen,setWorkingScenarioOpen]=useState(false);
- const [weekPreset,setWeekPreset]=useState<'five'|'six'>('five');
+ const [weekPreset,setWeekPreset]=useState<'five'|'six'|'custom'>('five');
+ const [customWeekdays,setCustomWeekdays]=useState<number[]>([1,2,3,4,5]);
+ const [calendarDraftId,setCalendarDraftId]=useState('');
+ const [calendarDraftName,setCalendarDraftName]=useState('Рабочая неделя');
+ const [calendarFeedback,setCalendarFeedback]=useState('');
  const [nonWorkingDates,setNonWorkingDates]=useState('');
  const [extraWorkingDates,setExtraWorkingDates]=useState('');
  const [continuousWorkIds,setContinuousWorkIds]=useState<Record<string,boolean>>({});
@@ -51,12 +61,56 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
     .filter(id=>continuousWorkIds[id]&&validIds.has(id))
     .map(id=>[id,'elapsed_days']));
    const result=previewOperationCalendars(schedule,{
-    startDate:projectStart,weekdays:weekPreset==='five'?[1,2,3,4,5]:[1,2,3,4,5,6],
+    startDate:projectStart,weekdays:weekPreset==='five'?[1,2,3,4,5]:
+     weekPreset==='six'?[1,2,3,4,5,6]:customWeekdays,
     holidays,additionalWorkingDates,defaultMode:'working_days',modeByWork
    });
    return {result,error:''};
   }catch(error){return {result:null as any,error:error instanceof Error?error.message:'Неверный рабочий календарь'};}
- },[schedule,projectStart,workingScenarioOpen,weekPreset,nonWorkingDates,extraWorkingDates,continuousWorkIds]);
+ },[schedule,projectStart,workingScenarioOpen,weekPreset,customWeekdays,nonWorkingDates,extraWorkingDates,continuousWorkIds]);
+ const loadCalendarDraft=()=>{
+  const draft=calendarDrafts.find(row=>row.id===calendarDraftId);
+  if(!draft){setCalendarFeedback('Выберите сохранённый вариант.');return;}
+  const days=draft.weekdays.join(',');
+  setWeekPreset(days==='1,2,3,4,5'?'five':days==='1,2,3,4,5,6'?'six':'custom');
+  setCustomWeekdays([...draft.weekdays]);
+  setNonWorkingDates(draft.excludedDates.join(', '));
+  setExtraWorkingDates(draft.additionalWorkingDates.join(', '));
+  const ids=new Set(schedule.rows.map(row=>row.id));
+  setContinuousWorkIds(Object.fromEntries(Object.entries(draft.modeByWork)
+   .filter(([id,unit])=>ids.has(id)&&unit==='elapsed_days').map(([id])=>[id,true])));
+  setWorkingLastToggledId(null);setWorkingQuery('');setWorkingLimit(12);
+  setCalendarDraftName(draft.name);
+  setCalendarFeedback('Загружен сохранённый вариант, версия '+draft.version+'. Это только сценарный расчёт.');
+ };
+ const saveCalendarDraft=()=>{
+  if(workingScenario.error||!workingScenario.result?.calendar){
+   setCalendarFeedback('Исправьте календарь перед сохранением.');return;
+  }
+  const chosenIds=new Set(schedule.rows.map(row=>row.id));
+  const modeByWork=Object.fromEntries(Object.entries(continuousWorkIds)
+   .filter(([id,on])=>on&&chosenIds.has(id))
+   .map(([id])=>[id,'elapsed_days' as const]));
+  const calendar=workingScenario.result.calendar;
+  const id=onSaveCalendarDraft({
+   ...(calendarDraftId?{id:calendarDraftId}:{}),
+   name:calendarDraftName,
+   weekdays:calendar.weekdays,excludedDates:calendar.excludedDates,
+   additionalWorkingDates:calendar.additionalWorkingDates,modeByWork
+  });
+  if(id){
+   setCalendarDraftId(id);
+   setCalendarFeedback('Вариант добавлен в черновик проекта. Нажмите Ctrl+S для записи на диск.');
+  }else setCalendarFeedback('Не удалось записать вариант в черновик. Проверьте сообщение Atlas.');
+ };
+ const deleteCalendarDraft=()=>{
+  if(!calendarDraftId){setCalendarFeedback('Выберите сохранённый вариант.');return;}
+  if(onRemoveCalendarDraft(calendarDraftId)){
+   setCalendarDraftId('');
+   setCalendarFeedback('Вариант удалён из черновика. Нажмите Ctrl+S для сохранения.');
+  }
+ };
+
  const workingDifferences=useMemo(()=>{
   const rows=workingScenario.result?.rows||[];
   const affected=rows.filter((row:any)=>row.shiftDays!=null&&row.shiftDays!==0);
@@ -185,9 +239,18 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
     </p>
    </>}
    <div className="atlas-gantt-tools">
-    <label>Рабочие дни <select value={weekPreset} onChange={event=>{setWeekPreset(event.target.value as 'five'|'six');setWorkingLimit(12)}}>
+    <label>Рабочие дни <select value={weekPreset} onChange={event=>{setWeekPreset(event.target.value as 'five'|'six'|'custom');setWorkingLimit(12)}}>
      <option value="five">Пн–Пт</option><option value="six">Пн–Сб</option>
+     <option value="custom">Другой график</option>
     </select></label>
+    {weekPreset==='custom'&&<div className="atlas-working-scenario-custom" role="group" aria-label="Дни рабочей недели">
+     {['Вс','Пн','Вт','Ср','Чт','Пт','Сб'].map((label,day)=>
+      <label key={day}><input type="checkbox" checked={customWeekdays.includes(day)}
+       onChange={event=>{
+        setCustomWeekdays(previous=>event.target.checked?
+         [...previous,day].sort((a,b)=>a-b):previous.filter(x=>x!==day));
+       }}/>{label}</label>)}
+    </div>
     <label className="atlas-working-scenario-dates">Исключить даты
      <input type="text" value={nonWorkingDates} onChange={event=>{setNonWorkingDates(event.target.value);setWorkingLimit(12)}}
       placeholder="2026-12-31, 2027-01-01" aria-label="Дополнительные нерабочие дни через запятую"/>
@@ -247,6 +310,35 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
    </>}
    {workingScenario.result?.available&&!workingScenario.result.rows.length&&
     <p className="minor">Для сравнения нужно добавить хотя бы одну работу.</p>}
+   <details className="atlas-working-scenario-saved">
+    <summary>Сохранённые календарные варианты ({calendarDrafts.length})</summary>
+    <p className="minor">Варианты сохраняются в проекте, но не меняют утверждённый план.
+     После изменения черновика используйте «Сохранить» или Ctrl+S для записи на диск.</p>
+    <div className="atlas-gantt-tools">
+     <label>Вариант
+      <select aria-label="Сохранённый календарный вариант" value={calendarDraftId}
+       onChange={event=>{setCalendarDraftId(event.target.value);setCalendarFeedback('')}}>
+       <option value="">Новый вариант</option>
+       {calendarDrafts.map(draft=><option key={draft.id} value={draft.id}>
+        {draft.name+' · версия '+draft.version}</option>)}
+      </select>
+     </label>
+     <button type="button" className="action-button" disabled={!calendarDraftId}
+      onClick={loadCalendarDraft}>Загрузить вариант</button>
+    </div>
+    <div className="atlas-gantt-tools">
+     <label className="atlas-working-scenario-search">Название
+      <input type="text" value={calendarDraftName} maxLength={120}
+       aria-label="Название календарного варианта"
+       onChange={event=>setCalendarDraftName(event.target.value)}/>
+     </label>
+     <button type="button" className="action-button" disabled={!!workingScenario.error||!calendarDraftName.trim()}
+      onClick={saveCalendarDraft}>Сохранить вариант в проект</button>
+     {calendarDraftId&&<button type="button" className="action-button"
+      onClick={deleteCalendarDraft}>Удалить вариант из проекта</button>}
+    </div>
+    {calendarFeedback&&<p className="minor" role="status">{calendarFeedback}</p>}
+   </details>
    <div className="atlas-working-scenario-footer">
     <span>Предварительный расчёт без изменения проекта.</span>
     <button type="button" className="action-button" aria-label="Закрыть календарный сценарий"
