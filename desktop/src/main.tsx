@@ -332,6 +332,13 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const [homeOpen,setHomeOpen]=useState(()=>!host);
  const [settingsOpen,setSettingsOpen]=useState(false);
  const [navPanelOpen,setNavPanelOpen]=useState(()=>Boolean(host)||window.innerWidth>=1030);
+ // Preserve a useful central workspace on compact Windows even after resize.
+ useEffect(()=>{
+  if(embedded)return;
+  const compact=()=>{if(window.innerWidth<1000)setNavPanelOpen(false)};
+  window.addEventListener("resize",compact);
+  return ()=>window.removeEventListener("resize",compact);
+ },[embedded]);
  const [inspectorWidth,setInspectorWidth]=useState(()=>{
   try{const n=Number(localStorage.getItem("iwxa.atlas.ui.inspector.width.v1"));
    return Number.isFinite(n)&&n>=300&&n<=760?n:390;}catch{return 390}
