@@ -71,3 +71,30 @@ test("0.8 independently reads original Atlas 1.0 ZIP payload with calendar, and 
   "elapsed_days");
  assert.equal(imported.manifest.format,"iwxa.package");
 });
+
+
+test("released Atlas 0.8 preserves unfamiliar portfolio calendar revisions on work edits",()=>{
+ const x=scenario();
+ const first=current.createWorkCalendar(x.saved.state,{
+  name:"Shared factory calendar",
+  weekdays:[1,2,3,4,5],excludedDates:["2026-11-23"],
+  additionalWorkingDates:["2026-11-28"],
+  source:{kind:"document_reference",reference:"Factory approved shifts source, ref DOC-42 (unverified by Atlas)"}
+ });
+ const second=current.reviseWorkCalendar(first.state,first.id,1,{
+  name:"Shared factory calendar",weekdays:[1,2,3,4,5,6],
+  excludedDates:["2026-11-23"],additionalWorkingDates:["2026-11-28"],
+  source:{kind:"entered_by_user",reference:null}
+ });
+ const old=legacy.deserialize(current.serialize(second.state));
+ assert.deepEqual(old.calendarLibrary,second.state.calendarLibrary);
+ const changed=legacy.editItem(old,x.id,x.first,{title:"Edited by original released 0.8"});
+ assert.deepEqual(changed.calendarLibrary,old.calendarLibrary);
+ const imported=current.deserialize(legacy.serialize(changed));
+ assert.equal(imported.projects[0].items[0].title,"Edited by original released 0.8");
+ assert.deepEqual(current.workCalendarRevision(imported,first.id,1),
+  second.state.calendarLibrary[0]);
+ assert.deepEqual(current.workCalendarRevision(imported,first.id,2),
+  second.state.calendarLibrary[1]);
+ assert.equal(imported.schema,"atlas.project/1");
+});
