@@ -182,7 +182,7 @@ export function AtlasInspectorPreview({project,snapshot,plan,forecast,comparison
       <strong>Решения и наблюдения</strong>
       {facts?.relatedChange&&<p>Изменение «{facts.relatedChange.title}», состояние: {facts.relatedChange.status}.</p>}
       {(facts?.history??[]).length>0?
-       <>{facts.history.slice(0,6).map((record:any)=>
+       <>{(facts?.history??[]).slice(0,6).map((record:any)=>
         <div className="atlas-v6-inspector-history" key={record.kind+":"+record.id}>
          <small>{record.kind==="decision"?"Решение по изменению":
           record.scope==="work"?"Наблюдение по работе":"Наблюдение по общей цели"}
@@ -190,7 +190,7 @@ export function AtlasInspectorPreview({project,snapshot,plan,forecast,comparison
          <p>{record.text||"Запись без пояснения"}</p>
          {record.source&&<small>Источник: {record.source}</small>}
         </div>)}
-        {facts.history.length>6&&<p>Других связанных записей: {facts.history.length-6}.</p>}</>:
+        {(facts?.history?.length??0)>6&&<p>Других связанных записей: {(facts?.history?.length??0)-6}.</p>}</>:
        <p>Для этой работы пока нет явно связанных решений и наблюдений.</p>}
       <button type="button" className="atlas-v6-preview-link" onClick={()=>onOpenTab("history")}>
        Открыть полную историю проекта</button>
