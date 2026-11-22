@@ -100,10 +100,12 @@ export function previewWorkingWeek(plan,{startDate=null,weekdays=DEFAULT_WEEKDAY
  }
  if(dates.length<=plan.durationDays)
   throw Error("Working-week calendar exceeds supported horizon");
- const scenarioLastDate=plan.rows.length?
-  dates[plan.durationDays>0?plan.durationDays-1:0]:null;
- const baselineLastDate=plan.rows.length?
-  addCivilDays(start,plan.durationDays>0?plan.durationDays-1:0):null;
+ // The last occupied workday can be EARLIER than a zero-day milestone
+ // at the same CPM end offset. A terminal milestone is a real date point.
+ const lastIndex=plan.rows.length?Math.max(...plan.rows.map(row=>
+  row.earlyFinish>row.earlyStart?row.earlyFinish-1:row.earlyStart)):null;
+ const scenarioLastDate=lastIndex===null?null:dates[lastIndex];
+ const baselineLastDate=lastIndex===null?null:addCivilDays(start,lastIndex);
  const rows=plan.rows.map(row=>{
   const lastIndex=row.earlyFinish>row.earlyStart?row.earlyFinish-1:row.earlyStart;
   const date=dates[lastIndex];
