@@ -10,9 +10,11 @@ test("Atlas inspector shares existing live Work, Source, Baseline records and or
  for(const section of ["project","work","source","baseline"]){
   assert.match(inspector,new RegExp(section+':'));
  }
- assert.match(inspector,/plan\?\.rows\?\.find/);
- assert.match(inspector,/project\.dependencies\.filter/);
- assert.match(inspector,/project\?\.planBaselines/);
+ const projection=read("../desktop/src/inspector-work-context.mjs");
+ assert.match(inspector,/inspectorWorkContext\(project,plan,shown\.id/);
+ assert.match(projection,/plan\?\.rows\?\?\[\]/);
+ assert.match(projection,/project\.dependencies\.filter/);
+ assert.match(inspector,/project\.planBaselines/);
  assert.match(inspector,/onEditWork\(work\.id\)/);
  assert.match(inspector,/onOpenTab\("reality"\)/);
  assert.match(inspector,/dirty\?"Черновик ещё не сохранён"/);
