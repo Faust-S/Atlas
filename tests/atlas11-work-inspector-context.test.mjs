@@ -96,6 +96,11 @@ test("Existing Atlas Work screen projects authoritative baseline and deadline co
  assert.match(preview,/aria-label="Контрольный план выбранной работы"/);
  assert.match(preview,/aria-label="Факторы расчётной просрочки"/);
  assert.match(preview,/aria-label="Связанные решения и наблюдения"/);
+ assert.match(preview,/role="tablist" aria-label="Разделы выбранной работы"/);
+ for(const section of ["schedule","baseline","relations","history"]){
+  assert.match(preview,new RegExp('workSection==="'+section+'"&&'));
+ }
+ assert.match(preview,/aria-label=\{"Инспектор: "\+label.toLowerCase\(\)\}/);
  assert.match(preview,/onClick=\{\(\)=>open\("work",linked\.id\)\}/);
  assert.match(preview,/onClick=\{\(\)=>onOpenTab\("history"\)\}/);
  assert.doesNotMatch(preview,/scheduleProject\(|portfolioSchedule\(/);
