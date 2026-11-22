@@ -182,7 +182,10 @@ export function criticalPathFocus(plan){
  const candidates=plan.rows.filter(row=>row.critical&&row.earlyFinish===plan.durationDays&&Array.isArray(row.predecessors))
   .flatMap(row=>{
    const limiting=row.predecessors.map(id=>byId.get(String(id)))
-    .filter(prior=>prior?.critical&&prior.earlyFinish===row.earlyStart)
+    // A pinned working calendar can delay the successor start across
+    // weekends or holidays. The causal critical constraint is the late
+    // finish/start boundary, not equality of the early civil-day offsets.
+    .filter(prior=>prior?.critical&&prior.lateFinish===row.lateStart)
     .sort((a,b)=>String(a.title).localeCompare(String(b.title),"ru")||String(a.id).localeCompare(String(b.id)));
    if(!limiting.length)return [];
    return [{
@@ -242,11 +245,21 @@ export function scheduleDeadlineExplanations(plan,{limit=2}={}){
   if(!row?.id||!row.dueDate||!row.finishDate)continue;
   const due=asUtcDay(row.dueDate),finish=asUtcDay(row.finishDate);
   if(due===null||finish===null||finish<=due)continue;
-  const limiting=(Array.isArray(row.predecessors)?row.predecessors:[])
-   .map(id=>byId.get(id)).filter(prior=>prior&&prior.earlyFinish===row.earlyStart);
+  const predecessors=(Array.isArray(row.predecessors)?row.predecessors:[])
+   .map(id=>byId.get(id)).filter(Boolean);
+  const ready=Math.max(0,...predecessors.map(prior=>prior.earlyFinish));
+  const calendarWaitDays=Math.max(0,row.earlyStart-ready);
+  // A predecessor with the latest physical finish constrains the ready date.
+  // A calendar-critical predecessor may also bind the successor despite a
+  // nonworking gap (and despite another predecessor finishing later).
+  const limiting=predecessors.filter(prior=>prior.earlyFinish===ready||
+   prior.critical&&row.critical&&prior.lateFinish===row.lateStart)
+   .sort((a,b)=>Number(b.critical)-Number(a.critical)||
+    b.earlyFinish-a.earlyFinish||String(a.id).localeCompare(String(b.id)));
   details.set(row.id,{
    daysLate:(finish-due)/86400000,finishDate:row.finishDate,dueDate:row.dueDate,
-   durationDays:row.durationDays,critical:Boolean(row.critical),
+   durationDays:row.durationDays,durationUnit:row.durationUnit??"elapsed_days",
+   calendarWaitDays,critical:Boolean(row.critical),
    driverTotal:limiting.length,
    drivers:limiting.slice(0,limit).map(prior=>({
     id:prior.id,title:prior.title,recordedDone:prior.state==='done'
