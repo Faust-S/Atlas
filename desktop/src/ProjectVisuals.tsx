@@ -88,10 +88,11 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
   latestLibraryVersions.set(d.id,Math.max(d.version,latestLibraryVersions.get(d.id)||0));
  }
  const applyCalendarRules=(draft:{weekdays:number[];excludedDates:string[];additionalWorkingDates:string[]})=>{
-  applyCalendarRules(draft);
-  setCalendarBasis(draft.calendarBasis??null);
-  setLibraryCalendarKey(draft.calendarBasis?
-   draft.calendarBasis.id+'@'+draft.calendarBasis.version:'');
+  const days=draft.weekdays.join(',');
+  setWeekPreset(days==='1,2,3,4,5'?'five':days==='1,2,3,4,5,6'?'six':'custom');
+  setCustomWeekdays([...draft.weekdays]);
+  setNonWorkingDates(draft.excludedDates.join(', '));
+  setExtraWorkingDates(draft.additionalWorkingDates.join(', '));
   setWorkingLimit(12);
  };
  const applyLibraryCalendar=()=>{
@@ -147,11 +148,10 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
  const loadCalendarDraft=()=>{
   const draft=calendarDrafts.find(row=>row.id===calendarDraftId);
   if(!draft){setCalendarFeedback('Выберите сохранённый вариант.');return;}
-  const days=draft.weekdays.join(',');
-  setWeekPreset(days==='1,2,3,4,5'?'five':days==='1,2,3,4,5,6'?'six':'custom');
-  setCustomWeekdays([...draft.weekdays]);
-  setNonWorkingDates(draft.excludedDates.join(', '));
-  setExtraWorkingDates(draft.additionalWorkingDates.join(', '));
+  applyCalendarRules(draft);
+  setCalendarBasis(draft.calendarBasis??null);
+  setLibraryCalendarKey(draft.calendarBasis?
+   draft.calendarBasis.id+'@'+draft.calendarBasis.version:'');
   const ids=new Set(schedule.rows.map(row=>row.id));
   setContinuousWorkIds(Object.fromEntries(Object.entries(draft.modeByWork)
    .filter(([id,unit])=>ids.has(id)&&unit==='elapsed_days').map(([id])=>[id,true])));
