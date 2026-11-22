@@ -342,7 +342,14 @@ export function removeItem(s,pid,id){return change(s,x=>{
  p.items=p.items.filter(w=>w.id!==id);
  // A deliberate work deletion also removes the scenario-only override.
  // Existing project history before this revision retains that work.
- for(const draft of p.calendarDrafts||[])delete draft.modeByWork[id];
+ for(const draft of p.calendarDrafts||[]){
+  if(Object.hasOwn(draft.modeByWork,id)){
+   delete draft.modeByWork[id];
+   draft.version++;
+   draft.baseRevision=s.revision;
+   draft.updatedAt=new Date().toISOString();
+  }
+ }
 })}
 export function connect(s,pid,from,to){return change(s,x=>{const p=project(x,pid);if(!p.items.some(t=>t.id===from)||!p.items.some(t=>t.id===to))throw Error("Unknown work item");p.dependencies.push({from,to})})}
 export function disconnect(s,pid,from,to){return change(s,x=>{
