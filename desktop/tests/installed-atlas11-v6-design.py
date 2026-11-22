@@ -64,6 +64,14 @@ def qualify():
     v.capture("atlas11-v6-dashboard-installed-820")
     print("ATLAS11_NATIVE_DASHBOARD_COMPACT_PASS",flush=True)
 
+    # Atlas v6 retains the direct original navigation to Store and exchange.
+    click_named("Хранилище и обмен","Button")
+    d.wait_text("Данные и восстановление",25)
+    d.wait_text("Native Store",25)
+    assert v.saved_head_or_none() is None
+    v.capture("atlas11-v6-store-route-installed-820")
+    print("ATLAS11_NATIVE_STORE_RAIL_PASS",flush=True)
+
     # New native sidebar works without old breadcrumbs.
     click_named("Портфель","Button")
     d.wait_text("Портфель проектов",35)
@@ -92,6 +100,10 @@ def qualify():
     assert v.saved_head_or_none() is None,"Import preview changed disk before approval"
     click_named("Заменить портфель в черновике","Button")
     assert v.saved_head_or_none() is None,"Import approval bypassed native Save"
+    save_buttons=visible_named("Сохранить","Button")
+    screen=win32gui.GetWindowRect(d.handle)
+    assert len(save_buttons)==1 and save_buttons[0].rectangle().top<=screen[1]+85,(
+        "Standalone Save must be in the titlebar, not on a duplicate command row")
     click_named("Сохранить","Button")
     saved=v.await_saved(None)
     assert d.saved_project(saved)==original,"Native import changed 1212-Work fixture"
@@ -114,11 +126,36 @@ def qualify():
     d.wait_text("Схема проекта: каталоги, работы и этапы",35)
     # Collapse the optional secondary navigation before opening the split dock.
     click_named("Показать или скрыть левую панель","Button")
+    # Every original project section stays reachable from the compact rail.
+    click_named("Изменения и решения","Button")
+    d.wait_text("Предложения и утверждённые изменения",35)
+    print("ATLAS11_NATIVE_CHANGES_RAIL_PASS",flush=True)
+
     # One rail navigation action must show the actual existing project Gantt.
     click_named("График работ","Button")
     d.wait_text("Сценарий: рабочая неделя",35)
     assert d.head()==saved,"Read-only Gantt caused a native write"
-    print("ATLAS11_NATIVE_GANTT_ROUTE_PASS",flush=True)
+    def gantt_bars_within_window():
+        bounds=win32gui.GetWindowRect(d.handle)
+        bars=[item for item in d.window().descendants(control_type="Button")
+              if str(item.window_text() or "").startswith("Открыть работу ")
+              and item.is_visible()]
+        return [item for item in bars if
+                item.rectangle().left>=bounds[0]+56 and
+                item.rectangle().right<=bounds[2]-5 and
+                item.rectangle().top>=bounds[1]+95 and
+                item.rectangle().bottom<=bounds[3]-32]
+    assert gantt_bars_within_window(),(
+        "The Gantt has no physically reachable Work bar at 820x650 without page scrolling")
+    v.capture("atlas11-v6-gantt-820-no-scroll")
+    win32gui.MoveWindow(d.handle,0,0,1024,710,True)
+    d.activate()
+    assert gantt_bars_within_window(),(
+        "The Gantt has no physically reachable Work bar at 1024x710")
+    v.capture("atlas11-v6-gantt-1024-no-scroll")
+    win32gui.MoveWindow(d.handle,0,0,820,650,True)
+    d.activate()
+    print("ATLAS11_NATIVE_GANTT_ROUTE_AND_COMPACT_BAR_PASS",flush=True)
 
     # Display a dock alongside the central Gantt at 820x650, not covering it.
     click_named("Показать инспектор","Button")
