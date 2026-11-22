@@ -60,7 +60,7 @@ test("0.11 menu and navigation use guarded existing Atlas mutations, version is 
  const settings=source("../desktop/src/AtlasSettings.tsx");
  assert.match(ui,/const goHome=\(\)=>\{\s*if\(!requireClosedForm\(\)\)return/);
  assert.match(ui,/const goProjectTab=\(id:Tab\)=>\{\s*if\(!project\|\|!requireClosedForm\(\)\)return/);
- assert.match(ui,/const goSettings=\(\)=>\{if\(!requireClosedForm\(\)\)return/);
+ assert.match(ui,/const goSettings=\(\)=>\{\s*if\(!requireClosedForm\(\)\)return/);
  assert.match(ui,/if\(!embedded&&!navPanelOpen\)setNavPanelOpen\(true\)/);
  assert.match(ui,/if\(!requireClosedForm\(\)\)return;\s*const next=routeCursor\.current\+delta/);
  assert.match(ui,/className=\{"inspector"\+\(editor\?" atlas-inspector-editing":""\)\}/);
@@ -71,4 +71,28 @@ test("0.11 menu and navigation use guarded existing Atlas mutations, version is 
  assert.ok(settings.includes("Установленная версия"));
  assert.ok(settings.includes("p.version"));
  assert.ok(!chrome.includes("p.version"));
+});
+
+test("0.11 approved Atlas prototype exposes full rail and titlebar Save without a duplicate command row",()=>{
+ const ui=source("../desktop/src/main.tsx");
+ const chrome=source("../desktop/src/AtlasChrome.tsx");
+ const settings=source("../desktop/src/AtlasSettings.tsx");
+ const css=source("../desktop/src/style.css");
+ assert.match(chrome, /label:"Изменения и решения"/);
+ assert.match(chrome, /label:"Хранилище и обмен"/);
+ assert.match(chrome, /data-tip="Хранилище и обмен"/);
+ assert.match(chrome, /atlas-v6-title-right/);
+ assert.match(chrome, /className=\{"atlas-v6-save-button"/);
+ assert.match(chrome, /aria-label=\{props.inspector\?"Скрыть инспектор":"Показать инспектор"\}/);
+ assert.match(ui, /onChanges=\{\(\)=>goProjectTab\("changes"\)\}/);
+ assert.match(ui, /onStore=\{goStorage\}/);
+ assert.match(ui, /statusLabel=\{editor\?"Форма не применена"/);
+ assert.match(ui, /onToggleInspector=\{toggleInspector\}/);
+ assert.match(ui, /setSettingsSection\("data"\);setSettingsOpen\(true\)/);
+ assert.match(ui, /key=\{settingsSection\} initialSection=\{settingsSection\}/);
+ assert.match(css, /\.atlas-v6-shell \.commandbar\{display:none\}/);
+ assert.match(css, /\.atlas-v6-shell \.workspace-footer\{display:none\}/);
+ assert.match(settings, /initialSection\?:"appearance"\|"data"\|"about"/);
+ assert.match(ui, /if\(!navPanelOpen&&window.innerWidth<1150&&!editor\)setInspector\(false\)/);
+ assert.match(ui, /if\(!inspector&&window.innerWidth<1150\)setNavPanelOpen\(false\)/);
 });
