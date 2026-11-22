@@ -166,9 +166,12 @@ def qualify():
     named=[i for i in raw.descendants() if i.name=="Изменить ширину инспектора"]
     assert named,"Resizable native inspector separator not exposed"
     grip=named[0].rectangle
-    assert bounds[0]+350<grip.left<bounds[2]-280,(
-        "Inspector must split the available workspace instead of overlaying it: "+str(grip))
+    assert bounds[2]-335<=grip.left<=bounds[2]-265,(
+        "Compact inspector should use about 300px instead of crowding the Gantt: "+str(grip))
+    assert grip.left-(bounds[0]+64)>=410,(
+        "The central Gantt lost too much width after showing the inspector: "+str(grip))
     assert d.head()==saved,"Opening split inspector changed Native Store"
+    print("ATLAS11_NATIVE_COMPACT_GANTT_WIDTH_820_PASS",flush=True)
     v.capture("atlas11-v6-split-inspector-installed-820")
     print("ATLAS11_NATIVE_SPLIT_INSPECTOR_820_PASS",flush=True)
 
