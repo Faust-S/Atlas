@@ -2641,7 +2641,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
        <td data-label="Ответственный">{w.assignee||"Не назначен"}</td>
        <td data-label="Срок">{readable(w.dueDate)}
         {planRowsById.has(w.id)&&<small className="atlas-work-plan-dates">
-         {scheduleView?.mode==="portfolio_forecast"?"Прогноз по портфелю":"CPM по плану"}: {planRowsById.get(w.id).startDate||"начало не задано"} → {planRowsById.get(w.id).finishDate||"финиш не определён"}
+         {(scheduleView?.mode==="portfolio_forecast"?"Прогноз по портфелю":"CPM по плану")+
+          ": "+(planRowsById.get(w.id).startDate||"начало не задано")+" → "+
+          (planRowsById.get(w.id).finishDate||"финиш не определён")}
         </small>}
         {overdueWorkFinishes.has(w.id)&&<small className="atlas-work-overdue-label">
          Расчётное окончание: {overdueWorkFinishes.get(w.id)}. Позже указанного срока.
