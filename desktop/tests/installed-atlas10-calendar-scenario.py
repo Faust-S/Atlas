@@ -106,6 +106,81 @@ def qualify():
     print("ATLAS10_INSTALLED_CALENDAR_CLOSE_820_PASS",flush=True)
     print("ATLAS10_INSTALLED_WORKING_WEEK_SCENARIO_NO_NATIVE_WRITE_PASS",flush=True)
 
+    # Explicitly save a named calendar scenario through the ordinary native
+    # Save and verify its physical cold readback. No test-only persistence.
+    import time
+    d.click_button("Сценарий: рабочая неделя")
+    d.wait_text("Календарный план:",35)
+    buttons=[str(item.window_text() or "")
+             for item in d.window().descendants(control_type="Button")]
+    choices=[name for name in buttons if name.startswith("Операция ") and
+             ": по рабочим дням. Переключить длительность" in name]
+    assert choices,"Cannot select a real work for the named calendar variant"
+    v.find_control(choices[0],types={"Button"},scroll=True).click_input()
+    d.wait_text("Непрерывных операций: 1",35)
+    v.find_control("Сохранённые календарные варианты (0)",scroll=True).click_input()
+    d.wait_text("Название",30)
+    d.set_text("Название календарного варианта","Atlas Calendar 2026")
+    v.find_control("Сохранить вариант в проект",types={"Button"},scroll=True).click_input()
+    d.wait_text("Вариант добавлен в черновик проекта",30)
+    assert d.head()==original_head and d.saved_project(original_head)==original_project,(
+        "Editing named calendar draft bypassed native Save")
+    v.capture("atlas10-named-calendar-draft-before-native-save")
+    d.activate()
+    d.keyboard.send_keys("^s")
+    expires=time.monotonic()+50
+    new_head=original_head
+    while time.monotonic()<expires:
+        current=d.head()
+        if current!=original_head:
+            new_head=current
+            break
+        time.sleep(0.3)
+    assert new_head!=original_head,"Named calendar variant did not reach native Save"
+    stored=d.saved_project(new_head)
+    drafts=stored.get("calendarDrafts",[])
+    assert len(drafts)==1,"Native Store did not preserve named calendar variant"
+    variant=drafts[0]
+    assert variant["name"]=="Atlas Calendar 2026" and variant["version"]==1
+    assert variant["weekdays"]==[1,2,3,4,5]
+    assert variant["excludedDates"]==["2026-11-10"]
+    assert list(variant["modeByWork"].values())==["elapsed_days"]
+    assert stored["items"]==original_project["items"],(
+        "Saving a planning scenario modified work objects")
+    assert stored["dependencies"]==original_project["dependencies"]
+    assert stored["stages"]==original_project["stages"]
+    v.capture("atlas10-named-calendar-native-saved")
+    print("ATLAS10_NATIVE_NAMED_CALENDAR_SAVE_READBACK_PASS",flush=True)
+
+    d.stop()
+    d.launch()
+    d.wait_text("Портфель проектов",45)
+    assert d.head()==new_head,"Cold open changed the stored calendar revision"
+    assert d.saved_project(new_head)==stored,"Cold open lost the named calendar"
+    d.click_button("Открыть портфель проектов")
+    d.wait_text("Проекты и последствия",35)
+    d.set_text("Найти проект по работе, этапу или источнику","1080 работа 5")
+    d.wait_text("Найдено проектов: 1",35)
+    v.find_control("Перейти к найденной работе "+route.FIRST_TITLE,
+                   types={"Button"},scroll=True).click_input()
+    d.wait_text("Работы проекта",35)
+    d.click_button("График")
+    d.wait_text("График работ",35)
+    v.find_control("Сценарий: рабочая неделя",types={"Button"},scroll=True).click_input()
+    d.wait_text("Календарный план:",35)
+    v.find_control("Сохранённые календарные варианты (1)",scroll=True).click_input()
+    picker=v.find_control("Сохранённый календарный вариант",
+                          types={"ComboBox"},scroll=True)
+    picker.click_input()
+    d.keyboard.send_keys("{DOWN}{ENTER}")
+    v.find_control("Загрузить вариант",types={"Button"},scroll=True).click_input()
+    d.wait_text("Загружен сохранённый вариант, версия 1",35)
+    d.wait_text("Непрерывных операций: 1",35)
+    assert d.head()==new_head and d.saved_project(new_head)==stored,(
+        "Reloading the named variant wrote to native Store")
+    v.capture("atlas10-named-calendar-cold-reload-installed")
+    print("ATLAS10_NATIVE_NAMED_CALENDAR_COLD_LOAD_PASS",flush=True)
+
 
 if __name__=="__main__":
     try:
