@@ -116,7 +116,19 @@ def qualify():
     choices=[name for name in buttons if name.startswith("Операция ") and
              ": по рабочим дням. Переключить длительность" in name]
     assert choices,"Cannot select a real work for the named calendar variant"
-    v.find_control(choices[0],types={"Button"},scroll=True).click_input()
+    mode_control=v.find_control(choices[0],types={"Button"},scroll=True)
+    import win32gui
+    rectangle=mode_control.rectangle()
+    bounds=win32gui.GetWindowRect(d.handle)
+    print("ATLAS10_NAMED_MODE_TARGET_UIA_RECT "+
+          repr((rectangle.left,rectangle.top,rectangle.right,rectangle.bottom))+
+          " WINDOW "+repr(bounds),flush=True)
+    assert v.rectangle_in_workspace(rectangle,bounds),(
+        "Mode control is not physically reachable inside the compact workspace")
+    assert rectangle.right-rectangle.left>=100,(
+        "Mode control clipped by the calendar grid at 820px")
+    v.capture("atlas10-named-calendar-mode-before-toggle-820")
+    mode_control.click_input()
     d.wait_text("Непрерывных операций: 1",35)
     v.find_control("Сохранённые календарные варианты (0)",scroll=True).click_input()
     d.wait_text("Название",30)
