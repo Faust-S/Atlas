@@ -2,7 +2,7 @@ import React,{useState} from "react";
 type SettingsProps={
  version:string;projectCount:number;workCount:number;revision:number;
  saved:boolean;dirty:boolean;native:boolean;t3Available:boolean;
- onBack:()=>void;onSave:()=>void;onExport:()=>void;onImport:()=>void;
+ onBack:()=>void;onHome:()=>void;onSave:()=>void;onExport:()=>void;onImport:()=>void;
  onHistory:()=>void;onPortfolio:()=>void;canImport:boolean;canSave:boolean;
 };
 export function AtlasSettings(p:SettingsProps){
@@ -23,7 +23,7 @@ export function AtlasSettings(p:SettingsProps){
      <h2>Оформление</h2>
      <div className="atlas-v6-settings-card"><div className="atlas-v6-setting-row"><div><strong>Язык</strong><p>Русский интерфейс Atlas.</p></div><span>Русский</span></div>
       <div className="atlas-v6-setting-row"><div><strong>Внешний вид</strong><p>Единая синяя тема IWXA, согласованная с Personal Agent.</p></div><span>Светлая</span></div>
-      <div className="atlas-v6-setting-row"><div><strong>Главная</strong><p>Порядок и состав блоков меняются через «Настроить дашборд» на главной. Эти параметры не меняют документы проекта.</p></div><button className="action-button" onClick={p.onBack}>Открыть главную</button></div>
+      <div className="atlas-v6-setting-row"><div><strong>Главная</strong><p>Порядок и состав блоков меняются через «Настроить дашборд» на главной. Эти параметры не меняют документы проекта.</p></div><button className="action-button" onClick={p.onHome}>Открыть главную</button></div>
      </div>
     </>}
     {section==="data"&&<>
