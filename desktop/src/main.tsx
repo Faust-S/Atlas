@@ -2039,14 +2039,15 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     canImport={!busy&&!editor&&pendingImport===null}/>:
    !project?(homeOpen&&!embedded?
     <AtlasDashboard data={data} dates={dates} resources={resources}
-     reviews={reviewRows} sourceQueue={sourceQueue} dirty={dirty}
+     reviews={reviewRows} sourceQueue={sourceQueue} ecosystemRows={ecosystemRows} dirty={dirty}
      onPortfolio={goPortfolio} onNewProject={()=>openEditor("new")}
      onConnect={()=>{goPortfolio();startConnection();}}
      onOpenProject={(id,target="overview")=>openProjectTab(id,target)}
      onResources={goPortfolio}
      onCalendar={()=>project?goProjectTab("timeline"):data.projects.length?
        openProjectTab(data.projects[0].id,"timeline"):goPortfolio()}
-     onReview={()=>reviewRows.length?openProjectTab(reviewRows[0].projectId,"changes"):goPortfolio()}/>:
+     onReview={()=>reviewRows.length?openProjectTab(reviewRows[0].projectId,"changes"):goPortfolio()}
+     onEcosystem={goPortfolio} onHistory={id=>openProjectTab(id,"history")}/>:
    <>
     <div className="page-heading"><div><small>Ваше рабочее пространство</small><h1>Портфель проектов</h1>
       <p>Что должно быть, что известно и какие решения влияют на планы.</p>
