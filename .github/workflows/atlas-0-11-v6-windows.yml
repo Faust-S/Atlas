@@ -101,6 +101,17 @@ jobs:
           python desktop/tests/installed-atlas11-v6-design.py
           if ($LASTEXITCODE -ne 0) { throw 'ATLAS11_NATIVE_V6_USER_ROUTE_FAIL' }
 
+      - name: Preserve accepted development installer and SHA-256
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: IWXA-Atlas-0.11.0-dev.1-Setup
+          path: |
+            artifacts/IWXA-Atlas-0.11.0-dev.1-Setup.exe
+            artifacts/IWXA-Atlas-0.11.0-dev.1-Setup.exe.sha256
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Upload installed Atlas UI evidence
         if: always()
         uses: actions/upload-artifact@v4
