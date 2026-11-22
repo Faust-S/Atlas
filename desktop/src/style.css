@@ -1554,3 +1554,20 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .atlas-v6-shell .board-card.is-dragging{opacity:.5}
 .atlas-v6-shell .board-column.atlas-v6-board-drop-target{border-style:dashed;border-color:#91add4}
 .atlas-v6-shell .board-card[draggable=true]{cursor:grab}
+
+/* Atlas 0.11: compact split Gantt heading. Keep the title readable
+   while native controls still fit without scrolling at 820x650. */
+@media(max-width:920px){
+ .atlas-v6-shell:not(.no-inspector) .atlas-gantt-panel>.section-heading{
+  flex-wrap:wrap;gap:7px
+ }
+ .atlas-v6-shell:not(.no-inspector) .atlas-gantt-panel>.section-heading>div:first-child{
+  flex:1 1 100%;min-width:0
+ }
+ .atlas-v6-shell:not(.no-inspector) .atlas-gantt-panel>.section-heading>.button-row{
+  justify-content:flex-start;gap:6px;flex-wrap:wrap
+ }
+ .atlas-v6-shell:not(.no-inspector) .atlas-gantt-panel>.section-heading>.button-row .action-button{
+  min-height:28px;padding:4px 7px;font-size:10px
+ }
+}
