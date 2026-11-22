@@ -947,7 +947,10 @@ test("Overdue work explains dated delay and limiting predecessor from canonical 
  const planning=read("../src/planning.mjs");
  const css=read("../desktop/src/style.css");
  assert.match(planning,/export function scheduleDeadlineExplanations\(plan,\{limit=2\}=\{\}\)/);
- assert.match(planning,/prior\.earlyFinish===row\.earlyStart/);
+ assert.match(planning,/prior\.earlyFinish===ready/);
+ assert.match(planning,/prior\.critical&&row\.critical&&prior\.lateFinish===row\.lateStart/);
+ assert.match(planning,/calendarWaitDays/);
+ assert.match(main,/Ожидание ближайшего рабочего дня/);
  assert.match(planning,/daysLate:\(finish-due\)\/86400000/);
  assert.match(main,/scheduleDeadlineExplanations\(plan\|\|\{rows:\[\]\}\)/);
  assert.match(main,/aria-label=\{"Почему нарушается срок работы "\+w\.title\}/);
