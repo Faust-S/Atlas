@@ -280,6 +280,9 @@ export function ProjectGantt({schedule,projectStart,recordedStart,projectDue,por
     Позже срока ({missedDeadlineTotal})</label>
    {!!query.trim()&&<div className="atlas-gantt-matches">
     <span className="atlas-range">{matching.length?String(Math.min(matchIndex+1,matching.length))+' из '+matching.length+' работ':'Нет совпадений'}</span>
+    {matching.length>0&&<small className="atlas-gantt-match-dates" role="status">
+     Расчёт выбранной работы: {matching[Math.min(matchIndex,matching.length-1)].dateStart} → {matching[Math.min(matchIndex,matching.length-1)].dateFinish}
+    </small>}
     {matching.length>0&&<>
      <button type="button" className="action-button" disabled={matchIndex<=0} onClick={()=>focusMatch(Math.max(0,matchIndex-1))} title="Предыдущая найденная работа">←</button>
      <button type="button" className="action-button" disabled={matchIndex>=matching.length-1} onClick={()=>focusMatch(Math.min(matching.length-1,matchIndex+1))} title="Следующая найденная работа">→</button>
