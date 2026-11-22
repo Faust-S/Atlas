@@ -12,6 +12,7 @@ import os
 import sys
 import time
 import zipfile
+import win32gui
 from pathlib import Path
 
 sys.stdout.reconfigure(encoding="utf-8",errors="replace")
@@ -68,6 +69,21 @@ def check_table_and_gantt():
     d.click_button("График")
     d.wait_text("График работ",35)
     d.wait_text("Прогноз по портфелю: начало 2026-11-20",35)
+    # FIRST-FOLD gate: verify the actual WebView2 work bar can be operated
+    # without scrolling the page or using a synthetic screenshot/DOM.
+    for width,height in ((1024,710),(820,650)):
+        win32gui.MoveWindow(d.handle,0,0,width,height,True)
+        d.activate()
+        bar=v.find_control("Открыть работу "+WORK_TITLE,
+                           types={"Button"},scroll=False)
+        rect=bar.rectangle()
+        bounds=win32gui.GetWindowRect(d.handle)
+        assert v.rectangle_in_workspace(rect,bounds),(
+            "Gantt Work bar is outside the initial viewport at "+
+            str(width)+"x"+str(height)+": "+str(rect))
+        v.capture("atlas10-gantt-first-fold-"+str(width)+"x"+str(height))
+        print("ATLAS10_INSTALLED_GANTT_FIRST_FOLD_PASS size="+
+              str(width)+"x"+str(height)+" row="+str(rect),flush=True)
     d.set_text("Поиск",WORK_TITLE)
     d.wait_text("Расчёт выбранной работы: 2026-11-20 → 2026-11-24",35)
     v.capture("atlas10-portfolio-forecast-gantt")

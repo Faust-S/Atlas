@@ -259,7 +259,7 @@ export function ProjectGantt({schedule,projectStart,recordedStart,projectDue,por
  return <section className={'surface atlas-gantt-panel'+(expanded?' is-expanded':'')} role={expanded?'dialog':undefined}
   aria-label={expanded?'Развёрнутый график работ':undefined} aria-modal={expanded?'true':undefined}>
   <div className="section-heading"><div><h2>График работ</h2>
-   <p>Даты рассчитаны по связям работ. Отметка о выполнении не означает, что результат принят.</p></div>
+   <p>Даты рассчитаны по связям работ. Выполнение не означает приёмку результата.</p></div>
    <div className="button-row"><span className="status-chip">{schedule.rows.length} работ · {schedule.durationDays} дн.</span>
     <button type="button" className="action-button" onClick={()=>{setExpanded(false);onEditDates()}}>Плановые даты</button>
     <button type="button" className="action-button" aria-expanded={expanded}
@@ -268,10 +268,12 @@ export function ProjectGantt({schedule,projectStart,recordedStart,projectDue,por
    <label>Масштаб <select value={scale} onChange={e=>{setScale(e.target.value as Mode);setOffset(0);setVisibleLimit(160)}}>
     <option value="fit">Весь проект</option><option value="30">30 дней</option><option value="90">90 дней</option>
    </select></label>
-   <button type="button" className="action-button" disabled={scale==='fit'||view.from===0}
-    onClick={()=>setOffset(Math.max(0,view.from-view.days))}>← Ранее</button>
-   <button type="button" className="action-button" disabled={scale==='fit'||view.from>=view.maxOffset}
-    onClick={()=>setOffset(Math.min(view.maxOffset,view.from+view.days))}>Позднее →</button>
+   {scale!=='fit'&&<>
+    <button type="button" className="action-button" disabled={view.from===0}
+     onClick={()=>setOffset(Math.max(0,view.from-view.days))}>← Ранее</button>
+    <button type="button" className="action-button" disabled={view.from>=view.maxOffset}
+     onClick={()=>setOffset(Math.min(view.maxOffset,view.from+view.days))}>Позднее →</button>
+   </>}
    <span className="atlas-range">{view.windowLabel}</span>
    <label className="atlas-gantt-query">Поиск <input type="search" value={query} onChange={e=>{setQuery(e.target.value);setMatchIndex(0);setVisibleLimit(160)}} placeholder="Название работы"/></label>
    <label className="atlas-check"><input type="checkbox" checked={criticalOnly} onChange={e=>{setCriticalOnly(e.target.checked);setMatchIndex(0);setVisibleLimit(160)}}/> Критический путь</label>
@@ -289,6 +291,11 @@ export function ProjectGantt({schedule,projectStart,recordedStart,projectDue,por
      <button type="button" className="action-button" onClick={()=>focusMatch(Math.min(matchIndex,matching.length-1))}>Показать на шкале</button>
     </>}
    </div>}
+   <button type="button" ref={workingToggleRef} className="action-button atlas-gantt-scenario-toggle"
+    aria-expanded={workingScenarioOpen} aria-controls="atlas-working-week-preview"
+    onClick={()=>setWorkingScenarioOpen(value=>!value)}>
+    {workingScenarioOpen?'Скрыть сценарий':'Сценарий: рабочая неделя'}
+   </button>
   </div>
   {(projectStatus==='paused'||projectStatus==='cancelled')&&<p className="atlas-schedule-warning" role="status">
    {projectStatus==='cancelled'?'Проект отменён':'Проект приостановлен'}.
@@ -312,16 +319,30 @@ export function ProjectGantt({schedule,projectStart,recordedStart,projectDue,por
    <p className="atlas-schedule-warning" role="status">
     {'Прогноз по портфелю: начало '+portfolioStart+', сдвиг на +'+shiftDays+
      ' календарных дней относительно записанного начала '+(recordedStart||'не задано')+
-     '. График ниже показывает расчёт от прогнозной даты. Записанный план и даты проекта не изменены.'}
+     '. Записанный план и даты проекта не изменены.'}
    </p>}
   {!recordedStart&&projectStart&&unavailableOrigins.length===0&&<p className="atlas-schedule-warning" role="status">Начало {projectStart} вычислено по межпроектным зависимостям, но ещё не записано как дата начала проекта.</p>}
   {!projectStart&&<p className="minor">Начальная дата не задана: на оси показаны относительные дни, не календарные даты.</p>}
-  <div className="atlas-gantt-tools">
-   <button type="button" ref={workingToggleRef} className="action-button" aria-expanded={workingScenarioOpen}
-    aria-controls="atlas-working-week-preview"
-    onClick={()=>setWorkingScenarioOpen(value=>!value)}>
-    {workingScenarioOpen?'Скрыть сценарий':'Сценарий: рабочая неделя'}
-   </button>
+  <div className="atlas-gantt-scroller" role="region" aria-label="График работ с прокруткой" tabIndex={0}>
+   <div className="atlas-gantt-axis">
+    <strong className="atlas-gantt-name">Работа</strong><div className="atlas-gantt-track atlas-gantt-scale">
+     {guide('axis')}{view.ticks.map((tick:any)=><span key={tick.day} className="atlas-gantt-tick" style={{left:tick.positionPct+'%'}}>{tick.label}</span>)}
+    </div><strong>Дл.</strong>
+   </div>
+   {displayed.map((row:any)=><div className="atlas-gantt-row" key={row.id}>
+    <button className="atlas-gantt-work" title={row.title} onClick={()=>{setExpanded(false);onOpenWork(row.id)}}>{trim(row.title,65)}
+     <small>{statusName[row.state]||row.state}{row.critical?' · критическая':''}</small>
+     {row.missedDeadline&&<small className="atlas-gantt-work-overdue">
+      Расчётный финиш позже срока {row.dueDate}</small>}</button>
+    <div className="atlas-gantt-track">
+     {guide(row.id)}
+     {row.visible&&<button type="button" onClick={()=>{setExpanded(false);onOpenWork(row.id)}}
+      title={row.title+' · '+row.dateStart+' → '+row.dateFinish+' · '+ganttDurationLabel(row)+' · '+(statusName[row.state]||row.state)+(row.missedDeadline?' · Расчётный финиш позже срока '+row.dueDate:'')}
+      aria-label={'Открыть работу '+row.title}
+      className={'atlas-gantt-bar'+(row.isMilestone?' is-milestone':'')+(row.critical?' is-critical':'')+(row.state==='done'?' is-done':'')+(row.state==='blocked'?' is-blocked':'')}
+      style={{left:row.leftPct+'%',width:row.isMilestone?'10px':Math.max(0.45,row.widthPct)+'%'}}/>}
+    </div><span className="atlas-gantt-days">{ganttDurationLabel(row)}</span>
+   </div>)}
   </div>
   {workingScenarioOpen&&<section id="atlas-working-week-preview" className="atlas-working-scenario"
    ref={workingPanelRef} aria-label="Необязательное сравнение рабочих календарей">
@@ -518,27 +539,6 @@ export function ProjectGantt({schedule,projectStart,recordedStart,projectDue,por
   <div className="atlas-gantt-key" aria-label="Условные обозначения"><span><i className="key-normal"/>Плановая работа</span>
    <span><i className="key-critical"/>Критический путь</span><span><i className="key-done"/>Заявлено выполнение</span>
    <span><i className="key-milestone"/>Работа 0 дней</span>{view.deadline&&<span><i className="key-deadline"/>Контрольный срок</span>}</div>
-  <div className="atlas-gantt-scroller" role="region" aria-label="График работ с прокруткой" tabIndex={0}>
-   <div className="atlas-gantt-axis">
-    <strong className="atlas-gantt-name">Работа</strong><div className="atlas-gantt-track atlas-gantt-scale">
-     {guide('axis')}{view.ticks.map((tick:any)=><span key={tick.day} className="atlas-gantt-tick" style={{left:tick.positionPct+'%'}}>{tick.label}</span>)}
-    </div><strong>Дл.</strong>
-   </div>
-   {displayed.map((row:any)=><div className="atlas-gantt-row" key={row.id}>
-    <button className="atlas-gantt-work" title={row.title} onClick={()=>{setExpanded(false);onOpenWork(row.id)}}>{trim(row.title,65)}
-     <small>{statusName[row.state]||row.state}{row.critical?' · критическая':''}</small>
-     {row.missedDeadline&&<small className="atlas-gantt-work-overdue">
-      Расчётный финиш позже срока {row.dueDate}</small>}</button>
-    <div className="atlas-gantt-track">
-     {guide(row.id)}
-     {row.visible&&<button type="button" onClick={()=>{setExpanded(false);onOpenWork(row.id)}}
-      title={row.title+' · '+row.dateStart+' → '+row.dateFinish+' · '+ganttDurationLabel(row)+' · '+(statusName[row.state]||row.state)+(row.missedDeadline?' · Расчётный финиш позже срока '+row.dueDate:'')}
-      aria-label={'Открыть работу '+row.title}
-      className={'atlas-gantt-bar'+(row.isMilestone?' is-milestone':'')+(row.critical?' is-critical':'')+(row.state==='done'?' is-done':'')+(row.state==='blocked'?' is-blocked':'')}
-      style={{left:row.leftPct+'%',width:row.isMilestone?'10px':Math.max(0.45,row.widthPct)+'%'}}/>}
-    </div><span className="atlas-gantt-days">{ganttDurationLabel(row)}</span>
-   </div>)}
-  </div>
   {!matching.length&&<p className="minor">По выбранному фильтру работ нет.</p>}
   {scale!=='fit'&&<p className="minor">В выбранном периоде: {inWindow.length} из {matching.length} работ по текущему фильтру.</p>}
   {scale!=='fit'&&matching.length>0&&!inWindow.length&&nearest&&

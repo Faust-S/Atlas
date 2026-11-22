@@ -318,3 +318,21 @@ test('the installed project Gantt explains paused plans and portfolio shifts wit
  assert.match(main,/Удалить связь между работами\? Atlas пересчитает график/);
  assert.match(main,/Изменение останется в черновике до сохранения/);
 });
+
+test('Atlas 0.10 shows Gantt work bars before optional scenario and legend',()=>{
+ const ts=readFileSync(new URL('../desktop/src/ProjectVisuals.tsx',import.meta.url),'utf8');
+ const css=readFileSync(new URL('../desktop/src/style.css',import.meta.url),'utf8');
+ const installed=readFileSync(new URL('../desktop/tests/installed-atlas10-portfolio-forecast.py',import.meta.url),'utf8');
+ const timeline=ts.indexOf('className="atlas-gantt-scroller"');
+ const scenario=ts.indexOf('id="atlas-working-week-preview"');
+ const legend=ts.indexOf('className="atlas-gantt-key"');
+ assert.ok(timeline>0&&scenario>timeline&&legend>scenario,
+  'The timeline must be rendered before secondary scenario and legend');
+ assert.match(ts,/ref=\{workingToggleRef\}/);
+ assert.match(ts,/aria-controls="atlas-working-week-preview"/);
+ assert.match(ts,/scale!=='fit'&&<>/);
+ assert.match(css,/\.atlas-gantt-panel>\.atlas-gantt-scroller/);
+ assert.match(installed,/for width,height in \(\(1024,710\),\(820,650\)\)/);
+ assert.match(installed,/types=\{"Button"\},scroll=False/);
+ assert.match(installed,/ATLAS10_INSTALLED_GANTT_FIRST_FOLD_PASS/);
+});
