@@ -1,0 +1,35 @@
+name: Atlas 0.11 baseline source and desktop qualification
+
+on:
+  push:
+    branches:
+      - work/2026-11-22-atlas-0-11-baseline
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: atlas11-baseline-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate all Atlas domain tests
+        run: npm test
+      - name: Check source syntax
+        run: |
+          for source in src/*.mjs; do node --check "$source"; done
+          node --check tests/atlas11-baseline.test.mjs
+      - name: Qualify installed-surface source and React build
+        working-directory: desktop
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
