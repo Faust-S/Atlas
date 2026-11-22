@@ -219,6 +219,8 @@ test('Gantt exposes saved typed calendars through native project drafts without 
  assert.match(style,/\.atlas-working-scenario-row>\.atlas-working-scenario-mode\{/);
  assert.match(style,/grid-column:2;grid-row:1/);
  assert.match(style,/@media \(min-width:681px\) and \(max-width:1080px\)/);
+ assert.match(style,/\.atlas-working-scenario:has\(\.atlas-working-scenario-saved\[open\]\) \.atlas-working-scenario-footer\{/);
+ assert.match(style,/position:static/);
  assert.match(ui,/Сохранить вариант в проект/);
  assert.match(ui,/Загрузить вариант/);
  assert.match(ui,/Удалить вариант из проекта/);
