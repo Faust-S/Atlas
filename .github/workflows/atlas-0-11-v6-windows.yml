@@ -1,0 +1,94 @@
+name: IWXA Atlas 0.11 original Windows v6 installed UI qualification
+
+on:
+  push:
+    branches:
+      - work/2026-11-22-atlas-0-11-baseline
+    paths:
+      - '.github/workflows/atlas-0-11-v6-windows.yml'
+      - 'desktop/tests/installed-atlas11-v6-design.py'
+      - 'desktop/src/main.tsx'
+      - 'desktop/src/AtlasChrome.tsx'
+      - 'desktop/src/AtlasDashboard.tsx'
+      - 'desktop/src/AtlasSettings.tsx'
+      - 'desktop/src/style.css'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: atlas11-v6-native-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  installed-native-ui:
+    runs-on: windows-latest
+    timeout-minutes: 65
+    steps:
+      - name: Checkout exact Atlas 0.11 source revision
+        uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Set up original Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build the real Atlas Tauri Windows program
+        shell: pwsh
+        working-directory: desktop
+        timeout-minutes: 18
+        run: |
+          $ErrorActionPreference = 'Stop'
+          npm ci --no-audit --no-fund
+          if ($LASTEXITCODE -ne 0) { throw 'ATLAS11_NPM_CI_FAILED' }
+          npm run desktop:build -- --no-bundle
+          if ($LASTEXITCODE -ne 0) { throw 'ATLAS11_TAURI_BUILD_FAILED' }
+
+      - name: Verify original T3 packaged in one dist
+        shell: pwsh
+        run: |
+          node tests/verify-atlas09-host-dist.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'ATLAS11_ORIGINAL_HOST_DIST_FAILED' }
+
+      - name: Checkout original qualified IWXA Setup Core
+        uses: actions/checkout@v4
+        with:
+          repository: Faust-S/Center
+          ref: 0ef7544e2a6fd5fab5994f7f25abbb960063908c
+          path: setup-core-source
+          persist-credentials: false
+
+      - name: Build and install native Atlas through original Setup Core
+        shell: pwsh
+        timeout-minutes: 9
+        run: |
+          $ErrorActionPreference = 'Stop'
+          ./desktop/installer/build-setup-core.ps1 -InstallForQualification
+          if ($LASTEXITCODE -ne 0) { throw 'ATLAS11_NATIVE_SETUP_FAILED' }
+
+      - name: Prepare real 1212 Work user-path IWXA package
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $archive = Join-Path $env:RUNNER_TEMP 'atlas11-v6-1212-work.iwxa'
+          node tests/fixtures/atlas06-visual-portfolio.mjs $archive
+          if ($LASTEXITCODE -ne 0 -or !(Test-Path -LiteralPath $archive)) {
+            throw 'ATLAS11_NATIVE_FIXTURE_FAILED'
+          }
+          "ATLAS06_VISUAL_IWXA=$archive" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Qualify installed native UI with Windows accessibility API
+        shell: pwsh
+        timeout-minutes: 22
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python -m pip install pywinauto==0.6.9 pillow==11.3.0
+          if ($LASTEXITCODE -ne 0) { throw 'ATLAS11_NATIVE_UIA_MISSING' }
+          python -m py_compile desktop/tests/installed-atlas11-v6-design.py
+          if ($LASTEXITCODE -ne 0) { throw 'ATLAS11_NATIVE_SCRIPT_SYNTAX' }
+          python desktop/tests/installed-atlas11-v6-design.py
+          if ($LASTEXITCODE -ne 0) { throw 'ATLAS11_NATIVE_V6_USER_ROUTE_FAIL' }
