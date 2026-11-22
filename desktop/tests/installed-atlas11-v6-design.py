@@ -117,6 +117,20 @@ def qualify():
     assert d.saved_project(saved)==original
     print("ATLAS11_NATIVE_COLD_RESTORE_PASS",flush=True)
 
+    # From the populated home, the global Resources rail must reach its
+    # real, initially offscreen portfolio section, not merely portfolio top.
+    click_named("Ресурсы","Button")
+    d.wait_text("Плановые ресурсы",35)
+    screen=win32gui.GetWindowRect(d.handle)
+    headings=visible_named("Плановые ресурсы","Text")
+    assert any(screen[1]+55<item.rectangle().top<screen[3]-65 for item in headings),(
+        "Resources rail did not bring the portfolio's resource manager into the viewport")
+    assert d.head()==saved,"Resources navigation changed the native Store"
+    v.capture("atlas11-v6-portfolio-resources-direct-820")
+    print("ATLAS11_NATIVE_DASHBOARD_RESOURCE_DIRECT_ROUTE_PASS",flush=True)
+    click_named("Главная","Button")
+    d.wait_text("Настроить дашборд",25)
+
     # Reach a concrete project and the original canonical Gantt.
     click_named("Портфель","Button")
     click_named("Показать или скрыть левую панель","Button")
