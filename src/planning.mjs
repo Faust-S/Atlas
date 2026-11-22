@@ -145,7 +145,9 @@ export function scheduleProject(p,{calendarLibrary=[],startDate=undefined}={}) {
   });
   return {durationDays,estimatedFinish:daysFrom(start,durationDays),rows,
     criticalIds:rows.filter(row=>row.critical).map(row=>row.id),workItems:rows.length,
-    warning:'Calendar-aware CPM estimate, no resource leveling, execution or release acceptance'};
+    warning:rows.some(row=>row.durationUnit==='working_days')?
+      'Calendar-aware CPM estimate; not resource-leveled, not execution authority, not release acceptance':
+      'Calendar-day CPM estimate; not resource-leveled, not execution authority, not release acceptance'};
 }
 
 /** One existing limiting link from a terminal critical chain, without asserting uniqueness.
