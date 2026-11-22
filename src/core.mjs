@@ -15,6 +15,69 @@ const validSourcePath=value=>typeof value==="string"&&value.length>0&&value.leng
  value.split("/").every(part=>part.length>0&&part!=="."&&part!==".."&&
   !/[\u0000-\u001f]/.test(part));
 const validDate=value=>{if(value==null||value==="")return true;if(typeof value!=="string"||!/^\d{4}-\d{2}-\d{2}$/.test(value))return false;const d=new Date(value+"T00:00:00Z");return Number.isFinite(d.valueOf())&&d.toISOString().slice(0,10)===value};
+
+/**
+ * Optional PROJECT-OWNED what-if calendar profiles. They are user drafts and
+ * never modify estimateDays, the canonical calendar-day CPM or an accepted
+ * Result. The existing atlas.project/1 container and native Store are reused.
+ */
+const calendarDate=value=>typeof value==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(value)&&
+ validDate(value);
+const calendarDates=(dates,label)=>{
+ if(!Array.isArray(dates)||dates.length>1000||dates.some(d=>!calendarDate(d))||
+  new Set(dates).size!==dates.length)throw Error("Invalid "+label);
+ return [...dates].sort();
+};
+function normalizedCalendarDraft(data,itemIds){
+ if(!data||typeof data!=="object"||Array.isArray(data)||
+  typeof data.name!=="string"||!data.name.trim()||data.name.trim().length>120)
+  throw Error("Invalid calendar draft name");
+ const weekdays=data.weekdays;
+ if(!Array.isArray(weekdays)||weekdays.length<1||weekdays.length>7||
+   new Set(weekdays).size!==weekdays.length||
+   weekdays.some(day=>!Number.isInteger(day)||day<0||day>6))
+  throw Error("Invalid calendar weekdays");
+ const excludedDates=calendarDates(data.excludedDates??[],"calendar excluded dates");
+ const additionalWorkingDates=calendarDates(data.additionalWorkingDates??[],
+   "calendar additional working dates");
+ if(additionalWorkingDates.some(day=>excludedDates.includes(day)))
+  throw Error("Conflicting calendar date");
+ const modeByWork=data.modeByWork??{};
+ if(!modeByWork||typeof modeByWork!=="object"||Array.isArray(modeByWork)||
+  Object.keys(modeByWork).length>5000)
+  throw Error("Invalid calendar draft work modes");
+ const modes=Object.entries(modeByWork);
+ if(modes.some(([id,mode])=>!itemIds.has(id)||
+  !["elapsed_days","working_days"].includes(mode)))
+  throw Error("Invalid calendar draft work modes");
+ return {name:data.name.trim(),weekdays:[...weekdays].sort((a,b)=>a-b),
+  excludedDates,additionalWorkingDates,
+  modeByWork:Object.fromEntries(modes.sort(([a],[b])=>a.localeCompare(b)))};
+}
+function checkCalendarDrafts(project){
+ const drafts=project.calendarDrafts;
+ if(drafts===undefined)return;
+ if(!Array.isArray(drafts)||drafts.length>12)
+  throw Error("Invalid project calendar drafts");
+ const ids=new Set(),names=new Set(),workIds=new Set(project.items.map(w=>w.id));
+ for(const d of drafts){
+  if(!d||typeof d.id!=="string"||!d.id||d.id.length>128||
+   ids.has(d.id)||!Number.isSafeInteger(d.version)||d.version<1||
+   !Number.isSafeInteger(d.baseRevision)||d.baseRevision<0||
+   typeof d.createdAt!=="string"||!Number.isFinite(Date.parse(d.createdAt))||
+   typeof d.updatedAt!=="string"||!Number.isFinite(Date.parse(d.updatedAt)))
+   throw Error("Invalid calendar draft identity");
+  const normalized=normalizedCalendarDraft(d,workIds);
+  const key=normalized.name.toLocaleLowerCase("ru-RU");
+  if(names.has(key))throw Error("Duplicate calendar draft name");
+  names.add(key);ids.add(d.id);
+  for(const key of ["weekdays","excludedDates","additionalWorkingDates"]){
+   if(JSON.stringify(d[key])!==JSON.stringify(normalized[key]))
+    throw Error("Non-canonical calendar draft "+key);
+  }
+ }
+}
+
 export const empty=()=>({schema:SCHEMA,revision:0,projects:[]});
 export function validate(s){
  if(s?.schema!==SCHEMA||!Number.isSafeInteger(s.revision)||s.revision<0||!Array.isArray(s.projects))throw Error("Invalid Atlas snapshot");
@@ -45,6 +108,7 @@ export function validate(s){
   ids.add(p.id);
   for(const k of ["stages","items","dependencies","sources","risks","decisions"])if(!Array.isArray(p[k]))throw Error("Invalid "+k);
   if(!validDate(p.startDate)||!validDate(p.dueDate)||p.startDate&&p.dueDate&&p.startDate>p.dueDate)throw Error("Invalid project dates");
+  checkCalendarDrafts(p);
   for(const stage of p.stages)if(!stage||typeof stage.id!=="string"||!stage.id||
    typeof stage.name!=="string"||!stage.name.trim()||!statuses.has(stage.status)||!validDate(stage.dueDate))throw Error("Invalid stage");
   for(const risk of p.risks)if(!risk||typeof risk.id!=="string"||!risk.id||
@@ -177,6 +241,50 @@ export function editProject(s,id,patch){return change(s,x=>{const p=project(x,id
  if(typeof p.name!=="string"||!p.name.trim())throw Error("Project name required");
  if(p.startDate&&p.dueDate&&p.startDate>p.dueDate)throw Error("Invalid project dates");
 })}
+
+/**
+ * Save a named, versioned scenario in the same Atlas project draft.
+ * Human must explicitly invoke native Save afterward. This function never
+ * changes Work durations, portfolio links, an approved plan or T3 evidence.
+ */
+export function upsertCalendarDraft(s,pid,input){
+ const p=project(s,pid),known=new Set(p.items.map(w=>w.id));
+ const normalized=normalizedCalendarDraft(input,known);
+ const existingId=input?.id??null;
+ if(existingId!==null&&
+   (typeof existingId!=="string"||!p.calendarDrafts?.some(d=>d.id===existingId)))
+  throw Error("Unknown project calendar draft");
+ const duplicate=(p.calendarDrafts||[]).find(d=>
+  d.id!==existingId&&d.name.trim().toLocaleLowerCase("ru-RU")===
+  normalized.name.toLocaleLowerCase("ru-RU"));
+ if(duplicate)throw Error("Duplicate calendar draft name");
+ if(!existingId&&(p.calendarDrafts||[]).length>=12)
+  throw Error("Project calendar draft limit: 12");
+ const id=existingId||uid(),now=new Date().toISOString();
+ const state=change(s,x=>{
+  const owner=project(x,pid);
+  const drafts=owner.calendarDrafts??[];
+  const existing=drafts.find(d=>d.id===id);
+  const record={
+   ...normalized,id,version:existing?existing.version+1:1,
+   baseRevision:s.revision,createdAt:existing?.createdAt??now,updatedAt:now
+  };
+  if(existing)drafts[drafts.findIndex(d=>d.id===id)]=record;
+  else drafts.push(record);
+  owner.calendarDrafts=drafts;
+ });
+ return {id,state};
+}
+/** Explicitly remove one saved what-if calendar draft, not Work or history. */
+export function removeCalendarDraft(s,pid,id){
+ if(!project(s,pid).calendarDrafts?.some(d=>d.id===id))
+  throw Error("Unknown project calendar draft");
+ return change(s,x=>{
+  const p=project(x,pid);
+  p.calendarDrafts=p.calendarDrafts.filter(d=>d.id!==id);
+ });
+}
+
 export function createStage(s,pid,name){const id=uid();return {id,state:change(s,x=>project(x,pid).stages.push({id,name:nonempty(name,"Stage name"),status:"planned",dueDate:null}))}}
 export function editStage(s,pid,id,patch){return change(s,x=>{
  const stage=project(x,pid).stages.find(t=>t.id===id);if(!stage)throw Error("Unknown stage");
@@ -232,6 +340,9 @@ export function removeItem(s,pid,id){return change(s,x=>{
  if((p.changes||[]).some(c=>(c.planAmendments||[]).some(a=>a.kind==="work"&&a.itemId===id||a.kind==="new_work"&&a.id===id)))
   throw Error("Работа связана с предложением изменения.");
  p.items=p.items.filter(w=>w.id!==id);
+ // A deliberate work deletion also removes the scenario-only override.
+ // Existing project history before this revision retains that work.
+ for(const draft of p.calendarDrafts||[])delete draft.modeByWork[id];
 })}
 export function connect(s,pid,from,to){return change(s,x=>{const p=project(x,pid);if(!p.items.some(t=>t.id===from)||!p.items.some(t=>t.id===to))throw Error("Unknown work item");p.dependencies.push({from,to})})}
 export function disconnect(s,pid,from,to){return change(s,x=>{
