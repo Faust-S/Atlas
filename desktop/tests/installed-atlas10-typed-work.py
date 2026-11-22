@@ -167,7 +167,7 @@ def qualify():
         "Cold restart did not recover the exact pinned calendar Work")
     open_work()
     d.wait_text("раб. дн.",35)
-    d.wait_text("CPM:",35)
+    d.wait_text("CPM по плану",35)
     d.wait_text(expected_dates["start"],35)
     d.wait_text(expected_dates["finish"],35)
     v.capture("atlas10-typed-work-native-cold-table")
