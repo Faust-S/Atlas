@@ -152,6 +152,7 @@ def qualify():
     v.capture("atlas10-typed-work-native-cold-table")
     d.click_button("График")
     d.wait_text("График работ",35)
+    d.set_text("Поиск",TITLE)
     d.wait_text("раб. дн.",35)
     v.capture("atlas10-typed-work-gantt-matching-units")
     print("ATLAS10_INSTALLED_TYPED_WORK_GANTT_TABLE_COLD_PASS",flush=True)
