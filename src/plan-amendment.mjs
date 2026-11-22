@@ -11,7 +11,17 @@ const text = (x,name,max=500) => {
  if(typeof x!=="string"||!x.trim()||x.length>max)throw Error("Invalid "+name);
  return x.trim();
 };
-const workFields = item => ({estimateDays:item.estimateDays??1,assignee:item.assignee||"",dueDate:item.dueDate||null,resourceId:item.resourceId||null,allocationPct:item.allocationPct??100});
+const amendableWorkFields = item => ({estimateDays:item.estimateDays??1,
+ assignee:item.assignee||"",dueDate:item.dueDate||null,
+ resourceId:item.resourceId||null,allocationPct:item.allocationPct??100});
+// Pin the meaning of a planned duration in the proposed decision. An
+// authorized Work edit may change its calendar, so checking only numeric
+// estimateDays before approval would silently change the proposal's meaning.
+const workFields = item => ({
+ ...amendableWorkFields(item),
+ durationUnit:item.durationUnit??"elapsed_days",
+ calendarBasis:item.calendarBasis??null
+});
 const dateFields = project => ({startDate:project.startDate||null,dueDate:project.dueDate||null});
 const key = action => action.kind==="dates"?"dates":action.kind==="work"?"work:"+action.itemId:"new_work:"+action.id;
 const eligible = c => c && ["proposed","deferred"].includes(c.status) && !c.planAppliedAt;
@@ -62,7 +72,7 @@ export function setPlanWork(snapshot,projectId,changeId,{itemId,estimateDays,ass
   if(!item)throw Error("Работа для изменения не найдена");
   const before=workFields(item),after={estimateDays,assignee:String(assignee??"").trim(),dueDate:dueDate||null,
    resourceId:resourceId===""?null:resourceId??item.resourceId??null,allocationPct:allocationPct??item.allocationPct??100};
-  if(same(before,after))throw Error("Укажите изменённый срок, длительность или ответственного");
+  if(same(amendableWorkFields(item),after))throw Error("Укажите изменённый срок, длительность или ответственного");
   upsert(change,{kind:"work",itemId,before,after});
   change.targetIds=[...new Set([...(change.targetIds||[]),...(item.targetIds||[])])];
  });
@@ -178,7 +188,8 @@ function describe(project,action) {
   "; контрольный срок "+shownDate(action.before.dueDate)+" → "+shownDate(action.after.dueDate);
  if(action.kind==="work"){
   const name=project.items.find(x=>x.id===action.itemId)?.title||"Работа";
-  return "Работа «"+name+"»: "+action.before.estimateDays+" → "+action.after.estimateDays+" дн.; "+
+  return "Работа «"+name+"»: "+action.before.estimateDays+" → "+action.after.estimateDays+
+   (action.before.durationUnit==="working_days"?" раб. дн.; ":" кал. дн.; ")+
    (action.before.assignee||"без ответственного")+" → "+(action.after.assignee||"без ответственного")+
    "; срок "+shownDate(action.before.dueDate)+" → "+shownDate(action.after.dueDate)+
    "; плановый ресурс "+(action.before.resourceId||"не назначен")+" → "+(action.after.resourceId||"не назначен")+
@@ -224,7 +235,7 @@ export function renderProjectPlanAmendments(snapshot,projectId,{previewId=null,e
      '<th>Ресурс</th><th>Максимальная загрузка</th><th>Дни выше мощности</th>'+
      '<th>Дни вне доступности</th></tr></thead><tbody>'+resourceTable+'</tbody></table></div>':
      '<p class="muted">Изменений расчётной ресурсной нагрузки не обнаружено; доступность не подтверждена.</p>';
-    preview='<p class="muted">Расчёт CPM по календарным дням: '+view.affected+
+    preview='<p class="muted">Календарный CPM по сохранённым единицам работ: '+view.affected+
      ' проектов по цепочке, изменены расчётные показатели у '+view.changed+
      '. Назначение ответственных не является проверкой доступности ресурсов.</p>'+
      '<div class="atlas-table-scroll"><table class="atlas-table"><thead><tr><th>Проект</th><th>Расчётное завершение</th><th>Контрольная дата</th><th>Риск срока, дни</th></tr></thead><tbody>'+tr+'</tbody></table></div>'+
