@@ -1,4 +1,5 @@
 import React,{useEffect,useMemo,useState} from "react";
+import {projectHistoryRows} from "./history-view.mjs";
 import {ATLAS_DASHBOARD_WIDGETS,DEFAULT_ATLAS_DASHBOARD,
  normalizeAtlasDashboardLayout,toggleAtlasDashboardWidget,
  moveAtlasDashboardWidget,shiftAtlasDashboardWidget} from "../../src/dashboard-layout.mjs";
@@ -8,10 +9,10 @@ import {ATLAS_DASHBOARD_WIDGETS,DEFAULT_ATLAS_DASHBOARD,
 const KEY="iwxa.atlas.dashboard.layout.v1";
 type Page="overview"|"work"|"timeline"|"reality"|"changes"|"resources"|"sources";
 type Props={
- data:any;dates:any;resources:any;reviews:any[];sourceQueue:any;
+ data:any;dates:any;resources:any;reviews:any[];sourceQueue:any;ecosystemRows:any[];
  dirty:boolean;onPortfolio:()=>void;onNewProject:()=>void;onConnect:()=>void;
  onOpenProject:(id:string,page?:Page)=>void;onResources:()=>void;
- onCalendar:()=>void;onReview:()=>void;
+ onCalendar:()=>void;onReview:()=>void;onEcosystem:()=>void;onHistory:(projectId:string)=>void;
 };
 function initialLayout(){
  try{
@@ -25,8 +26,8 @@ const status:Record<string,string>={
  completed:"Завершён (заявлено)",cancelled:"Отменён"
 };
 const count=(value:number)=>value.toLocaleString("ru-RU");
-export function AtlasDashboard({data,dates,resources,reviews,sourceQueue,dirty,
- onPortfolio,onNewProject,onConnect,onOpenProject,onResources,onCalendar,onReview}:Props){
+export function AtlasDashboard({data,dates,resources,reviews,sourceQueue,ecosystemRows,dirty,
+ onPortfolio,onNewProject,onConnect,onOpenProject,onResources,onCalendar,onReview,onEcosystem,onHistory}:Props){
  const [layout,setLayout]=useState<string[]>(initialLayout);
  const [editing,setEditing]=useState(false);
  const [dragged,setDragged]=useState<string|null>(null);
@@ -43,6 +44,10 @@ export function AtlasDashboard({data,dates,resources,reviews,sourceQueue,dirty,
  const attention=projected.filter(({forecast}:any)=>forecast?.needsReview);
  const conflictResources=(resources.people??[]).filter((r:any)=>r.overloadDays>0||r.unavailableDays>0);
  const lastProjects=projects.slice(0,6);
+ const recentHistory=useMemo(()=>projects.flatMap((p:any)=>
+  projectHistoryRows(p).slice(0,8).map((row:any)=>({...row,projectId:p.id,projectName:p.name})))
+  .sort((a:any,b:any)=>(Date.parse(b.at||"")||0)-(Date.parse(a.at||"")||0)).slice(0,7),
+ [projects]);
  const widget=(id:string)=>{
   switch(id){
    case "metrics":return <div className="atlas-dash-metrics">
@@ -106,6 +111,25 @@ export function AtlasDashboard({data,dates,resources,reviews,sourceQueue,dirty,
      <button className="atlas-dash-secondary" onClick={()=>onOpenProject(r.projectId,"sources")}>Источник</button>
     </div>)}
    </div>:<div className="atlas-dash-empty">Публичных источников для обновления сейчас нет.
+    <button onClick={onPortfolio}>Открыть портфель</button></div>;
+   case "ecosystem":return ecosystemRows.length?<div className="atlas-dash-rows">
+    {ecosystemRows.slice(0,6).map((r:any)=><div className="atlas-dash-row" key={r.id}>
+     <div><button className="atlas-dash-link" onClick={()=>onOpenProject(r.id)}>{r.name}</button>
+      <small>{r.repositories?.length??0} публичных репозиториев · {r.workCount??r.workTotal??0} работ
+       · {r.sourcesMissing?"Источник не подтверждён":"Сведения проекта доступны"}</small></div>
+     <button className="atlas-dash-secondary" onClick={()=>onOpenProject(r.id,"sources")}>Исходники</button>
+    </div>)}
+    <button className="atlas-dash-secondary" onClick={onEcosystem}>Карта портфеля</button>
+   </div>:<div className="atlas-dash-empty">Пока нет проектов с исходниками на карте разработки.
+    <button onClick={onEcosystem}>Карта портфеля</button></div>;
+   case "history":return recentHistory.length?<div className="atlas-dash-rows">
+    {recentHistory.map((r:any)=><div className="atlas-dash-row" key={r.projectId+":"+r.id}>
+     <div><button className="atlas-dash-link" onClick={()=>onHistory(r.projectId)}>{r.projectName}</button>
+      <small>{r.kind==="decision"?"Решение":"Наблюдение"} · {r.at?.slice(0,10)||"Дата не указана"}
+       · {r.text||"Содержание не указано"}</small></div>
+     <button className="atlas-dash-secondary" onClick={()=>onHistory(r.projectId)}>История</button>
+    </div>)}
+   </div>:<div className="atlas-dash-empty">В портфеле пока нет записанных решений и наблюдений.
     <button onClick={onPortfolio}>Открыть портфель</button></div>;
    case "calendar":return <div className="atlas-dash-empty">В портфеле сохранено редакций рабочих календарей: <strong>{data.calendarLibrary?.length??0}</strong>.
     <p>Календарь закрепляется за работой по конкретной редакции. Сценарий рассчитывается отдельно от сохранённого плана.</p>
