@@ -12,6 +12,14 @@ on:
       - 'desktop/src/AtlasDashboard.tsx'
       - 'desktop/src/AtlasSettings.tsx'
       - 'desktop/src/style.css'
+      - 'desktop/index.html'
+      - 'desktop/package.json'
+      - 'desktop/package-lock.json'
+      - 'desktop/installer/**'
+      - 'desktop/src-tauri/**'
+      - 'desktop/tests/installed-atlas11-*.py'
+      - 'tests/fixtures/**'
+      - 'src/**'
   workflow_dispatch:
 
 permissions:
