@@ -23,6 +23,7 @@ const validDate=value=>{if(value==null||value==="")return true;if(typeof value!=
  */
 const calendarDate=value=>typeof value==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(value)&&
  validDate(value);
+const durationUnits=new Set(["elapsed_days","working_days"]);
 const calendarDates=(dates,label)=>{
  if(!Array.isArray(dates)||dates.length>1000||dates.some(d=>!calendarDate(d))||
   new Set(dates).size!==dates.length)throw Error("Invalid "+label);
@@ -201,7 +202,17 @@ export function validate(s){
   const itemIds=new Set(p.items.map(x=>x.id)),stageIds=new Set(p.stages.map(x=>x.id)),sourceIds=new Set(p.sources.map(x=>x.id)),targetIds=new Set((p.targets||[]).map(x=>x.id)),changeIds=new Set((p.changes||[]).map(x=>x.id));
   if(itemIds.size!==p.items.length||stageIds.size!==p.stages.length||sourceIds.size!==p.sources.length)throw Error("Duplicate ID");
   for(const x of p.items){if(!x||typeof x.id!=="string"||!x.id||typeof x.title!=="string"||!x.title.trim()||
-    !workStates.has(x.state)||!priorities.has(x.priority)||x.stageId&&!stageIds.has(x.stageId)||x.sourceId&&!sourceIds.has(x.sourceId))throw Error("Invalid work item");if(x.estimateDays!==undefined&&(!Number.isSafeInteger(x.estimateDays)||x.estimateDays<0||x.estimateDays>36500))throw Error("Invalid work estimateDays");if(!validDate(x.dueDate))throw Error("Invalid work dueDate");if(!validResource(x.resourceId)||!validAllocation(x.allocationPct))throw Error("Invalid work resource commitment");if(x.targetIds!==undefined&&(!Array.isArray(x.targetIds)||new Set(x.targetIds).size!==x.targetIds.length||x.targetIds.some(id=>!targetIds.has(id))))throw Error("Invalid work targetIds");if(x.changeId!=null&&!changeIds.has(x.changeId))throw Error("Invalid work changeId");
+    !workStates.has(x.state)||!priorities.has(x.priority)||x.stageId&&!stageIds.has(x.stageId)||x.sourceId&&!sourceIds.has(x.sourceId))throw Error("Invalid work item");if(x.estimateDays!==undefined&&(!Number.isSafeInteger(x.estimateDays)||x.estimateDays<0||x.estimateDays>36500))throw Error("Invalid work estimateDays");
+   const unit=x.durationUnit??"elapsed_days";
+   if(!durationUnits.has(unit))throw Error("Invalid work duration unit");
+   if(unit==="working_days"){
+    const basis=calendarBasis(x.calendarBasis);
+    if(!p.startDate)throw Error("Для рабочих дней установите дату начала проекта");
+    if(!(s.calendarLibrary??[]).some(d=>d.id===basis.id&&d.version===basis.version))
+     throw Error("Указанная редакция рабочего календаря недоступна");
+   }else if(x.calendarBasis!==undefined&&x.calendarBasis!==null)
+    throw Error("Calendar source is allowed only for working-day work");
+   if(!validDate(x.dueDate))throw Error("Invalid work dueDate");if(!validResource(x.resourceId)||!validAllocation(x.allocationPct))throw Error("Invalid work resource commitment");if(x.targetIds!==undefined&&(!Array.isArray(x.targetIds)||new Set(x.targetIds).size!==x.targetIds.length||x.targetIds.some(id=>!targetIds.has(id))))throw Error("Invalid work targetIds");if(x.changeId!=null&&!changeIds.has(x.changeId))throw Error("Invalid work changeId");
    if(x.sourcePath!==undefined||x.sourceRevision!==undefined){
     if(!x.sourceId||!validSourcePath(x.sourcePath)||
       typeof x.sourceRevision!=="string"||!/^[a-f0-9]{40}$/i.test(x.sourceRevision))
@@ -494,6 +505,16 @@ export function editItem(s,pid,id,patch){return change(s,x=>{const item=project(
  }
  if("allocationPct" in patch)item.allocationPct=patch.allocationPct;
  if("estimateDays" in patch){if(!Number.isSafeInteger(patch.estimateDays)||patch.estimateDays<0||patch.estimateDays>36500)throw Error("Invalid work estimateDays");item.estimateDays=patch.estimateDays;}
+ if("durationUnit" in patch){
+  if(!durationUnits.has(patch.durationUnit))throw Error("Invalid work duration unit");
+  item.durationUnit=patch.durationUnit;
+  if(patch.durationUnit==="elapsed_days")delete item.calendarBasis;
+ }
+ if("calendarBasis" in patch){
+  if(patch.calendarBasis===null){delete item.calendarBasis;}
+  else item.calendarBasis=calendarBasis(patch.calendarBasis);
+ }
+
  if("targetIds" in patch){if(!Array.isArray(patch.targetIds))throw Error("Invalid work targetIds");item.targetIds=[...patch.targetIds];}
  if("changeId" in patch)item.changeId=patch.changeId||null;
  if("executor" in patch){const e=patch.executor;if(e&&(!["human","external-agent","iwxa-agent"].includes(e.kind)||!e.ref))throw Error("Invalid executor");item.executor=e;}
