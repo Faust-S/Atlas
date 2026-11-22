@@ -22,7 +22,15 @@
 
 Стабильный `v0.10.0` публикуется отдельным контролируемым workflow `.github/workflows/atlas-0-10-publish.yml`. Workflow проверяет SUCCESS указанного Windows-прогона и его точный SHA, скачивает уже принятый Windows-EXE без пересборки, проверяет SHA-256 и создаёт GitHub Release только при отсутствии прежнего тега и релиза.
 
-Публикация считается завершённой только после SUCCESS workflow и появления тега `v0.10.0` и обоих файлов на GitHub Release.
+**Публикация завершена:** [workflow №45047280828](https://github.com/Faust-S/Atlas/actions/runs/45047280828) — **SUCCESS** 22.11.2026. Тег `v0.10.0` является прямой ссылкой на принятый коммит `812f1ddc447fc68f99f15d14595c276b593a6159`, а не на позднейший документационный или публикационный коммит.
+
+Стабильный GitHub Release: [IWXA Atlas 0.10.0](https://github.com/Faust-S/Atlas/releases/tag/v0.10.0), не draft и не prerelease.
+
+- [Скачать Windows-установщик](https://github.com/Faust-S/Atlas/releases/download/v0.10.0/IWXA-Atlas-0.10.0-Setup.exe), 3 207 168 байт.
+- [Скачать SHA-256](https://github.com/Faust-S/Atlas/releases/download/v0.10.0/IWXA-Atlas-0.10.0-Setup.exe.sha256).
+- В опубликованных метаданных GitHub SHA-256 EXE равен исходному проверенному `5a8849c887fae2bbc5ab922d52e43abdd9eb12ad80286d7a15c9a680307907ec`. Скачанный из принятого Actions-прогона EXE отдельно проверен хешированием, результат совпал.
+- `release/0.10` содержит документацию и публикационный workflow; действующий тег точно указывает на **проверенный исходный код**, более поздняя фиксация документации не меняет его.
+
 
 ## Границы
 
