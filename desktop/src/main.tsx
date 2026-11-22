@@ -466,6 +466,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const persisted=generation!=="none";
  const dirtyRef=useRef(false),busyRef=useRef(false),editorOpenRef=useRef(false);
  const editorDirtyRef=useRef(false);
+ const inspectorEditorReturnRef=useRef(false);
  dirtyRef.current=dirty;busyRef.current=busy;editorOpenRef.current=!!editor;
  // The host can prevent U04 detachment while the Atlas draft is unsaved.
  useEffect(()=>{
@@ -761,8 +762,10 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   }
   if(!editorOpenRef.current)return true;
   if(!editorDirtyRef.current){
+   const returnToPreview=inspectorEditorReturnRef.current&&!embedded;
+   inspectorEditorReturnRef.current=false;
    setEditor(null);
-   if(embedded||window.innerWidth<=1220)setInspector(false);
+   if(!returnToPreview&&(embedded||window.innerWidth<=1220))setInspector(false);
    return true;
   }
   issue(Error("Открытая форма содержит неприменённые данные. Примените её (Ctrl+Enter) или нажмите «Отмена» перед переходом."));
@@ -1297,11 +1300,12 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    setRelationJump(projectId);
   }
  };
- const openEditor=(action:string,projectId?:string)=>{
+ const openEditor=(action:string,projectId?:string,fromInspector=false)=>{
   if(!requireClosedForm()||busyRef.current)return;
   try{
    const p=data.projects.find((x:any)=>x.id===(projectId??active))||null;
    const spec=editorSpec(p,action,data);
+   inspectorEditorReturnRef.current=fromInspector&&!embedded;
    setEditor({action,spec});setInspector(true);
    if(!embedded&&window.innerWidth<1150)setNavPanelOpen(false);
    setError("");
@@ -1315,6 +1319,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    resetWorkspaceScroll();
    setActive(projectId);setHomeOpen(false);setSettingsOpen(false);
    setTab(action.startsWith("plan-")?"changes":"reality");
+   inspectorEditorReturnRef.current=false;
    setEditor({action,spec:editorSpec(p,action,data)});setInspector(true);
    if(!embedded&&window.innerWidth<1150)setNavPanelOpen(false);
    setError("");
@@ -1322,8 +1327,10 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  };
  const cancelEditor=()=>{
   if(editorDirtyRef.current&&!confirmAction("Отказаться от введённых изменений формы?"))return;
+  const returnToPreview=inspectorEditorReturnRef.current&&!embedded;
+  inspectorEditorReturnRef.current=false;
   editorDirtyRef.current=false;setEditor(null);
-  if(embedded||window.innerWidth<=1220)setInspector(false);
+  if(!returnToPreview&&(embedded||window.innerWidth<=1220))setInspector(false);
  };
  const revealWorkInTable=(id:string,focusRow=true)=>{
   // New work: reveal its exact row, including entries beyond the preview limit.
@@ -1406,8 +1413,10 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      }
     }
    }
+   const returnToPreview=inspectorEditorReturnRef.current&&!embedded;
+   inspectorEditorReturnRef.current=false;
    editorDirtyRef.current=false;setEditor(null);
-   if(embedded||window.innerWidth<=1220)setInspector(false);
+   if(!returnToPreview&&(embedded||window.innerWidth<=1220))setInspector(false);
   }catch(e){issue(e)}
  };
  const save=async():Promise<boolean>=>{
@@ -3670,8 +3679,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     <AtlasInspectorPreview key={project?.id||"portfolio"}
      project={project} snapshot={data} plan={plan} forecast={projected}
      dirty={dirty} saved={persisted} workRequest={previewWorkRequest}
-     onClose={()=>setInspector(false)} onEditWork={id=>openEditor("work:"+id)}
-     onEditProject={()=>openEditor("project-edit")} onOpenTab={goProjectTab}
+     onClose={()=>setInspector(false)} onEditWork={id=>openEditor("work:"+id,undefined,true)}
+     onEditProject={()=>openEditor("project-edit",undefined,true)} onOpenTab={goProjectTab}
      onSave={()=>void save()} canSave={dirty&&!busy&&!editor}/>
    </div>}
    {editor?<EditorPanel key={editor.action} editor={editor} onSubmit={submit}
