@@ -2,7 +2,8 @@ import React,{useEffect,useMemo,useRef,useState} from "react";
 import atlasPackage from "../package.json";
 import {invoke as nativeInvoke,isTauri} from "@tauri-apps/api/core";
 import {getCurrentWindow} from "@tauri-apps/api/window";
-import {empty,deserialize,serialize,editItem,removeStage,removeItem,disconnect,removeProject as dropProject} from "../../src/core.mjs";
+import {empty,deserialize,serialize,editItem,removeStage,removeItem,disconnect,
+ upsertCalendarDraft,removeCalendarDraft,removeProject as dropProject} from "../../src/core.mjs";
 import {removePortfolioLink} from "../../src/portfolio.mjs";
 import {editorSpec,applyEditor,editorSelectionFields,filterWorkPickerOptions,PROJECT_TYPE_LABELS} from "../../src/editor.mjs";
 import {compareProject,decideChange} from "../../src/trace.mjs";
@@ -2701,6 +2702,24 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
        projectStatus={project.status} projectStart={project.startDate||null} projectDue={project.dueDate||null}
        portfolioStart={projected?.projectedStart||null} shiftDays={projected?.shiftDays??null}
        unavailableOrigins={projected?.unavailableOrigins||[]}
+       calendarDrafts={project.calendarDrafts||[]}
+       onSaveCalendarDraft={draft=>{
+        if(busyRef.current||!ready||!requireClosedForm())return null;
+        try{
+         const result=upsertCalendarDraft(latestSnapshot.current,project.id,draft);
+         mutate(result.state,"Календарный вариант сохранён в черновике. Для записи на диск нажмите «Сохранить».");
+         return result.id;
+        }catch(error){issue(error);return null}
+       }}
+       onRemoveCalendarDraft={id=>{
+        if(busyRef.current||!ready||!requireClosedForm())return false;
+        if(!confirmAction("Удалить сохранённый календарный вариант из черновика проекта?"))return false;
+        try{
+         const result=removeCalendarDraft(latestSnapshot.current,project.id,id);
+         mutate(result,"Календарный вариант удалён из черновика. Для записи на диск нажмите «Сохранить».");
+         return true;
+        }catch(error){issue(error);return false}
+       }}
        onOpenProject={id=>selectProject(id)}
        onEditDates={()=>openEditor("dates")} onOpenWork={id=>openEditor("work:"+id)}/>:
       <section className="surface"><Fallback message="План пока не рассчитан. Добавьте работы или проверьте зависимости."/></section>)}
