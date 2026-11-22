@@ -17,7 +17,7 @@ const cumulativeResult=(baseline,plan)=>baseline?{
  beforeDays:baseline.durationDays,afterDays:plan.durationDays
 }:null;
 
-export function previewWorkScheduleEdit(project,workId,draft,beforePlan=null,cumulativeBaseline=null){
+export function previewWorkScheduleEdit(project,workId,draft,beforePlan=null,cumulativeBaseline=null,{calendarLibrary=[]}={}){
  if(!project||!Array.isArray(project.items)||!Array.isArray(project.dependencies))
   throw Error("Проект для расчёта недоступен");
  const work=project.items.find(item=>item.id===workId);
@@ -31,17 +31,36 @@ export function previewWorkScheduleEdit(project,workId,draft,beforePlan=null,cum
  if(!validDate(dueDate))
   return {kind:"invalid",reason:"Проверьте календарную дату контрольного срока."};
  const oldEstimate=work.estimateDays??1,oldDueDate=work.dueDate??null;
- if(estimateDays===oldEstimate&&dueDate===oldDueDate)
+ const oldUnit=work.durationUnit??"elapsed_days",newUnit=draft?.durationUnit??oldUnit;
+ const oldBasis=work.calendarBasis??null;
+ let nextBasis=oldBasis;
+ if(draft?.calendarBasis!==undefined){
+  const selected=draft.calendarBasis;
+  if(selected===null||selected==="")nextBasis=null;
+  else if(typeof selected==="string"){
+   const separator=selected.lastIndexOf("@"),version=Number(selected.slice(separator+1));
+   if(separator<1||!Number.isSafeInteger(version)||version<1)
+    return {kind:"invalid",reason:"Выберите редакцию рабочего календаря."};
+   nextBasis={id:selected.slice(0,separator),version};
+  }else nextBasis=selected;
+ }
+ if(newUnit==="elapsed_days")nextBasis=null;
+ if(newUnit==="working_days"&&!nextBasis)
+  return {kind:"invalid",reason:"Для рабочих дней требуется действительная редакция календаря."};
+ if(estimateDays===oldEstimate&&dueDate===oldDueDate&&
+    newUnit===oldUnit&&JSON.stringify(nextBasis)===JSON.stringify(oldBasis))
   return {kind:"unchanged",cumulative:cumulativeResult(
-   cumulativeBaseline,beforePlan??(cumulativeBaseline?scheduleProject(project):null))};
+   cumulativeBaseline,beforePlan??(cumulativeBaseline?
+    scheduleProject(project,{calendarLibrary}):null))};
  // Only the changed work gets a new object, all other project data are shared
  // as read-only inputs to the existing scheduler.
  const projected={...project,items:project.items.map(item=>item.id===workId?
-  {...item,estimateDays,dueDate}:item)};
+  {...item,estimateDays,dueDate,durationUnit:newUnit,
+   ...(nextBasis?{calendarBasis:nextBasis}:{calendarBasis:undefined})}:item)};
  let before,after,effect;
  try{
-  before=beforePlan??scheduleProject(project);
-  after=scheduleProject(projected);
+  before=beforePlan??scheduleProject(project,{calendarLibrary});
+  after=scheduleProject(projected,{calendarLibrary});
   effect=scheduleChangeSummary(before,after,{limit:3});
  }catch{
   return {kind:"invalid",reason:"План с такими значениями не рассчитывается. Проверьте длительность и сроки."};
