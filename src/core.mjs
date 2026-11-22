@@ -28,7 +28,7 @@ const calendarDates=(dates,label)=>{
   new Set(dates).size!==dates.length)throw Error("Invalid "+label);
  return [...dates].sort();
 };
-function normalizedCalendarDraft(data,itemIds){
+function normalizedCalendarDraft(data,itemIds,{allowMissingWork=false}={}){
  if(!data||typeof data!=="object"||Array.isArray(data)||
   typeof data.name!=="string"||!data.name.trim()||data.name.trim().length>120)
   throw Error("Invalid calendar draft name");
@@ -47,7 +47,7 @@ function normalizedCalendarDraft(data,itemIds){
   Object.keys(modeByWork).length>5000)
   throw Error("Invalid calendar draft work modes");
  const modes=Object.entries(modeByWork);
- if(modes.some(([id,mode])=>!itemIds.has(id)||
+ if(modes.some(([id,mode])=>(!allowMissingWork&&!itemIds.has(id))||
   !["elapsed_days","working_days"].includes(mode)))
   throw Error("Invalid calendar draft work modes");
  return {name:data.name.trim(),weekdays:[...weekdays].sort((a,b)=>a-b),
@@ -67,7 +67,11 @@ function checkCalendarDrafts(project){
    typeof d.createdAt!=="string"||!Number.isFinite(Date.parse(d.createdAt))||
    typeof d.updatedAt!=="string"||!Number.isFinite(Date.parse(d.updatedAt)))
    throw Error("Invalid calendar draft identity");
-  const normalized=normalizedCalendarDraft(d,workIds);
+  // Old Atlas 0.8 did not know calendar drafts: it can delete a Work while
+  // preserving the unknown scenario field. Keep such historical links on
+  // import, otherwise the complete native project would become unreadable.
+  // New scenario writes still reject unknown Work IDs.
+  const normalized=normalizedCalendarDraft(d,workIds,{allowMissingWork:true});
   const key=normalized.name.toLocaleLowerCase("ru-RU");
   if(names.has(key))throw Error("Duplicate calendar draft name");
   names.add(key);ids.add(d.id);
@@ -247,6 +251,35 @@ export function editProject(s,id,patch){return change(s,x=>{const p=project(x,id
  * Human must explicitly invoke native Save afterward. This function never
  * changes Work durations, portfolio links, an approved plan or T3 evidence.
  */
+/**
+ * A scenario may refer to a removed Work after an older Atlas 0.8 edits it.
+ * Report these historical references, do not discard them during validation.
+ * This is a diagnosis, not a second store or an automatic repair.
+ */
+export function missingCalendarDraftWorkIds(p,id){
+ if(!p||!Array.isArray(p.items))throw Error("Invalid project calendar drafts");
+ const draft=p.calendarDrafts?.find(d=>d.id===id);
+ if(!draft)throw Error("Unknown project calendar draft");
+ const known=new Set(p.items.map(w=>w.id));
+ return Object.keys(draft.modeByWork).filter(workId=>!known.has(workId)).sort();
+}
+
+/** Human-confirmed repair of only unresolved Work references in a draft. */
+export function resolveCalendarDraftMissingWorkRefs(s,pid,id){
+ const p=project(s,pid);
+ const missing=missingCalendarDraftWorkIds(p,id);
+ if(!missing.length)return {state:s,removed:[]};
+ const state=change(s,x=>{
+  const owner=project(x,pid);
+  const draft=owner.calendarDrafts.find(d=>d.id===id);
+  for(const workId of missing)delete draft.modeByWork[workId];
+  draft.version++;
+  draft.baseRevision=s.revision;
+  draft.updatedAt=new Date().toISOString();
+ });
+ return {state,removed:missing};
+}
+
 export function upsertCalendarDraft(s,pid,input){
  const p=project(s,pid),known=new Set(p.items.map(w=>w.id));
  const normalized=normalizedCalendarDraft(input,known);
@@ -254,6 +287,8 @@ export function upsertCalendarDraft(s,pid,input){
  if(existingId!==null&&
    (typeof existingId!=="string"||!p.calendarDrafts?.some(d=>d.id===existingId)))
   throw Error("Unknown project calendar draft");
+ if(existingId!==null&&missingCalendarDraftWorkIds(p,existingId).length)
+  throw Error("В календарном варианте есть ссылки на удалённые работы. Сначала подтвердите очистку ссылок.");
  const duplicate=(p.calendarDrafts||[]).find(d=>
   d.id!==existingId&&d.name.trim().toLocaleLowerCase("ru-RU")===
   normalized.name.toLocaleLowerCase("ru-RU"));
