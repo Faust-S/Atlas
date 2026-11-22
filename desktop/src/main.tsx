@@ -31,6 +31,8 @@ import {ProjectGantt,ProjectDependencyDiagram,PortfolioNetworkMap} from "./Proje
 import {AtlasDashboard} from "./AtlasDashboard";
 import {AtlasSettings} from "./AtlasSettings";
 import {AtlasInspectorPreview} from "./AtlasInspectorPreview";
+import {atlasInspectorMaxWidth,atlasInspectorDisplayedWidth,
+ atlasInspectorResize} from "../../src/desktop-inspector-layout.mjs";
 import {AtlasChromeTopbar,AtlasChromeRail,AtlasGlyph} from "./AtlasChrome";
 import {ProjectConnect} from "./ProjectConnect";
 import {ProjectOrganizationGuide} from "./ProjectOrganizationGuide";
@@ -341,10 +343,19 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   window.addEventListener("resize",compact);
   return ()=>window.removeEventListener("resize",compact);
  },[embedded]);
+ const [viewportWidth,setViewportWidth]=useState(()=>window.innerWidth);
+ useEffect(()=>{
+  if(embedded)return;
+  const resize=()=>setViewportWidth(window.innerWidth);
+  window.addEventListener("resize",resize);
+  return ()=>window.removeEventListener("resize",resize);
+ },[embedded]);
  const [inspectorWidth,setInspectorWidth]=useState(()=>{
   try{const n=Number(localStorage.getItem("iwxa.atlas.ui.inspector.width.v1"));
-   return Number.isFinite(n)&&n>=300&&n<=760?n:390;}catch{return 390}
+   return Number.isFinite(n)&&n>=270&&n<=760?n:390;}catch{return 390}
  });
+ const inspectorMaxWidth=atlasInspectorMaxWidth(viewportWidth,Boolean(editor));
+ const inspectorDockWidth=atlasInspectorDisplayedWidth(inspectorWidth,viewportWidth,Boolean(editor));
  type AtlasLocation={projectId:string|null;tab:Tab;home:boolean;settings:boolean};
  const routeHistory=useRef<AtlasLocation[]>([]);
  const routeCursor=useRef(-1);
@@ -1932,7 +1943,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  return <div ref={rootRef}
   className={"app-shell"+(inspector?"":" no-inspector")+(editor?" editor-active":"")+
    (embedded?" atlas-embedded":" atlas-v6-shell")+(connectOpen?" atlas-connect-focused":"")}
-  style={!embedded?{"--atlas-v6-dock-width":inspectorWidth+"px"} as React.CSSProperties:undefined}>
+  style={!embedded?{"--atlas-v6-dock-width":inspectorDockWidth+"px"} as React.CSSProperties:undefined}>
   {!embedded&&<AtlasChromeTopbar logoUrl={logoUrl}
    statusLabel={editor?"Форма не применена":dirty?"Не сохранено":persisted?"Сохранено":"Новый портфель"}
    canBack={routeControls.back}
@@ -3602,25 +3613,26 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    aria-label={editor?"Редактирование данных":"Инспектор Atlas"}>
    {!embedded&&<div className="atlas-v6-dock-grip" role="separator" tabIndex={0}
     aria-label="Изменить ширину инспектора" aria-orientation="vertical"
-    aria-valuemin={300} aria-valuemax={760} aria-valuenow={inspectorWidth}
+    aria-valuemin={editor?300:270} aria-valuemax={inspectorMaxWidth} aria-valuenow={inspectorDockWidth}
     onKeyDown={event=>{
      if(event.key!=="ArrowLeft"&&event.key!=="ArrowRight")return;
      event.preventDefault();
-     setInspectorWidth(w=>{
-      const next=Math.max(300,Math.min(760,w+(event.key==="ArrowLeft"?20:-20)));
-      try{localStorage.setItem("iwxa.atlas.ui.inspector.width.v1",String(next))}catch{}
-      return next;
-     });
+     const next=atlasInspectorResize(inspectorDockWidth,viewportWidth,
+      event.key==="ArrowLeft"?20:-20,Boolean(editor));
+     setInspectorWidth(next);
+     try{localStorage.setItem("iwxa.atlas.ui.inspector.width.v1",String(next))}catch{}
     }}
     onPointerDown={event=>{
      if(event.button!==0)return;
      event.preventDefault();
-     const start=event.clientX,initial=inspectorWidth;
+     const start=event.clientX,initial=inspectorDockWidth;
      const drag=(move:PointerEvent)=>{
-      setInspectorWidth(Math.max(300,Math.min(760,initial+start-move.clientX)));
+      setInspectorWidth(atlasInspectorResize(initial,viewportWidth,
+       start-move.clientX,Boolean(editor)));
      };
      const stop=(end:PointerEvent)=>{
-      const width=Math.max(300,Math.min(760,initial+start-end.clientX));
+      const width=atlasInspectorResize(initial,viewportWidth,
+       start-end.clientX,Boolean(editor));
       setInspectorWidth(width);
       try{localStorage.setItem("iwxa.atlas.ui.inspector.width.v1",String(width))}catch{}
       window.removeEventListener("pointermove",drag);
