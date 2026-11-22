@@ -13,7 +13,7 @@ test("Atlas displayed version follows the packaged standalone version, not the p
  assert.match(ui,/atlasPackage\.version\.includes\("-"\)\?" \(разработка\)":""/);
  assert.match(ui,/<h1>IWXA Atlas <em>\{atlasVersionLabel\}<\/em><\/h1>/);
  assert.match(ui,/<strong>Atlas<\/strong><small>IWXA · \{atlasVersionLabel\}<\/small>/);
- assert.match(ui,/<AtlasSettings version=\{atlasPackage\.version\}/);
+ assert.match(ui,/<AtlasSettings key=\{settingsSection\} initialSection=\{settingsSection\}\s+version=\{atlasPackage\.version\}/);
  const settings=read("../desktop/src/AtlasSettings.tsx");
  assert.match(settings,/Установленная версия/);
  assert.match(settings,/>\{p\.version\}<\/span>/);
