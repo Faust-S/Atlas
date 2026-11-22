@@ -131,8 +131,18 @@ def qualify():
     mode_control.click_input()
     d.wait_text("Непрерывных операций: 1",35)
     v.find_control("Сохранённые календарные варианты (0)",scroll=True).click_input()
-    d.wait_text("Название",30)
-    d.set_text("Название календарного варианта","Atlas Calendar 2026")
+    # The name field is inside an expanded details element. On a compact
+    # laptop the user must scroll to it; unlike set_text() this driver
+    # requires a physically reachable edit control before typing.
+    name_input=v.find_control("Название календарного варианта",
+                              types={"Edit"},scroll=True)
+    rect=name_input.rectangle()
+    assert v.rectangle_in_workspace(rect,win32gui.GetWindowRect(d.handle)),(
+        "Named calendar input is physically unreachable in compact Windows")
+    name_input.click_input()
+    d.keyboard.send_keys("^a")
+    d.keyboard.send_keys("Atlas Calendar 2026",with_spaces=True)
+    v.capture("atlas10-named-calendar-edit-field-820")
     v.find_control("Сохранить вариант в проект",types={"Button"},scroll=True).click_input()
     d.wait_text("Вариант добавлен в черновик проекта",30)
     assert d.head()==original_head and d.saved_project(original_head)==original_project,(
