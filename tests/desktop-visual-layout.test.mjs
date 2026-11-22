@@ -218,6 +218,16 @@ test('Gantt exposes saved typed calendars through native project drafts without 
  assert.match(ui,/calendarBasis/);
  assert.match(ui,/libraryRulesMatch/);
  assert.match(ui,/onRecordWorkCalendar\(input,selectedLibrary/);
+ const loader=ui.slice(ui.indexOf(' const applyCalendarRules='),ui.indexOf(' const applyLibraryCalendar='));
+ assert.match(loader,/setWeekPreset\(/);
+ assert.match(loader,/setCustomWeekdays\(/);
+ assert.match(loader,/setNonWorkingDates\(/);
+ assert.match(loader,/setExtraWorkingDates\(/);
+ assert.doesNotMatch(loader,/applyCalendarRules\(draft\)/,
+  'The shared calendar loader must never recurse into itself');
+ const scenarioLoader=ui.slice(ui.indexOf(' const loadCalendarDraft='),ui.indexOf(' const saveCalendarDraft='));
+ assert.match(scenarioLoader,/applyCalendarRules\(draft\)/);
+ assert.match(scenarioLoader,/setCalendarBasis\(draft.calendarBasis\?\?null\)/);
  assert.match(desktop,/calendarLibrary=\{data.calendarLibrary\|\|\[\]\}/);
  assert.match(desktop,/createWorkCalendar\(source,record\)/);
  assert.match(desktop,/reviseWorkCalendar\(source,basis.id,basis.version,record\)/);
