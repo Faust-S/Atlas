@@ -219,6 +219,9 @@ test('Gantt exposes saved typed calendars through native project drafts without 
  assert.match(ui,/Сохранить вариант в проект/);
  assert.match(ui,/Загрузить вариант/);
  assert.match(ui,/Удалить вариант из проекта/);
+ assert.match(ui,/Подтвердить очистку недействительных ссылок/);
+ assert.match(ui,/missingCalendarWorkRefs/);
+ assert.match(ui,/onRepairCalendarDraft\(calendarDraftId\)/);
  assert.match(ui,/onSaveCalendarDraft\(\{/);
  assert.match(ui,/setCustomWeekdays\(\[\.\.\.draft.weekdays\]\)/);
  assert.match(ui,/additionalWorkingDates:calendar.additionalWorkingDates,modeByWork/);
@@ -226,9 +229,13 @@ test('Gantt exposes saved typed calendars through native project drafts without 
  assert.match(desktop,/calendarDrafts=\{project.calendarDrafts\|\|\[\]\}/);
  assert.match(desktop,/upsertCalendarDraft\(latestSnapshot.current,project.id,draft\)/);
  assert.match(desktop,/removeCalendarDraft\(latestSnapshot.current,project.id,id\)/);
+ assert.match(desktop,/resolveCalendarDraftMissingWorkRefs\(latestSnapshot.current,project.id,id\)/);
+ assert.match(desktop,/confirmAction\("Удалить только недействительные ссылки календарного варианта\?/);
  assert.match(desktop,/mutate\(result.state,/);
  assert.match(core,/export function upsertCalendarDraft\(/);
  assert.match(core,/export function removeCalendarDraft\(/);
+ assert.match(core,/export function missingCalendarDraftWorkIds\(/);
+ assert.match(core,/export function resolveCalendarDraftMissingWorkRefs\(/);
  assert.equal(core.includes('export const SCHEMA="atlas.project/1"'),true);
  assert.doesNotMatch(core,/export const SCHEMA="atlas.project\/2"/);
  const panel=ui.slice(ui.indexOf('id="atlas-working-week-preview"'),
