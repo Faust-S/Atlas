@@ -2,7 +2,7 @@ import React,{useEffect,useMemo,useRef,useState} from 'react';
 import {dependencyDiagram,ganttViewport,ganttFocusOffset} from './visual-layout.mjs';
 import {portfolioNetwork} from '../../src/portfolio.mjs';
 import {projectSourcePlanSearch,projectSourcePlanWorkContext,projectSourceFolderSearch} from '../../src/project-organization.mjs';
-import {previewWorkingWeek} from '../../src/working-week-scenario.mjs';
+import {previewOperationCalendars} from '../../src/working-week-scenario.mjs';
 
 type CPM={durationDays:number;rows:Array<{id:string;title:string;earlyStart:number;earlyFinish:number;durationDays:number;critical:boolean;state:string;predecessors:string[];blockedBy:string[];floatDays:number;dueDate?:string|null;finishDate?:string|null}>};
 type Mode='fit'|'30'|'90';
@@ -26,6 +26,8 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
  const [workingScenarioOpen,setWorkingScenarioOpen]=useState(false);
  const [weekPreset,setWeekPreset]=useState<'five'|'six'>('five');
  const [nonWorkingDates,setNonWorkingDates]=useState('');
+ const [extraWorkingDates,setExtraWorkingDates]=useState('');
+ const [continuousWorkIds,setContinuousWorkIds]=useState<Record<string,boolean>>({});
  const [workingQuery,setWorkingQuery]=useState('');
  const [workingShowAll,setWorkingShowAll]=useState(false);
  const [workingLimit,setWorkingLimit]=useState(12);
@@ -38,17 +40,21 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
   if(!workingScenarioOpen)return {result:null as any,error:''};
   try{
    const holidays=nonWorkingDates.trim()?nonWorkingDates.split(/[,;\n]+/).map(x=>x.trim()).filter(Boolean):[];
-   const result=previewWorkingWeek(schedule,{
+   const additionalWorkingDates=extraWorkingDates.trim()?extraWorkingDates.split(/[,;\n]+/).map(x=>x.trim()).filter(Boolean):[];
+   const modeByWork=Object.fromEntries(Object.keys(continuousWorkIds)
+    .filter(id=>continuousWorkIds[id]).map(id=>[id,'elapsed_days']));
+   const result=previewOperationCalendars(schedule,{
     startDate:projectStart,weekdays:weekPreset==='five'?[1,2,3,4,5]:[1,2,3,4,5,6],
-    holidays
+    holidays,additionalWorkingDates,defaultMode:'working_days',modeByWork
    });
    return {result,error:''};
   }catch(error){return {result:null as any,error:error instanceof Error?error.message:'Неверный рабочий календарь'};}
- },[schedule,projectStart,workingScenarioOpen,weekPreset,nonWorkingDates]);
+ },[schedule,projectStart,workingScenarioOpen,weekPreset,nonWorkingDates,extraWorkingDates,continuousWorkIds]);
  const workingDifferences=useMemo(()=>{
   const rows=workingScenario.result?.rows||[];
   const affected=rows.filter((row:any)=>row.shiftDays!=null&&row.shiftDays!==0);
-  const selected=workingShowAll?rows:affected;
+  const selected=workingShowAll?rows:rows.filter((row:any)=>
+   row.shiftDays!=null&&row.shiftDays!==0||row.durationMode==='elapsed_days');
   const q=workingQuery.trim().toLocaleLowerCase('ru-RU');
   const matching=selected.filter((row:any)=>
    !q||row.title.toLocaleLowerCase('ru-RU').includes(q));
@@ -161,6 +167,7 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
      <span>Разница: <strong>{workingScenario.result.shiftDays==null?'Не определить':
       (workingScenario.result.shiftDays>0?'+':'')+workingScenario.result.shiftDays+' дн.'}</strong></span>
      <span>Затронуто: <strong>{workingDifferences.shifted} работ</strong></span>
+     <span>Непрерывных операций: <strong>{workingScenario.result.continuousTotal}</strong></span>
     </div>
     <p className="atlas-working-scenario-first">
      {'Первый рабочий день: '+(workingScenario.result.firstEligibleDate||'Не определён')}
@@ -178,10 +185,15 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
    </div>
    <details className="atlas-working-scenario-explanation">
     <summary>Как рассчитывается сценарий</summary>
-    <p className="minor">Вариант «что, если длительности означали рабочие дни», не новый
-     утверждённый график. Исходные сроки, записи, факты и график Ганта не меняются.
-     Праздники не подставляются автоматически. Дата завершения здесь означает
-     последний занятый рабочий день, а не исключительную границу основного расчёта.</p>
+    <p className="minor">Исходный план остаётся в календарных днях. Здесь можно сравнить
+     рабочий график с непрерывной технологической операцией: в списке работ переключите
+     её на «Без выходных». Календарные исключения действуют только на рабочие операции.
+     Нулевые контрольные точки не требуют рабочего дня. Это гипотеза, не принятый график;
+     изменения не записываются, праздники не подставляются автоматически.</p>
+    <label className="atlas-working-scenario-dates">Дополнительные рабочие даты
+     <input type="text" value={extraWorkingDates} onChange={event=>{setExtraWorkingDates(event.target.value);setWorkingLimit(12)}}
+      placeholder="2026-11-21" aria-label="Дополнительные рабочие даты через запятую"/>
+    </label>
    </details>
    {workingScenario.result?.available&&workingScenario.result.rows.length>0&&<>
     <div className="atlas-gantt-tools atlas-working-scenario-filters">
@@ -194,6 +206,7 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
       Все работы ({workingScenario.result.rows.length})
      </label>
      <span className="minor">Показано {workingDifferences.visible.length} из {workingDifferences.matching.length}</span>
+     <span className="minor">Рабочие дни по умолчанию. Нажмите «Рабочие дни» у технологической операции, чтобы изменить её режим.</span>
     </div>
     {!!workingDifferences.visible.length&&<div className="atlas-working-scenario-rows"
       role="region" aria-label="Работы календарного сценария" tabIndex={0}>
@@ -203,6 +216,12 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
       <span>{row.baselineLastDate||'Нет даты'} → <strong>{row.completionDate||'Нет даты'}</strong></span>
       <small>{row.shiftDays===null?'Вне диапазона':(row.shiftDays>0?'+':'')+row.shiftDays+' дн.'}
        {row.wouldMissDueDate?' · Позже срока':''}</small>
+      <button type="button" className="action-button atlas-working-scenario-mode"
+       aria-pressed={row.durationMode==='elapsed_days'}
+       aria-label={'Операция '+row.title+': '+(row.durationMode==='elapsed_days'?'без выходных':'по рабочим дням')+'. Переключить длительность'}
+       onClick={()=>setContinuousWorkIds(previous=>({...previous,[row.id]:!previous[row.id]}))}>
+       {row.durationMode==='elapsed_days'?'Без выходных':'Рабочие дни'}
+      </button>
      </div>)}
     </div>}
     {workingDifferences.visible.length<workingDifferences.matching.length&&
