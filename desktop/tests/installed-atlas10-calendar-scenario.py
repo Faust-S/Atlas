@@ -17,7 +17,7 @@ spec.loader.exec_module(base)
 
 
 def qualify():
-    base.qualify(expected_version="0.10.0 (разработка)")
+    base.qualify(expected_version="0.10.0")
     route=base.route
     d=route.d
     v=route.v
