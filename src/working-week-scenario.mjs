@@ -137,3 +137,154 @@ export function previewWorkingWeek(plan,{startDate=null,weekdays=DEFAULT_WEEKDAY
   rows
  };
 }
+
+
+/**
+ * Typed, draft-only calculation for a MIXED project:
+ *   working_days = consumes N eligible dates (e.g. installation);
+ *   elapsed_days = occupies N consecutive civil dates (e.g. curing).
+ *
+ * Uses the canonical scheduleProject() topological row ordering and direct
+ * predecessors. Does not introduce another graph, CPM, project field, Store,
+ * authorization layer or .iwxa schema. Float/critical data remain the original
+ * calendar-day CPM attributes and are NOT recomputed here.
+ *
+ * Work that has zero duration is an instantaneous milestone at the predecessor
+ * release boundary, even if that boundary falls on a non-working day. To
+ * require staffed acceptance, model a positive-duration working operation.
+ *
+ * @param {object} plan scheduleProject(project), unchanged.
+ * @param {object} options explicit draft calendar and per-work duration modes.
+ * @returns {object} non-authoritative scenario, never a saved project.
+ */
+export function previewOperationCalendars(plan,{
+ startDate=null,weekdays=DEFAULT_WEEKDAYS,holidays=[],
+ additionalWorkingDates=[],defaultMode="working_days",modeByWork={}
+}={}){
+ validatePlan(plan);
+ const config=calendarOptions({weekdays,holidays});
+ if(!Array.isArray(additionalWorkingDates)||additionalWorkingDates.length>1000)
+  throw Error("Invalid additional working dates");
+ const included=new Set();
+ for(const date of additionalWorkingDates){
+  civilDate(date,"additional working date");
+  if(config.excluded.has(date))throw Error("Conflicting calendar date "+date);
+  included.add(date);
+ }
+ const modes=new Set(["working_days","elapsed_days"]);
+ if(!modes.has(defaultMode)||!modeByWork||typeof modeByWork!=="object"||
+  Array.isArray(modeByWork))
+  throw Error("Invalid duration mode");
+ const ids=new Set();
+ for(const row of plan.rows){
+  if(!row||typeof row.id!=="string"||!row.id||ids.has(row.id)||
+   !Array.isArray(row.predecessors)||!Number.isSafeInteger(row.durationDays)||
+   row.durationDays<0||row.durationDays!==row.earlyFinish-row.earlyStart)
+   throw Error("Invalid calendar scenario work");
+  ids.add(row.id);
+ }
+ for(const [id,mode] of Object.entries(modeByWork)){
+  if(!ids.has(id)||!modes.has(mode))throw Error("Invalid work calendar mode");
+ }
+ const definition={
+  kind:"PLANNING_CALENDAR_DRAFT",version:1,weekdays:config.weekdays,
+  excludedDates:[...config.excluded].sort(),
+  additionalWorkingDates:[...included].sort()
+ };
+ if(startDate===null||startDate===""){
+  return {available:false,reason:"NO_PROJECT_START",kind:"MIXED_CALENDAR_HYPOTHESIS",
+   calendar:definition,rows:[],projectScenarioLastDate:null,
+   projectBaselineLastDate:null,shiftDays:null};
+ }
+ const start=civilDate(startDate,"project start date");
+ const allowed=new Set(config.weekdays);
+ const eligible=[];
+ let cursor=start,scanned=0,skippedHolidays=0;
+ // The canonical CPM bounds all positive-duration work along a dependency
+ // chain. A worst-case one-day week and 1000 holidays remain finite.
+ const maxScans=(plan.durationDays+config.excluded.size+included.size+3)*7+7;
+ function appendEligible(){
+  while(scanned<maxScans){
+   const at=cursor, label=dateAt(at);
+   cursor+=DAY_MS;
+   scanned++;
+   const weekly=allowed.has(new Date(at).getUTCDay());
+   if(label!==null&&config.excluded.has(label)){
+    if(weekly)skippedHolidays++;
+    continue;
+   }
+   if(weekly||(label!==null&&included.has(label))){
+    eligible.push(at);
+    return;
+   }
+  }
+  throw Error("Working-week calendar exceeds supported horizon");
+ }
+ function eligibleIndex(at){
+  while(!eligible.length||eligible[eligible.length-1]<at)appendEligible();
+  let left=0,right=eligible.length;
+  while(left<right){
+   const mid=left+Math.floor((right-left)/2);
+   if(eligible[mid]<at)left=mid+1;
+   else right=mid;
+  }
+  return left;
+ }
+ const ends=new Map();
+ const rows=[];
+ for(const row of plan.rows){
+  let ready=start;
+  for(const predecessor of row.predecessors){
+   if(!ends.has(predecessor))
+    throw Error("Invalid canonical predecessor order");
+   ready=Math.max(ready,ends.get(predecessor));
+  }
+  const mode=Object.hasOwn(modeByWork,row.id)?modeByWork[row.id]:defaultMode;
+  const count=row.durationDays;
+  let first=ready,last=ready,finishBoundary=ready;
+  if(count>0&&mode==="working_days"){
+   const index=eligibleIndex(ready);
+   while(eligible.length<index+count)appendEligible();
+   first=eligible[index];
+   last=eligible[index+count-1];
+   finishBoundary=last+DAY_MS;
+  }else if(count>0){
+   last=ready+(count-1)*DAY_MS;
+   finishBoundary=ready+count*DAY_MS;
+  }
+  ends.set(row.id,finishBoundary);
+  const offset=row.earlyFinish>row.earlyStart?
+   row.earlyFinish-1:row.earlyStart;
+  const baseline=addCivilDays(start,offset);
+  const completion=dateAt(last);
+  rows.push({
+   id:row.id,title:row.title,critical:Boolean(row.critical),
+   dueDate:row.dueDate??null,durationDays:count,durationMode:mode,
+   startDate:dateAt(first),completionDate:completion,
+   finishBoundaryDate:dateAt(finishBoundary),
+   baselineLastDate:baseline,
+   shiftDays:dateDifference(completion,baseline),
+   wouldMissDueDate:Boolean(completion&&row.dueDate&&completion>row.dueDate)
+  });
+ }
+ if(!eligible.length)appendEligible();
+ const lastBaselineIndex=plan.rows.length?Math.max(...plan.rows.map(row=>
+  row.earlyFinish>row.earlyStart?row.earlyFinish-1:row.earlyStart)):null;
+ const baselineLast=lastBaselineIndex===null?null:addCivilDays(start,lastBaselineIndex);
+ const scenarioLast=rows.length?rows.reduce((latest,row)=>
+  !latest||row.completionDate&&row.completionDate>latest?row.completionDate:latest,null):null;
+ // A date outside the four-digit range is unavailable. Do not fabricate a
+ // shorter date or claim "on time" for that row.
+ const boundary=ends.size?Math.max(...ends.values()):null;
+ return {
+  available:true,kind:"MIXED_CALENDAR_HYPOTHESIS",
+  inputDurationMeaning:"HYPOTHETICAL_MIXED_DURATIONS_NOT_PERSISTED",
+  calendar:definition,firstEligibleDate:dateAt(eligible[0]),
+  startAdjusted:dateAt(eligible[0])!==startDate,
+  skippedHolidays,continuousTotal:rows.filter(row=>row.durationMode==="elapsed_days").length,
+  workdayTotal:rows.filter(row=>row.durationMode==="working_days").length,
+  projectBaselineLastDate:baselineLast,projectScenarioLastDate:scenarioLast,
+  projectedBoundaryDate:boundary===null?null:dateAt(boundary),
+  shiftDays:dateDifference(scenarioLast,baselineLast),rows
+ };
+}
