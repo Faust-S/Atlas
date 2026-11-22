@@ -11,6 +11,7 @@ on:
       - 'desktop/tests/installed-atlas06-visual-scale.py'
       - 'desktop/tests/installed-atlas09-qualification.py'
       - 'desktop/tests/installed-atlas10-calendar-scenario.py'
+      - 'desktop/tests/installed-atlas10-typed-work.py'
       - 'desktop/src/**'
       - 'desktop/vite.config.ts'
       - 'desktop/index.html'
@@ -30,7 +31,7 @@ jobs:
   installed-atlas10-calendar:
     if: github.ref_name == 'work/2026-11-22-atlas-0-10-calendar-scenario'
     runs-on: windows-latest
-    timeout-minutes: 40
+    timeout-minutes: 60
     steps:
       - name: Checkout exact Atlas 0.10 development revision
         uses: actions/checkout@v4
@@ -111,6 +112,7 @@ jobs:
           python -m py_compile desktop/tests/installed-atlas08-corrections.py
           python -m py_compile desktop/tests/installed-atlas09-qualification.py
           python -m py_compile desktop/tests/installed-atlas10-calendar-scenario.py
+          python -m py_compile desktop/tests/installed-atlas10-typed-work.py
           if ($LASTEXITCODE -ne 0) { throw 'ATLAS09_NATIVE_WITNESS_SYNTAX_FAILED' }
 
       - name: Verify exact release-candidate installer SHA-256
@@ -129,12 +131,19 @@ jobs:
           }
           Write-Host "ATLAS10_RC_INSTALLER_SHA256_PASS $sha"
 
-      - name: Requalify installed Atlas 0.10 baseline then navigate to optional working-week scenario
+      - name: Qualify installed 0.10 calendar variants and original native Store
         shell: pwsh
-        timeout-minutes: 11
+        timeout-minutes: 20
         run: |
           python desktop/tests/installed-atlas10-calendar-scenario.py
           if ($LASTEXITCODE -ne 0) { throw 'ATLAS10_CALENDAR_WINDOWS_USER_ROUTE_FAILED' }
+
+      - name: Qualify installed 0.10 typed Work, cold Save and independent IWXA import
+        shell: pwsh
+        timeout-minutes: 16
+        run: |
+          python desktop/tests/installed-atlas10-typed-work.py
+          if ($LASTEXITCODE -ne 0) { throw 'ATLAS10_TYPED_WORK_NATIVE_IWXA_FAILED' }
 
       - name: Keep Windows screen evidence on success or failure
         if: always()
