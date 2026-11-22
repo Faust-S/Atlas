@@ -365,6 +365,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const [requirementJump,setRequirementJump]=useState<{projectId:string;targetId:string}|null>(null);
  const [changeJump,setChangeJump]=useState<{projectId:string;changeId:string}|null>(null);
  const [boardLimits,setBoardLimits]=useState<Record<string,number>>({});
+ const [dragWorkId,setDragWorkId]=useState<string|null>(null);
  const [message,setMessage]=useState(""),[error,setError]=useState("");
  const [inspector,setInspector]=useState(()=>!host&&window.innerWidth>1220),[recovery,setRecovery]=useState(false);
  const [closeGuard,setCloseGuard]=useState(false);
@@ -2883,8 +2884,26 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      {!project.items.length&&<Fallback message="Пока нет работ. Добавьте первую работу и сохраните проект."/>}
     </section>}
     {tab==="board"&&<div className="board">
-     {Object.entries(workStatuses).map(([key,title])=><section className="board-column" key={key}><h3>{String(title)} <small>{project.items.filter((w:any)=>w.state===key).length}</small></h3>
-      {project.items.filter((w:any)=>w.state===key).slice(0,boardLimits[key]||60).map((w:any)=><div className="board-card" key={w.id}><strong>{w.title}</strong><small>{w.assignee||"Нет ответственного"} · {workDurationLabel(w)}</small>
+     {Object.entries(workStatuses).map(([key,title])=><section className={"board-column"+(dragWorkId?" atlas-v6-board-drop-target":"")} key={key}
+      onDragOver={event=>{if(dragWorkId)event.preventDefault()}}
+      onDrop={event=>{
+       if(!dragWorkId)return;
+       event.preventDefault();
+       const id=event.dataTransfer.getData("application/x-atlas-work");
+       if(project.items.some((item:any)=>item.id===id)&&
+        project.items.find((item:any)=>item.id===id)?.state!==key)quickWork(id,key);
+       setDragWorkId(null);
+      }}>
+      <h3>{String(title)} <small>{project.items.filter((w:any)=>w.state===key).length}</small></h3>
+      {project.items.filter((w:any)=>w.state===key).slice(0,boardLimits[key]||60).map((w:any)=><div className={"board-card"+(dragWorkId===w.id?" is-dragging":"")}
+       key={w.id} draggable={!busy&&!editor}
+       onDragStart={event=>{
+        if(busy||editor){event.preventDefault();return;}
+        event.dataTransfer.setData("application/x-atlas-work",w.id);
+        event.dataTransfer.effectAllowed="move";setDragWorkId(w.id);
+       }}
+       onDragEnd={()=>setDragWorkId(null)}>
+       <strong>{w.title}</strong><small>{w.assignee||"Нет ответственного"} · {workDurationLabel(w)}</small>
         <WorkDependencyHint info={workLinks.get(w.id)} onOpenWork={id=>openEditor("work:"+id)}/>
        <div className="board-actions"><select aria-label={"Состояние "+w.title} value={w.state} onChange={e=>quickWork(w.id,e.target.value)}>
         {Object.entries(workStatuses).map(([v,title])=><option key={v} value={v}>{String(title)}</option>)}</select>
