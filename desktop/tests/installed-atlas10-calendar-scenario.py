@@ -203,6 +203,81 @@ def qualify():
     v.capture("atlas10-named-calendar-cold-reload-installed")
     print("ATLAS10_NATIVE_NAMED_CALENDAR_COLD_LOAD_PASS",flush=True)
 
+    # Shared portfolio calendar is separate from the project scenario, but is
+    # written through the same original native Atlas Store and head CAS.
+    catalog_before=d.head()
+    existing_project=d.saved_project(catalog_before)
+    v.find_control("Календари портфеля (0)",scroll=True).click_input()
+    library_input=v.find_control("Название календаря портфеля",
+                                  types={"Edit"},scroll=True)
+    import win32gui
+    assert v.rectangle_in_workspace(library_input.rectangle(),
+         win32gui.GetWindowRect(d.handle)),(
+        "Portfolio calendar editor must be reachable at native 820x650")
+    library_input.click_input()
+    d.keyboard.send_keys("^a")
+    d.keyboard.send_keys("Atlas Org Test Calendar",with_spaces=True)
+    v.find_control("Добавить календарь в портфель",
+                   types={"Button"},scroll=True).click_input()
+    d.wait_text("Редакция 1 добавлена в черновик портфеля",35)
+    assert d.head()==catalog_before and d.saved_project(catalog_before)==existing_project,(
+        "Draft calendar library write bypassed the original native Save")
+    v.capture("atlas10-portfolio-calendar-draft-before-save")
+
+    d.activate()
+    d.keyboard.send_keys("^s")
+    expires=time.monotonic()+50
+    saved_head=catalog_before
+    while time.monotonic()<expires:
+        updated=d.head()
+        if updated!=catalog_before:
+            saved_head=updated
+            break
+        time.sleep(0.3)
+    assert saved_head!=catalog_before,"Local portfolio calendar never reached native Store"
+    assert d.saved_project(saved_head)==existing_project,(
+        "Saving a shared calendar changed the native project block")
+    library=saved_head["root"].get("calendarLibrary",[])
+    assert len(library)==1,"The original Rust native root lost shared calendar records"
+    definition=library[0]
+    assert definition["name"]=="Atlas Org Test Calendar"
+    assert definition["version"]==1
+    assert definition["source"]=={"kind":"entered_by_user","reference":None}
+    assert definition["weekdays"]==[1,2,3,4,5]
+    assert definition["excludedDates"]==["2026-11-10"]
+    print("ATLAS10_NATIVE_PORTFOLIO_CALENDAR_SAVE_READBACK_PASS",flush=True)
+    v.capture("atlas10-portfolio-calendar-native-saved")
+
+    d.stop()
+    d.launch()
+    d.wait_text("Портфель проектов",45)
+    assert d.head()==saved_head,"Cold restart lost saved portfolio calendar library"
+    assert d.saved_project(saved_head)==existing_project
+    d.click_button("Открыть портфель проектов")
+    d.wait_text("Проекты и последствия",35)
+    d.set_text("Найти проект по работе, этапу или источнику","1080 работа 5")
+    d.wait_text("Найдено проектов: 1",35)
+    v.find_control("Перейти к найденной работе "+route.FIRST_TITLE,
+                   types={"Button"},scroll=True).click_input()
+    d.wait_text("Работы проекта",35)
+    d.click_button("График")
+    d.wait_text("График работ",35)
+    v.find_control("Сценарий: рабочая неделя",types={"Button"},scroll=True).click_input()
+    d.wait_text("Календарный план:",35)
+    v.find_control("Календари портфеля (1)",scroll=True).click_input()
+    calendar_picker=v.find_control("Редакция календаря портфеля",
+                                  types={"ComboBox"},scroll=True)
+    calendar_picker.click_input()
+    d.keyboard.send_keys("{DOWN}{ENTER}")
+    v.find_control("Применить редакцию в сценарии",
+                   types={"Button"},scroll=True).click_input()
+    d.wait_text("Применена редакция 1 к сценарию",35)
+    assert d.head()==saved_head and d.saved_project(saved_head)==existing_project,(
+        "Loading source calendar silently modified the native Store")
+    v.capture("atlas10-portfolio-calendar-cold-reload-installed")
+    print("ATLAS10_NATIVE_PORTFOLIO_CALENDAR_COLD_LOAD_PASS",flush=True)
+
+
 
 if __name__=="__main__":
     try:
