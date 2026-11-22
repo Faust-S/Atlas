@@ -142,7 +142,7 @@ export function AtlasInspectorPreview({project,snapshot,plan,forecast,comparison
       <p>{workPlan?.critical?"Работа находится на критическом пути.":"Критический путь рассчитывается по действующему календарю."}</p>
       <p>Факт начала (введён): {format(work.actualStartDate)}</p>
       <p>Факт завершения (введён): {format(work.actualFinishDate)}</p>
-     </section>
+     </section>}
      {workSection==="baseline"&&<><section className="atlas-v6-preview-card" aria-label="Контрольный план выбранной работы">
       <strong>Исходный план и текущий прогноз</strong>
       {(project.planBaselines??[]).length>0?<>
@@ -193,13 +193,13 @@ export function AtlasInspectorPreview({project,snapshot,plan,forecast,comparison
        key={"s"+linked.id} onClick={()=>open("work",linked.id)}>
        → {linked.title}</button>)}
       {predecessors.length+successors.length>12&&<p>Остальные связи доступны в полном графе.</p>}
-     </section>
+     </section>}
      {workSection==="schedule"&&<section className="atlas-v6-preview-card"><strong>Ответственность и происхождение</strong>
       <p>Ответственный: {work.assignee||"Не указан"}</p>
       <p>Плановый ресурс: {resourceOfWork?.label||"Не назначен"}</p>
       {sourceOfWork?<button type="button" className="atlas-v6-preview-link" onClick={()=>open("source",sourceOfWork.id)}>
        Источник: {sourceOfWork.locator}</button>:<p>Источник не привязан.</p>}
-     </section>
+     </section>}
      {workSection==="history"&&<section className="atlas-v6-preview-card" aria-label="Связанные решения и наблюдения">
       <strong>Решения и наблюдения</strong>
       {facts?.relatedChange&&<p>Изменение «{facts.relatedChange.title}»: {changeStatusNames[facts.relatedChange.status]||"Не определено"}.</p>}
