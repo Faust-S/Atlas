@@ -4,7 +4,7 @@
 // changes a working-day Work's finish even when its entered duration stays 2.
 import {scheduleProject} from "./planning.mjs";
 
-export function projectScreenSchedule(project,portfolioRow,{calendarLibrary=[],plannedPlan=null}={}){
+export function projectScreenSchedule(project,portfolioRow,{calendarLibrary=[],plannedPlan=/** @type {any} */(null)}={}){
  if(!project||!Array.isArray(project.items)||!Array.isArray(project.dependencies))
   throw Error("Invalid project for screen schedule");
  const baseline=plannedPlan??scheduleProject(project,{calendarLibrary});
