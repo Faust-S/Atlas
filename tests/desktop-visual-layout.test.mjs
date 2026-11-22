@@ -175,6 +175,22 @@ test("fullscreen views release overlay before invoking project/work editors",()=
  assert.match(ts,/setExpanded\(false\);onOpenWork\(node\.id\)/);
 });
 
+test('working-week preview puts the result first, supports full work search, and never edits Store',()=>{
+ const ts=readFileSync(new URL('../desktop/src/ProjectVisuals.tsx',import.meta.url),'utf8');
+ const block=ts.slice(ts.indexOf('id="atlas-working-week-preview"'),ts.indexOf('<div className="atlas-gantt-key"'));
+ assert.ok(block.includes('workingPanelRef')&&block.includes('scrollIntoView'),
+  'The scenario must scroll into the native workspace viewport on opening');
+ assert.ok(block.indexOf('atlas-working-scenario-summary')<block.indexOf('Исключить даты'),
+  'Date comparison must be before the controls in small Windows views');
+ assert.match(block,/Первый рабочий день:/);
+ assert.match(block,/aria-label="Поиск по работам календарного сценария"/);
+ assert.match(block,/Все работы \(/);
+ assert.match(block,/Показать ещё работы/);
+ assert.match(ts,/setExpanded\(false\);onOpenWork\(row\.id\)/);
+ assert.doesNotMatch(block,/nativeInvoke\(|\.save\(|localStorage|setData\(/,
+  'A hypothetical calendar scenario must never write to authoritative storage');
+});
+
 test('Gantt exposes dated work deadline overruns and can filter to the real affected work',()=>{
  const source={durationDays:4,rows:[
   {id:'on-time',title:'В срок',earlyStart:0,earlyFinish:2,dueDate:'2026-11-03',finishDate:'2026-11-03'},
