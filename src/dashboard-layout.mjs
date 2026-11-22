@@ -7,6 +7,8 @@ export const ATLAS_DASHBOARD_WIDGETS=Object.freeze([
  {id:"review",title:"Решения по плану",span:"normal"},
  {id:"resources",title:"Плановые ресурсы",span:"normal"},
  {id:"sources",title:"Источники",span:"normal"},
+ {id:"ecosystem",title:"Карта разработки",span:"normal"},
+ {id:"history",title:"Последние изменения",span:"normal"},
  {id:"calendar",title:"Рабочие календари",span:"normal"}
 ]);
 export const DEFAULT_ATLAS_DASHBOARD=Object.freeze(
