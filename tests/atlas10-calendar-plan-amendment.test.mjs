@@ -41,11 +41,12 @@ test("approved Work amendment keeps pinned calendar semantics and requires new r
  const changed=editItem(approved.state,project.id,created.id,{
   durationUnit:"elapsed_days",calendarBasis:null});
  assert.throws(()=>applyPlanAmendment(changed,project.id,proposed.id),/изменилась/);
+ const approvedBefore=serialize(approved.state);
  const applied=applyPlanAmendment(approved.state,project.id,proposed.id);
  const result=applied.state.projects[0].items.find(w=>w.id===created.id);
  assert.equal(result.estimateDays,3);
  assert.equal(result.durationUnit,"working_days");
  assert.deepEqual(result.calendarBasis,pinned);
- assert.equal(serialize(approved.state),serialize(approved.state),
-  "Approval itself did not mutate the input snapshot");
+ assert.equal(serialize(approved.state),approvedBefore,
+  "Applying the approved amendment must not mutate the input snapshot");
 });
