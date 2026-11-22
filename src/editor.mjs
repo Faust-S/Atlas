@@ -38,15 +38,24 @@ const workDurationFields=(snapshot,item=null)=>[
   workCalendarChoices(snapshot),item?.calendarBasis?
   item.calendarBasis.id+"@"+item.calendarBasis.version:"",false)
 ];
-function workDurationPatch(get){
+function workDurationPatch(get,original=null){
  const unit=get("durationUnit")||"elapsed_days";
  if(!["elapsed_days","working_days"].includes(unit))throw Error("Выберите единицу длительности");
  const selected=get("calendarBasis");
- if(unit==="elapsed_days")return {durationUnit:unit,calendarBasis:null};
+ if(unit==="elapsed_days"){
+  // Unrelated edits must preserve a previously implicit elapsed-day unit.
+  if((original?.durationUnit??"elapsed_days")==="elapsed_days"&&!original?.calendarBasis)
+   return {};
+  return {durationUnit:unit,calendarBasis:null};
+ }
  const at=selected.lastIndexOf("@"),version=Number(selected.slice(at+1));
  if(at<=0||!Number.isSafeInteger(version)||version<1)
   throw Error("Выберите редакцию рабочего календаря");
- return {durationUnit:unit,calendarBasis:{id:selected.slice(0,at),version}};
+ const basis={id:selected.slice(0,at),version};
+ if(original?.durationUnit==="working_days"&&
+  original?.calendarBasis?.id===basis.id&&original.calendarBasis.version===basis.version)
+  return {};
+ return {durationUnit:unit,calendarBasis:basis};
 }
 
 const changeOptions=[option("proposed","Предложено"),option("approved","Утверждено"),option("in_progress","В работе"),option("implemented","Реализовано (заявлено)"),option("deferred","Отложено"),option("rejected","Отклонено")];
@@ -585,7 +594,7 @@ export function applyEditor(snapshot,projectId,action,input){
    throw Error("Связь с источником уже отсутствует.");
   const selected=get("targetId"),rest=(item.targetIds||[]).slice(1);
   const targetIds=[...(selected?[selected]:[]),...rest.filter(link=>link!==selected)];
-  return {state:editItem(snapshot,projectId,id,{title:get("title"),stageId:get("stageId")||null,dueDate:get("dueDate")||null,state:get("state"),priority:get("priority"),assignee:get("assignee"),estimateDays:integer("estimateDays"),...workDurationPatch(get),
+  return {state:editItem(snapshot,projectId,id,{title:get("title"),stageId:get("stageId")||null,dueDate:get("dueDate")||null,state:get("state"),priority:get("priority"),assignee:get("assignee"),estimateDays:integer("estimateDays"),...workDurationPatch(get,item),
    resourceId:get("resourceId"),allocationPct:percentage("allocationPct"),targetIds,
    ...(sourceLink==="remove"?{sourceId:null}:{})})};
  }

@@ -723,11 +723,12 @@ test("A newly created work is revealed by its saved identity, with its stage and
 
 test("Plan feedback is calculated from the existing schedule, without background writes",()=>{
  const ui=read("../desktop/src/main.tsx");
- assert.ok(ui.includes("const plan=useMemo(()=>project?scheduleProject(project):null,[project]);"));
+ assert.ok(ui.includes("const plan=useMemo(()=>project?scheduleProject(project,{"));
+ assert.ok(ui.includes("calendarLibrary:data.calendarLibrary??[]"));
  assert.ok(ui.includes("const recentPlanRow=recentWork&&plan?plan.rows.find"));
  assert.ok(ui.includes("recentPlanBefore.workId===recentWork.id&&recentPlanBefore.revision===data.revision?"));
  assert.ok(ui.includes("recentPlanBefore.days:null"));
- assert.ok(ui.includes("beforePlan:plan,afterPlan:scheduleProject(updatedProject)"));
+ assert.ok(ui.includes("beforePlan:plan,afterPlan:scheduleProject(updatedProject,{calendarLibrary:data.calendarLibrary??[]})"));
  assert.ok(ui.includes("revision:result.state.revision"));
  assert.ok(ui.includes("Продолжительность плана: было {planBeforeRecent} дн., стало {plan.durationDays} дн."));
  assert.ok(ui.includes("recentPlanRow.predecessors.length"));
@@ -743,7 +744,7 @@ test("An existing-work dependency explains CPM effects without writing data",()=
  const plan=read("../src/planning.mjs");
  assert.match(editor,/return \{state:connect\(snapshot,projectId,from,id\),workId:id\}/);
  assert.match(ui,/startWorkCorrection\(\{/);
- assert.match(ui,/beforePlan:plan,afterPlan:scheduleProject\(updatedProject\)/);
+ assert.match(ui,/beforePlan:plan,afterPlan:scheduleProject\(updatedProject,\{calendarLibrary:data.calendarLibrary\?\?\[\]\}\)/);
  assert.match(ui,/const isDependencyChange=editor\.action\.startsWith\("dep-to:"\)/);
  assert.match(ui,/setRecentWorkKind\(isDependencyChange\?"dependency":"created"\)/);
  assert.match(ui,/Изменение зависимостей работы/);
@@ -805,7 +806,7 @@ test("Correcting a work named in the impact list recalculates the schedule befor
  assert.match(ui,/recentScheduleEffect\.affectedIds\.includes\(correctedId\)/);
  assert.match(ui,/const correctedId=editor\.action\.slice\(5\)/);
  assert.match(ui,/startWorkCorrection\(\{/);
- assert.match(ui,/beforePlan:plan,afterPlan:scheduleProject\(updatedProject\)/);
+ assert.match(ui,/beforePlan:plan,afterPlan:scheduleProject\(updatedProject,\{calendarLibrary:data.calendarLibrary\?\?\[\]\}\)/);
  assert.match(ui,/setRecentWorkKind\("adjusted"\)/);
  assert.match(ui,/revealWorkInTable\(nextContext\?\.workId\|\|correctedId,false\)/);
  assert.match(ui,/Последствия изменения работы/);

@@ -179,7 +179,10 @@ export function previewOperationCalendars(plan,{
  for(const row of plan.rows){
   if(!row||typeof row.id!=="string"||!row.id||ids.has(row.id)||
    !Array.isArray(row.predecessors)||!Number.isSafeInteger(row.durationDays)||
-   row.durationDays<0)
+   row.durationDays<0||
+   (row.durationDays!==row.earlyFinish-row.earlyStart&&
+    !(row.durationUnit==="working_days"&&row.calendarBasis?.id&&
+      Number.isSafeInteger(row.calendarBasis.version))))
    throw Error("Invalid calendar scenario work");
   ids.add(row.id);
  }

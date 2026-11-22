@@ -1241,7 +1241,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     const updatedProject=result.state.projects.find((p:any)=>p.id===formProject);
     setRecentPlanBefore(plan&&updatedProject?startWorkCorrection({
      projectId:formProject,workId:result.workId,revision:result.state.revision,
-     beforePlan:plan,afterPlan:scheduleProject(updatedProject)
+     beforePlan:plan,afterPlan:scheduleProject(updatedProject,{calendarLibrary:data.calendarLibrary??[]})
     }):null);
     const isDependencyChange=editor.action.startsWith("dep-to:");
     setRecentWorkKind(isDependencyChange?"dependency":"created");
@@ -1265,7 +1265,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      (recentWorkKind==="dependency"||recentWorkKind==="adjusted")&&
      recentScheduleEffect.affectedIds.includes(correctedId));
     if(scheduleFieldsChanged||fromImpactList){
-     const updatedPlan=updatedProject?scheduleProject(updatedProject):null;
+     const updatedPlan=updatedProject?scheduleProject(updatedProject,{calendarLibrary:data.calendarLibrary??[]}):null;
      const continued=fromImpactList&&updatedPlan?continueWorkCorrection(
       recentPlanBefore,{projectId:formProject,workId:correctedId,
        revision:data.revision,nextRevision:result.state.revision,afterPlan:updatedPlan,
@@ -1538,7 +1538,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    mutate(next,"Связь удалена из черновика. Проверьте последствия и сохраните изменение.");
    setRecentPlanBefore(plan?startWorkCorrection({
     projectId:project.id,workId:to,revision:next.revision,
-    beforePlan:plan,afterPlan:scheduleProject(updatedProject)
+    beforePlan:plan,afterPlan:scheduleProject(updatedProject,{calendarLibrary:data.calendarLibrary??[]})
    }):null);
    setRecentWorkKind("dependency");setRecentWorkId(to);
    revealWorkInTable(to,false);

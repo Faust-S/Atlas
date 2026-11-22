@@ -305,7 +305,8 @@ test("focused graph shows a read-only forecast before any critical dependency re
  const main=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
  const css=readFileSync(new URL("../desktop/src/style.css",import.meta.url),"utf8");
  assert.match(main,/const graphRemovalPreview=useMemo\(\(\)=>\{/);
- assert.match(main,/forecastDependencyRemoval\(project,plan,graphSelectedPredecessor\.id,graphFocusWork\.id\)/);
+ assert.match(main,/forecastDependencyRemoval\(project,plan,graphSelectedPredecessor\.id,graphFocusWork\.id,\{/);
+ assert.match(main,/calendarLibrary:data.calendarLibrary\?\?\[\]/);
  assert.match(main,/setGraphPreviewFrom\(prior\.id\)/);
  assert.match(main,/Если убрать связь с \{graphSelectedPredecessor\.title\}/);
  assert.match(main,/aria-label=\{"Прогноз удаления связи с "\+graphSelectedPredecessor\.title/);

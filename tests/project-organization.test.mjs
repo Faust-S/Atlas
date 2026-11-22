@@ -59,7 +59,7 @@ test("A user-submitted editor creates one standard work linked to its real sourc
   {sourceId,folder:"src",repository:"example/site",branch:"work/dev",commitSha:SHA});
  const spec=editorSpec(state.projects[0],action,state);
  assert.equal(spec.title,"Работа по каталогу: src");
- assert.deepEqual(spec.fields.map(field=>field.name),["title","newStageName","estimateDays","dueDate"]);
+ assert.deepEqual(spec.fields.map(field=>field.name),["title","newStageName","estimateDays","durationUnit","calendarBasis","dueDate"]);
  assert.ok(spec.hint.includes("Назовите работу"));
  assert.equal(spec.fields.find(x=>x.name==="title").value,"Уточнить назначение каталога src");
  const form=new FormData();
@@ -169,7 +169,7 @@ test("User chooses an existing stage or creates one with a source-linked work",(
  assert.deepEqual(deserialize(serialize(created)),created);
  const spec=editorSpec(p,action,created);
  assert.deepEqual(spec.fields.map(f=>f.name),
-  ["title","stageId","newStageName","estimateDays","dueDate","predecessorId"]);
+  ["title","stageId","newStageName","estimateDays","durationUnit","calendarBasis","dueDate","predecessorId"]);
  assert.equal(spec.fields.find(f=>f.name==="stageId").options[1].value,p.stages[0].id);
  const existing=new FormData();
  existing.set("title","Доработать интерфейс");
@@ -215,7 +215,7 @@ test("New folder work saves a deadline, explicit predecessor, and schedule effec
  const original=serialize(started),action=folderWorkAction(sourceId,SHA,"src");
  const spec=editorSpec(started.projects[0],action,started);
  assert.deepEqual(spec.fields.map(x=>x.name),
-  ["title","newStageName","estimateDays","dueDate","predecessorId"]);
+  ["title","newStageName","estimateDays","durationUnit","calendarBasis","dueDate","predecessorId"]);
  const predecessor=spec.fields.find(x=>x.name==="predecessorId");
  assert.equal(predecessor.required,false);
  assert.deepEqual(predecessor.options.map(o=>o.label),
