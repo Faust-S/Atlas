@@ -1128,3 +1128,20 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
  .atlas-working-scenario-row small{text-align:right}
  .atlas-working-scenario-mode{justify-self:start}
 }
+
+/* Named, project-owned what-if calendar variants. Keep the existing Atlas
+   palette and the preview compact; a variant is not the authoritative CPM. */
+.atlas-working-scenario-saved{margin:11px 0 9px;padding:8px 10px;
+ border:1px solid #c7d8ec;border-radius:8px;background:#f1f6ff}
+.atlas-working-scenario-saved>summary{cursor:pointer;color:#21578e;font-size:12px;font-weight:700}
+.atlas-working-scenario-saved>.minor{margin:8px 0;color:#466386}
+.atlas-working-scenario-saved>.atlas-gantt-tools{margin:8px 0;gap:7px 11px}
+.atlas-working-scenario-saved select{max-width:min(340px,100%)}
+.atlas-working-scenario-custom{display:flex;flex-wrap:wrap;align-items:center;
+ gap:4px 10px;font-size:12px;color:#385879}
+.atlas-working-scenario-custom label{display:flex;align-items:center;gap:4px}
+.atlas-working-scenario-custom input{min-width:14px;min-height:14px}
+@media(max-width:680px){
+ .atlas-working-scenario-saved>.atlas-gantt-tools{align-items:stretch;flex-direction:column}
+ .atlas-working-scenario-saved .action-button{width:100%;max-width:100%}
+}
