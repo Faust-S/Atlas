@@ -289,6 +289,43 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
       placeholder="2026-11-21" aria-label="Дополнительные рабочие даты через запятую"/>
     </label>
    </details>
+   <details className="atlas-working-scenario-saved">
+    <summary>Сохранённые календарные варианты ({calendarDrafts.length})</summary>
+    <p className="minor">Варианты сохраняются в проекте, но не меняют утверждённый план.
+     После изменения черновика используйте «Сохранить» или Ctrl+S для записи на диск.</p>
+    <div className="atlas-gantt-tools">
+     <label>Вариант
+      <select aria-label="Сохранённый календарный вариант" value={calendarDraftId}
+       onChange={event=>{setCalendarDraftId(event.target.value);setCalendarFeedback('')}}>
+       <option value="">Новый вариант</option>
+       {calendarDrafts.map(draft=><option key={draft.id} value={draft.id}>
+        {draft.name+' · версия '+draft.version}</option>)}
+      </select>
+     </label>
+     <button type="button" className="action-button" disabled={!calendarDraftId}
+      onClick={loadCalendarDraft}>Загрузить вариант</button>
+    </div>
+    <div className="atlas-gantt-tools">
+     <label className="atlas-working-scenario-search">Название
+      <input type="text" value={calendarDraftName} maxLength={120}
+       aria-label="Название календарного варианта"
+       onChange={event=>setCalendarDraftName(event.target.value)}/>
+     </label>
+     <button type="button" className="action-button" disabled={!!workingScenario.error||!calendarDraftName.trim()}
+      onClick={saveCalendarDraft}>Сохранить вариант в проект</button>
+     {calendarDraftId&&<button type="button" className="action-button"
+      onClick={deleteCalendarDraft}>Удалить вариант из проекта</button>}
+    </div>
+    {!!missingCalendarWorkRefs.length&&<div className="atlas-schedule-warning"
+      role="alert" aria-label="Календарный вариант содержит удалённые работы">
+     В варианте сохранились ссылки на {missingCalendarWorkRefs.length} удалённых работ.
+     Пока они не исправлены, вариант доступен для чтения, но не для перезаписи.
+     <button type="button" className="action-button" onClick={repairCalendarDraft}>
+      Подтвердить очистку недействительных ссылок
+     </button>
+    </div>}
+    {calendarFeedback&&<p className="minor" role="status">{calendarFeedback}</p>}
+   </details>
    {workingScenario.result?.available&&workingScenario.result.rows.length>0&&<>
     <div className="atlas-gantt-tools atlas-working-scenario-filters">
      <label className="atlas-working-scenario-search">Найти работу
@@ -331,43 +368,7 @@ export function ProjectGantt({schedule,projectStart,projectDue,portfolioStart,sh
    </>}
    {workingScenario.result?.available&&!workingScenario.result.rows.length&&
     <p className="minor">Для сравнения нужно добавить хотя бы одну работу.</p>}
-   <details className="atlas-working-scenario-saved">
-    <summary>Сохранённые календарные варианты ({calendarDrafts.length})</summary>
-    <p className="minor">Варианты сохраняются в проекте, но не меняют утверждённый план.
-     После изменения черновика используйте «Сохранить» или Ctrl+S для записи на диск.</p>
-    <div className="atlas-gantt-tools">
-     <label>Вариант
-      <select aria-label="Сохранённый календарный вариант" value={calendarDraftId}
-       onChange={event=>{setCalendarDraftId(event.target.value);setCalendarFeedback('')}}>
-       <option value="">Новый вариант</option>
-       {calendarDrafts.map(draft=><option key={draft.id} value={draft.id}>
-        {draft.name+' · версия '+draft.version}</option>)}
-      </select>
-     </label>
-     <button type="button" className="action-button" disabled={!calendarDraftId}
-      onClick={loadCalendarDraft}>Загрузить вариант</button>
-    </div>
-    <div className="atlas-gantt-tools">
-     <label className="atlas-working-scenario-search">Название
-      <input type="text" value={calendarDraftName} maxLength={120}
-       aria-label="Название календарного варианта"
-       onChange={event=>setCalendarDraftName(event.target.value)}/>
-     </label>
-     <button type="button" className="action-button" disabled={!!workingScenario.error||!calendarDraftName.trim()}
-      onClick={saveCalendarDraft}>Сохранить вариант в проект</button>
-     {calendarDraftId&&<button type="button" className="action-button"
-      onClick={deleteCalendarDraft}>Удалить вариант из проекта</button>}
-    </div>
-    {!!missingCalendarWorkRefs.length&&<div className="atlas-schedule-warning"
-      role="alert" aria-label="Календарный вариант содержит удалённые работы">
-     В варианте сохранились ссылки на {missingCalendarWorkRefs.length} удалённых работ.
-     Пока они не исправлены, вариант доступен для чтения, но не для перезаписи.
-     <button type="button" className="action-button" onClick={repairCalendarDraft}>
-      Подтвердить очистку недействительных ссылок
-     </button>
-    </div>}
-    {calendarFeedback&&<p className="minor" role="status">{calendarFeedback}</p>}
-   </details>
+
    <div className="atlas-working-scenario-footer">
     <span>Предварительный расчёт без изменения проекта.</span>
     <button type="button" className="action-button" aria-label="Закрыть календарный сценарий"
