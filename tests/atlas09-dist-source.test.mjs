@@ -34,7 +34,7 @@ test("Atlas 0.9 ships both entrypoints in one original Tauri dist",()=>{
  assert.match(native,/originalSignedRecipient\.quarantineSignedArchive\(bytes\)/);
  assert.match(native,/export async function createInstalledAtlasSignedFileSurfacePorts\(/);
  assert.equal(tauri.build.frontendDist,"../dist");
- assert.equal(tauri.version,"0.10.0-dev.1");
+ assert.equal(tauri.version,"0.10.0");
 });
 
 test("Atlas D6 UI never retries a native signed-file CAS after an uncertain answer",()=>{

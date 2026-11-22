@@ -12,10 +12,10 @@ test("Atlas 0.10 reuses original Atlas identity without a second data namespace"
  const rustLock=read("desktop/src-tauri/Cargo.lock");
  const setup=read("desktop/installer/build-setup-core.ps1");
  for(const version of [pkg.version,lock.version,lock.packages[""].version,
-  tauri.version,profile.version])assert.equal(version,"0.10.0-dev.1");
- assert.match(cargo,/name = "iwxa-atlas-desktop"\nversion = "0\.10\.0-dev\.1"/);
- assert.match(rustLock,/name = "iwxa-atlas-desktop"\nversion = "0\.10\.0-dev\.1"/);
- assert.match(setup,/IWXA-Atlas-0\.10\.0-dev\.1-Setup\.exe/);
+  tauri.version,profile.version])assert.equal(version,"0.10.0");
+ assert.match(cargo,/name = "iwxa-atlas-desktop"\nversion = "0\.10\.0"/);
+ assert.match(rustLock,/name = "iwxa-atlas-desktop"\nversion = "0\.10\.0"/);
+ assert.match(setup,/IWXA-Atlas-0\.10\.0-Setup\.exe/);
  assert.equal(tauri.identifier,"ru.iwxa.atlas");
  assert.equal(profile.data_namespace,tauri.identifier);
  assert.equal(profile.id,"iwxa.atlas");
