@@ -332,6 +332,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  // Standalone v6 chrome; embedded T3 keeps its already-qualified host surface.
  const [homeOpen,setHomeOpen]=useState(()=>!host);
  const [settingsOpen,setSettingsOpen]=useState(false);
+ const [settingsSection,setSettingsSection]=useState<"appearance"|"data">("appearance");
  const [navPanelOpen,setNavPanelOpen]=useState(()=>Boolean(host)||window.innerWidth>=1030);
  // Preserve a useful central workspace on compact Windows even after resize.
  useEffect(()=>{
@@ -1281,7 +1282,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   try{
    const p=data.projects.find((x:any)=>x.id===(projectId??active))||null;
    const spec=editorSpec(p,action,data);
-   setEditor({action,spec});setInspector(true);setError("");
+   setEditor({action,spec});setInspector(true);
+   if(!embedded&&window.innerWidth<1150)setNavPanelOpen(false);
+   setError("");
   }catch(e){issue(e)}
  };
  const openEditorFor=(projectId:string,action:string)=>{
@@ -1292,7 +1295,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    resetWorkspaceScroll();
    setActive(projectId);setHomeOpen(false);setSettingsOpen(false);
    setTab(action.startsWith("plan-")?"changes":"reality");
-   setEditor({action,spec:editorSpec(p,action,data)});setInspector(true);setError("");
+   setEditor({action,spec:editorSpec(p,action,data)});setInspector(true);
+   if(!embedded&&window.innerWidth<1150)setNavPanelOpen(false);
+   setError("");
   }catch(e){issue(e)}
  };
  const cancelEditor=()=>{
@@ -1717,7 +1722,22 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const goPortfolio=()=>{
   if(!requireClosedForm())return;selectProject(null);setHomeOpen(false);setSettingsOpen(false);
  };
- const goSettings=()=>{if(!requireClosedForm())return;setSettingsOpen(true)};
+ const goSettings=()=>{
+  if(!requireClosedForm())return;
+  setSettingsSection("appearance");setSettingsOpen(true);
+ };
+ const goStorage=()=>{
+  if(!requireClosedForm())return;
+  setSettingsSection("data");setSettingsOpen(true);
+ };
+ const toggleNavPanel=()=>{
+  if(!navPanelOpen&&window.innerWidth<1150&&!editor)setInspector(false);
+  setNavPanelOpen(x=>!x);
+ };
+ const toggleInspector=()=>{
+  if(!inspector&&window.innerWidth<1150)setNavPanelOpen(false);
+  setInspector(x=>!x);
+ };
  const goProjectTab=(id:Tab)=>{
   if(!project||!requireClosedForm())return;
   setHomeOpen(false);setSettingsOpen(false);view(id);
@@ -1913,10 +1933,12 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   className={"app-shell"+(inspector?"":" no-inspector")+(editor?" editor-active":"")+
    (embedded?" atlas-embedded":" atlas-v6-shell")+(connectOpen?" atlas-connect-focused":"")}
   style={!embedded?{"--atlas-v6-dock-width":inspectorWidth+"px"} as React.CSSProperties:undefined}>
-  {!embedded&&<AtlasChromeTopbar logoUrl={logoUrl} canBack={routeControls.back}
+  {!embedded&&<AtlasChromeTopbar logoUrl={logoUrl}
+   statusLabel={editor?"Форма не применена":dirty?"Не сохранено":persisted?"Сохранено":"Новый портфель"}
+   canBack={routeControls.back}
    canForward={routeControls.forward} onBack={()=>moveRoute(-1)} onForward={()=>moveRoute(1)}
-   onTogglePanel={()=>setNavPanelOpen(v=>!v)}
-   onToggleInspector={()=>setInspector(v=>!v)} inspector={inspector}
+   onTogglePanel={toggleNavPanel}
+   onToggleInspector={toggleInspector} inspector={inspector}
    onHome={goHome} onPortfolio={goPortfolio} onGantt={()=>goProjectTab("timeline")}
    onReality={()=>goProjectTab("reality")}
    onNewProject={()=>openEditor("new")} onNewWork={()=>openEditor("item")}
@@ -1935,10 +1957,11 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    onSettings={goSettings}/>}
   <div className="atlas-v6-layout">
    {!embedded&&<AtlasChromeRail logoUrl={logoUrl}
-    active={settingsOpen?"settings":!project?(homeOpen?"home":"portfolio"):tab}
+    active={settingsOpen?(settingsSection==="data"?"store":"settings"):!project?(homeOpen?"home":"portfolio"):tab}
     hasProject={!!project} onHome={goHome} onPortfolio={goPortfolio}
     onWork={()=>goProjectTab("work")} onGantt={()=>goProjectTab("timeline")}
     onGraph={()=>goProjectTab("graph")} onReality={()=>goProjectTab("reality")}
+    onChanges={()=>goProjectTab("changes")} onStore={goStorage}
     onResources={goResources} onSources={goSources} onSettings={goSettings}/>}
 
   <aside className={"sidebar"+(!embedded&&!navPanelOpen?" atlas-v6-sidebar-collapsed":"")}>
@@ -2023,12 +2046,13 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       </div>
      </details>
      <button disabled={!!editor} className="icon-button inspector-button" aria-label={inspector?"Скрыть инспектор":"Показать инспектор"}
-      title="Инспектор" onClick={()=>setInspector(!inspector)}>◧</button>
+      title="Инспектор" onClick={toggleInspector}>◧</button>
     </div>
    </header>
    {error&&<div className="alert error" role="alert">{error}<button onClick={()=>setError("")} aria-label="Закрыть сообщение">×</button></div>}
    {message&&<div className="alert notice" role="status">{message}<button onClick={()=>setMessage("")} aria-label="Закрыть сообщение">×</button></div>}
-   {settingsOpen&&!embedded?<AtlasSettings version={atlasPackage.version}
+   {settingsOpen&&!embedded?<AtlasSettings key={settingsSection} initialSection={settingsSection}
+    version={atlasPackage.version}
     projectCount={data.projects.length}
     workCount={data.projects.reduce((n:number,p:any)=>n+p.items.length,0)}
     revision={data.revision} saved={persisted} dirty={dirty} native={native}
