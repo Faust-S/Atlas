@@ -30,6 +30,7 @@ import {githubPortfolioCatalog,createProjectFromGitHubCatalog,githubPortfolioOve
 import {ProjectGantt,ProjectDependencyDiagram,PortfolioNetworkMap} from "./ProjectVisuals";
 import {AtlasDashboard} from "./AtlasDashboard";
 import {AtlasSettings} from "./AtlasSettings";
+import {AtlasInspectorPreview} from "./AtlasInspectorPreview";
 import {AtlasChromeTopbar,AtlasChromeRail,AtlasGlyph} from "./AtlasChrome";
 import {ProjectConnect} from "./ProjectConnect";
 import {ProjectOrganizationGuide} from "./ProjectOrganizationGuide";
@@ -425,6 +426,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const [controlPlanId,setControlPlanId]=useState<string|null>(null);
  const [controlPlanLimit,setControlPlanLimit]=useState(100);
  const [controlPlanOnlyChanges,setControlPlanOnlyChanges]=useState(true);
+ const [previewWorkRequest,setPreviewWorkRequest]=useState<{id:string;serial:number}|null>(null);
  const project=data.projects.find((p:any)=>p.id===active)||null;
  const t3WorkLinks=useMemo(()=>atlasT3RecordedWorkLinks(project),[project]);
  const recentWork=recentWorkId?project?.items.find((item:any)=>item.id===recentWorkId):null;
@@ -1209,6 +1211,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   if(id!==null){setHomeOpen(false);setSettingsOpen(false);}
   setSourceJump(null);setMapSearchReturn(null);setGraphJump(null);setWorkReturnId(null);
   setRecentWorkId(null);setRecentPlanBefore(null);setWorkImpactOnly(false);setWorkCriticalOnly(false);
+  setPreviewWorkRequest(null);
   setShowProjectRelations(false);setRelationLimit(12);setRequirementJump(null);setChangeJump(null);
   if(!afterSubmit)setMessage("");
   setWorkDependencyFilter("all");setWorkDeadlineFilter("all");setWorkFilter("all");setWorkTargetFilter("all");setWorkObservationFilter("all");setWorkHistoryLimits({});setWorkQuery("");setWorkSort("title");setWorkLimit(200);setRealityLimit(8);
@@ -1679,6 +1682,11 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   try{mutate(dropProject(data,id),"Проект удалён из черновика. Сохраните изменение.");
    if(active===id)selectProject(null,true);
   }catch(e){issue(e)}
+ };
+ const inspectWork=(id:string)=>{
+  if(!project||!requireClosedForm())return;
+  setPreviewWorkRequest(previous=>({id,serial:(previous?.serial??0)+1}));
+  setInspector(true);
  };
  const quickWork=(id:string,state:string)=>{
   if(!project||!requireClosedForm()||busyRef.current)return;
@@ -2722,6 +2730,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
          aria-label={"Открыть работу "+w.title}
          ref={workReturnId===w.id?workReturnRef:undefined}
          onClick={()=>openEditor("work:"+w.id)}>{w.title}</button>
+        {!embedded&&<button type="button" className="text-link atlas-v6-row-preview"
+         aria-label={"Просмотреть в инспекторе "+w.title}
+         onClick={()=>inspectWork(w.id)}>Просмотр</button>}
         {w.stageId&&project.stages.some((stage:any)=>stage.id===w.stageId)?
          <button type="button" className="text-link atlas-work-stage-link"
           aria-label={"Открыть этап "+project.stages.find((stage:any)=>stage.id===w.stageId)!.name+" для работы "+w.title}
@@ -2878,6 +2889,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
        <div className="board-actions"><select aria-label={"Состояние "+w.title} value={w.state} onChange={e=>quickWork(w.id,e.target.value)}>
         {Object.entries(workStatuses).map(([v,title])=><option key={v} value={v}>{String(title)}</option>)}</select>
         <button onClick={()=>openEditor("work:"+w.id)}>Детали</button>
+        {!embedded&&<button type="button" onClick={()=>inspectWork(w.id)}
+         aria-label={"Открыть в инспекторе работу "+w.title}>Просмотр</button>}
         <button type="button" ref={workReturnId===w.id?workReturnRef:undefined}
          aria-label={"Связи работы "+w.title}
          onClick={()=>openWorkGraph(w.id,"","board")}>Связи</button></div></div>)}
@@ -3580,6 +3593,12 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     busy={busy} project={project} plan={plannedPlan}
     calendarLibrary={data.calendarLibrary??[]}
     correctionBaseline={correctionBaseline}/>:
+   !embedded?<AtlasInspectorPreview key={project?.id||"portfolio"}
+     project={project} snapshot={data} plan={plan} forecast={projected}
+     dirty={dirty} saved={persisted} workRequest={previewWorkRequest}
+     onClose={()=>setInspector(false)} onEditWork={id=>openEditor("work:"+id)}
+     onEditProject={()=>openEditor("project-edit")} onOpenTab={goProjectTab}
+     onSave={()=>void save()} canSave={dirty&&!busy&&!editor}/>:
    <section><div className="section-heading"><h2>Инспектор</h2><button className="icon-button" aria-label="Скрыть инспектор" onClick={()=>setInspector(false)}>×</button></div>
     <div className="inspector-block"><small>Текущий контекст</small><strong>{project?.name||"Портфель проектов"}</strong>
      <p>{project?.goal||"Выберите проект для работы с планом, доказательствами и изменениями."}</p></div>
