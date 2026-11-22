@@ -425,7 +425,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const recheckRows=useMemo(()=>active?rechecks.rows.filter((r:any)=>r.projectId===active):[],[rechecks,active]);
  const history=useMemo(()=>project?projectHistoryRows(project,{kind:historyType,query:historyQuery}):[],
   [project,historyType,historyQuery]);
- const plan=useMemo(()=>project?scheduleProject(project):null,[project]);
+ const plan=useMemo(()=>project?scheduleProject(project,{
+  calendarLibrary:data.calendarLibrary??[]
+ }):null,[project,data.calendarLibrary]);
  const criticalWorkIds=useMemo(()=>new Set<string>((plan?.criticalIds||[]).map(String)),[plan]);
  const criticalFocus=useMemo(()=>plan?criticalPathFocus(plan):null,[plan]);
  const graphFocusPredecessors=useMemo(()=>{
@@ -442,8 +444,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  useEffect(()=>setGraphPreviewFrom(null),[project?.id,graphFocusWork?.id]);
  const graphRemovalPreview=useMemo(()=>{
   if(!project||!plan||!graphFocusWork||!graphSelectedPredecessor)return null;
-  return forecastDependencyRemoval(project,plan,graphSelectedPredecessor.id,graphFocusWork.id);
- },[project,plan,graphFocusWork,graphSelectedPredecessor]);
+  return forecastDependencyRemoval(project,plan,graphSelectedPredecessor.id,graphFocusWork.id,{
+   calendarLibrary:data.calendarLibrary??[]});
+ },[project,plan,graphFocusWork,graphSelectedPredecessor,data.calendarLibrary]);
  // The table and Gantt share the canonical project schedule. Keep an indexed
  // view for large projects rather than scanning 1,200+ CPM rows per work card.
  const overdueWorkFinishes=useMemo(()=>new Map<string,string>(
