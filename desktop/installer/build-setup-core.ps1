@@ -3,7 +3,7 @@
 [CmdletBinding()]
 param(
     [string]$SetupCoreRoot = "setup-core-source",
-    [string]$Output = "artifacts/IWXA-Atlas-0.9.0-dev.1-Setup.exe",
+    [string]$Output = "artifacts/IWXA-Atlas-0.10.0-dev.1-Setup.exe",
     [switch]$InstallForQualification
 )
 Set-StrictMode -Version Latest
@@ -96,7 +96,7 @@ try {
     [IO.File]::WriteAllText($outputPath + '.sha256',
         "$sha *$([IO.Path]::GetFileName($outputPath))" + [Environment]::NewLine,
         [Text.UTF8Encoding]::new($false))
-    Write-Host "ATLAS09_SETUP_CORE_PACKAGE_PASS product=$($product.id) version=$($product.version) source=$head SHA256=$sha"
+    Write-Host "ATLAS10_SETUP_CORE_PACKAGE_PASS product=$($product.id) version=$($product.version) source=$head SHA256=$sha"
     if ($InstallForQualification) {
         $preflight = Inspect '--preflight-file' (Join-Path $temporary 'preflight.json')
         if ($preflight.status -ne 'READY_FOR_FIRST_INSTALL') {
@@ -137,7 +137,7 @@ try {
         } finally { $nativeIcon.Dispose() }
         "ATLAS_INSTALLED_EXE=$installedExe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
         "ATLAS_SETUP_CORE_PACKAGE=$outputPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-        Write-Host "ATLAS09_SETUP_CORE_NATIVE_INSTALL_PASS data=$($locations.dataRoot) program=$($locations.programRoot)"
+        Write-Host "ATLAS10_SETUP_CORE_NATIVE_INSTALL_PASS data=$($locations.dataRoot) program=$($locations.programRoot)"
     }
 } finally {
     Remove-Item -LiteralPath $temporary -Recurse -Force -ErrorAction SilentlyContinue
