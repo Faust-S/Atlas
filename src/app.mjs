@@ -120,7 +120,7 @@ function renderPortfolioImpact(){
 }
 function renderSchedule(p){
  const target=document.querySelector("#atlas-schedule");if(!target||!p)return;
- const plan=scheduleProject(p);
+ const plan=scheduleProject(p,{calendarLibrary:data.calendarLibrary??[]});
  const rows=plan.rows.map(x=>'<tr><td>'+esc(x.title)+'</td><td>'+x.durationDays+'</td><td>'+esc(x.startDate||"день "+x.earlyStart)+'</td><td>'+esc(x.finishDate||"день "+x.earlyFinish)+'</td><td>'+x.floatDays+'</td><td>'+(x.critical?"●":"—")+'</td></tr>').join("");
  target.innerHTML='<div class="card"><p><strong>Длительность:</strong> '+plan.durationDays+' календарных дней · <strong>Начало:</strong> '+esc(p.startDate||"не задано")+' · <strong>Финиш:</strong> '+esc(plan.estimatedFinish||"—")+'</p><div style="overflow:auto"><table style="width:100%;text-align:left"><thead><tr><th>Работа</th><th>Дни</th><th>Начало</th><th>Финиш</th><th>Резерв</th><th>Критическая</th></tr></thead><tbody>'+rows+'</tbody></table></div><p class="muted">Календарный CPM без ресурсного выравнивания. Не означает принятие результата или релиза.</p></div>';
 }
