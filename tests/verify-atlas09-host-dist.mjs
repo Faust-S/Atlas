@@ -53,7 +53,7 @@ assert.ok(!delivered.includes("createTrustedAgentAtlasSourcePublisher")&&
 assert.ok(code.includes("mountAtlasSurface"),
  "ATLAS09_ORIGINAL_ATLAS_SURFACE_NOT_SHIPPED");
 const html=readFileSync(join(root,"index.html"),"utf8");
-assert.ok(html.includes("IWXA Atlas 0.10.0 (разработка)"),
+assert.ok(html.includes("IWXA Atlas 0.10.0"),
  "ATLAS09_BOOTSTRAP_VERSION_MISMATCH");
 assert.ok(html.includes("atlas-bootstrap"));
 assert.ok(!html.includes(entry.file),
@@ -61,7 +61,7 @@ assert.ok(!html.includes(entry.file),
 const tauri=JSON.parse(readFileSync(
  fileURLToPath(new URL("../desktop/src-tauri/tauri.conf.json",import.meta.url)),"utf8"));
 assert.equal(tauri.build.frontendDist,"../dist");
-assert.equal(tauri.version,"0.10.0-dev.1");
+assert.equal(tauri.version,"0.10.0");
 console.log("ATLAS09_ONE_DIST_SIGNED_HOST_PASS",JSON.stringify({
  installedHost:entry.file,bytes:statSync(file).size,
  standalone:"index.html",version:tauri.version

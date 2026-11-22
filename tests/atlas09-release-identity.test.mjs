@@ -22,7 +22,7 @@ test("Atlas 0.10 reuses original Atlas identity without a second data namespace"
  assert.equal(tauri.bundle.active,false);
  const ui=read("desktop/src/main.tsx");
  assert.match(ui,/atlasPackage\.version\.split\("-"\)\[0\]/);
- assert.match(ui,/разработка/);
+ assert.doesNotMatch(ui,/разработка/);
 });
 test("Atlas 0.9 has its own installed Windows gate and cannot publish a release",()=>{
  const ci=read(".github/workflows/atlas-0-9-windows.yml");
