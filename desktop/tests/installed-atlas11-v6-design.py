@@ -58,6 +58,9 @@ def qualify():
     click_named("Настроить дашборд","Button")
     d.wait_text("Блоки главной",25)
     d.wait_text("Рабочие календари",25)
+    # Move the first actual dashboard widget through its accessibility control.
+    # The order is user preference, not a project/Work revision.
+    click_named("Переместить блок вниз: Состояние портфеля","Button")
     # Preferences must not cause a Native Store generation.
     assert v.saved_head_or_none() is None
     click_named("Готово","Button")
@@ -113,8 +116,15 @@ def qualify():
     win32gui.MoveWindow(d.handle,0,0,820,650,True)
     d.activate()
     d.wait_text("Настроить дашборд",45)
+    # The second widget must still lead after a genuine process restart.
+    schedule_titles=visible_named("Ближайшие сроки","Text")
+    metric_titles=visible_named("Состояние портфеля","Text")
+    assert schedule_titles and metric_titles and (
+        schedule_titles[0].rectangle().top<metric_titles[0].rectangle().top),(
+        "Native dashboard widget order was lost across a cold restart")
     assert d.head()==saved
     assert d.saved_project(saved)==original
+    print("ATLAS11_NATIVE_DASHBOARD_LAYOUT_COLD_RESTORE_PASS",flush=True)
     print("ATLAS11_NATIVE_COLD_RESTORE_PASS",flush=True)
 
     # From the populated home, the global Resources rail must reach its
