@@ -53,15 +53,21 @@ assert.ok(!delivered.includes("createTrustedAgentAtlasSourcePublisher")&&
 assert.ok(code.includes("mountAtlasSurface"),
  "ATLAS09_ORIGINAL_ATLAS_SURFACE_NOT_SHIPPED");
 const html=readFileSync(join(root,"index.html"),"utf8");
-assert.ok(html.includes("IWXA Atlas 0.10.0"),
- "ATLAS09_BOOTSTRAP_VERSION_MISMATCH");
+assert.ok(html.includes("<title>IWXA Atlas</title>")&&
+ html.includes("<h1 style="),
+ "ATLAS11_BOOTSTRAP_IDENTITY_MISMATCH");
 assert.ok(html.includes("atlas-bootstrap"));
 assert.ok(!html.includes(entry.file),
  "ATLAS09_SIGNED_HOST_MUST_NOT_AUTO_START_IN_STANDALONE");
 const tauri=JSON.parse(readFileSync(
  fileURLToPath(new URL("../desktop/src-tauri/tauri.conf.json",import.meta.url)),"utf8"));
 assert.equal(tauri.build.frontendDist,"../dist");
-assert.equal(tauri.version,"0.10.0");
+const pkg=JSON.parse(readFileSync(
+ fileURLToPath(new URL("../desktop/package.json",import.meta.url)),"utf8"));
+assert.equal(tauri.version,pkg.version,
+ "ATLAS11_TAURI_PACKAGE_VERSION_MISMATCH");
+assert.equal(tauri.version,"0.11.0-dev.1",
+ "ATLAS11_DEVELOPMENT_VERSION_MISMATCH");
 console.log("ATLAS09_ONE_DIST_SIGNED_HOST_PASS",JSON.stringify({
  installedHost:entry.file,bytes:statSync(file).size,
  standalone:"index.html",version:tauri.version
