@@ -5,7 +5,7 @@ import {empty,createProject,createItem,editItem,editProject,serialize} from '../
 import {addPlanningResource} from '../src/resource-planning.mjs';
 import {portfolioSchedule} from '../src/portfolio-schedule.mjs';
 import {portfolioResources} from '../src/portfolio-resources.mjs';
-import {previewWorkResourceReassignment,prepareResourceEditorChoice,assertResourceEditorChoiceCurrent} from '../src/resource-alternatives.mjs';
+import {previewWorkResourceReassignment,compareWorkResourceAlternatives,prepareResourceEditorChoice,assertResourceEditorChoiceCurrent} from '../src/resource-alternatives.mjs';
 
 function fixture(){
  const a=createProject(empty(),{name:'Монтаж оборудования',type:'engineering'});
@@ -183,4 +183,79 @@ test('The ordinary Work editor preselects the suggestion but never applies it au
  assert.match(main,/resourceProposal\}\);setInspector\(true\)/);
  assert.match(css,/\.atlas-resource-editor-proposal\{/);
  assert.doesNotMatch(ui,/applyEditor\(|commitWithReadback\(|save\(\)/);
+});
+
+test('Several resource options share authoritative calendar baseline without mutations',()=>{
+ const f=fixture(),saved=serialize(f.snapshot);
+ const third=addPlanningResource(f.snapshot,{label:'Автокран',capacityPct:100});
+ f.snapshot=third.state;
+ const forecast=portfolioSchedule(f.snapshot);
+ const resources=portfolioResources(f.snapshot,{schedule:forecast});
+ const before=serialize(f.snapshot);
+ const page=compareWorkResourceAlternatives(f.snapshot,{projectId:f.pid,workId:f.second,
+  offset:0,limit:1},{schedule:forecast,resources});
+ const next=compareWorkResourceAlternatives(f.snapshot,{projectId:f.pid,workId:f.second,
+  offset:1,limit:1},{schedule:forecast,resources});
+ assert.equal(page.kind,'RESOURCE_ASSIGNMENT_OPTIONS');
+ assert.equal(page.candidateCount,2);
+ assert.equal(page.options.length,1);
+ assert.equal(next.options.length,1);
+ assert.notEqual(page.options[0].target.id,next.options[0].target.id);
+ assert.equal(page.options[0].original.overloadResourceDays,3);
+ assert.equal(next.options[0].original.overloadResourceDays,3);
+ assert.equal(serialize(f.snapshot),before);
+ assert.equal(resources.byId.get(f.crane).overloadDays,3);
+ assert.notEqual(saved,before,'Adding a candidate is a normal portfolio change');
+});
+
+test('A shifted overload is a tradeoff even when portfolio conflict totals stay unchanged',()=>{
+ const f=fixture();
+ const parallel=createItem(f.snapshot,f.pid,{title:'Подъём груза',resourceId:f.lift,allocationPct:70});
+ f.snapshot=editItem(parallel.state,f.pid,parallel.id,{estimateDays:3});
+ const result=run(f);
+ assert.equal(result.overloadDaysDelta,0);
+ assert.equal(result.constraints.classification,'TRADEOFF');
+ assert.equal(result.constraints.relieved[0].resourceId,f.crane);
+ assert.equal(result.constraints.relieved[0].fullyCleared,true);
+ assert.equal(result.constraints.introduced[0].resourceId,f.lift);
+ assert.equal(result.constraints.introduced[0].days,3);
+ assert.equal(result.constraints.outlook,'KNOWN_RESOURCE_CONFLICTS');
+});
+
+test('An improved alternative distinguishes no known overload from true feasibility',()=>{
+ const f=fixture(),result=run(f);
+ assert.equal(result.constraints.classification,'IMPROVED');
+ assert.equal(result.constraints.relieved[0].days,3);
+ assert.equal(result.constraints.introduced.length,0);
+ assert.equal(result.constraints.outlook,'NO_KNOWN_RESOURCE_CONFLICTS');
+ assert.equal(result.datesUnchanged,true);
+});
+
+test('Unknown dates do not turn a clean resource projection into verified readiness',()=>{
+ const f=fixture();f.snapshot.projects[0].startDate=null;
+ const result=run(f);
+ assert.equal(result.constraints.outlook,'DATES_INCOMPLETE');
+ assert.equal(result.unverified,true);
+});
+
+test('Candidate pages reject invalid selection without changing the source portfolio',()=>{
+ const f=fixture(),saved=serialize(f.snapshot);
+ for(const options of [{offset:-1},{limit:0},{limit:13},{offset:1.5}]){
+  assert.throws(()=>compareWorkResourceAlternatives(f.snapshot,{
+   projectId:f.pid,workId:f.second,...options}),/страница/);
+ }
+ assert.equal(serialize(f.snapshot),saved);
+});
+
+test('Comparison UI displays all options, their tradeoffs and a review-only choice',()=>{
+ const ui=readFileSync(new URL('../desktop/src/ResourceAlternatives.tsx',import.meta.url),'utf8');
+ const style=readFileSync(new URL('../desktop/src/style.css',import.meta.url),'utf8');
+ assert.match(ui,/compareWorkResourceAlternatives\(snapshot/);
+ assert.match(ui,/Сравнение нескольких ресурсных альтернатив/);
+ assert.match(ui,/Новый конфликт:/);
+ assert.match(ui,/Компромисс/);
+ assert.match(ui,/setChosenTarget\(option\.target\.id\)/);
+ assert.match(ui,/setPage\(p=>p\+1\)/);
+ assert.match(style,/\.atlas-resource-options-list/);
+ assert.doesNotMatch(ui,/commitWithReadback\(|applyEditor\(|save\(\)/);
 });
