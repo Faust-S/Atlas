@@ -103,6 +103,7 @@ test("compact dock provides a return route after visiting the downstream Gantt",
  const main=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
  const preview=readFileSync(new URL("../desktop/src/AtlasInspectorPreview.tsx",import.meta.url),"utf8");
  const css=readFileSync(new URL("../desktop/src/style.css",import.meta.url),"utf8");
+ const gantt=readFileSync(new URL("../desktop/src/ProjectVisuals.tsx",import.meta.url),"utf8");
  assert.match(main,/const openInspectorLinkedProject=\(linkedProjectId:string,sourceWorkId:string\)/);
  assert.match(main,/setCrossProjectReturn\(route\)/);
  assert.match(main,/setRecentPlanBefore\(current\?route\.correction:null\)/);
@@ -114,4 +115,5 @@ test("compact dock provides a return route after visiting the downstream Gantt",
  assert.match(preview,/onClick=\{onReturnToSource\}/);
  assert.match(preview,/onOpenLinkedProject\(linked\.id,shown\.id\)/);
  assert.match(css,/\.atlas-v6-cross-project-return-action:focus-visible/);
+ assert.match(gantt,/aria-label=\{"\\u0412\\u044b\\u0431\\u0440\\u0430\\u0442\\u044c/);
 });

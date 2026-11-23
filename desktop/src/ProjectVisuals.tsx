@@ -522,7 +522,9 @@ export function ProjectGantt({schedule,projectStart,recordedStart,projectDue,por
     </div><strong>Дл.</strong>
    </div>
    {displayed.map((row:any)=><div className="atlas-gantt-row" key={row.id}>
-    <button className="atlas-gantt-work" title={row.title} onClick={()=>{setExpanded(false);onOpenWork(row.id)}}>{trim(row.title,65)}
+    <button className="atlas-gantt-work" title={row.title}
+     aria-label={"\u0412\u044b\u0431\u0440\u0430\u0442\u044c \u0440\u0430\u0431\u043e\u0442\u0443 "+row.title}
+     onClick={()=>{setExpanded(false);onOpenWork(row.id)}}>{trim(row.title,65)}
      <small>{statusName[row.state]||row.state}{row.critical?' · критическая':''}</small>
      {row.missedDeadline&&<small className="atlas-gantt-work-overdue">
       Расчётный финиш позже срока {row.dueDate}</small>}</button>

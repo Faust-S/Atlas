@@ -129,7 +129,10 @@ def qualify():
     # Extend the same user journey with one actual edit in the downstream
     # project, then return to the source and verify cumulative forecast.
     native.click_named("\u041e\u0442\u043a\u0440\u044b\u0442\u044c \u0437\u0430\u0432\u0438\u0441\u0438\u043c\u044b\u0439 \u043f\u0440\u043e\u0435\u043a\u0442 "+DOWNSTREAM,"Button")
-    native.click_named("\u041e\u0442\u043a\u0440\u044b\u0442\u044c \u0440\u0430\u0431\u043e\u0442\u0443 "+TARGET_WORK,"Button")
+    # In the 820px window, bring the first Gantt row above the lower edge.
+    # Choose its full-size text control rather than the narrow calendar bar.
+    v.mouse.scroll(coords=(260,520),wheel_dist=-4)
+    native.click_named("\u0412\u044b\u0431\u0440\u0430\u0442\u044c \u0440\u0430\u0431\u043e\u0442\u0443 "+TARGET_WORK,"Button")
     d.wait_text("\u0418\u0437\u043c\u0435\u043d\u0438\u0442\u044c \u0440\u0430\u0431\u043e\u0442\u0443",25)
     native.click_named("\u0418\u0437\u043c\u0435\u043d\u0438\u0442\u044c \u0440\u0430\u0431\u043e\u0442\u0443","Button")
     d.wait_text("\u0418\u0437\u043c\u0435\u043d\u0438\u0435 \u0434\u0430\u043d\u043d\u044b\u0445",25)
