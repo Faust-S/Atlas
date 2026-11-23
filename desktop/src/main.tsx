@@ -2426,7 +2426,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       {resources.people.slice(0,resourceLimit).map((r:any)=><React.Fragment key={r.id}>
        <tr><td>{r.label}</td><td>{r.capacityPct}%</td><td>{r.maxLoadPct}%</td>
        <td>{r.overloadDays} дн.</td><td>{r.unavailableDays} дн.</td><td>
-        {r.itemCount>0&&<Action onClick={()=>setResourceComparisonId(id=>id===r.id?null:r.id)}>
+        {r.itemCount>0&&<Action ariaLabel={(resourceComparisonId===r.id?"Скрыть варианты ресурса ":"Сравнить варианты ресурса ")+r.label} onClick={()=>setResourceComparisonId(id=>id===r.id?null:r.id)}>
          {resourceComparisonId===r.id?"Скрыть варианты":"Сравнить варианты"}</Action>}
         <Action onClick={()=>openEditor("resource-edit:"+r.id)}>Настроить</Action>
        </td></tr>
