@@ -34,7 +34,7 @@ def check_archive():
     return snapshot
 
 
-def click_scrollable_button(name):
+def click_scrollable_button(name,scroll_direction=-2):
     """Scroll the real installed viewport until the user action is visible."""
     for attempt in range(12):
         bounds=win32gui.GetWindowRect(d.handle)
@@ -47,7 +47,7 @@ def click_scrollable_button(name):
         if len(physical)==1:
             native.click_named(name,'Button')
             return
-        mouse.scroll(coords=(520,530),wheel_dist=-2)
+        mouse.scroll(coords=(520,530),wheel_dist=scroll_direction)
     raise AssertionError('Resource choice not reachable in 820x650: '+name)
 
 
@@ -110,10 +110,10 @@ def qualify():
     d.wait_text('Изменение дней перегрузки: -3. Вне доступности: 0. Сроки Work по CPM не изменятся.',35)
     assert d.head()==saved,'Restoring the preferred option wrote to Native Store'
     print('ATLAS12_NATIVE_MULTIPLE_OPTIONS_TRADEOFF_PASS',flush=True)
-    click_scrollable_button('Скрыть все варианты')
+    click_scrollable_button('Скрыть все варианты',scroll_direction=2)
     # The user must reach the ordinary Work editor; the resource comparison
     # itself cannot execute an assignment or write to Native Store.
-    click_scrollable_button(work_action)
+    click_scrollable_button(work_action,scroll_direction=2)
     d.wait_text('Изменение данных',35)
     d.wait_text('Работа: '+first_work,35)
     d.wait_text('Плановый ресурс',35)
