@@ -47,7 +47,7 @@ def qualify():
     d.launch()
     win32gui.MoveWindow(d.handle,0,0,820,650,True)
     d.activate()
-    d.wait_text("Портфель проектов",35)
+    d.wait_text("Настроить дашборд",45)
 
     # Ordinary native file-picker import, explicit approval, then Save.
     native.click_named("Портфель","Button")
@@ -70,7 +70,7 @@ def qualify():
     d.launch()
     win32gui.MoveWindow(d.handle,0,0,820,650,True)
     d.activate()
-    d.wait_text("Портфель проектов",35)
+    d.wait_text("Настроить дашборд",45)
     assert d.head()==saved,"Two-project state lost on cold restart"
     native.click_named("Портфель","Button")
     native.click_named("Показать или скрыть левую панель","Button")
