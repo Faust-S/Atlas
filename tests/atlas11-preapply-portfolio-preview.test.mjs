@@ -79,6 +79,8 @@ test('pre-apply portfolio summary appears in the existing compact native Work fo
  assert.match(ui,/portfolioSnapshot=\{data\} portfolioBefore=\{dates\}/);
  assert.match(ui,/cumulativePortfolioBaseline=\{correctionBaseline\?recentPlanBefore\?\.portfolioBaseline:null\}/);
  assert.match(ui,/aria-label="Предварительный прогноз связанных проектов"/);
+ assert.match(ui,/\]\.filter\(Boolean\)\.join\(" "\)\}<\/p>/,
+  'Accessibility status must be one text value, not separated JSX fragments');
  assert.match(css,/\.editor-panel \.atlas-work-draft-portfolio\{/);
  assert.doesNotMatch(ui.slice(form,submit),/onClick=\{.*editItem\(/);
 });

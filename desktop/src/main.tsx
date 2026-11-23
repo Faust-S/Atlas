@@ -250,17 +250,22 @@ function EditorPanel({editor,onSubmit,onCancel,onDirtyChange,busy,project,plan,c
      {workDraftPreview.portfolioImpact&&<div className="atlas-work-draft-portfolio"
        role="group" aria-label="Предварительный прогноз связанных проектов">
       <strong>Связанные проекты до применения правки</strong>
-      <p role="status">Зависимых проектов: {workDraftPreview.portfolioImpact.linkedTotal}.
-       Изменится прогноз у {workDraftPreview.portfolioImpact.affectedTotal}.
-       {workDraftPreview.portfolioImpact.laterTotal>0?
-        " Позже: "+workDraftPreview.portfolioImpact.laterTotal+".":""}
-       {workDraftPreview.portfolioImpact.earlierTotal>0?
-        " Раньше: "+workDraftPreview.portfolioImpact.earlierTotal+".":""}
-       {workDraftPreview.portfolioImpact.undatedTotal>0?
-        " Без расчётной даты: "+workDraftPreview.portfolioImpact.undatedTotal+".":""}
-       {workDraftPreview.portfolioImpact.newDeadlineRisks>0?
-        " Новых нарушений срока: "+workDraftPreview.portfolioImpact.newDeadlineRisks+".":""}
-      </p>
+      <p role="status">{[
+       "Зависимых проектов: "+workDraftPreview.portfolioImpact.linkedTotal+".",
+       "Изменится прогноз у "+workDraftPreview.portfolioImpact.affectedTotal+".",
+       workDraftPreview.portfolioImpact.laterTotal>0?
+        "Позже: "+workDraftPreview.portfolioImpact.laterTotal+".":null,
+       workDraftPreview.portfolioImpact.earlierTotal>0?
+        "Раньше: "+workDraftPreview.portfolioImpact.earlierTotal+".":null,
+       workDraftPreview.portfolioImpact.undatedTotal>0?
+        "Без расчётной даты: "+workDraftPreview.portfolioImpact.undatedTotal+".":null,
+       workDraftPreview.portfolioImpact.newDeadlineRisks>0?
+        "Новых нарушений срока: "+workDraftPreview.portfolioImpact.newDeadlineRisks+".":null,
+       workDraftPreview.portfolioImpact.rows[0]?
+        "Первый проект: "+workDraftPreview.portfolioImpact.rows[0].name+
+        ", финиш "+(workDraftPreview.portfolioImpact.rows[0].previousFinish||"без даты")+
+        " → "+(workDraftPreview.portfolioImpact.rows[0].projectedFinish||"без даты")+".":null
+      ].filter(Boolean).join(" ")}</p>
       {workDraftPreview.portfolioImpact.affectedTotal>0&&
        <details className="atlas-work-draft-details">
         <summary>Прогноз по зависимым проектам ({workDraftPreview.portfolioImpact.affectedTotal})</summary>

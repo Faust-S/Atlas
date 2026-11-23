@@ -91,7 +91,7 @@ def qualify():
     d.wait_text("Изменение данных",25)
     v.set_editor_text("Плановая длительность, дней","3")
     d.wait_text("Связанные проекты до применения правки",35)
-    d.wait_text("Изменится прогноз у 1",35)
+    d.wait_text("Зависимых проектов: 1. Изменится прогноз у 1",35)
     d.wait_text("2026-11-24",35)
     d.wait_text("2026-11-25",35)
     assert d.head()==saved,"Pre-apply portfolio preview unexpectedly wrote Native Store"
