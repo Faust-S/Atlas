@@ -112,3 +112,13 @@ test('UI presents both baselines and an explicit ordinary Work editor action',()
  assert.doesNotMatch(ui,/applyEditor\(|commitWithReadback\(|save\(\)/);
  assert.doesNotMatch(ui,/[—–]/);
 });
+
+test('Installed Windows resource comparison follows native Work editing without test-only labels',()=>{
+ const native=readFileSync(new URL('../desktop/tests/installed-atlas12-resource-alternatives.py',import.meta.url),'utf8');
+ const workflow=readFileSync(new URL('../.github/workflows/atlas-0-11-v6-windows.yml',import.meta.url),'utf8');
+ assert.match(native,/first_work=original\['projects'\]\[0\]\['items'\]\[0\]\['title'\]/);
+ assert.match(native,/v\.find_control\(work_action,types=\{'Button'\}\)\.click_input\(\)/);
+ assert.match(native,/ATLAS12_NATIVE_RESOURCE_TO_WORK_EDITOR_PASS/);
+ assert.doesNotMatch(native,/\+FIRST\b/,'No undefined Python Work label may enter the installed scenario');
+ assert.match(workflow,/desktop\/tests\/installed-atlas12-\*\.py/);
+});

@@ -23,6 +23,7 @@ on:
       - 'desktop/installer/**'
       - 'desktop/src-tauri/**'
       - 'desktop/tests/installed-atlas11-*.py'
+      - 'desktop/tests/installed-atlas12-*.py'
       - 'tests/fixtures/**'
       - 'tests/verify-atlas09-host-dist.mjs'
       - 'tests/atlas11-*.test.mjs'
