@@ -2495,6 +2495,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     </nav>
     {tab==="overview"&&<>
      <ProjectOrganizationGuide snapshot={data} projectId={project.id}
+      portfolioForecast={dates} resourceForecast={resources}
       restoreSearch={mapSearchReturn}
       onEdit={openEditor}
       onRefresh={sourceId=>void syncPublic({projectId:project.id,sourceId})}

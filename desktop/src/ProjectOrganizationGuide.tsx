@@ -6,11 +6,11 @@ import {projectWorkPlanReadiness} from "../../src/work-plan-readiness.mjs";
 // Saved GitHub observations enrich this view when available; existing work,
 // stage and dependency links remain usable in any project without GitHub.
 // Suggested roles are explanations to review, never new project entities.
-export function ProjectOrganizationGuide({snapshot,projectId,restoreSearch,onEdit,onRefresh,onOpenProject,
+export function ProjectOrganizationGuide({snapshot,projectId,portfolioForecast,resourceForecast,restoreSearch,onEdit,onRefresh,onOpenProject,
  onOpenSources,onOpenLinkedSource,onOpenWorks,onOpenPendingWorks,pendingWorkCount,
  onOpenOverdueWorks,overdueWorkCount,overdueHighlights,onOpenCriticalWorks,criticalWorkCount,criticalFocus,
  onOpenStages,onAddRelation,onOpenTimeline,onOpenGraph,busy=false}:{
- snapshot:any;projectId:string;restoreSearch:{workId:string;query:string}|null;
+ snapshot:any;projectId:string;portfolioForecast:any;resourceForecast:any;restoreSearch:{workId:string;query:string}|null;
  onEdit:(action:string)=>void;
  onRefresh:(sourceId:string)=>void;onOpenProject:(id:string)=>void;
  onOpenSources:()=>void;onOpenLinkedSource:(workId:string,query:string)=>void;
@@ -31,7 +31,7 @@ export function ProjectOrganizationGuide({snapshot,projectId,restoreSearch,onEdi
   {maxSources:8,maxFoldersPerSource:16,maxWorksPerFolder:8,maxOtherWorks:20,maxUnassignedStages:16}:
   {maxSources:2,maxFoldersPerSource:4,maxWorksPerFolder:3,maxOtherWorks:6,maxUnassignedStages:4});
  const suggested=guide.nextAction;
- const readiness=projectWorkPlanReadiness(snapshot,projectId,{maxRows:3});
+ const readiness=projectWorkPlanReadiness(snapshot,projectId,{portfolio:portfolioForecast,resources:resourceForecast,maxRows:3});
  const hasSources=guide.sources.length>0;
  const project=snapshot.projects.find((p:any)=>p.id===projectId);
  const recordedSources=project?.sources.length??0;

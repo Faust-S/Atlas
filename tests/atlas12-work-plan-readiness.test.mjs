@@ -103,6 +103,9 @@ test('UI and source enforce planning-only responsibility, no additional Task or 
  const source=readFileSync(new URL('../src/work-plan-readiness.mjs',import.meta.url),'utf8');
  const ui=readFileSync(new URL('../desktop/src/ProjectOrganizationGuide.tsx',import.meta.url),'utf8');
  assert.match(ui,/projectWorkPlanReadiness\(snapshot,projectId/);
+ assert.match(ui,/portfolio:portfolioForecast,resources:resourceForecast,maxRows:3/);
+ const main=readFileSync(new URL('../desktop/src/main.tsx',import.meta.url),'utf8');
+ assert.match(main,/portfolioForecast=\{dates\} resourceForecast=\{resources\}/);
  assert.match(ui,/Готовность работ по плану/);
  assert.match(ui,/Проверить работу/);
  assert.match(source,/Оценка по датам, состояниям и связям Atlas/);
