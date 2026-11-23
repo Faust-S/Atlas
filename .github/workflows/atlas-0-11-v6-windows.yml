@@ -14,6 +14,7 @@ on:
       - 'desktop/src/AtlasSettings.tsx'
       - 'desktop/src/AtlasInspectorPreview.tsx'
       - 'desktop/src/ProjectOrganizationGuide.tsx'
+      - 'desktop/src/ResourceAlternatives.tsx'
       - 'desktop/src/inspector-work-context.mjs'
       - 'desktop/src/style.css'
       - 'desktop/index.html'
@@ -107,6 +108,17 @@ jobs:
           }
           "ATLAS11_PORTFOLIO_IMPACT_IWXA=$archive" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
+      - name: Prepare independent Atlas 0.12 resource alternative IWXA
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $archive = Join-Path $env:RUNNER_TEMP 'atlas12-resource-options.iwxa'
+          node tests/fixtures/atlas12-resource-alternatives.mjs $archive
+          if ($LASTEXITCODE -ne 0 -or !(Test-Path -LiteralPath $archive)) {
+            throw 'ATLAS12_RESOURCE_OPTIONS_FIXTURE_FAILED'
+          }
+          "ATLAS12_RESOURCE_ALTERNATIVES_IWXA=$archive" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
       - name: Qualify installed native UI with Windows accessibility API
         shell: pwsh
         timeout-minutes: 25
@@ -114,12 +126,14 @@ jobs:
           $ErrorActionPreference = 'Stop'
           python -m pip install pywinauto==0.6.9 pillow==11.3.0
           if ($LASTEXITCODE -ne 0) { throw 'ATLAS11_NATIVE_UIA_MISSING' }
-          python -m py_compile desktop/tests/installed-atlas11-v6-design.py desktop/tests/installed-atlas11-portfolio-impact.py
+          python -m py_compile desktop/tests/installed-atlas11-v6-design.py desktop/tests/installed-atlas11-portfolio-impact.py desktop/tests/installed-atlas12-resource-alternatives.py
           if ($LASTEXITCODE -ne 0) { throw 'ATLAS11_NATIVE_SCRIPT_SYNTAX' }
           python desktop/tests/installed-atlas11-v6-design.py
           if ($LASTEXITCODE -ne 0) { throw 'ATLAS11_NATIVE_V6_USER_ROUTE_FAIL' }
           python desktop/tests/installed-atlas11-portfolio-impact.py
           if ($LASTEXITCODE -ne 0) { throw 'ATLAS11_NATIVE_PORTFOLIO_IMPACT_FAIL' }
+          python desktop/tests/installed-atlas12-resource-alternatives.py
+          if ($LASTEXITCODE -ne 0) { throw 'ATLAS12_NATIVE_RESOURCE_ALTERNATIVES_FAIL' }
 
       - name: Preserve accepted development installer and SHA-256
         if: success()

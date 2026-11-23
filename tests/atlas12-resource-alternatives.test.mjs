@@ -1,0 +1,112 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {empty,createProject,createItem,editItem,editProject,serialize} from '../src/core.mjs';
+import {addPlanningResource} from '../src/resource-planning.mjs';
+import {portfolioSchedule} from '../src/portfolio-schedule.mjs';
+import {portfolioResources} from '../src/portfolio-resources.mjs';
+import {previewWorkResourceReassignment} from '../src/resource-alternatives.mjs';
+
+function fixture(){
+ const a=createProject(empty(),{name:'Монтаж оборудования',type:'engineering'});
+ let snapshot=editProject(a.state,a.id,{startDate:'2026-11-23'});
+ const crane=addPlanningResource(snapshot,{label:'Кран',capacityPct:100});
+ const lift=addPlanningResource(crane.state,{label:'Подъёмник',capacityPct:100});
+ snapshot=lift.state;
+ const first=createItem(snapshot,a.id,{title:'Разгрузка',resourceId:crane.id,allocationPct:70});
+ snapshot=editItem(first.state,a.id,first.id,{estimateDays:3});
+ const second=createItem(snapshot,a.id,{title:'Монтаж',resourceId:crane.id,allocationPct:60});
+ snapshot=editItem(second.state,a.id,second.id,{estimateDays:3});
+ return {snapshot,pid:a.id,first:first.id,second:second.id,crane:crane.id,lift:lift.id};
+}
+const run=(f,options={})=>previewWorkResourceReassignment(f.snapshot,{
+ projectId:f.pid,workId:f.second,targetResourceId:f.lift
+ },options);
+
+test('Explicit reassignment preview compares current and alternative total overload without edits',()=>{
+ const f=fixture(),raw=serialize(f.snapshot);
+ const preview=run(f);
+ assert.equal(preview.kind,'RESOURCE_ASSIGNMENT_COMPARISON');
+ assert.equal(preview.original.overloadResourceDays,3);
+ assert.equal(preview.alternative.overloadResourceDays,0);
+ assert.equal(preview.overloadDaysDelta,-3);
+ assert.equal(preview.unavailableDaysDelta,0);
+ assert.equal(preview.source.overloadDays,3);
+ assert.equal(preview.proposedSource.overloadDays,0);
+ assert.equal(preview.target.overloadDays,0);
+ assert.equal(preview.proposedTarget.overloadDays,0);
+ assert.equal(preview.datesUnchanged,true);
+ assert.equal(preview.unverified,false);
+ assert.equal(preview.revision,f.snapshot.revision);
+ assert.equal(preview.startDate,'2026-11-23');
+ assert.equal(preview.finishDate,'2026-11-26');
+ assert.equal(serialize(f.snapshot),raw,'Preview must not edit a draft or Store');
+});
+
+test('Reassignment does not conceal a newly overloaded alternative resource',()=>{
+ const f=fixture();
+ const onLift=createItem(f.snapshot,f.pid,{title:'Параллельный подъём',resourceId:f.lift,allocationPct:70});
+ f.snapshot=editItem(onLift.state,f.pid,onLift.id,{estimateDays:3});
+ const preview=run(f);
+ assert.equal(preview.source.overloadDays,3);
+ assert.equal(preview.proposedSource.overloadDays,0);
+ assert.equal(preview.target.overloadDays,0);
+ assert.equal(preview.proposedTarget.overloadDays,3);
+ assert.equal(preview.overloadDaysDelta,0);
+ assert.equal(preview.alternative.overloadedResources,1);
+});
+
+test('Availability outside declared window is measured, not called resolved by a transfer',()=>{
+ const f=fixture();
+ f.snapshot.resources.find(r=>r.id===f.lift).availableUntil='2026-11-24';
+ const preview=run(f);
+ assert.equal(preview.source.unavailableDays,0);
+ assert.ok(preview.proposedTarget.unavailableDays>0);
+ assert.ok(preview.unavailableDaysDelta>0);
+ assert.equal(preview.original.unavailableResourceDays,0);
+});
+
+test('Unknown dates remain unknown; no invented improvement or personnel identity',()=>{
+ const f=fixture();
+ f.snapshot.projects[0].startDate=null;
+ const preview=run(f);
+ assert.equal(preview.unverified,true);
+ assert.equal(preview.startDate,null);
+ assert.equal(preview.finishDate,null);
+ assert.equal(preview.original.overloadResourceDays,0);
+ assert.equal(preview.alternative.overloadResourceDays,0);
+ assert.match(preview.note,/реальной доступности/);
+});
+
+test('Invalid, identical or completed resource options cannot be compared',()=>{
+ const f=fixture();
+ assert.throws(()=>previewWorkResourceReassignment(f.snapshot,{projectId:f.pid,workId:f.second,targetResourceId:f.crane}),/другое/);
+ assert.throws(()=>previewWorkResourceReassignment(f.snapshot,{projectId:f.pid,workId:f.second,targetResourceId:'missing'}),/не найден/);
+ assert.throws(()=>previewWorkResourceReassignment(f.snapshot,{projectId:f.pid,workId:'missing',targetResourceId:f.lift}),/не найдена/);
+ const done=editItem(f.snapshot,f.pid,f.second,{state:'done'});
+ assert.throws(()=>previewWorkResourceReassignment(done,f.pid?{projectId:f.pid,workId:f.second,targetResourceId:f.lift}:{}),/Завершённую/);
+});
+
+test('Reuse the original schedule and capacity projection without changing its forecast',()=>{
+ const f=fixture();
+ const schedule=portfolioSchedule(f.snapshot),resources=portfolioResources(f.snapshot,{schedule});
+ const initial=JSON.stringify(schedule.rows);
+ const preview=run(f,{schedule,resources});
+ assert.equal(preview.overloadDaysDelta,-3);
+ assert.equal(JSON.stringify(schedule.rows),initial);
+ assert.equal(resources.byId.get(f.crane).overloadDays,3);
+ assert.equal(preview.source.itemCount,2);
+ assert.equal(preview.proposedSource.itemCount,1);
+});
+
+test('UI presents both baselines and an explicit ordinary Work editor action',()=>{
+ const ui=readFileSync(new URL('../desktop/src/ResourceAlternatives.tsx',import.meta.url),'utf8');
+ const main=readFileSync(new URL('../desktop/src/main.tsx',import.meta.url),'utf8');
+ assert.match(main,/resourceComparisonId===r.id/);
+ assert.match(main,/onOpenWork=\{\(pid,wid\)=>openEditorFor\(pid,"work:"\+wid\)\}/);
+ assert.match(ui,/Плановая загрузка до и после изменения назначения/);
+ assert.match(ui,/Изменение дней перегрузки:/);
+ assert.match(ui,/Сравните существующее назначение Work/);
+ assert.doesNotMatch(ui,/applyEditor\(|commitWithReadback\(|save\(\)/);
+ assert.doesNotMatch(ui,/[—–]/);
+});

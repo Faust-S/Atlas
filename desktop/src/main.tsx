@@ -36,6 +36,7 @@ import {atlasInspectorMaxWidth,atlasInspectorDisplayedWidth,
 import {AtlasChromeTopbar,AtlasChromeRail,AtlasGlyph} from "./AtlasChrome";
 import {ProjectConnect} from "./ProjectConnect";
 import {ProjectOrganizationGuide} from "./ProjectOrganizationGuide";
+import {ResourceAlternatives} from "./ResourceAlternatives";
 import {projectSourcePlanWorkContext,projectWorkTableSearch} from "../../src/project-organization.mjs";
 import {repoName} from "../../src/github-public.mjs";
 import {applyPublicProjectPreview} from "../../src/project-onboarding.mjs";
@@ -471,6 +472,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const signedFileOwnerAvailable=Boolean(host?.t3?.inspectSignedFile&&
   host?.t3?.receiveSignedFile&&host?.t3?.readbackSignedFile);
  const [resourceLimit,setResourceLimit]=useState(40);
+ const [resourceComparisonId,setResourceComparisonId]=useState<string|null>(null);
  const [reviewLimit,setReviewLimit]=useState(20);
  const [sourceLimit,setSourceLimit]=useState(15);
  const [sourceRowLimits,setSourceRowLimits]=useState<Record<string,number>>({});
@@ -2398,8 +2400,19 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      <div className="section-heading"><div><h2>Плановые ресурсы</h2><p>Ресурсы объединяются только по явному назначению, не по имени человека.</p></div>
       <Action onClick={()=>openEditor("resource-new")}>＋ Плановый ресурс</Action></div>
      {resources.people.length?<div className="table-scroll"><table><thead><tr><th>Ресурс</th><th>Мощность</th><th>Максимум</th><th>Выше мощности</th><th>Вне доступности</th><th></th></tr></thead><tbody>
-      {resources.people.slice(0,resourceLimit).map((r:any)=><tr key={r.id}><td>{r.label}</td><td>{r.capacityPct}%</td><td>{r.maxLoadPct}%</td>
-       <td>{r.overloadDays} дн.</td><td>{r.unavailableDays} дн.</td><td><Action onClick={()=>openEditor("resource-edit:"+r.id)}>Настроить</Action></td></tr>)}</tbody></table></div>:
+      {resources.people.slice(0,resourceLimit).map((r:any)=><React.Fragment key={r.id}>
+       <tr><td>{r.label}</td><td>{r.capacityPct}%</td><td>{r.maxLoadPct}%</td>
+       <td>{r.overloadDays} дн.</td><td>{r.unavailableDays} дн.</td><td>
+        {r.itemCount>0&&<Action onClick={()=>setResourceComparisonId(id=>id===r.id?null:r.id)}>
+         {resourceComparisonId===r.id?"Скрыть варианты":"Сравнить варианты"}</Action>}
+        <Action onClick={()=>openEditor("resource-edit:"+r.id)}>Настроить</Action>
+       </td></tr>
+       {resourceComparisonId===r.id&&<tr className="atlas-resource-comparison-row"><td colSpan={6}>
+        <ResourceAlternatives key={r.id} snapshot={data} forecast={dates} resources={resources}
+         resourceId={r.id} onClose={()=>setResourceComparisonId(null)}
+         onOpenWork={(pid,wid)=>openEditorFor(pid,"work:"+wid)}/>
+       </td></tr>}
+      </React.Fragment>)}</tbody></table></div>:
       <Fallback message="Плановые ресурсы пока не добавлены. Назначения ответственных в текстовых полях не считаются подтверждёнными ресурсами."/>}
      {resources.people.length>0&&<p className="minor">Показано {Math.min(resourceLimit,resources.people.length)} из {resources.people.length} ресурсов.</p>}
      {resources.people.length>resourceLimit&&<Action onClick={()=>setResourceLimit(n=>Math.min(resources.people.length,n+40))}>Показать ещё ресурсы</Action>}
