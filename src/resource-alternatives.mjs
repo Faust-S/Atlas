@@ -1,7 +1,6 @@
 // Read-only comparison over the original Atlas portfolio resources.
 // A proposed planning-resource assignment is NOT proof of employee availability
 // or a decision by Admin Center / a domain system.
-import {editItem} from './core.mjs';
 import {portfolioSchedule} from './portfolio-schedule.mjs';
 import {portfolioResources} from './portfolio-resources.mjs';
 
@@ -23,9 +22,10 @@ function resourceStatus(group){
 }
 /**
  * Compare ONE explicit change of a Work's existing planning-resource link.
- * The only hypothetical mutation goes through Atlas editItem() on a detached
- * snapshot. Calendar forecasts are reused because assignment alone cannot
- * change CPM without resource leveling, which Atlas does not implement.
+ * The hypothetical assignment is projected onto a shallow, isolated Work
+ * copy. The authoritative calendar and capacity calculations remain the
+ * original portfolioSchedule / portfolioResources. Applying the choice is
+ * only possible through the ordinary Work editor and Native Store flow.
  * Nothing is applied to the caller's snapshot or to Native Store.
  *
  * @param {any} snapshot
@@ -52,7 +52,12 @@ export function previewWorkResourceReassignment(snapshot,{projectId,workId,targe
  if(!baseline.byId.has(sourceId)||!baseline.byId.has(targetResourceId))
   throw Error('Нет расчёта выбранных ресурсов');
  const before=totals(baseline);
- const candidate=editItem(snapshot,projectId,workId,{resourceId:targetResourceId});
+ // The comparison is read-only. Copy only the selected Work and its
+ // containing project instead of cloning and validating the full portfolio.
+ // Capacity values still use the single canonical portfolioResources engine.
+ const candidate={...snapshot,projects:snapshot.projects.map(p=>p.id===projectId?
+  {...p,items:p.items.map(item=>item.id===workId?
+   {...item,resourceId:targetResourceId}:item)}:p)};
  const result=portfolioResources(candidate,{schedule:forecast});
  const after=totals(result);
  const current=baseline.work.find(row=>row.projectId===projectId&&row.id===workId);

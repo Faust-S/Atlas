@@ -122,3 +122,19 @@ test('Installed Windows resource comparison follows native Work editing without 
  assert.doesNotMatch(native,/\+FIRST\b/,'No undefined Python Work label may enter the installed scenario');
  assert.match(workflow,/desktop\/tests\/installed-atlas12-\*\.py/);
 });
+
+test('Fast transient Work projection agrees with the authoritative editItem and capacity engine',()=>{
+ const f=fixture(),before=serialize(f.snapshot);
+ const forecast=portfolioSchedule(f.snapshot);
+ const resources=portfolioResources(f.snapshot,{schedule:forecast});
+ const expectedState=editItem(f.snapshot,f.pid,f.second,{resourceId:f.lift});
+ const expected=portfolioResources(expectedState,{schedule:forecast});
+ const preview=run(f,{schedule:forecast,resources});
+ assert.equal(preview.proposedSource.overloadDays,expected.byId.get(f.crane).overloadDays);
+ assert.equal(preview.proposedSource.maxLoadPct,expected.byId.get(f.crane).maxLoadPct);
+ assert.equal(preview.proposedTarget.overloadDays,expected.byId.get(f.lift).overloadDays);
+ assert.equal(preview.proposedTarget.maxLoadPct,expected.byId.get(f.lift).maxLoadPct);
+ assert.equal(preview.alternative.unavailableResourceDays,
+  expected.people.reduce((n,r)=>n+r.unavailableDays,0));
+ assert.equal(serialize(f.snapshot),before);
+});
