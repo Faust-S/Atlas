@@ -226,6 +226,26 @@ def qualify():
     v.capture("atlas11-v6-split-inspector-installed-820")
     print("ATLAS11_NATIVE_SPLIT_INSPECTOR_820_PASS",flush=True)
 
+    # Apply a real Work duration edit through the installed Tauri form,
+    # then inspect the original CPM consequences without saving to disk.
+    click_named("Изменить работу","Button")
+    d.wait_text("Изменение данных",25)
+    v.set_editor_text("Плановая длительность, дней","37")
+    v.find_control("Применить к черновику",types={"Button"}).click_input()
+    d.wait_text("Работа изменена в черновике.",35)
+    d.wait_text("Последствия корректировки",35)
+    click_named("Инспектор: итог","Button")
+    d.wait_text("Продолжительность проекта по CPM",35)
+    d.wait_text("Затронутые работы",35)
+    assert d.head()==saved,"Work correction wrote to Native Store without Save"
+    v.capture("atlas11-v6-inspector-work-impact-820")
+    click_named("Инспектор: сроки","Button")
+    d.wait_text("Календарь работы",25)
+    click_named("Инспектор: итог","Button")
+    d.wait_text("Последствия корректировки",25)
+    assert d.head()==saved
+    print("ATLAS11_NATIVE_WORK_CORRECTION_IMPACT_INSPECTOR_PASS",flush=True)
+
 if __name__=="__main__":
     try:
         qualify()

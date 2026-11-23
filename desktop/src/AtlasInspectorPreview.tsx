@@ -1,11 +1,12 @@
-import React,{useEffect,useMemo,useState} from "react";
-import {inspectorWorkContext,inspectorPagedRows} from "./inspector-work-context.mjs";
+import React,{useEffect,useMemo,useRef,useState} from "react";
+import {inspectorWorkContext,inspectorPagedRows,inspectorRecentCorrection} from "./inspector-work-context.mjs";
 
 type Kind="project"|"work"|"source"|"baseline";
 type Tab={key:string;kind:Kind;id:string};
 type Props={
  project:any|null;snapshot:any;plan:any;forecast:any;dirty:boolean;
  comparison:any|null;deadlineRisks:Map<string,any>;onSelectBaseline:(id:string)=>void;
+ localPlan:any|null;correctionContext:any|null;onShowAffected:()=>void;
  saved:boolean;workRequest:{id:string;serial:number}|null;
  onClose:()=>void;onEditWork:(id:string)=>void;onEditProject:()=>void;
  onOpenTab:(tab:"overview"|"work"|"timeline"|"graph"|"reality"|"sources"|"history")=>void;
@@ -30,11 +31,12 @@ const sourceTypes:Record<string,string>={
 };
 export function AtlasInspectorPreview({project,snapshot,plan,forecast,comparison,
  deadlineRisks,onSelectBaseline,dirty,saved,workRequest,
+ localPlan,correctionContext,onShowAffected,
  onClose,onEditWork,onEditProject,onOpenTab,onSave,canSave}:Props){
  const defaultId=project?.id??"portfolio";
  const [tabs,setTabs]=useState<Tab[]>([{key:"project:"+defaultId,kind:"project",id:defaultId}]);
  const [active,setActive]=useState("project:"+defaultId);
- const [workSection,setWorkSection]=useState<"schedule"|"baseline"|"relations"|"history">("schedule");
+ const [workSection,setWorkSection]=useState<"schedule"|"baseline"|"relations"|"history"|"impact">("schedule");
  const [relationPage,setRelationPage]=useState(0);
  const [historyPage,setHistoryPage]=useState(0);
  const shown=useMemo(()=>{
@@ -72,6 +74,21 @@ export function AtlasInspectorPreview({project,snapshot,plan,forecast,comparison
  ];
  const relationWindow=inspectorPagedRows(relationItems,relationPage);
  const historyWindow=inspectorPagedRows(facts?.history??[],historyPage);
+ const correction=useMemo(()=>project&&shown?.kind==="work"?
+  inspectorRecentCorrection(project,snapshot.revision,shown.id,correctionContext,localPlan):null,
+  [project,snapshot.revision,shown?.kind,shown?.id,correctionContext,localPlan]);
+ const lastAutoImpact=useRef<string|null>(null);
+ useEffect(()=>{
+  if(!correction||shown?.kind!=="work"||shown.id!==correction.rootId)return;
+  const token=correction.projectId+":"+correction.rootId+":"+correction.revision;
+  if(lastAutoImpact.current!==token){
+   lastAutoImpact.current=token;
+   setWorkSection("impact");
+  }
+ },[correction?.projectId,correction?.rootId,correction?.revision,shown?.kind,shown?.id]);
+ useEffect(()=>{
+  if(workSection==="impact"&&!correction)setWorkSection("schedule");
+ },[workSection,correction]);
  const sourceOfWork=facts?.source??null;
  const resourceOfWork=facts?.resource??null;
  const source=shown?.kind==="source"?project?.sources.find((s:any)=>s.id===shown.id):null;
@@ -133,14 +150,70 @@ export function AtlasInspectorPreview({project,snapshot,plan,forecast,comparison
       <button type="button" className="action-button"
        onClick={()=>onOpenTab("graph")}>Все зависимости</button>
      </div>
-     <div className="atlas-v6-work-sections" role="tablist" aria-label="Разделы выбранной работы">
+     <div className={"atlas-v6-work-sections"+(correction?" has-impact":"")} role="tablist" aria-label="Разделы выбранной работы">
        {([
         ["schedule","Сроки"],["baseline","План"],["relations","Связи"],["history","История"]
        ] as const).map(([key,label])=><button type="button" key={key} role="tab"
         aria-selected={workSection===key} aria-label={"Инспектор: "+label.toLowerCase()}
         className={workSection===key?"is-active":""} onClick={()=>setWorkSection(key)}>
         {label}</button>)}
+       {correction&&<button type="button" role="tab" aria-selected={workSection==="impact"}
+        aria-label="Инспектор: итог" className={workSection==="impact"?"is-active":""}
+        onClick={()=>setWorkSection("impact")}>Итог</button>}
       </div>
+      {workSection==="impact"&&correction&&<section className="atlas-v6-preview-card atlas-v6-impact-summary"
+       aria-label="Последствия корректировки работы">
+       <strong>Последствия корректировки</strong>
+       <p role="status">{correction.followupCount>0?
+        "Последовательных правок: "+correction.followupCount+". Сравнение с планом до первого изменения.":
+        "Сравнение с планом до изменения."}</p>
+       <p>Изменена работа: {correction.rootTitle}.</p>
+       <p>Продолжительность проекта по CPM: было {correction.beforeDays} дн.,
+        стало {correction.afterDays} дн.
+        {correction.beforeDays!==correction.afterDays?
+         " Сдвиг "+(correction.afterDays>correction.beforeDays?"+":"")+
+          (correction.afterDays-correction.beforeDays)+" дн.":" Без сдвига длительности проекта."}
+       </p>
+       <p>Текущий прогноз окончания проекта: {format(forecast?.projectedFinish)}.</p>
+       <p>Работ с изменениями: {correction.change.affectedTotal}.
+        {correction.change.movedTotal>0?
+         " Сдвинуты сроки: "+correction.change.movedTotal+
+         " (позже "+correction.change.delayedTotal+", раньше "+correction.change.earlierTotal+").":""}
+        {correction.change.criticalChangedTotal>0?
+         " Изменён критический путь у "+correction.change.criticalChangedTotal+" работ.":""}
+       </p>
+       {correction.change.deadlineChangedTotal>0&&
+        <p>Контрольные сроки изменены у {correction.change.deadlineChangedTotal} работ.
+         {correction.change.deadlineRemovedTotal>0?
+          " Снято контрольных сроков: "+correction.change.deadlineRemovedTotal+".":""}</p>}
+       {correction.change.deadlineResolvedTotal>0&&
+        <p>Нарушений срока по прогнозу устранено: {correction.change.deadlineResolvedTotal}.</p>}
+       {correction.change.deadlineMissedTotal>0&&
+        <p>Работ с просроченным контрольным сроком: {correction.change.deadlineMissedTotal}.</p>}
+       {correction.change.examples.length>0&&<div className="atlas-v6-impact-items">
+        <strong>Затронутые работы</strong>
+        {correction.change.examples.map((affected:any)=><div className="atlas-v6-impact-row" key={affected.id}>
+         <button type="button" className="atlas-v6-preview-link"
+          aria-label={"Открыть затронутую работу "+affected.title}
+          onClick={()=>open("work",affected.id)}>{affected.title}</button>
+         <small>Финиш: {affected.previousFinishDate||"без даты"} → {affected.finishDate||"без даты"}.
+          {" "}{affected.shiftDays===0?"Без сдвига":("Сдвиг "+(affected.shiftDays>0?"+":"")+affected.shiftDays+" дн.")}.
+          {affected.criticalChanged?" Критический путь изменился.":""}
+          {affected.dueDateChanged?" Контрольный срок изменён.":""}</small>
+         <button type="button" className="action-button"
+          aria-label={"Исправить затронутую работу "+affected.title}
+          onClick={()=>{open("work",affected.id);onEditWork(affected.id)}}>Изменить</button>
+        </div>)}
+       </div>}
+       {correction.change.affectedTotal>0&&
+        <button type="button" className="action-button atlas-v6-impact-all"
+         aria-label={"Показать все затронутые работы: "+correction.change.affectedTotal}
+         onClick={onShowAffected}>Все затронутые работы ({correction.change.affectedTotal})</button>}
+       <p className="atlas-v6-impact-note">{dirty?
+        "Пересчёт выполнен в черновике. Для записи на диск нажмите «Сохранить».":
+        "Расчёт соответствует текущему сохранённому плану."}
+        {" "}Оценка относится к календарному плану без выравнивания ресурсов.</p>
+      </section>}
       {workSection==="schedule"&&<section className="atlas-v6-preview-card"><strong>Календарь работы</strong>
       <p>Длительность: {work.estimateDays??1} {work.durationUnit==="working_days"?"рабочих":"календарных"} дн.</p>
       <p>Расчётное начало: {format(workPlan?.startDate)}</p>

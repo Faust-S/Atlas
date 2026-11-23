@@ -3679,7 +3679,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     <AtlasInspectorPreview key={project?.id||"portfolio"}
      project={project} snapshot={data} plan={plan} forecast={projected}
      comparison={controlPlanComparison} deadlineRisks={deadlineRiskDetails}
-     onSelectBaseline={setControlPlanId}
+     localPlan={plannedPlan} correctionContext={recentWorkKind!=="created"?recentPlanBefore:null}
+     onShowAffected={showAffectedWorks} onSelectBaseline={setControlPlanId}
      dirty={dirty} saved={persisted} workRequest={previewWorkRequest}
      onClose={()=>setInspector(false)} onEditWork={id=>openEditor("work:"+id,undefined,true)}
      onEditProject={()=>openEditor("project-edit",undefined,true)} onOpenTab={goProjectTab}

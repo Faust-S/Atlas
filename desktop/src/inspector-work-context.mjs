@@ -74,3 +74,30 @@ export function inspectorPagedRows(rows,requestedPage,pageSize=6){
  const end=Math.min(start+pageSize,total);
  return {items:rows.slice(start,end),page,pages,total,start,end};
 }
+
+/**
+ * Read-only projection of the existing successive Work correction. The
+ * original scheduleChangeSummary remains the only impact calculation.
+ */
+export function inspectorRecentCorrection(project,revision,selectedWorkId,context,localPlan){
+ if(!project||!Array.isArray(project.items)||!context||!localPlan||
+   context.projectId!==project.id||context.revision!==revision||
+   !Number.isSafeInteger(localPlan.durationDays)||
+   !Number.isSafeInteger(context.days)||
+   !context.change||!Array.isArray(context.change.affectedIds)||
+   !Array.isArray(context.change.examples))return null;
+ const root=project.items.find(item=>item.id===context.workId);
+ const selected=project.items.find(item=>item.id===selectedWorkId);
+ if(!root||!selected||(root.id!==selectedWorkId&&
+    !context.change.affectedIds.includes(selectedWorkId)))return null;
+ const byId=new Map(project.items.map(item=>[item.id,item]));
+ const examples=context.change.examples
+  .filter(item=>byId.has(item.id))
+  .map(item=>({...item,title:byId.get(item.id).title}));
+ return {
+  projectId:project.id,revision,rootId:root.id,rootTitle:root.title,
+  beforeDays:context.days,afterDays:localPlan.durationDays,
+  followupCount:Array.isArray(context.followups)?context.followups.length:0,
+  change:{...context.change,examples}
+ };
+}
