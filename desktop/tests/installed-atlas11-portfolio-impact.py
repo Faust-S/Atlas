@@ -77,7 +77,7 @@ def qualify():
     d.set_text("Найти проект по работе, этапу или источнику",SOURCE_WORK)
     d.wait_text("Найдено проектов: 1",35)
     native.click_named("Открыть найденный проект "+UPSTREAM,"Button")
-    d.wait_text("Схема проекта: каталоги, работы и этапы",35)
+    d.wait_text("Схема проекта: работы и этапы",35)
     native.click_named("Показать или скрыть левую панель","Button")
     native.click_named("График работ","Button")
     d.wait_text("График работ",35)
