@@ -54,6 +54,11 @@ test('Existing inspector renders the projected linked correction count in the im
  assert.match(preview,/correction\.linkedFollowups\?\.length>0/);
  assert.match(preview,/Правок в связанных проектах:/);
  assert.match(preview,/Прогноз от исходного плана/);
+ const section=preview.indexOf('<strong>Последствия корректировки</strong>');
+ const summary=preview.indexOf('correction.linkedFollowups?.length>0',section);
+ const details=preview.indexOf('className="atlas-v6-portfolio-impact"',section);
+ assert.ok(section>=0&&summary>section&&details>summary,
+  'Linked correction count must appear before scroll-heavy portfolio details at 820x650');
  const helper=readFileSync(new URL('../desktop/src/inspector-work-context.mjs',import.meta.url),'utf8');
  assert.match(helper,/linkedFollowups,linkedFollowupCount:linkedFollowups\.length/);
 });

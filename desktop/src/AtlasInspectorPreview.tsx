@@ -182,6 +182,7 @@ export function AtlasInspectorPreview({project,snapshot,plan,forecast,comparison
       {workSection==="impact"&&correction&&<section className="atlas-v6-preview-card atlas-v6-impact-summary"
        aria-label="Последствия корректировки работы">
        <strong>Последствия корректировки</strong>
+       {correction.linkedFollowups?.length>0&&<p role="status" className="atlas-v6-linked-correction-count">{"Правок в связанных проектах: "+correction.linkedFollowups.length+". Прогноз от исходного плана."}</p>}
        {portfolio&&<section className="atlas-v6-portfolio-impact"
         aria-label="Последствия изменения работы для портфеля">
         <strong>Влияние на связанные проекты</strong>
@@ -231,7 +232,7 @@ export function AtlasInspectorPreview({project,snapshot,plan,forecast,comparison
        <p role="status">{correction.followupCount>0?
         "Последовательных правок: "+correction.followupCount+". Сравнение с планом до первого изменения.":
         "Сравнение с планом до изменения."}</p>
-       {correction.linkedFollowups?.length>0&&<p role="status">{"Правок в связанных проектах: "+correction.linkedFollowups.length+". Прогноз от исходного плана."}</p>}
+
        <p>Изменена работа: {correction.rootTitle}.</p>
        {shown?.id!==correction.rootId&&<button type="button" className="atlas-v6-preview-link"
         aria-label={"Вернуться к исходной работе "+correction.rootTitle}
