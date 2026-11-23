@@ -96,13 +96,13 @@ export function ResourceAlternatives({snapshot,forecast,resources,resourceId,onC
      <strong>Контрольные сроки и ресурсные ограничения</strong>
      <p>Work: расчётный финиш {preview.controlDates.work.forecastFinish||'не определён'};
       контрольная дата {preview.controlDates.work.controlDate||'не задана'}.
-      {preview.controlDates.work.slipDays>0?
+      {preview.controlDates.work.slipDays!==null&&preview.controlDates.work.slipDays>0?
        ' Превышение: '+preview.controlDates.work.slipDays+' дн.':
        preview.controlDates.work.slipDays===0?' По календарю в пределах срока.':
        ' Нельзя определить календарное отклонение.'}</p>
      <p>Проект: расчётный финиш {preview.controlDates.project.forecastFinish||'не определён'};
       контрольная дата {preview.controlDates.project.controlDate||'не задана'}.
-      {preview.controlDates.project.slipDays>0?
+      {preview.controlDates.project.slipDays!==null&&preview.controlDates.project.slipDays>0?
        ' Превышение: '+preview.controlDates.project.slipDays+' дн.':
        preview.controlDates.project.slipDays===0?' По календарю в пределах срока.':
        ' Нельзя определить календарное отклонение.'}</p>
