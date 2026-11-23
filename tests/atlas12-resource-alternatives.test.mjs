@@ -117,7 +117,7 @@ test('Installed Windows resource comparison follows native Work editing without 
  const native=readFileSync(new URL('../desktop/tests/installed-atlas12-resource-alternatives.py',import.meta.url),'utf8');
  const workflow=readFileSync(new URL('../.github/workflows/atlas-0-11-v6-windows.yml',import.meta.url),'utf8');
  assert.match(native,/first_work=original\['projects'\]\[0\]\['items'\]\[0\]\['title'\]/);
- assert.match(native,/v\.find_control\(work_action,types=\{'Button'\}\)\.click_input\(\)/);
+ assert.match(native,/native\.click_named\(work_action,'Button'\)/);
  assert.match(native,/ATLAS12_NATIVE_RESOURCE_TO_WORK_EDITOR_PASS/);
  assert.doesNotMatch(native,/\+FIRST\b/,'No undefined Python Work label may enter the installed scenario');
  assert.match(workflow,/desktop\/tests\/installed-atlas12-\*\.py/);

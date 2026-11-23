@@ -82,7 +82,7 @@ def qualify():
     print('ATLAS12_NATIVE_RESOURCE_OPTIONS_READ_ONLY_PASS',flush=True)
     # The user must reach the ordinary Work editor; the resource comparison
     # itself cannot execute an assignment or write to Native Store.
-    v.find_control(work_action,types={'Button'}).click_input()
+    native.click_named(work_action,'Button')
     d.wait_text('Изменение данных',35)
     d.wait_text('Работа: '+first_work,35)
     d.wait_text('Плановый ресурс',35)
