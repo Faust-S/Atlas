@@ -170,32 +170,18 @@ export function AtlasInspectorPreview({project,snapshot,plan,forecast,comparison
       {workSection==="impact"&&correction&&<section className="atlas-v6-preview-card atlas-v6-impact-summary"
        aria-label="Последствия корректировки работы">
        <strong>Последствия корректировки</strong>
-       <p role="status">{correction.followupCount>0?
-        "Последовательных правок: "+correction.followupCount+". Сравнение с планом до первого изменения.":
-        "Сравнение с планом до изменения."}</p>
-       <p>Изменена работа: {correction.rootTitle}.</p>
-       {shown?.id!==correction.rootId&&<button type="button" className="atlas-v6-preview-link"
-        aria-label={"Вернуться к исходной работе "+correction.rootTitle}
-        onClick={()=>{open("work",correction.rootId);setWorkSection("impact")}}>
-        К исходной работе: {correction.rootTitle}</button>}
        {portfolio&&<section className="atlas-v6-portfolio-impact"
         aria-label="Последствия изменения работы для портфеля">
         <strong>Влияние на связанные проекты</strong>
-        <p>Финиш текущего проекта: было {format(portfolio.source.previousFinish)},
-         стало {format(portfolio.source.projectedFinish)}.
-         {portfolio.source.finishShiftDays!==null&&portfolio.source.finishShiftDays!==0?
-          " Сдвиг "+(portfolio.source.finishShiftDays>0?"+":"")+
-          portfolio.source.finishShiftDays+" дн.":""}</p>
         {portfolio.linkedTotal===0?
-         <p>У проекта нет зависимых проектов в портфеле.</p>:
-         <p role="status">Зависимых проектов: {portfolio.linkedTotal}.
-          Изменился прогноз у {portfolio.affectedTotal}.
-          {portfolio.laterTotal>0?" Позже: "+portfolio.laterTotal+".":""}
-          {portfolio.earlierTotal>0?" Раньше: "+portfolio.earlierTotal+".":""}
-          {portfolio.undatedTotal>0?" Потеряна расчётная дата: "+portfolio.undatedTotal+".":""}
-          {portfolio.restoredTotal>0?" Появилась расчётная дата: "+portfolio.restoredTotal+".":""}
-          {portfolio.newDeadlineRisks>0?" Новых нарушений срока: "+portfolio.newDeadlineRisks+".":""}
-         </p>}
+         <p role="status">У проекта нет зависимых проектов в портфеле.</p>:
+         <p role="status">{"Зависимых проектов: "+portfolio.linkedTotal+
+          ". Изменился прогноз у "+portfolio.affectedTotal+"."+
+          (portfolio.laterTotal>0?" Позже: "+portfolio.laterTotal+".":"")+
+          (portfolio.earlierTotal>0?" Раньше: "+portfolio.earlierTotal+".":"")+
+          (portfolio.undatedTotal>0?" Потеряна расчётная дата: "+portfolio.undatedTotal+".":"")+
+          (portfolio.restoredTotal>0?" Появилась расчётная дата: "+portfolio.restoredTotal+".":"")+
+          (portfolio.newDeadlineRisks>0?" Новых нарушений срока: "+portfolio.newDeadlineRisks+".":"")}</p>}
         {portfolio.affectedTotal>0&&<div className="atlas-v6-portfolio-impact-list">
          {portfolioWindow.items.map((linked:any)=><div className="atlas-v6-portfolio-impact-row" key={linked.id}>
           <button type="button" className="atlas-v6-preview-link"
@@ -222,9 +208,22 @@ export function AtlasInspectorPreview({project,snapshot,plan,forecast,comparison
            onClick={()=>setPortfolioPage(portfolioWindow.page+1)}>Далее</button>
          </div>}
         </div>}
+        <p>Финиш текущего проекта: было {format(portfolio.source.previousFinish)},
+         стало {format(portfolio.source.projectedFinish)}.
+         {portfolio.source.finishShiftDays!==null&&portfolio.source.finishShiftDays!==0?
+          " Сдвиг "+(portfolio.source.finishShiftDays>0?"+":"")+
+          portfolio.source.finishShiftDays+" дн.":""}</p>
         <small>Прогноз рассчитан по связям проектов и рабочим календарям.
          {dirty?" Для записи правки на диск нажмите «Сохранить».":""}</small>
        </section>}
+       <p role="status">{correction.followupCount>0?
+        "Последовательных правок: "+correction.followupCount+". Сравнение с планом до первого изменения.":
+        "Сравнение с планом до изменения."}</p>
+       <p>Изменена работа: {correction.rootTitle}.</p>
+       {shown?.id!==correction.rootId&&<button type="button" className="atlas-v6-preview-link"
+        aria-label={"Вернуться к исходной работе "+correction.rootTitle}
+        onClick={()=>{open("work",correction.rootId);setWorkSection("impact")}}>
+        К исходной работе: {correction.rootTitle}</button>}
        <p>Продолжительность проекта по CPM: было {correction.beforeDays} дн.,
         стало {correction.afterDays} дн.
         {correction.beforeDays!==correction.afterDays?

@@ -137,6 +137,10 @@ test("Inspector provides compact, keyboard-addressable cross-project routes",()=
  assert.match(main,/beforePortfolio:dates,afterPortfolio:portfolioSchedule\(next\)/);
  assert.match(main,/onOpenLinkedProject=\{id=>openProjectTab\(id,"timeline"\)\}/);
  assert.match(preview,/aria-label="Последствия изменения работы для портфеля"/);
+ assert.match(preview,/role="status">\{"Зависимых проектов: "\+portfolio\.linkedTotal/);
+ assert.ok(preview.indexOf("Влияние на связанные проекты")<
+  preview.indexOf("Последовательных правок:"),
+  "Portfolio impact and its project link must precede the local correction details");
  assert.match(preview,/aria-label=\{"Открыть зависимый проект "\+linked\.name\}/);
  assert.match(preview,/onClick=\{\(\)=>onOpenLinkedProject\(linked\.id\)\}/);
  assert.match(preview,/inspectorPagedRows\(portfolio\?\.rows\?\?\[\],portfolioPage,2\)/);
