@@ -1,6 +1,7 @@
 import React,{useEffect,useState} from "react";
 import {projectStructureGuide,projectSourcePlanProjection,folderWorkAction,folderLinkAction} from "../../src/project-organization.mjs";
 import {ProjectSourcePlanMap} from "./ProjectVisuals";
+import {projectWorkPlanReadiness} from "../../src/work-plan-readiness.mjs";
 
 // Saved GitHub observations enrich this view when available; existing work,
 // stage and dependency links remain usable in any project without GitHub.
@@ -30,6 +31,7 @@ export function ProjectOrganizationGuide({snapshot,projectId,restoreSearch,onEdi
   {maxSources:8,maxFoldersPerSource:16,maxWorksPerFolder:8,maxOtherWorks:20,maxUnassignedStages:16}:
   {maxSources:2,maxFoldersPerSource:4,maxWorksPerFolder:3,maxOtherWorks:6,maxUnassignedStages:4});
  const suggested=guide.nextAction;
+ const readiness=projectWorkPlanReadiness(snapshot,projectId,{maxRows:3});
  const hasSources=guide.sources.length>0;
  const project=snapshot.projects.find((p:any)=>p.id===projectId);
  const recordedSources=project?.sources.length??0;
@@ -58,6 +60,31 @@ export function ProjectOrganizationGuide({snapshot,projectId,restoreSearch,onEdi
     "Здесь показаны ваши работы, этапы и записанные зависимости."}</p>
   </div>{!recordedSources&&<button type="button"
    className="action-button" onClick={onOpenSources}>Подключить источник</button>}</div>
+  {readiness.totals.all>0&&<section className="atlas-work-plan-readiness"
+   role="group" aria-label="Готовность работ по плану">
+   <div className="atlas-work-plan-readiness-head">
+    <strong>Готовность работ по плану</strong>
+    <span role="status">Без записанных препятствий: {readiness.totals.ready}.
+     {readiness.totals.waiting>0?" Ждут предшественников: "+readiness.totals.waiting+".":""}
+     {readiness.totals.blocked>0?" Заблокированы: "+readiness.totals.blocked+".":""}
+     {readiness.totals.review>0?" Проверить ресурсы: "+readiness.totals.review+".":""}
+     {readiness.totals.no_dates>0?" Уточнить даты: "+readiness.totals.no_dates+".":""}</span>
+   </div>
+   <details className="atlas-work-plan-readiness-details">
+    <summary>Проверить работы и причины</summary>
+    {readiness.attention.map(row=><div key={row.id} className="atlas-work-plan-readiness-row">
+     <div><strong>{row.title}</strong><small>{row.label}.
+      {row.reasons.length?" "+row.reasons.join(". "):""}
+      {row.startDate?" Начало по плану: "+row.startDate+".":""}</small></div>
+     <button type="button" className="action-button" disabled={busy}
+      aria-label={"Проверить работу "+row.title}
+      onClick={()=>onEdit("work:"+row.id)}>Проверить работу</button>
+    </div>)}
+    {readiness.hiddenAttention>0&&<button type="button" className="text-link"
+     onClick={onOpenWorks}>Все работы ({readiness.totals.all})</button>}
+    <p className="minor">{readiness.note}</p>
+   </details>
+  </section>}
   {overdueHighlights.length>0&&<div className="atlas-overdue-preview"
    role="group" aria-label="Работы с наибольшим расчётным отставанием">
    <div className="atlas-overdue-preview-heading">

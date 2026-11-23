@@ -148,6 +148,12 @@ def qualify():
     d.wait_text("Найдено проектов: 1",35)
     click_named("Открыть найденный проект "+v.PROJECT,"Button")
     d.wait_text("Схема проекта: каталоги, работы и этапы",35)
+    # Atlas 0.12 uses only current planning data. Reading the compact
+    # readiness view must not issue a Task or write to the native Store.
+    d.wait_text("Готовность работ по плану",35)
+    assert d.head()==saved,"Read-only plan readiness wrote to Native Store"
+    v.capture("atlas12-plan-readiness-overview-820")
+    print("ATLAS12_NATIVE_PLAN_READINESS_OVERVIEW_PASS",flush=True)
     # Collapse the optional secondary navigation before opening the split dock.
     click_named("Показать или скрыть левую панель","Button")
     # Every original project section stays reachable from the compact rail.

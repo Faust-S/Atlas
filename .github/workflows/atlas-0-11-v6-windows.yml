@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - work/2026-11-22-atlas-0-11-baseline
+      - work/2026-11-23-atlas-0-12-plan-readiness
     paths:
       - '.github/workflows/atlas-0-11-v6-windows.yml'
       - 'desktop/tests/installed-atlas11-v6-design.py'
@@ -12,6 +13,7 @@ on:
       - 'desktop/src/AtlasDashboard.tsx'
       - 'desktop/src/AtlasSettings.tsx'
       - 'desktop/src/AtlasInspectorPreview.tsx'
+      - 'desktop/src/ProjectOrganizationGuide.tsx'
       - 'desktop/src/inspector-work-context.mjs'
       - 'desktop/src/style.css'
       - 'desktop/index.html'
@@ -23,6 +25,7 @@ on:
       - 'tests/fixtures/**'
       - 'tests/verify-atlas09-host-dist.mjs'
       - 'tests/atlas11-*.test.mjs'
+      - 'tests/atlas12-*.test.mjs'
       - 'src/**'
   workflow_dispatch:
 

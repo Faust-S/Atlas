@@ -1648,3 +1648,23 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
  cursor:pointer;min-height:25px}
 .editor-panel .atlas-work-draft-portfolio ul{margin:4px 0 7px;padding-left:17px}
 .editor-panel .atlas-work-draft-portfolio li{font-size:10px;overflow-wrap:anywhere}
+
+/* Atlas 0.12: plan feasibility, not personnel, execution, or Result authority. */
+.atlas-work-plan-readiness{border:1px solid #c3d7e9;border-radius:9px;
+ background:#f4f9ff;padding:8px 11px;margin:9px 0;min-width:0}
+.atlas-work-plan-readiness-head{display:flex;flex-wrap:wrap;align-items:baseline;
+ gap:4px 10px}
+.atlas-work-plan-readiness-head strong{color:#28587e;font-size:12px}
+.atlas-work-plan-readiness-head span{color:#4a6680;font-size:11px;line-height:1.45}
+.atlas-work-plan-readiness-details>summary{min-height:28px;cursor:pointer;
+ color:#246197;font-size:11px;font-weight:600}
+.atlas-work-plan-readiness-row{display:flex;flex-wrap:wrap;align-items:center;
+ justify-content:space-between;gap:6px;padding:6px 0;border-top:1px solid #d4e3f2}
+.atlas-work-plan-readiness-row>div{flex:1 1 230px;min-width:0}
+.atlas-work-plan-readiness-row strong{display:block;font-size:11px;overflow-wrap:anywhere}
+.atlas-work-plan-readiness-row small{display:block;font-size:10px;color:#58738f;
+ line-height:1.45;overflow-wrap:anywhere}
+.atlas-work-plan-readiness-row .action-button{font-size:10px;min-height:29px;padding:5px 8px}
+.atlas-work-plan-readiness>.minor{font-size:10px;line-height:1.4;margin:5px 0 0;
+ color:#647b91;overflow-wrap:anywhere}
+.atlas-work-plan-readiness :focus-visible{outline:2px solid #1e78b9;outline-offset:2px}
