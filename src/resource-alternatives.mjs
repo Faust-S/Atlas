@@ -162,7 +162,7 @@ export function prepareResourceEditorChoice(snapshot,comparison){
  * No choice is made, applied, or saved by this function.
  */
 export function compareWorkResourceAlternatives(snapshot,
- {projectId,workId,offset=0,limit=6}={}, {schedule=null,resources=null}={}){
+ {projectId,workId,offset=0,limit=6}, {schedule=null,resources=null}={}){
  if(!snapshot||!Array.isArray(snapshot.projects)||!projectId||!workId)
   throw Error('Выберите работу для сравнения');
  if(!Number.isSafeInteger(offset)||offset<0||
