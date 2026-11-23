@@ -7,6 +7,7 @@ type Props={
  project:any|null;snapshot:any;plan:any;forecast:any;dirty:boolean;
  comparison:any|null;deadlineRisks:Map<string,any>;onSelectBaseline:(id:string)=>void;
  localPlan:any|null;correctionContext:any|null;onShowAffected:()=>void;
+ onOpenLinkedProject:(projectId:string)=>void;
  saved:boolean;workRequest:{id:string;serial:number}|null;
  onClose:()=>void;onEditWork:(id:string)=>void;onEditProject:()=>void;
  onOpenTab:(tab:"overview"|"work"|"timeline"|"graph"|"reality"|"sources"|"history")=>void;
@@ -31,7 +32,7 @@ const sourceTypes:Record<string,string>={
 };
 export function AtlasInspectorPreview({project,snapshot,plan,forecast,comparison,
  deadlineRisks,onSelectBaseline,dirty,saved,workRequest,
- localPlan,correctionContext,onShowAffected,
+ localPlan,correctionContext,onShowAffected,onOpenLinkedProject,
  onClose,onEditWork,onEditProject,onOpenTab,onSave,canSave}:Props){
  const defaultId=project?.id??"portfolio";
  const [tabs,setTabs]=useState<Tab[]>([{key:"project:"+defaultId,kind:"project",id:defaultId}]);
@@ -39,6 +40,7 @@ export function AtlasInspectorPreview({project,snapshot,plan,forecast,comparison
  const [workSection,setWorkSection]=useState<"schedule"|"baseline"|"relations"|"history"|"impact">("schedule");
  const [relationPage,setRelationPage]=useState(0);
  const [historyPage,setHistoryPage]=useState(0);
+ const [portfolioPage,setPortfolioPage]=useState(0);
  const shown=useMemo(()=>{
   const key=tabs.some(t=>t.key===active)?active:tabs[0]?.key;
   return tabs.find(t=>t.key===key)||null;
@@ -77,6 +79,9 @@ export function AtlasInspectorPreview({project,snapshot,plan,forecast,comparison
  const correction=useMemo(()=>project&&shown?.kind==="work"?
   inspectorRecentCorrection(project,snapshot.revision,shown.id,correctionContext,localPlan):null,
   [project,snapshot.revision,shown?.kind,shown?.id,correctionContext,localPlan]);
+ const portfolio=correction?.portfolioChange??null;
+ const portfolioWindow=inspectorPagedRows(portfolio?.rows??[],portfolioPage,2);
+ useEffect(()=>setPortfolioPage(0),[project?.id,correction?.revision]);
  const lastAutoImpact=useRef<string|null>(null);
  useEffect(()=>{
   if(!correction||shown?.kind!=="work"||
@@ -173,6 +178,53 @@ export function AtlasInspectorPreview({project,snapshot,plan,forecast,comparison
         aria-label={"Вернуться к исходной работе "+correction.rootTitle}
         onClick={()=>{open("work",correction.rootId);setWorkSection("impact")}}>
         К исходной работе: {correction.rootTitle}</button>}
+       {portfolio&&<section className="atlas-v6-portfolio-impact"
+        aria-label="Последствия изменения работы для портфеля">
+        <strong>Влияние на связанные проекты</strong>
+        <p>Финиш текущего проекта: было {format(portfolio.source.previousFinish)},
+         стало {format(portfolio.source.projectedFinish)}.
+         {portfolio.source.finishShiftDays!==null&&portfolio.source.finishShiftDays!==0?
+          " Сдвиг "+(portfolio.source.finishShiftDays>0?"+":"")+
+          portfolio.source.finishShiftDays+" дн.":""}</p>
+        {portfolio.linkedTotal===0?
+         <p>У проекта нет зависимых проектов в портфеле.</p>:
+         <p role="status">Зависимых проектов: {portfolio.linkedTotal}.
+          Изменился прогноз у {portfolio.affectedTotal}.
+          {portfolio.laterTotal>0?" Позже: "+portfolio.laterTotal+".":""}
+          {portfolio.earlierTotal>0?" Раньше: "+portfolio.earlierTotal+".":""}
+          {portfolio.undatedTotal>0?" Потеряна расчётная дата: "+portfolio.undatedTotal+".":""}
+          {portfolio.restoredTotal>0?" Появилась расчётная дата: "+portfolio.restoredTotal+".":""}
+          {portfolio.newDeadlineRisks>0?" Новых нарушений срока: "+portfolio.newDeadlineRisks+".":""}
+         </p>}
+        {portfolio.affectedTotal>0&&<div className="atlas-v6-portfolio-impact-list">
+         {portfolioWindow.items.map((linked:any)=><div className="atlas-v6-portfolio-impact-row" key={linked.id}>
+          <button type="button" className="atlas-v6-preview-link"
+           aria-label={"Открыть зависимый проект "+linked.name}
+           onClick={()=>onOpenLinkedProject(linked.id)}>{linked.name}</button>
+          <small>Начало: {format(linked.previousStart)} → {format(linked.projectedStart)}.
+           {" "}Финиш: {format(linked.previousFinish)} → {format(linked.projectedFinish)}.
+           {linked.finishShiftDays!==null&&linked.finishShiftDays!==0?
+            " Сдвиг "+(linked.finishShiftDays>0?"+":"")+linked.finishShiftDays+" дн.":""}
+           {linked.newlyUndated?" Расчётная дата больше недоступна.":""}
+           {linked.newlyDated?" Появилась расчётная дата.":""}
+           {linked.deadlineSlipDays>0?" Превышение контрольного срока: "+linked.deadlineSlipDays+" дн.":""}
+          </small>
+         </div>)}
+         {portfolioWindow.pages>1&&<div className="atlas-v6-inspector-pager"
+          aria-label="Страницы зависимых проектов">
+          <span role="status">Проекты {portfolioWindow.start+1}–{portfolioWindow.end}
+           {" "}из {portfolioWindow.total}</span>
+          <button type="button" disabled={portfolioWindow.page===0}
+           aria-label="Предыдущие зависимые проекты"
+           onClick={()=>setPortfolioPage(portfolioWindow.page-1)}>Назад</button>
+          <button type="button" disabled={portfolioWindow.page===portfolioWindow.pages-1}
+           aria-label="Следующие зависимые проекты"
+           onClick={()=>setPortfolioPage(portfolioWindow.page+1)}>Далее</button>
+         </div>}
+        </div>}
+        <small>Прогноз рассчитан по связям проектов и рабочим календарям.
+         {dirty?" Для записи правки на диск нажмите «Сохранить».":""}</small>
+       </section>}
        <p>Продолжительность проекта по CPM: было {correction.beforeDays} дн.,
         стало {correction.afterDays} дн.
         {correction.beforeDays!==correction.afterDays?

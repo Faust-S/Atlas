@@ -1364,7 +1364,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     const updatedProject=result.state.projects.find((p:any)=>p.id===formProject);
     setRecentPlanBefore(plannedPlan&&updatedProject?startWorkCorrection({
      projectId:formProject,workId:result.workId,revision:result.state.revision,
-     beforePlan:plannedPlan,afterPlan:scheduleProject(updatedProject,{calendarLibrary:data.calendarLibrary??[]})
+     beforePlan:plannedPlan,afterPlan:scheduleProject(updatedProject,{calendarLibrary:data.calendarLibrary??[]}),
+     beforePortfolio:dates,afterPortfolio:portfolioSchedule(result.state)
     }):null);
     const isDependencyChange=editor.action.startsWith("dep-to:");
     setRecentWorkKind(isDependencyChange?"dependency":"created");
@@ -1392,14 +1393,16 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      recentScheduleEffect.affectedIds.includes(correctedId));
     if(scheduleFieldsChanged||fromImpactList){
      const updatedPlan=updatedProject?scheduleProject(updatedProject,{calendarLibrary:data.calendarLibrary??[]}):null;
+     const updatedPortfolio=updatedPlan?portfolioSchedule(result.state):null;
      const continued=fromImpactList&&updatedPlan?continueWorkCorrection(
       recentPlanBefore,{projectId:formProject,workId:correctedId,
        revision:data.revision,nextRevision:result.state.revision,afterPlan:updatedPlan,
-       recordCorrection:Boolean(scheduleFieldsChanged)}
+       afterPortfolio:updatedPortfolio,recordCorrection:Boolean(scheduleFieldsChanged)}
      ):null;
      const nextContext=continued||(plannedPlan&&updatedPlan?startWorkCorrection({
       projectId:formProject,workId:correctedId,revision:result.state.revision,
-      beforePlan:plannedPlan,afterPlan:updatedPlan
+      beforePlan:plannedPlan,afterPlan:updatedPlan,
+      beforePortfolio:dates,afterPortfolio:updatedPortfolio
      }):null);
      setRecentPlanBefore(nextContext);
      setRecentWorkKind("adjusted");
@@ -1666,7 +1669,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    mutate(next,"Связь удалена из черновика. Проверьте последствия и сохраните изменение.");
    setRecentPlanBefore(plannedPlan?startWorkCorrection({
     projectId:project.id,workId:to,revision:next.revision,
-    beforePlan:plannedPlan,afterPlan:scheduleProject(updatedProject,{calendarLibrary:data.calendarLibrary??[]})
+    beforePlan:plannedPlan,afterPlan:scheduleProject(updatedProject,{calendarLibrary:data.calendarLibrary??[]}),
+    beforePortfolio:dates,afterPortfolio:portfolioSchedule(next)
    }):null);
    setRecentWorkKind("dependency");setRecentWorkId(to);
    revealWorkInTable(to,false);
@@ -3688,6 +3692,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      comparison={controlPlanComparison} deadlineRisks={deadlineRiskDetails}
      localPlan={plannedPlan} correctionContext={recentWorkKind!=="created"?recentPlanBefore:null}
      onShowAffected={showAffectedWorks} onSelectBaseline={setControlPlanId}
+     onOpenLinkedProject={id=>openProjectTab(id,"timeline")}
      dirty={dirty} saved={persisted} workRequest={previewWorkRequest}
      onClose={()=>setInspector(false)} onEditWork={id=>openEditor("work:"+id,undefined,true)}
      onEditProject={()=>openEditor("project-edit",undefined,true)} onOpenTab={goProjectTab}

@@ -93,17 +93,30 @@ jobs:
           }
           "ATLAS06_VISUAL_IWXA=$archive" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
+      - name: Prepare existing two-project calendar IWXA package
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $archive = Join-Path $env:RUNNER_TEMP 'atlas11-portfolio-work-impact.iwxa'
+          node tests/fixtures/atlas10-portfolio-forecast.mjs $archive
+          if ($LASTEXITCODE -ne 0 -or !(Test-Path -LiteralPath $archive)) {
+            throw 'ATLAS11_NATIVE_PORTFOLIO_FIXTURE_FAILED'
+          }
+          "ATLAS11_PORTFOLIO_IMPACT_IWXA=$archive" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
       - name: Qualify installed native UI with Windows accessibility API
         shell: pwsh
-        timeout-minutes: 22
+        timeout-minutes: 25
         run: |
           $ErrorActionPreference = 'Stop'
           python -m pip install pywinauto==0.6.9 pillow==11.3.0
           if ($LASTEXITCODE -ne 0) { throw 'ATLAS11_NATIVE_UIA_MISSING' }
-          python -m py_compile desktop/tests/installed-atlas11-v6-design.py
+          python -m py_compile desktop/tests/installed-atlas11-v6-design.py desktop/tests/installed-atlas11-portfolio-impact.py
           if ($LASTEXITCODE -ne 0) { throw 'ATLAS11_NATIVE_SCRIPT_SYNTAX' }
           python desktop/tests/installed-atlas11-v6-design.py
           if ($LASTEXITCODE -ne 0) { throw 'ATLAS11_NATIVE_V6_USER_ROUTE_FAIL' }
+          python desktop/tests/installed-atlas11-portfolio-impact.py
+          if ($LASTEXITCODE -ne 0) { throw 'ATLAS11_NATIVE_PORTFOLIO_IMPACT_FAIL' }
 
       - name: Preserve accepted development installer and SHA-256
         if: success()

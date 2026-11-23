@@ -36,3 +36,16 @@ jobs:
         run: |
           npm ci --no-audit --no-fund
           npm run build
+
+      - name: Archive exact source for independent qualification
+        if: success()
+        run: git archive --format=zip --output=atlas11-source.zip HEAD
+
+      - name: Provide qualified source archive
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas11-source-${{ github.sha }}
+          path: atlas11-source.zip
+          if-no-files-found: error
+          retention-days: 3

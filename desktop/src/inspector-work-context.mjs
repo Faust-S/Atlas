@@ -100,6 +100,8 @@ export function inspectorRecentCorrection(project,revision,selectedWorkId,contex
   projectId:project.id,revision,rootId:root.id,rootTitle:root.title,
   beforeDays:context.days,afterDays:localPlan.durationDays,
   followupCount:followupIds.length,followupIds:[...followupIds],
-  change:{...context.change,examples}
+  change:{...context.change,examples},
+  // Already computed by the original portfolioSchedule; never recalculate in UI.
+  portfolioChange:context.portfolioChange??null
  };
 }

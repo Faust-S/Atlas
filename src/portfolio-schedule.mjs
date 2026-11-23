@@ -145,3 +145,94 @@ export function renderProjectSchedule(snapshot,projectId,escape=escapeHtml){
   (notes?'<ul>'+notes+'</ul>':'<p class="muted">Календарных конфликтов не выявлено, но готовность не подтверждена.</p>')+
   '<p class="muted">Расчёт носит рекомендательный характер. Даты изменяются только по явному решению пользователя.</p></section>';
 }
+
+
+/**
+ * Inspect downstream calendar consequences between two authoritative
+ * portfolioSchedule() projections. Never replan, edit Work, or infer delivery.
+ *
+ * The source project is reported separately; only reachable downstream
+ * projects can appear in rows. Multiple paths through a diamond are counted
+ * once. Unknown forecasts are not converted to zero-day delays.
+ */
+export function portfolioScheduleChangeSummary(before,after,sourceProjectId){
+ if(!before||!after||!Array.isArray(before.rows)||!Array.isArray(after.rows)||
+    !(before.byId instanceof Map)||!(after.byId instanceof Map)||
+    !sourceProjectId||!before.byId.has(sourceProjectId)||
+    !after.byId.has(sourceProjectId))
+  throw Error("Invalid portfolio correction comparison");
+
+ const outgoing=new Map(after.rows.map(row=>[row.id,[]]));
+ for(const row of after.rows){
+  if(!Array.isArray(row.incoming))throw Error("Invalid portfolio schedule links");
+  for(const predecessor of row.incoming){
+   if(!outgoing.has(predecessor))throw Error("Missing predecessor in portfolio schedule");
+   outgoing.get(predecessor).push(row.id);
+  }
+ }
+ const downstream=new Set(),queue=[sourceProjectId];
+ for(let index=0;index<queue.length;index++){
+  for(const successor of outgoing.get(queue[index])||[]){
+   if(successor===sourceProjectId||downstream.has(successor))continue;
+   downstream.add(successor);
+   queue.push(successor);
+  }
+ }
+ const offset=(oldDate,newDate)=>{
+  if(!oldDate||!newDate)return null;
+  return day(newDate)-day(oldDate);
+ };
+ const availability=row=>
+  (row.unavailableOrigins||[]).map(origin=>origin.id+":"+origin.status).sort().join("|");
+ const previousSource=before.byId.get(sourceProjectId);
+ const nextSource=after.byId.get(sourceProjectId);
+ const source={
+  id:sourceProjectId,name:nextSource.name,
+  previousStart:previousSource.projectedStart??null,
+  projectedStart:nextSource.projectedStart??null,
+  previousFinish:previousSource.projectedFinish??null,
+  projectedFinish:nextSource.projectedFinish??null,
+  finishShiftDays:offset(previousSource.projectedFinish,nextSource.projectedFinish)
+ };
+ const rows=[];
+ let shiftedTotal=0,laterTotal=0,earlierTotal=0,undatedTotal=0,restoredTotal=0;
+ let newDeadlineRisks=0,resolvedDeadlineRisks=0;
+ for(const row of after.rows){
+  if(!downstream.has(row.id))continue;
+  const old=before.byId.get(row.id);
+  if(!old)throw Error("Missing previous project forecast");
+  const previousStart=old.projectedStart??null,projectedStart=row.projectedStart??null;
+  const previousFinish=old.projectedFinish??null,projectedFinish=row.projectedFinish??null;
+  const previousDeadlineSlip=old.deadlineSlipDays??null;
+  const deadlineSlipDays=row.deadlineSlipDays??null;
+  const changed=previousStart!==projectedStart||previousFinish!==projectedFinish||
+   previousDeadlineSlip!==deadlineSlipDays||availability(old)!==availability(row);
+  if(!changed)continue;
+  const startShiftDays=offset(previousStart,projectedStart);
+  const finishShiftDays=offset(previousFinish,projectedFinish);
+  if(finishShiftDays!==null&&finishShiftDays!==0){
+   shiftedTotal++;
+   if(finishShiftDays>0)laterTotal++;else earlierTotal++;
+  }
+  if(previousFinish&&!projectedFinish)undatedTotal++;
+  if(!previousFinish&&projectedFinish)restoredTotal++;
+  if(!(previousDeadlineSlip>0)&&deadlineSlipDays>0)newDeadlineRisks++;
+  // Losing a forecast is not a resolved violation.
+  if(previousDeadlineSlip>0&&deadlineSlipDays===0)resolvedDeadlineRisks++;
+  rows.push({
+   id:row.id,name:row.name,
+   previousStart,projectedStart,startShiftDays,
+   previousFinish,projectedFinish,finishShiftDays,
+   previousDeadlineSlip,deadlineSlipDays,
+   unavailableOrigins:[...(row.unavailableOrigins||[])],
+   status:row.status,
+   newlyUndated:Boolean(previousFinish&&!projectedFinish),
+   newlyDated:Boolean(!previousFinish&&projectedFinish)
+  });
+ }
+ return {
+  source,linkedTotal:downstream.size,affectedTotal:rows.length,
+  shiftedTotal,laterTotal,earlierTotal,undatedTotal,restoredTotal,
+  newDeadlineRisks,resolvedDeadlineRisks,rows
+ };
+}
