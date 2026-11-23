@@ -37,6 +37,7 @@ import {AtlasChromeTopbar,AtlasChromeRail,AtlasGlyph} from "./AtlasChrome";
 import {ProjectConnect} from "./ProjectConnect";
 import {ProjectOrganizationGuide} from "./ProjectOrganizationGuide";
 import {ResourceAlternatives} from "./ResourceAlternatives";
+import {prepareResourceEditorChoice,assertResourceEditorChoiceCurrent} from "../../src/resource-alternatives.mjs";
 import {projectSourcePlanWorkContext,projectWorkTableSearch} from "../../src/project-organization.mjs";
 import {repoName} from "../../src/github-public.mjs";
 import {applyPublicProjectPreview} from "../../src/project-onboarding.mjs";
@@ -64,7 +65,8 @@ type HistoryEntry = {generation:string;revision:number;projects:number};
 type ImportPreview = {snapshot:Atlas;originalRevision:number;expectedGeneration:string;startedWith:Atlas;summary:any;format:"json"|"iwxa"};
 type OpenResult = {generation:string;snapshot:Atlas;restoredFromBackup:boolean;needsConfirmation:boolean};
 type Field = {name:string;label:string;value?:string;required?:boolean;type:string;searchable?:boolean;options?:{value:string;label:string}[]};
-type Editor = {action:string;spec:{title:string;hint?:string;fields:Field[]}};
+type Editor = {action:string;spec:{title:string;hint?:string;fields:Field[]};
+ resourceProposal?:ReturnType<typeof prepareResourceEditorChoice>};
 type SavedRefPreview = {label:string;json:string;revision:string;generation:string};
 type Tab = "overview"|"work"|"board"|"timeline"|"graph"|"reality"|"changes"|"resources"|"history"|"sources";
 const tabs:{key:Tab;title:string}[]=[
@@ -180,10 +182,16 @@ function EditorPanel({editor,onSubmit,onCancel,onDirtyChange,busy,project,plan,c
     fields.durationUnit,fields.calendarBasis,correctionBaseline,calendarLibrary,
     portfolioSnapshot,portfolioBefore,cumulativePortfolioBaseline]);
  useEffect(()=>{
-  setFields(Object.fromEntries(editor.spec.fields.map(f=>[f.name,String(f.value??"")])));
+  const defaults=Object.fromEntries(editor.spec.fields.map(f=>[f.name,String(f.value??"")]));
+  // The proposal is preselected ONLY in this local form. It remains unapplied
+  // until the user confirms the ordinary Work editor, and is never saved here.
+  const selected=editor.resourceProposal?
+   {...defaults,resourceId:editor.resourceProposal.targetResourceId}:defaults;
+  setFields(selected);
   setWorkQuery("");
-  onDirtyChange(false);
- },[editor.action,editor.spec]);
+  if(editor.resourceProposal)onDirtyChange(true);
+  else onDirtyChange(false);
+ },[editor.action,editor.spec,editor.resourceProposal]);
  const updateFields=(next:Record<string,string>)=>{
   onDirtyChange(editor.spec.fields.some(f=>String(f.value??"")!==(next[f.name]??"")));
   setFields(next);
@@ -198,6 +206,14 @@ function EditorPanel({editor,onSubmit,onCancel,onDirtyChange,busy,project,plan,c
     event.currentTarget.requestSubmit();
    }
   }}>
+   {editor.resourceProposal&&<p className="atlas-resource-editor-proposal" role="status">
+    {fields.resourceId===editor.resourceProposal.targetResourceId?
+     "Предложение из сравнения: "+editor.resourceProposal.sourceLabel+
+     " → "+editor.resourceProposal.targetLabel+
+     ". Ресурс выбран в форме, но ещё не применён к черновику.":
+     "Назначение изменено в форме. Прежнее сравнение относится только к ресурсу "+
+     editor.resourceProposal.targetLabel+"."}
+   </p>}
    <div className="atlas-editor-fields" role="region" aria-label="Поля редактора" tabIndex={0}>
    {editor.spec.fields.map((f,index)=>f.searchable?
     <div className="field atlas-work-picker" role="group" aria-label={f.label} key={f.name}>
@@ -1409,16 +1425,20 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    setError("");
   }catch(e){issue(e)}
  };
- const openEditorFor=(projectId:string,action:string)=>{
+ const openEditorFor=(projectId:string,action:string,comparison:any=null)=>{
   if(!requireClosedForm()||busyRef.current)return;
   try{
    const p=data.projects.find((x:any)=>x.id===projectId);
    if(!p)throw Error("Проект для решения не найден");
+   const resourceProposal=comparison?prepareResourceEditorChoice(data,comparison):undefined;
+   if(resourceProposal&&(action!=="work:"+resourceProposal.workId||
+      projectId!==resourceProposal.projectId))
+    throw Error("Ресурсный вариант относится к другой работе");
    resetWorkspaceScroll();
    setActive(projectId);setHomeOpen(false);setSettingsOpen(false);
    setTab(action.startsWith("plan-")?"changes":"reality");
    inspectorEditorReturnRef.current=false;
-   setEditor({action,spec:editorSpec(p,action,data)});setInspector(true);
+   setEditor({action,spec:editorSpec(p,action,data),resourceProposal});setInspector(true);
    if(!embedded&&window.innerWidth<1150)setNavPanelOpen(false);
    setError("");
   }catch(e){issue(e)}
@@ -1444,6 +1464,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   event.preventDefault();
   if(!editor||busy)return;
   try{
+   // The owner can always cancel; submitting a proposal must recheck that
+   // the source Work and revision have not changed since the comparison.
+   if(editor.resourceProposal)assertResourceEditorChoiceCurrent(data,editor.resourceProposal);
    const form=new FormData(event.currentTarget);
    const formProject=editor.action.startsWith("plan-review:")?
    decodeURIComponent(editor.action.split(":")[3]||""):editor.action.startsWith("plan-proposal:")?
@@ -2410,7 +2433,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
        {resourceComparisonId===r.id&&<tr className="atlas-resource-comparison-row"><td colSpan={6}>
         <ResourceAlternatives key={r.id} snapshot={data} forecast={dates} resources={resources}
          resourceId={r.id} onClose={()=>setResourceComparisonId(null)}
-         onOpenWork={(pid,wid)=>openEditorFor(pid,"work:"+wid)}/>
+         onOpenWork={(pid,wid,comparison)=>openEditorFor(pid,"work:"+wid,comparison)}/>
        </td></tr>}
       </React.Fragment>)}</tbody></table></div>:
       <Fallback message="Плановые ресурсы пока не добавлены. Назначения ответственных в текстовых полях не считаются подтверждёнными ресурсами."/>}

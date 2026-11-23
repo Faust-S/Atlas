@@ -86,6 +86,7 @@ def qualify():
     d.wait_text('Изменение данных',35)
     d.wait_text('Работа: '+first_work,35)
     d.wait_text('Плановый ресурс',35)
+    d.wait_text('Предложение из сравнения: Кран → Подъёмник.',35)
     assert d.head()==saved,'Opening Work editor wrote to Native Store'
     v.capture('atlas12-resource-alternatives-work-editor-820')
     print('ATLAS12_NATIVE_RESOURCE_TO_WORK_EDITOR_PASS',flush=True)

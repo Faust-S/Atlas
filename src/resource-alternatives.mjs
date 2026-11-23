@@ -82,3 +82,37 @@ export function previewWorkResourceReassignment(snapshot,{projectId,workId,targe
    'Изменения можно внести только через карточку Work и отдельно сохранить.'
  };
 }
+
+/**
+ * Preserve an explicit resource comparison as a one-time Work editor choice.
+ * The proposal has no authority: its target remains a local form value until
+ * the user applies the ordinary Work edit and separately saves Native Store.
+ */
+export function assertResourceEditorChoiceCurrent(snapshot,choice){
+ if(!snapshot||!choice||!Array.isArray(snapshot.projects)||
+    snapshot.revision!==choice.revision||!choice.projectId||!choice.workId||
+    !choice.sourceResourceId||!choice.targetResourceId||
+    choice.sourceResourceId===choice.targetResourceId)
+  throw Error('Ресурсный вариант устарел. Повторите сравнение.');
+ const project=snapshot.projects.find(p=>p.id===choice.projectId);
+ const work=project?.items?.find(w=>w.id===choice.workId);
+ if(!work||project.status==='cancelled'||work.state==='done'||
+    work.resourceId!==choice.sourceResourceId)
+  throw Error('Назначение Work изменилось. Повторите сравнение.');
+ const source=(snapshot.resources??[]).find(r=>r.id===choice.sourceResourceId);
+ const target=(snapshot.resources??[]).find(r=>r.id===choice.targetResourceId);
+ if(!source||!target)throw Error('Плановый ресурс изменился. Повторите сравнение.');
+ return {...choice,sourceLabel:source.label,targetLabel:target.label};
+}
+
+/** Turn a previously calculated read-only comparison into a form-only choice. */
+export function prepareResourceEditorChoice(snapshot,comparison){
+ if(comparison?.kind!=='RESOURCE_ASSIGNMENT_COMPARISON'||
+    !comparison.source?.id||!comparison.target?.id)
+  throw Error('Нет рассчитанного ресурсного варианта');
+ return assertResourceEditorChoiceCurrent(snapshot,{
+  projectId:comparison.projectId,workId:comparison.workId,
+  revision:comparison.revision,
+  sourceResourceId:comparison.source.id,targetResourceId:comparison.target.id
+ });
+}

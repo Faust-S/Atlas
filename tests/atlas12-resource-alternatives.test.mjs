@@ -5,7 +5,7 @@ import {empty,createProject,createItem,editItem,editProject,serialize} from '../
 import {addPlanningResource} from '../src/resource-planning.mjs';
 import {portfolioSchedule} from '../src/portfolio-schedule.mjs';
 import {portfolioResources} from '../src/portfolio-resources.mjs';
-import {previewWorkResourceReassignment} from '../src/resource-alternatives.mjs';
+import {previewWorkResourceReassignment,prepareResourceEditorChoice,assertResourceEditorChoiceCurrent} from '../src/resource-alternatives.mjs';
 
 function fixture(){
  const a=createProject(empty(),{name:'Монтаж оборудования',type:'engineering'});
@@ -103,7 +103,7 @@ test('UI presents both baselines and an explicit ordinary Work editor action',()
  const ui=readFileSync(new URL('../desktop/src/ResourceAlternatives.tsx',import.meta.url),'utf8');
  const main=readFileSync(new URL('../desktop/src/main.tsx',import.meta.url),'utf8');
  assert.match(main,/resourceComparisonId===r.id/);
- assert.match(main,/onOpenWork=\{\(pid,wid\)=>openEditorFor\(pid,"work:"\+wid\)\}/);
+ assert.match(main,/onOpenWork=\{\(pid,wid,comparison\)=>openEditorFor\(pid,"work:"\+wid,comparison\)\}/);
  assert.match(ui,/Плановая загрузка до и после изменения назначения/);
  assert.match(ui,/aria-label=\{'Варианты ресурсного назначения: '/);
  assert.match(ui,/role="status" aria-label=\{summary\}/);
@@ -137,4 +137,50 @@ test('Fast transient Work projection agrees with the authoritative editItem and 
  assert.equal(preview.alternative.unavailableResourceDays,
   expected.people.reduce((n,r)=>n+r.unavailableDays,0));
  assert.equal(serialize(f.snapshot),before);
+});
+
+
+test('A compared target is carried into Work editor as a reversible form-only choice',()=>{
+ const f=fixture(),saved=serialize(f.snapshot);
+ const comparison=run(f);
+ const proposed=prepareResourceEditorChoice(f.snapshot,comparison);
+ assert.deepEqual(proposed,{
+  projectId:f.pid,workId:f.second,revision:f.snapshot.revision,
+  sourceResourceId:f.crane,targetResourceId:f.lift,
+  sourceLabel:'Кран',targetLabel:'Подъёмник'
+ });
+ assert.deepEqual(assertResourceEditorChoiceCurrent(f.snapshot,proposed),proposed);
+ assert.equal(serialize(f.snapshot),saved,'Preparing editor choice must not mutate Work');
+ assert.equal(f.snapshot.projects[0].items.find(w=>w.id===f.second).resourceId,f.crane,
+  'The original resource is unchanged until a user applies an edit');
+});
+
+test('A changed revision, Work, or resource invalidates an earlier comparison',()=>{
+ const f=fixture(),proposal=prepareResourceEditorChoice(f.snapshot,run(f));
+ assert.throws(()=>assertResourceEditorChoiceCurrent(
+  editItem(f.snapshot,f.pid,f.second,{estimateDays:5}),proposal),/устарел/);
+ const changed={...f.snapshot,projects:f.snapshot.projects.map(p=>({...p,
+  items:p.items.map(w=>w.id===f.second?{...w,resourceId:f.lift}:w)}))};
+ assert.throws(()=>assertResourceEditorChoiceCurrent(changed,proposal),/Назначение Work изменилось/);
+ const unlinked={...f.snapshot,resources:f.snapshot.resources.filter(r=>r.id!==f.lift)};
+ assert.throws(()=>assertResourceEditorChoiceCurrent(unlinked,proposal),/ресурс изменился/);
+ assert.throws(()=>prepareResourceEditorChoice(f.snapshot,{kind:'UNTRUSTED'}),/Нет рассчитанного/);
+ assert.throws(()=>assertResourceEditorChoiceCurrent(f.snapshot,{...proposal,
+  targetResourceId:f.crane}),/устарел/);
+});
+
+test('The ordinary Work editor preselects the suggestion but never applies it automatically',()=>{
+ const ui=readFileSync(new URL('../desktop/src/ResourceAlternatives.tsx',import.meta.url),'utf8');
+ const main=readFileSync(new URL('../desktop/src/main.tsx',import.meta.url),'utf8');
+ const css=readFileSync(new URL('../desktop/src/style.css',import.meta.url),'utf8');
+ assert.match(ui,/onOpenWork\(preview\.projectId,preview\.workId,preview\)/);
+ assert.match(main,/prepareResourceEditorChoice\(data,comparison\)/);
+ assert.match(main,/assertResourceEditorChoiceCurrent\(data,editor\.resourceProposal\)/);
+ assert.match(main,/resourceId:editor\.resourceProposal\.targetResourceId/);
+ assert.match(main,/if\(editor\.resourceProposal\)onDirtyChange\(true\)/);
+ assert.match(main,/else onDirtyChange\(false\)/);
+ assert.match(main,/Ресурс выбран в форме, но ещё не применён к черновику/);
+ assert.match(main,/resourceProposal\}\);setInspector\(true\)/);
+ assert.match(css,/\.atlas-resource-editor-proposal\{/);
+ assert.doesNotMatch(ui,/applyEditor\(|commitWithReadback\(|save\(\)/);
 });

@@ -2,7 +2,7 @@ import React,{useMemo,useState} from 'react';
 import {previewWorkResourceReassignment} from '../../src/resource-alternatives.mjs';
 
 type Props={snapshot:any;forecast:any;resources:any;resourceId:string;
- onClose:()=>void;onOpenWork:(projectId:string,workId:string)=>void};
+ onClose:()=>void;onOpenWork:(projectId:string,workId:string,comparison:any)=>void};
 const key=(w:any)=>JSON.stringify([w.projectId,w.id]);
 const change=(value:number)=>value>0?'+'+value:String(value);
 
@@ -76,8 +76,8 @@ export function ResourceAlternatives({snapshot,forecast,resources,resourceId,onC
      className="atlas-resource-alternatives-result">{summary}</p>
     <button type="button" className="atlas-resource-alternatives-edit"
      aria-label={'Открыть Work для изменения ресурса '+preview.workTitle}
-     onClick={()=>onOpenWork(preview.projectId,preview.workId)}>
-      Открыть Work и выбрать назначение
+     onClick={()=>onOpenWork(preview.projectId,preview.workId,preview)}>
+      Открыть Work с выбранным ресурсом
     </button>
     <p className="atlas-resource-alternatives-note">{preview.note}</p>
    </>}

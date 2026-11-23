@@ -1691,3 +1691,8 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .atlas-resource-alternatives-edit{min-height:32px;padding:6px 10px;font-size:11px}
 .atlas-resource-alternatives-note{color:#5c7790;font-size:10px!important}
 .atlas-resource-alternatives :focus-visible{outline:2px solid #246fd3;outline-offset:2px}
+
+/* An evaluated resource choice lives in the Work form, not in Native Store. */
+.atlas-resource-editor-proposal{padding:8px 10px;margin:5px 0 9px;
+ border:1px solid #a9cae8;border-radius:7px;background:#f0f7ff;
+ color:#215580;font-size:11px;line-height:1.45;overflow-wrap:anywhere}

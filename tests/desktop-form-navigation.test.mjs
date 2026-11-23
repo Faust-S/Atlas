@@ -9,7 +9,7 @@ test("all project, tab and editor navigation preserves unapplied forms",()=>{
  assert.match(ui,/if\(!editorOpenRef\.current\)return true/);
  assert.match(ui,/const selectProject=\(id:string\|null,afterSubmit=false\)=>\{\s*if\(!afterSubmit&&!requireClosedForm\(\)\)return/);
  assert.match(ui,/const openEditor=\(action:string,projectId\?:string,fromInspector=false\)=>\{\s*if\(!requireClosedForm\(\)\|\|busyRef\.current\)return/);
- assert.match(ui,/const openEditorFor=\(projectId:string,action:string\)=>\{\s*if\(!requireClosedForm\(\)\|\|busyRef\.current\)return/);
+ assert.match(ui,/const openEditorFor=\(projectId:string,action:string,comparison:any=null\)=>\{\s*if\(!requireClosedForm\(\)\|\|busyRef\.current\)return/);
  assert.match(ui,/const view=\(tabId:Tab\)=>\{\s*if\(!requireClosedForm\(\)\)return/);
  assert.match(ui,/if\(result\.projectId\)selectProject\(result\.projectId,true\)/);
  assert.match(ui,/<nav className="tabbar atlas-compact-tabs" aria-label="Представления проекта">/);
