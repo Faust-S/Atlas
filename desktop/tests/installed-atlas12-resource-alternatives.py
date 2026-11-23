@@ -110,7 +110,7 @@ def qualify():
     d.wait_text('Изменение дней перегрузки: 0. Вне доступности: 0. Сроки Work по CPM не изменятся.',35)
     assert d.head()==saved,'Choosing a tradeoff wrote to Native Store'
     v.capture('atlas12-resource-multiple-tradeoff-820')
-    click_scrollable_button('Рассмотреть ресурс Подъёмник')
+    click_scrollable_button('Рассмотреть ресурс Подъёмник',scroll_direction=2)
     d.wait_text('Изменение дней перегрузки: -3. Вне доступности: 0. Сроки Work по CPM не изменятся.',35)
     assert d.head()==saved,'Restoring the preferred option wrote to Native Store'
     print('ATLAS12_NATIVE_MULTIPLE_OPTIONS_TRADEOFF_PASS',flush=True)
