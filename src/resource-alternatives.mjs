@@ -15,7 +15,7 @@ function totals(view){
  };
 }
 function resourceStatus(group){
- if(!group)return null;
+ if(!group)throw Error('Плановый ресурс не найден');
  return {id:group.id,label:group.label,capacityPct:group.capacityPct,
   maxLoadPct:group.maxLoadPct,overloadDays:group.overloadDays,
   unavailableDays:group.unavailableDays,undatedWork:group.undatedWork,
