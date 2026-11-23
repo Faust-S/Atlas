@@ -105,6 +105,8 @@ test('UI presents both baselines and an explicit ordinary Work editor action',()
  assert.match(main,/resourceComparisonId===r.id/);
  assert.match(main,/onOpenWork=\{\(pid,wid\)=>openEditorFor\(pid,"work:"\+wid\)\}/);
  assert.match(ui,/Плановая загрузка до и после изменения назначения/);
+ assert.match(ui,/aria-label=\{'Варианты ресурсного назначения: '/);
+ assert.match(ui,/role="status" aria-label=\{summary\}/);
  assert.match(ui,/Изменение дней перегрузки:/);
  assert.match(ui,/Сравните существующее назначение Work/);
  assert.doesNotMatch(ui,/applyEditor\(|commitWithReadback\(|save\(\)/);

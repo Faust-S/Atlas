@@ -24,8 +24,14 @@ export function ResourceAlternatives({snapshot,forecast,resources,resourceId,onC
  const preview=result&&'value' in result?result.value:null;
  const failure=result&&'error' in result?result.error:null;
  const original=resources.byId.get(resourceId);
+ const summary=preview?[
+  'Изменение дней перегрузки: '+change(preview.overloadDaysDelta)+'.',
+  'Вне доступности: '+change(preview.unavailableDaysDelta)+'.',
+  preview.unverified?'У части расчёта нет достоверных плановых дат.':
+   'Сроки Work по CPM не изменятся.'
+ ].join(' '):'';
  return <section className="atlas-resource-alternatives" role="region"
-  aria-label={'Сравнение ресурсных вариантов: '+(original?.label||'ресурс')}>
+  aria-label={'Варианты ресурсного назначения: '+(original?.label||'ресурс')}>
   <div className="atlas-resource-alternatives-header">
    <strong>Варианты ресурсного назначения</strong>
    <button type="button" onClick={onClose} aria-label="Закрыть сравнение ресурсных вариантов">Закрыть</button>
@@ -66,12 +72,8 @@ export function ResourceAlternatives({snapshot,forecast,resources,resourceId,onC
       </tbody>
      </table>
     </div>
-    <p role="status" className="atlas-resource-alternatives-result">{[
-     'Изменение дней перегрузки: '+change(preview.overloadDaysDelta)+'.',
-     'Вне доступности: '+change(preview.unavailableDaysDelta)+'.',
-     preview.unverified?'У части расчёта нет достоверных плановых дат.':
-      'Сроки Work по CPM не изменятся.'
-    ].join(' ')}</p>
+    <p role="status" aria-label={summary}
+     className="atlas-resource-alternatives-result">{summary}</p>
     <button type="button" className="atlas-resource-alternatives-edit"
      aria-label={'Открыть Work для изменения ресурса '+preview.workTitle}
      onClick={()=>onOpenWork(preview.projectId,preview.workId)}>

@@ -11,6 +11,7 @@ import zipfile
 from pathlib import Path
 
 import win32gui
+from pywinauto import mouse
 
 sys.stdout.reconfigure(encoding='utf-8',errors='replace')
 source=Path(__file__).with_name('installed-atlas11-v6-design.py')
@@ -66,9 +67,11 @@ def qualify():
     d.wait_text('Плановые ресурсы',35)
     d.wait_text('Кран',35)
     native.click_named('Сравнить варианты','Button')
-    d.wait_text('Варианты ресурсного назначения',35)
+    d.wait_text('Варианты ресурсного назначения: Кран',35)
+    # Bring the comparison's result and Work action above the lower edge.
+    mouse.scroll(coords=(520,530),wheel_dist=-3)
     d.wait_text('Изменение дней перегрузки: -3. Вне доступности: 0. Сроки Work по CPM не изменятся.',35)
-    d.wait_text('Открыть Work и выбрать назначение',35)
+    d.wait_text('Открыть Work для изменения ресурса '+FIRST,35)
     assert d.head()==saved,'Comparison modified Native Store without explicit Save'
     v.capture('atlas12-resource-alternatives-820')
     print('ATLAS12_NATIVE_RESOURCE_OPTIONS_READ_ONLY_PASS',flush=True)
