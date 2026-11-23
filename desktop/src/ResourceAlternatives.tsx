@@ -1,5 +1,5 @@
 import React,{useMemo,useState} from 'react';
-import {previewWorkResourceReassignment} from '../../src/resource-alternatives.mjs';
+import {previewWorkResourceReassignment,compareWorkResourceAlternatives} from '../../src/resource-alternatives.mjs';
 
 type Props={snapshot:any;forecast:any;resources:any;resourceId:string;
  onClose:()=>void;onOpenWork:(projectId:string,workId:string,comparison:any)=>void};
@@ -12,6 +12,8 @@ export function ResourceAlternatives({snapshot,forecast,resources,resourceId,onC
  const alternatives=resources.people.filter((r:any)=>r.id!==resourceId);
  const [chosenWork,setChosenWork]=useState('');
  const [chosenTarget,setChosenTarget]=useState('');
+ const [page,setPage]=useState(0);
+ const pageSize=6;
  const work=assigned.find((w:any)=>key(w)===chosenWork)||assigned[0]||null;
  const target=alternatives.find((r:any)=>r.id===chosenTarget)||alternatives[0]||null;
  const result=useMemo(()=>{
@@ -21,6 +23,15 @@ export function ResourceAlternatives({snapshot,forecast,resources,resourceId,onC
   },{schedule:forecast,resources})};}
   catch(error){return {error:error instanceof Error?error.message:'Прогноз недоступен'};}
  },[snapshot,forecast,resources,work?.projectId,work?.id,target?.id]);
+ const comparisons=useMemo(()=>{
+  if(!work||!alternatives.length)return null;
+  try{return {value:compareWorkResourceAlternatives(snapshot,{
+   projectId:work.projectId,workId:work.id,offset:page*pageSize,limit:pageSize
+  },{schedule:forecast,resources})};}
+  catch(error){return {error:error instanceof Error?error.message:'Сравнение недоступно'};}
+ },[snapshot,forecast,resources,work?.projectId,work?.id,page]);
+ const pageData=comparisons&&'value' in comparisons?comparisons.value:null;
+ const comparisonError=comparisons&&'error' in comparisons?comparisons.error:null;
  const preview=result&&'value' in result?result.value:null;
  const failure=result&&'error' in result?result.error:null;
  const original=resources.byId.get(resourceId);
@@ -44,7 +55,7 @@ export function ResourceAlternatives({snapshot,forecast,resources,resourceId,onC
    <div className="atlas-resource-alternatives-controls">
     <label>Работа
      <select aria-label="Выбрать работу для сравнения ресурсов"
-      value={key(work)} onChange={event=>setChosenWork(event.target.value)}>
+      value={key(work)} onChange={event=>{setChosenWork(event.target.value);setPage(0);setChosenTarget('');}}>
       {assigned.map((w:any)=><option key={key(w)} value={key(w)}>{w.projectName}: {w.title}</option>)}
      </select>
     </label>
@@ -56,6 +67,51 @@ export function ResourceAlternatives({snapshot,forecast,resources,resourceId,onC
     </label>
    </div>
    {failure&&<p role="status">{failure}</p>}
+   {comparisonError&&<p role="status">{comparisonError}</p>}
+   {pageData&&<section className="atlas-resource-options" aria-label="Сравнение нескольких ресурсных альтернатив">
+    <strong>Все варианты назначения</strong>
+    <p>Сравнение по известным календарям и мощности. Нулевой суммарный сдвиг
+     может означать перенос конфликта на другой ресурс, а не его устранение.</p>
+    <div className="atlas-resource-options-list">
+     {pageData.options.map((option:any)=>{
+      const c=option.constraints;
+      const label=c.classification==='TRADEOFF'?'Компромисс':
+       c.classification==='WORSENED'?'Ухудшение':
+       c.classification==='IMPROVED'?'Улучшение':'Без измеримого изменения';
+      return <div className="atlas-resource-option" key={option.target.id}>
+       <div><strong>{option.target.label}</strong>
+        <small>{label}. Перегрузка {change(option.overloadDaysDelta)} дн.;
+         вне доступности {change(option.unavailableDaysDelta)} дн.</small>
+        <small>Устранено или сокращено: {c.relieved.length};
+         новых конфликтов: {c.introduced.length};
+         усилено существующих: {c.worsened.length}.</small>
+        {c.introduced.map((x:any)=><small key={x.resourceId+x.kind}>
+         Новый конфликт: {x.resourceLabel},
+         {x.kind==='overload'?' перегрузка':' вне периода доступности'} {x.days} дн.</small>)}
+        {c.worsened.map((x:any)=><small key={x.resourceId+x.kind}>
+         Усиление: {x.resourceLabel}, {x.days} дн.</small>)}
+        {c.relieved.map((x:any)=><small key={x.resourceId+x.kind}>
+         Снижение: {x.resourceLabel}, {x.days} дн.
+         {x.fullyCleared?' (ограничение снято)':''}</small>)}
+        <small>{c.outlook==='KNOWN_RESOURCE_CONFLICTS'?
+         'В портфеле остаются известные ресурсные конфликты.':
+         c.outlook==='DATES_INCOMPLETE'?'Сроки части работ неизвестны.':
+         'По известным датам ресурсных конфликтов не обнаружено.'}</small>
+       </div>
+       <button type="button" onClick={()=>setChosenTarget(option.target.id)}
+        aria-label={'Рассмотреть ресурс '+option.target.label}
+        aria-pressed={target?.id===option.target.id}>Рассмотреть</button>
+      </div>;
+     })}
+    </div>
+    <div className="atlas-resource-options-pagination">
+     <button type="button" disabled={page===0} onClick={()=>setPage(p=>Math.max(0,p-1))}>Назад</button>
+     <span>Варианты {pageData.offset+1}-{pageData.offset+pageData.options.length} из {pageData.candidateCount}</span>
+     <button type="button" disabled={pageData.offset+pageData.options.length>=pageData.candidateCount}
+      onClick={()=>setPage(p=>p+1)}>Далее</button>
+    </div>
+   </section>}
+
    {preview&&<>
     <div className="atlas-resource-alternatives-table">
      <table aria-label="Плановая загрузка до и после изменения назначения">
