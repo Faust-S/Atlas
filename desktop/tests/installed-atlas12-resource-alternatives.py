@@ -91,7 +91,7 @@ def qualify():
     native.click_named('Ресурсы','Button')
     d.wait_text('Плановые ресурсы',35)
     d.wait_text('Кран',35)
-    native.click_named('Сравнить варианты','Button')
+    native.click_named('Сравнить варианты ресурса Кран','Button')
     d.wait_text('Варианты ресурсного назначения: Кран',35)
     # Bring the comparison's result and Work action above the lower edge.
     mouse.scroll(coords=(520,530),wheel_dist=-3)
