@@ -259,3 +259,56 @@ test('Comparison UI displays all options, their tradeoffs and a review-only choi
  assert.match(style,/\.atlas-resource-options-list/);
  assert.doesNotMatch(ui,/commitWithReadback\(|applyEditor\(|save\(\)/);
 });
+
+test('Resource choice reports original Work and project deadlines without fabricated schedule gains',()=>{
+ const f=fixture();
+ const edited=editProject(f.snapshot,f.pid,{dueDate:'2026-11-25'});
+ f.snapshot=editItem(edited,f.pid,f.second,{dueDate:'2026-11-24'});
+ const before=serialize(f.snapshot);
+ const result=run(f);
+ assert.equal(result.controlDates.work.forecastFinish,'2026-11-26');
+ assert.equal(result.controlDates.work.controlDate,'2026-11-24');
+ assert.equal(result.controlDates.work.slipDays,2);
+ assert.equal(result.controlDates.work.status,'CALENDAR_LATE');
+ assert.equal(result.controlDates.project.forecastFinish,'2026-11-26');
+ assert.equal(result.controlDates.project.controlDate,'2026-11-25');
+ assert.equal(result.controlDates.project.slipDays,1);
+ assert.equal(result.controlDates.calendarForecastUnchanged,true);
+ assert.match(result.controlDates.note,/не изменяет даты CPM/);
+ assert.equal(serialize(f.snapshot),before);
+});
+
+test('An absent project control date is unknown, not a delivered on-time plan',()=>{
+ const f=fixture(),result=run(f);
+ assert.equal(result.controlDates.project.controlDate,null);
+ assert.equal(result.controlDates.project.status,'CONTROL_DATE_UNKNOWN');
+ assert.equal(result.controlDates.project.slipDays,null);
+ assert.equal(result.controlDates.work.controlDate,null);
+});
+
+test('Undated Work and project forecasts preserve explicit unknown statuses',()=>{
+ const f=fixture();
+ f.snapshot.projects[0].startDate=null;
+ const result=run(f);
+ assert.equal(result.controlDates.project.forecastFinish,null);
+ assert.equal(result.controlDates.project.status,'FORECAST_UNKNOWN');
+ assert.equal(result.controlDates.work.status,'FORECAST_UNKNOWN');
+ assert.equal(result.controlDates.calendarForecastUnchanged,true);
+});
+
+test('The multiple-choice view is on-demand and keeps the Work editor action first',()=>{
+ const ui=readFileSync(new URL('../desktop/src/ResourceAlternatives.tsx',import.meta.url),'utf8');
+ const style=readFileSync(new URL('../desktop/src/style.css',import.meta.url),'utf8');
+ const native=readFileSync(new URL('../desktop/tests/installed-atlas12-resource-alternatives.py',import.meta.url),'utf8');
+ assert.match(ui,/\[showAll,setShowAll\]=useState\(false\)/);
+ assert.match(ui,/if\(!showAll\|\|!work\|\|!alternatives\.length\)return null/);
+ assert.match(ui,/Контрольные сроки и ресурсные ограничения/);
+ assert.match(ui,/Показать все варианты/);
+ assert.ok(ui.indexOf('Открыть Work с выбранным ресурсом')<
+  ui.indexOf('Сравнение нескольких ресурсных альтернатив'),
+  'The ordinary Work action must precede the optional full list');
+ assert.match(ui,/aria-expanded=\{showAll\}/);
+ assert.match(style,/\.atlas-resource-deadlines\{/);
+ assert.match(native,/ATLAS12_NATIVE_MULTIPLE_OPTIONS_TRADEOFF_PASS/);
+ assert.match(native,/820,650,True/);
+});
