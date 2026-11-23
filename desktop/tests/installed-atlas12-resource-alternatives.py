@@ -36,6 +36,10 @@ def check_archive():
 
 def qualify():
     original=check_archive()
+    # Identify the exact Work from the imported .iwxa, never from a
+    # hardcoded test-only name or the order of native UIA descendants.
+    first_work=original['projects'][0]['items'][0]['title']
+    assert first_work,'The first Work must have a title'
     previous=v.saved_head_or_none()
     assert previous and len(previous['projects'])==2
     v.ARCHIVE=ARCHIVE
@@ -71,10 +75,20 @@ def qualify():
     # Bring the comparison's result and Work action above the lower edge.
     mouse.scroll(coords=(520,530),wheel_dist=-3)
     d.wait_text('Изменение дней перегрузки: -3. Вне доступности: 0. Сроки Work по CPM не изменятся.',35)
-    d.wait_text('Открыть Work для изменения ресурса '+FIRST,35)
+    work_action='Открыть Work для изменения ресурса '+first_work
+    d.wait_text(work_action,35)
     assert d.head()==saved,'Comparison modified Native Store without explicit Save'
     v.capture('atlas12-resource-alternatives-820')
     print('ATLAS12_NATIVE_RESOURCE_OPTIONS_READ_ONLY_PASS',flush=True)
+    # The user must reach the ordinary Work editor; the resource comparison
+    # itself cannot execute an assignment or write to Native Store.
+    v.find_control(work_action,types={'Button'}).click_input()
+    d.wait_text('Изменение данных',35)
+    d.wait_text('Работа: '+first_work,35)
+    d.wait_text('Плановый ресурс',35)
+    assert d.head()==saved,'Opening Work editor wrote to Native Store'
+    v.capture('atlas12-resource-alternatives-work-editor-820')
+    print('ATLAS12_NATIVE_RESOURCE_TO_WORK_EDITOR_PASS',flush=True)
 
 if __name__=='__main__':
     try:
