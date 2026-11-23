@@ -61,6 +61,9 @@ test("linked Work correction accumulates portfolio effects from first source bas
   advanced.correction,scheduleProject(c.source,{calendarLibrary:amended.calendarLibrary??[]}));
  assert.ok(viewed);
  assert.equal(viewed.portfolioChange.source.previousFinish,c.before.byId.get(c.upstream.id).projectedFinish);
+ assert.deepEqual(viewed.linkedFollowups,[{projectId:c.downstreamId,workId:linkedWorkId}],
+  "The original inspector must show the downstream Work correction");
+ assert.equal(viewed.linkedFollowupCount,1);
  assert.equal(inspectorRecentCorrection(c.source,c.changed.revision,c.sourceId,
   advanced.correction,scheduleProject(c.source,{calendarLibrary:amended.calendarLibrary??[]})),null);
  assert.equal(serialize(c.changed),origin,"Navigation must not edit original data");

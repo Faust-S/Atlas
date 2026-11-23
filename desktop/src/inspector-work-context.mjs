@@ -89,6 +89,14 @@ export function inspectorRecentCorrection(project,revision,selectedWorkId,contex
  const root=project.items.find(item=>item.id===context.workId);
  const selected=project.items.find(item=>item.id===selectedWorkId);
  const followupIds=Array.isArray(context.followups)?context.followups:[];
+ // Cross-project corrections are an in-memory continuation of this Work.
+ // Preserve their identifiers in the read-only projection: the source of
+ // truth is the correction session, not the inspector's local Work list.
+ const linkedFollowups=Array.isArray(context.linkedFollowups)?
+  context.linkedFollowups.filter(entry=>entry&&typeof entry.projectId==="string"&&
+   typeof entry.workId==="string"&&entry.projectId!==project.id&&
+   entry.projectId.length>0&&entry.workId.length>0)
+   .map(entry=>({projectId:entry.projectId,workId:entry.workId})):[];
  if(!root||!selected||(root.id!==selectedWorkId&&
     !context.change.affectedIds.includes(selectedWorkId)&&
     !followupIds.includes(selectedWorkId)))return null;
@@ -100,6 +108,7 @@ export function inspectorRecentCorrection(project,revision,selectedWorkId,contex
   projectId:project.id,revision,rootId:root.id,rootTitle:root.title,
   beforeDays:context.days,afterDays:localPlan.durationDays,
   followupCount:followupIds.length,followupIds:[...followupIds],
+  linkedFollowups,linkedFollowupCount:linkedFollowups.length,
   change:{...context.change,examples},
   // Already computed by the original portfolioSchedule; never recalculate in UI.
   portfolioChange:context.portfolioChange??null
