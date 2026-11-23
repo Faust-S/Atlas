@@ -28,10 +28,27 @@ def check_archive():
     with zipfile.ZipFile(ARCHIVE) as archive:
         assert json.loads(archive.read('manifest.json'))['format']=='iwxa.package'
         snapshot=json.loads(archive.read('content/objects.ndjson'))['data']['snapshot']
-    assert len(snapshot['projects'])==1 and len(snapshot['resources'])==2
-    assert len(snapshot['projects'][0]['items'])==2
+    assert len(snapshot['projects'])==1 and len(snapshot['resources'])==4
+    assert len(snapshot['projects'][0]['items'])==3
     assert snapshot['projects'][0]['items'][0]['resourceId']==snapshot['projects'][0]['items'][1]['resourceId']
     return snapshot
+
+
+def click_scrollable_button(name):
+    """Scroll the real installed viewport until the user action is visible."""
+    for attempt in range(12):
+        bounds=win32gui.GetWindowRect(d.handle)
+        possible=native.visible_named(name,'Button')
+        physical=[e for e in possible if e.is_enabled() and
+                  e.rectangle().left>=bounds[0]+4 and
+                  e.rectangle().right<=bounds[2]-4 and
+                  e.rectangle().top>=bounds[1]+4 and
+                  e.rectangle().bottom<=bounds[3]-4]
+        if len(physical)==1:
+            native.click_named(name,'Button')
+            return
+        mouse.scroll(coords=(520,530),wheel_dist=-2)
+    raise AssertionError('Resource choice not reachable in 820x650: '+name)
 
 
 def qualify():
@@ -80,9 +97,23 @@ def qualify():
     assert d.head()==saved,'Comparison modified Native Store without explicit Save'
     v.capture('atlas12-resource-alternatives-820')
     print('ATLAS12_NATIVE_RESOURCE_OPTIONS_READ_ONLY_PASS',flush=True)
+    d.wait_text('Контрольные сроки и ресурсные ограничения',35)
+    click_scrollable_button('Показать все варианты (3)')
+    d.wait_text('Сравнение нескольких ресурсных альтернатив',35)
+    d.wait_text('Новый конфликт: Резервный кран',35)
+    assert d.head()==saved,'Showing several comparisons wrote to Native Store'
+    click_scrollable_button('Рассмотреть ресурс Резервный кран')
+    d.wait_text('Изменение дней перегрузки: 0. Вне доступности: 0. Сроки Work по CPM не изменятся.',35)
+    assert d.head()==saved,'Choosing a tradeoff wrote to Native Store'
+    v.capture('atlas12-resource-multiple-tradeoff-820')
+    click_scrollable_button('Рассмотреть ресурс Подъёмник')
+    d.wait_text('Изменение дней перегрузки: -3. Вне доступности: 0. Сроки Work по CPM не изменятся.',35)
+    assert d.head()==saved,'Restoring the preferred option wrote to Native Store'
+    print('ATLAS12_NATIVE_MULTIPLE_OPTIONS_TRADEOFF_PASS',flush=True)
+    click_scrollable_button('Скрыть все варианты')
     # The user must reach the ordinary Work editor; the resource comparison
     # itself cannot execute an assignment or write to Native Store.
-    native.click_named(work_action,'Button')
+    click_scrollable_button(work_action)
     d.wait_text('Изменение данных',35)
     d.wait_text('Работа: '+first_work,35)
     d.wait_text('Плановый ресурс',35)
