@@ -681,7 +681,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   if(!(recentScheduleEffect??current)?.affectedIds.length||!requireClosedForm())return;
   // This action can come from the inspector after visiting Gantt or the DAG.
   // Return to the existing Work table without discarding the correction.
-  if(current&&recentWorkId!==recentPlanBefore.workId)setRecentWorkId(recentPlanBefore.workId);
+  if(current&&recentPlanBefore&&recentWorkId!==recentPlanBefore.workId)
+   setRecentWorkId(recentPlanBefore.workId);
   if(tab!=="work"){resetWorkspaceScroll();setTab("work");setSourceJump(null);setGraphJump(null);}
   setWorkFilter("all");setWorkTargetFilter("all");
   setWorkObservationFilter("all");setWorkDependencyFilter("all");
