@@ -2,6 +2,7 @@
 // Uses canonical Atlas CPM and its comparison. Never calls editItem, changes a
 // revision, creates an approval or writes to the native Store.
 import {scheduleProject,scheduleChangeSummary} from "./planning.mjs";
+import {portfolioSchedule,portfolioScheduleChangeSummary} from "./portfolio-schedule.mjs";
 
 const validDate=value=>{
  if(value===null)return true;
@@ -17,8 +18,18 @@ const cumulativeResult=(baseline,plan)=>baseline?{
  beforeDays:baseline.durationDays,afterDays:plan.durationDays
 }:null;
 
+/**
+ * @param {any} project
+ * @param {string} workId
+ * @param {any} draft
+ * @param {any} [beforePlan]
+ * @param {any} [cumulativeBaseline]
+ * @param {{calendarLibrary?:any[],portfolioSnapshot?:any,
+ *  portfolioBefore?:any,cumulativePortfolioBaseline?:any}} [options]
+ */
 export function previewWorkScheduleEdit(project,workId,draft,beforePlan=null,cumulativeBaseline=null,
- {calendarLibrary=/** @type {any[]} */([])}={}){
+ {calendarLibrary=/** @type {any[]} */([]),portfolioSnapshot=null,
+  portfolioBefore=null,cumulativePortfolioBaseline=null}={}){
  if(!project||!Array.isArray(project.items)||!Array.isArray(project.dependencies))
   throw Error("Проект для расчёта недоступен");
  const work=project.items.find(item=>item.id===workId);
@@ -69,8 +80,31 @@ export function previewWorkScheduleEdit(project,workId,draft,beforePlan=null,cum
  const was=before.rows.find(row=>row.id===workId);
  const will=after.rows.find(row=>row.id===workId);
  if(!was||!will)throw Error("Работа отсутствует в расчёте плана");
+ // The form estimates consequences before any draft or Native Store write.
+ // This is the existing portfolioSchedule, with only the selected Work
+ // substituted into an ephemeral snapshot. No second calendar algorithm.
+ let portfolioImpact=null,portfolioCumulative=null,portfolioIssue=null;
+ if(portfolioSnapshot?.portfolioLinks?.some(link=>link.from===project.id)){
+  const original=portfolioSnapshot.projects?.find(item=>item.id===project.id);
+  if(original!==project){
+   portfolioIssue="Проект изменился. Откройте редактор заново для расчёта связей.";
+  }else{
+   try{
+    const state={...portfolioSnapshot,projects:portfolioSnapshot.projects.map(item=>
+     item.id===project.id?projected:item)};
+    const beforePortfolio=portfolioBefore??portfolioSchedule(portfolioSnapshot);
+    const afterPortfolio=portfolioSchedule(state);
+    portfolioImpact=portfolioScheduleChangeSummary(beforePortfolio,afterPortfolio,project.id);
+    if(cumulativePortfolioBaseline)
+     portfolioCumulative=portfolioScheduleChangeSummary(
+      cumulativePortfolioBaseline,afterPortfolio,project.id);
+   }catch{
+    portfolioIssue="Расчёт связанных проектов недоступен для этих значений.";
+   }
+  }
+ }
  return {
-  kind:"changed",workId,
+  kind:"changed",workId,portfolioImpact,portfolioCumulative,portfolioIssue,
   oldEstimate,estimateDays,oldDueDate,dueDate,
   beforeDays:before.durationDays,afterDays:after.durationDays,
   oldFinish:was.finishDate??null,newFinish:will.finishDate??null,

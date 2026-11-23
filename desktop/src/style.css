@@ -1624,3 +1624,15 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
   min-height:28px;padding:4px 7px;font-size:10px
  }
 }
+
+/* Atlas 0.11: linked-project effect before applying a Work edit. */
+.editor-panel .atlas-work-draft-portfolio{border:1px solid #bed7ee;
+ background:#f3f8ff;border-radius:7px;padding:8px 10px;margin:7px 0}
+.editor-panel .atlas-work-draft-portfolio strong{display:block;font-size:11px;color:#285781}
+.editor-panel .atlas-work-draft-portfolio p{margin:5px 0;font-size:11px;
+ line-height:1.45;color:#43627e;overflow-wrap:anywhere}
+.editor-panel .atlas-work-draft-portfolio small{font-size:10px;color:#617e98}
+.editor-panel .atlas-work-draft-portfolio details summary{font-size:11px;
+ cursor:pointer;min-height:25px}
+.editor-panel .atlas-work-draft-portfolio ul{margin:4px 0 7px;padding-left:17px}
+.editor-panel .atlas-work-draft-portfolio li{font-size:10px;overflow-wrap:anywhere}

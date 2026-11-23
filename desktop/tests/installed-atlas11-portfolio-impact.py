@@ -90,6 +90,13 @@ def qualify():
     native.click_named("Изменить работу","Button")
     d.wait_text("Изменение данных",25)
     v.set_editor_text("Плановая длительность, дней","3")
+    d.wait_text("Связанные проекты до применения правки",35)
+    d.wait_text("Изменится прогноз у 1",35)
+    d.wait_text("2026-11-24",35)
+    d.wait_text("2026-11-25",35)
+    assert d.head()==saved,"Pre-apply portfolio preview unexpectedly wrote Native Store"
+    v.capture("atlas11-portfolio-impact-before-apply-820")
+    print("ATLAS11_NATIVE_PREAPPLY_PORTFOLIO_PREVIEW_PASS",flush=True)
     v.find_control("Применить к черновику",types={"Button"}).click_input()
     d.wait_text("Последствия корректировки",35)
     d.wait_text("Влияние на связанные проекты",35)

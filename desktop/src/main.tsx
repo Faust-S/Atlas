@@ -153,10 +153,11 @@ function WorkDependencyHint({info,onOpenWork}:{info?:WorkLinkPreview|null;onOpen
   {later&&<span>{later}</span>}
  </div>;
 }
-function EditorPanel({editor,onSubmit,onCancel,onDirtyChange,busy,project,plan,correctionBaseline,calendarLibrary}:{
+function EditorPanel({editor,onSubmit,onCancel,onDirtyChange,busy,project,plan,correctionBaseline,calendarLibrary,portfolioSnapshot,portfolioBefore,cumulativePortfolioBaseline}:{
  editor:Editor;onSubmit:(event:React.FormEvent<HTMLFormElement>)=>void;
  onCancel:()=>void;onDirtyChange:(changed:boolean)=>void;busy:boolean;
- project:Atlas|null;plan:any|null;correctionBaseline:any|null;calendarLibrary:any[]
+ project:Atlas|null;plan:any|null;correctionBaseline:any|null;calendarLibrary:any[];
+ portfolioSnapshot:Atlas;portfolioBefore:any;cumulativePortfolioBaseline:any|null
 }){
  const [fields,setFields]=useState<Record<string,string>>({});
  const [workQuery,setWorkQuery]=useState("");
@@ -173,9 +174,10 @@ function EditorPanel({editor,onSubmit,onCancel,onDirtyChange,busy,project,plan,c
   return previewWorkScheduleEdit(project,editor.action.slice(5),
    {estimateDays:fields.estimateDays,dueDate:fields.dueDate,
     durationUnit:fields.durationUnit,calendarBasis:fields.calendarBasis},
-   plan,correctionBaseline,{calendarLibrary});
+   plan,correctionBaseline,{calendarLibrary,portfolioSnapshot,portfolioBefore,cumulativePortfolioBaseline});
  },[editor.action,project,plan,fields.estimateDays,fields.dueDate,
-    fields.durationUnit,fields.calendarBasis,correctionBaseline,calendarLibrary]);
+    fields.durationUnit,fields.calendarBasis,correctionBaseline,calendarLibrary,
+    portfolioSnapshot,portfolioBefore,cumulativePortfolioBaseline]);
  useEffect(()=>{
   setFields(Object.fromEntries(editor.spec.fields.map(f=>[f.name,String(f.value??"")])));
   setWorkQuery("");
@@ -245,6 +247,39 @@ function EditorPanel({editor,onSubmit,onCancel,onDirtyChange,busy,project,plan,c
     <div className="atlas-work-draft-preview" role="status"
      aria-label="Предварительный расчёт изменения работы">
      <strong>Если применить эти значения</strong>
+     {workDraftPreview.portfolioImpact&&<div className="atlas-work-draft-portfolio"
+       role="group" aria-label="Предварительный прогноз связанных проектов">
+      <strong>Связанные проекты до применения правки</strong>
+      <p role="status">Зависимых проектов: {workDraftPreview.portfolioImpact.linkedTotal}.
+       Изменится прогноз у {workDraftPreview.portfolioImpact.affectedTotal}.
+       {workDraftPreview.portfolioImpact.laterTotal>0?
+        " Позже: "+workDraftPreview.portfolioImpact.laterTotal+".":""}
+       {workDraftPreview.portfolioImpact.earlierTotal>0?
+        " Раньше: "+workDraftPreview.portfolioImpact.earlierTotal+".":""}
+       {workDraftPreview.portfolioImpact.undatedTotal>0?
+        " Без расчётной даты: "+workDraftPreview.portfolioImpact.undatedTotal+".":""}
+       {workDraftPreview.portfolioImpact.newDeadlineRisks>0?
+        " Новых нарушений срока: "+workDraftPreview.portfolioImpact.newDeadlineRisks+".":""}
+      </p>
+      {workDraftPreview.portfolioImpact.affectedTotal>0&&
+       <details className="atlas-work-draft-details">
+        <summary>Прогноз по зависимым проектам ({workDraftPreview.portfolioImpact.affectedTotal})</summary>
+        <ul>{workDraftPreview.portfolioImpact.rows.slice(0,8).map((row:any)=><li key={row.id}>
+         {row.name}: {row.previousFinish||"без даты"} → {row.projectedFinish||"без даты"}
+         {row.finishShiftDays!==null&&row.finishShiftDays!==0?
+          " ("+(row.finishShiftDays>0?"+":"")+row.finishShiftDays+" дн.)":""}
+         {row.newlyUndated?" · расчётная дата недоступна":""}
+        </li>)}</ul>
+        {workDraftPreview.portfolioImpact.affectedTotal>8&&
+         <small>Показаны первые восемь проектов. Остальные появятся в инспекторе после применения к черновику.</small>}
+       </details>}
+      {workDraftPreview.portfolioCumulative&&
+       <p>От первой корректировки: изменится прогноз у {workDraftPreview.portfolioCumulative.affectedTotal}
+        {" "}проектов.</p>}
+      <small>Расчёт только для просмотра. Работа и другие проекты ещё не изменены.</small>
+     </div>}
+     {workDraftPreview.portfolioIssue&&<p className="atlas-work-draft-invalid"
+      role="status">{workDraftPreview.portfolioIssue}</p>}
      <p>План проекта: было {workDraftPreview.beforeDays} дн.,
       станет {workDraftPreview.afterDays} дн.
       {workDraftPreview.afterDays!==workDraftPreview.beforeDays?
@@ -3702,6 +3737,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     onCancel={cancelEditor} onDirtyChange={changed=>{editorDirtyRef.current=changed}}
     busy={busy} project={project} plan={plannedPlan}
     calendarLibrary={data.calendarLibrary??[]}
+    portfolioSnapshot={data} portfolioBefore={dates}
+    cumulativePortfolioBaseline={correctionBaseline?recentPlanBefore?.portfolioBaseline:null}
     correctionBaseline={correctionBaseline}/>:
    embedded?<section><div className="section-heading"><h2>Инспектор</h2><button className="icon-button" aria-label="Скрыть инспектор" onClick={()=>setInspector(false)}>×</button></div>
     <div className="inspector-block"><small>Текущий контекст</small><strong>{project?.name||"Портфель проектов"}</strong>
