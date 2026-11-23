@@ -7,7 +7,9 @@ type Props={
  project:any|null;snapshot:any;plan:any;forecast:any;dirty:boolean;
  comparison:any|null;deadlineRisks:Map<string,any>;onSelectBaseline:(id:string)=>void;
  localPlan:any|null;correctionContext:any|null;onShowAffected:()=>void;
- onOpenLinkedProject:(projectId:string)=>void;
+ onOpenLinkedProject:(projectId:string,sourceWorkId:string)=>void;
+ returnContext:{projectTitle:string;workTitle:string;linkedChanges:number;current:boolean}|null;
+ onReturnToSource:()=>void;
  saved:boolean;workRequest:{id:string;serial:number}|null;
  onClose:()=>void;onEditWork:(id:string)=>void;onEditProject:()=>void;
  onOpenTab:(tab:"overview"|"work"|"timeline"|"graph"|"reality"|"sources"|"history")=>void;
@@ -32,7 +34,7 @@ const sourceTypes:Record<string,string>={
 };
 export function AtlasInspectorPreview({project,snapshot,plan,forecast,comparison,
  deadlineRisks,onSelectBaseline,dirty,saved,workRequest,
- localPlan,correctionContext,onShowAffected,onOpenLinkedProject,
+ localPlan,correctionContext,onShowAffected,onOpenLinkedProject,returnContext,onReturnToSource,
  onClose,onEditWork,onEditProject,onOpenTab,onSave,canSave}:Props){
  const defaultId=project?.id??"portfolio";
  const [tabs,setTabs]=useState<Tab[]>([{key:"project:"+defaultId,kind:"project",id:defaultId}]);
@@ -118,7 +120,17 @@ export function AtlasInspectorPreview({project,snapshot,plan,forecast,comparison
      onClick={()=>close(tab.key)}>×</button>
    </div>)}
   </div>
-  <div className="atlas-v6-preview-body" role="tabpanel">
+   {returnContext&&<div className="atlas-v6-cross-project-return" role="group"
+    aria-label="Исходный проект:">
+    <button type="button" className="atlas-v6-cross-project-return-action"
+     aria-label={"Вернуться к исходной работе "+returnContext.workTitle}
+     title={"Вернуться к исходной работе "+returnContext.workTitle}
+     onClick={onReturnToSource}>{"К исходной Work: "+returnContext.workTitle}</button>
+    <small>{"Исходный проект: "+returnContext.projectTitle}
+     {returnContext.linkedChanges>0?". Правок в зависимых проектах: "+returnContext.linkedChanges:""}
+     {!returnContext.current?". План изменился. При возврате покажем работу без устаревшего расчёта.":""}</small>
+   </div>}
+   <div className="atlas-v6-preview-body" role="tabpanel">
    {shown?.kind==="project"&&<div className="atlas-v6-preview-view">
     <h2>{project?.name||"Портфель проектов"}</h2>
     {project?<><p>{project.goal||"Цель пока не определена"}</p>
@@ -186,7 +198,7 @@ export function AtlasInspectorPreview({project,snapshot,plan,forecast,comparison
          {portfolioWindow.items.map((linked:any)=><div className="atlas-v6-portfolio-impact-row" key={linked.id}>
           <button type="button" className="atlas-v6-preview-link"
            aria-label={"Открыть зависимый проект "+linked.name}
-           onClick={()=>onOpenLinkedProject(linked.id)}>{linked.name}</button>
+           onClick={()=>onOpenLinkedProject(linked.id,shown.id)}>{linked.name}</button>
           <small>Начало: {format(linked.previousStart)} → {format(linked.projectedStart)}.
            {" "}Финиш: {format(linked.previousFinish)} → {format(linked.projectedFinish)}.
            {linked.finishShiftDays!==null&&linked.finishShiftDays!==0?
@@ -219,6 +231,7 @@ export function AtlasInspectorPreview({project,snapshot,plan,forecast,comparison
        <p role="status">{correction.followupCount>0?
         "Последовательных правок: "+correction.followupCount+". Сравнение с планом до первого изменения.":
         "Сравнение с планом до изменения."}</p>
+       {correction.linkedFollowups?.length>0&&<p role="status">{"Правок в связанных проектах: "+correction.linkedFollowups.length+". Прогноз от исходного плана."}</p>}
        <p>Изменена работа: {correction.rootTitle}.</p>
        {shown?.id!==correction.rootId&&<button type="button" className="atlas-v6-preview-link"
         aria-label={"Вернуться к исходной работе "+correction.rootTitle}

@@ -15,7 +15,7 @@ import {realityOverview,workObservationIndex} from "../../src/reality-overview.m
 import {responseState} from "../../src/response.mjs";
 import {scheduleProject,scheduleChangeSummary,scheduleDeadlineExplanations,criticalPathFocus,forecastDependencyRemoval,workDependencyOverview,filterWorkRowsByDependencies} from "../../src/planning.mjs";
 import {previewWorkScheduleEdit} from "../../src/work-schedule-preview.mjs";
-import {startWorkCorrection,continueWorkCorrection} from "../../src/work-correction-flow.mjs";
+import {startWorkCorrection,continueWorkCorrection,beginCrossProjectWorkReturn,advanceCrossProjectWorkReturn} from "../../src/work-correction-flow.mjs";
 import {portfolioSchedule,projectedFinishLabel} from "../../src/portfolio-schedule.mjs";
 import {capturePlanBaseline,comparePlanBaseline} from "../../src/plan-baseline.mjs";
 import {projectScreenSchedule} from "../../src/project-schedule-view.mjs";
@@ -489,7 +489,20 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const [controlPlanLimit,setControlPlanLimit]=useState(100);
  const [controlPlanOnlyChanges,setControlPlanOnlyChanges]=useState(true);
  const [previewWorkRequest,setPreviewWorkRequest]=useState<{id:string;serial:number}|null>(null);
+ const [crossProjectReturn,setCrossProjectReturn]=useState<
+  ReturnType<typeof beginCrossProjectWorkReturn>|null
+ >(null);
  const project=data.projects.find((p:any)=>p.id===active)||null;
+ const crossProjectReturnInfo=crossProjectReturn&&active===crossProjectReturn.linkedProjectId?
+  (()=>{
+   const source=data.projects.find((p:any)=>p.id===crossProjectReturn.sourceProjectId);
+   const work=source?.items.find((w:any)=>w.id===crossProjectReturn.sourceWorkId);
+   return source&&work?{
+    projectTitle:source.name,workTitle:work.title,
+    linkedChanges:crossProjectReturn.correction.linkedFollowups?.length??0,
+    current:crossProjectReturn.revision===data.revision
+   }:null;
+  })():null;
  const t3WorkLinks=useMemo(()=>atlasT3RecordedWorkLinks(project),[project]);
  const recentWork=recentWorkId?project?.items.find((item:any)=>item.id===recentWorkId):null;
  const recentStage=recentWork?.stageId?
@@ -1276,6 +1289,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  };
  const selectProject=(id:string|null,afterSubmit=false)=>{
   if(!afterSubmit&&!requireClosedForm())return;
+  // Ordinary project switching ends a temporary cross-project return route.
+  setCrossProjectReturn(null);
   workNavigationContext.current=null;
   resetWorkspaceScroll();
   host?.onSelection?.({projectId:id,workId:null,revision:String(latestSnapshot.current.revision)});
@@ -1322,6 +1337,40 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    setForecastId(changeId);
    setChangeJump({projectId:id,changeId});
   }
+ };
+ const openInspectorLinkedProject=(linkedProjectId:string,sourceWorkId:string)=>{
+  if(!project||!requireClosedForm())return;
+  const route=beginCrossProjectWorkReturn(data,recentPlanBefore,{
+   sourceWorkId,sourceTab:tab,linkedProjectId,sourceWorkKind:recentWorkKind
+  });
+  if(!route)return;
+  openProjectTab(linkedProjectId,"timeline");
+  // Set after selectProject's ordinary reset, never with a stale ref.
+  setCrossProjectReturn(route);
+  setInspector(true);
+ };
+ const returnToCrossProjectWork=()=>{
+  if(!crossProjectReturn||!requireClosedForm())return;
+  const route=crossProjectReturn;
+  const source=data.projects.find((p:any)=>p.id===route.sourceProjectId);
+  if(!source?.items.some((w:any)=>w.id===route.sourceWorkId)){
+   setCrossProjectReturn(null);
+   setMessage("\u0418\u0441\u0445\u043e\u0434\u043d\u0430\u044f \u0440\u0430\u0431\u043e\u0442\u0430 \u0431\u043e\u043b\u044c\u0448\u0435 \u043d\u0435\u0434\u043e\u0441\u0442\u0443\u043f\u043d\u0430.");
+   return;
+  }
+  const current=route.revision===data.revision&&
+   route.correction?.revision===data.revision;
+  openProjectTab(source.id,route.sourceTab);
+  setRecentPlanBefore(current?route.correction:null);
+  setRecentWorkKind(route.sourceWorkKind);
+  setRecentWorkId(current?route.correction.workId:null);
+  setPreviewWorkRequest(previous=>({id:route.sourceWorkId,
+   serial:(previous?.serial??0)+1}));
+  setInspector(true);
+  setCrossProjectReturn(null);
+  setMessage(current?
+   "\u0412\u043e\u0437\u0432\u0440\u0430\u0442 \u043a \u0438\u0441\u0445\u043e\u0434\u043d\u043e\u0439 \u0440\u0430\u0431\u043e\u0442\u0435. \u041e\u0431\u0449\u0438\u0439 \u043f\u0440\u043e\u0433\u043d\u043e\u0437 \u0443\u0447\u0438\u0442\u044b\u0432\u0430\u0435\u0442 \u043f\u0440\u0430\u0432\u043a\u0438 \u0441\u0432\u044f\u0437\u0430\u043d\u043d\u044b\u0445 \u043f\u0440\u043e\u0435\u043a\u0442\u043e\u0432.":
+   "\u0412\u043e\u0437\u0432\u0440\u0430\u0442 \u043a \u0438\u0441\u0445\u043e\u0434\u043d\u043e\u0439 \u0440\u0430\u0431\u043e\u0442\u0435. \u041f\u043b\u0430\u043d \u0438\u0437\u043c\u0435\u043d\u0438\u043b\u0441\u044f, \u043f\u0440\u0435\u0436\u043d\u0438\u0439 \u0440\u0430\u0441\u0447\u0451\u0442 \u043d\u0435 \u043f\u043e\u043a\u0430\u0437\u0430\u043d.");
  };
  const openPortfolioWorkResults=(id:string,query:string,focusWorkId:string|null=null)=>{
   if(busyRef.current||!requireClosedForm())return;
@@ -1428,6 +1477,14 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     // Consecutive corrections must be compared with the plan before the
     // original edit. A comparison with the immediate prior revision hides
     // earlier shifts and makes an unfinished correction look completed.
+    if(crossProjectReturn?.linkedProjectId===formProject){
+     const updated=advanceCrossProjectWorkReturn(crossProjectReturn,{
+      beforeSnapshot:data,afterSnapshot:result.state,
+      editedProjectId:formProject,editedWorkId:correctedId,
+      recordCorrection:Boolean(scheduleFieldsChanged)
+     });
+     setCrossProjectReturn(updated);
+    }
     const fromImpactList=Boolean(recentScheduleEffect&&
      (recentWorkKind==="dependency"||recentWorkKind==="adjusted")&&
      recentScheduleEffect.affectedIds.includes(correctedId));
@@ -3732,7 +3789,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      comparison={controlPlanComparison} deadlineRisks={deadlineRiskDetails}
      localPlan={plannedPlan} correctionContext={recentWorkKind!=="created"?recentPlanBefore:null}
      onShowAffected={showAffectedWorks} onSelectBaseline={setControlPlanId}
-     onOpenLinkedProject={id=>openProjectTab(id,"timeline")}
+     onOpenLinkedProject={openInspectorLinkedProject}
+     returnContext={crossProjectReturnInfo} onReturnToSource={returnToCrossProjectWork}
      dirty={dirty} saved={persisted} workRequest={previewWorkRequest}
      onClose={()=>setInspector(false)} onEditWork={id=>openEditor("work:"+id,undefined,true)}
      onEditProject={()=>openEditor("project-edit",undefined,true)} onOpenTab={goProjectTab}

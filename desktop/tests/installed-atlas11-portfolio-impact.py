@@ -117,6 +117,32 @@ def qualify():
     v.capture("atlas11-portfolio-impact-linked-project-820")
     print("ATLAS11_NATIVE_PORTFOLIO_IMPACT_PROJECT_JUMP_PASS",flush=True)
 
+    # The source Work remains one action away, including its original
+    # calendar comparison and dock selection. Do not rely on browser Back.
+    native.click_named("\u0412\u0435\u0440\u043d\u0443\u0442\u044c\u0441\u044f \u043a \u0438\u0441\u0445\u043e\u0434\u043d\u043e\u0439 \u0440\u0430\u0431\u043e\u0442\u0435 "+SOURCE_WORK,"Button")
+    d.wait_text("\u041f\u043e\u0441\u043b\u0435\u0434\u0441\u0442\u0432\u0438\u044f \u043a\u043e\u0440\u0440\u0435\u043a\u0442\u0438\u0440\u043e\u0432\u043a\u0438",35)
+    d.wait_text("\u0412\u043b\u0438\u044f\u043d\u0438\u0435 \u043d\u0430 \u0441\u0432\u044f\u0437\u0430\u043d\u043d\u044b\u0435 \u043f\u0440\u043e\u0435\u043a\u0442\u044b",35)
+    assert d.head()==saved,"Returning to the source Work wrote Native Store"
+    v.capture("atlas11-portfolio-impact-return-to-source-820")
+    print("ATLAS11_NATIVE_PORTFOLIO_SOURCE_WORK_RETURN_PASS",flush=True)
+
+    # Extend the same user journey with one actual edit in the downstream
+    # project, then return to the source and verify cumulative forecast.
+    native.click_named("\u041e\u0442\u043a\u0440\u044b\u0442\u044c \u0437\u0430\u0432\u0438\u0441\u0438\u043c\u044b\u0439 \u043f\u0440\u043e\u0435\u043a\u0442 "+DOWNSTREAM,"Button")
+    native.click_named("\u041e\u0442\u043a\u0440\u044b\u0442\u044c \u0440\u0430\u0431\u043e\u0442\u0443 "+TARGET_WORK,"Button")
+    d.wait_text("\u0418\u0437\u043c\u0435\u043d\u0438\u0442\u044c \u0440\u0430\u0431\u043e\u0442\u0443",25)
+    native.click_named("\u0418\u0437\u043c\u0435\u043d\u0438\u0442\u044c \u0440\u0430\u0431\u043e\u0442\u0443","Button")
+    d.wait_text("\u0418\u0437\u043c\u0435\u043d\u0438\u0435 \u0434\u0430\u043d\u043d\u044b\u0445",25)
+    v.set_editor_text("\u041f\u043b\u0430\u043d\u043e\u0432\u0430\u044f \u0434\u043b\u0438\u0442\u0435\u043b\u044c\u043d\u043e\u0441\u0442\u044c, \u0434\u043d\u0435\u0439","3")
+    v.find_control("\u041f\u0440\u0438\u043c\u0435\u043d\u0438\u0442\u044c \u043a \u0447\u0435\u0440\u043d\u043e\u0432\u0438\u043a\u0443",types={"Button"}).click_input()
+    d.wait_text("\u041f\u043e\u0441\u043b\u0435\u0434\u0441\u0442\u0432\u0438\u044f \u043a\u043e\u0440\u0440\u0435\u043a\u0442\u0438\u0440\u043e\u0432\u043a\u0438",35)
+    assert d.head()==saved,"Downstream Work edit wrote Native Store without Save"
+    native.click_named("\u0412\u0435\u0440\u043d\u0443\u0442\u044c\u0441\u044f \u043a \u0438\u0441\u0445\u043e\u0434\u043d\u043e\u0439 \u0440\u0430\u0431\u043e\u0442\u0435 "+SOURCE_WORK,"Button")
+    d.wait_text("\u041f\u0440\u0430\u0432\u043e\u043a \u0432 \u0441\u0432\u044f\u0437\u0430\u043d\u043d\u044b\u0445 \u043f\u0440\u043e\u0435\u043a\u0442\u0430\u0445: 1",35)
+    assert d.head()==saved,"Cumulative return wrote Native Store"
+    v.capture("atlas11-portfolio-impact-cumulative-return-820")
+    print("ATLAS11_NATIVE_PORTFOLIO_CUMULATIVE_RETURN_PASS",flush=True)
+
 if __name__=="__main__":
     try:
         qualify()
