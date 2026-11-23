@@ -234,14 +234,14 @@ def qualify():
     v.find_control("Применить к черновику",types={"Button"}).click_input()
     d.wait_text("Работа изменена в черновике.",35)
     d.wait_text("Последствия корректировки",35)
-    click_named("Инспектор: итог","Button")
+    click_named("Инспектор: итог")
     d.wait_text("Продолжительность проекта по CPM",35)
     d.wait_text("Затронутые работы",35)
     assert d.head()==saved,"Work correction wrote to Native Store without Save"
     v.capture("atlas11-v6-inspector-work-impact-820")
-    click_named("Инспектор: сроки","Button")
+    click_named("Инспектор: сроки")
     d.wait_text("Календарь работы",25)
-    click_named("Инспектор: итог","Button")
+    click_named("Инспектор: итог")
     d.wait_text("Последствия корректировки",25)
     assert d.head()==saved
     print("ATLAS11_NATIVE_WORK_CORRECTION_IMPACT_INSPECTOR_PASS",flush=True)

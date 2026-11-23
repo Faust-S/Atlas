@@ -88,8 +88,10 @@ export function inspectorRecentCorrection(project,revision,selectedWorkId,contex
    !Array.isArray(context.change.examples))return null;
  const root=project.items.find(item=>item.id===context.workId);
  const selected=project.items.find(item=>item.id===selectedWorkId);
+ const followupIds=Array.isArray(context.followups)?context.followups:[];
  if(!root||!selected||(root.id!==selectedWorkId&&
-    !context.change.affectedIds.includes(selectedWorkId)))return null;
+    !context.change.affectedIds.includes(selectedWorkId)&&
+    !followupIds.includes(selectedWorkId)))return null;
  const byId=new Map(project.items.map(item=>[item.id,item]));
  const examples=context.change.examples
   .filter(item=>byId.has(item.id))
@@ -97,7 +99,7 @@ export function inspectorRecentCorrection(project,revision,selectedWorkId,contex
  return {
   projectId:project.id,revision,rootId:root.id,rootTitle:root.title,
   beforeDays:context.days,afterDays:localPlan.durationDays,
-  followupCount:Array.isArray(context.followups)?context.followups.length:0,
+  followupCount:followupIds.length,followupIds:[...followupIds],
   change:{...context.change,examples}
  };
 }

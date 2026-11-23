@@ -79,7 +79,8 @@ export function AtlasInspectorPreview({project,snapshot,plan,forecast,comparison
   [project,snapshot.revision,shown?.kind,shown?.id,correctionContext,localPlan]);
  const lastAutoImpact=useRef<string|null>(null);
  useEffect(()=>{
-  if(!correction||shown?.kind!=="work"||shown.id!==correction.rootId)return;
+  if(!correction||shown?.kind!=="work"||
+   (shown.id!==correction.rootId&&!correction.followupIds.includes(shown.id)))return;
   const token=correction.projectId+":"+correction.rootId+":"+correction.revision;
   if(lastAutoImpact.current!==token){
    lastAutoImpact.current=token;
@@ -168,6 +169,10 @@ export function AtlasInspectorPreview({project,snapshot,plan,forecast,comparison
         "Последовательных правок: "+correction.followupCount+". Сравнение с планом до первого изменения.":
         "Сравнение с планом до изменения."}</p>
        <p>Изменена работа: {correction.rootTitle}.</p>
+       {shown?.id!==correction.rootId&&<button type="button" className="atlas-v6-preview-link"
+        aria-label={"Вернуться к исходной работе "+correction.rootTitle}
+        onClick={()=>{open("work",correction.rootId);setWorkSection("impact")}}>
+        К исходной работе: {correction.rootTitle}</button>}
        <p>Продолжительность проекта по CPM: было {correction.beforeDays} дн.,
         стало {correction.afterDays} дн.
         {correction.beforeDays!==correction.afterDays?

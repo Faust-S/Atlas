@@ -676,7 +676,13 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   setWorkReturnId(null);setWorkLimit(200);
  };
  const showAffectedWorks=()=>{
-  if(!recentScheduleEffect?.affectedIds.length||!requireClosedForm())return;
+  const current=recentPlanBefore&&project&&recentPlanBefore.projectId===project.id&&
+   recentPlanBefore.revision===data.revision?recentPlanBefore.change:null;
+  if(!(recentScheduleEffect??current)?.affectedIds.length||!requireClosedForm())return;
+  // This action can come from the inspector after visiting Gantt or the DAG.
+  // Return to the existing Work table without discarding the correction.
+  if(current&&recentWorkId!==recentPlanBefore.workId)setRecentWorkId(recentPlanBefore.workId);
+  if(tab!=="work"){resetWorkspaceScroll();setTab("work");setSourceJump(null);setGraphJump(null);}
   setWorkFilter("all");setWorkTargetFilter("all");
   setWorkObservationFilter("all");setWorkDependencyFilter("all");
   setWorkDeadlineFilter("all");setWorkQuery("");setWorkImpactOnly(true);setWorkCriticalOnly(false);

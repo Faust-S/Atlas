@@ -55,7 +55,8 @@ test("Successive correction compares against the first plan, never an intermedia
  assert.equal(result.afterDays,5);
  assert.deepEqual(result.change.affectedIds,["a"]);
  assert.equal(inspectorRecentCorrection(p2,40,"a",second,scheduleProject(p2)),null);
- assert.equal(inspectorRecentCorrection(p2,41,"b",second,scheduleProject(p2)),null);
+ assert.equal(inspectorRecentCorrection(p2,41,"b",second,scheduleProject(p2)).followupCount,1,
+  "A corrected Work retains the cumulative result even when its own shift disappears");
 });
 
 test("Compact native inspector includes impact tab, direct Work edit and separate Save",()=>{
@@ -67,6 +68,9 @@ test("Compact native inspector includes impact tab, direct Work edit and separat
  assert.match(main,/onShowAffected=\{showAffectedWorks\}/);
  assert.match(preview,/inspectorRecentCorrection\(project,snapshot.revision,shown.id,correctionContext,localPlan\)/);
  assert.match(preview,/setWorkSection\("impact"\)/);
+ assert.match(preview,/correction\.followupIds\.includes\(shown\.id\)/);
+ assert.match(preview,/Вернуться к исходной работе/);
+ assert.match(main,/if\(tab!=="work"\)\{resetWorkspaceScroll\(\);setTab\("work"\)/);
  assert.match(preview,/aria-label="Инспектор: итог"/);
  assert.match(preview,/aria-label="Последствия корректировки работы"/);
  assert.match(preview,/onClick=\{\(\)=>\{open\("work",affected.id\);onEditWork\(affected.id\)\}\}/);
