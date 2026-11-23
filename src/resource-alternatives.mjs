@@ -13,6 +13,38 @@ function totals(view){
   undatedWork:view.totals.undated
  };
 }
+
+/**
+ * Explain resource-level consequences, including a conflict moved from one
+ * planning resource to another with no change in the portfolio total.
+ * "Relieved" may be partial; only fullyCleared means the recorded constraint
+ * disappears. No resource leveling or new scheduling authority is introduced.
+ */
+function explainShift(sourceBefore,sourceAfter,targetBefore,targetAfter,remaining){
+ const relieved=[],introduced=[],worsened=[];
+ for(const [prior,next] of [[sourceBefore,sourceAfter],[targetBefore,targetAfter]]){
+  for(const [metric,kind] of [['overloadDays','overload'],['unavailableDays','availability']]){
+   const beforeDays=prior[metric],afterDays=next[metric];
+   if(afterDays<beforeDays)relieved.push({resourceId:prior.id,resourceLabel:prior.label,
+    kind,days:beforeDays-afterDays,beforeDays,afterDays,fullyCleared:afterDays===0});
+   if(afterDays>beforeDays){
+    const record={resourceId:prior.id,resourceLabel:prior.label,kind,
+     days:afterDays-beforeDays,beforeDays,afterDays};
+    if(beforeDays===0)introduced.push(record);
+    else worsened.push(record);
+   }
+  }
+ }
+ return {relieved,introduced,worsened,remaining,
+  classification:introduced.length||worsened.length?
+   relieved.length?'TRADEOFF':'WORSENED':relieved.length?'IMPROVED':'UNCHANGED',
+  // Even a fully clean *planning* result is not an assertion that a real
+  // person, machine, or delivery slot has been committed.
+  outlook:remaining.overloadResourceDays>0||remaining.unavailableResourceDays>0?
+   'KNOWN_RESOURCE_CONFLICTS':remaining.undatedWork>0?'DATES_INCOMPLETE':
+   'NO_KNOWN_RESOURCE_CONFLICTS'};
+}
+
 function resourceStatus(group){
  if(!group)throw Error('Плановый ресурс не найден');
  return {id:group.id,label:group.label,capacityPct:group.capacityPct,
@@ -63,14 +95,17 @@ export function previewWorkResourceReassignment(snapshot,{projectId,workId,targe
  const current=baseline.work.find(row=>row.projectId===projectId&&row.id===workId);
  const alternative=result.work.find(row=>row.projectId===projectId&&row.id===workId);
  if(!current||!alternative)throw Error('Нет расчёта выбранной работы');
+ const sourceBefore=resourceStatus(baseline.byId.get(sourceId));
+ const sourceAfter=resourceStatus(result.byId.get(sourceId));
+ const targetBefore=resourceStatus(baseline.byId.get(targetResourceId));
+ const targetAfter=resourceStatus(result.byId.get(targetResourceId));
  return {
   kind:'RESOURCE_ASSIGNMENT_COMPARISON',
   projectId,workId,workTitle:work.title,revision:snapshot.revision,
-  source:resourceStatus(baseline.byId.get(sourceId)),
-  proposedSource:resourceStatus(result.byId.get(sourceId)),
-  target:resourceStatus(baseline.byId.get(targetResourceId)),
-  proposedTarget:resourceStatus(result.byId.get(targetResourceId)),
+  source:sourceBefore,proposedSource:sourceAfter,
+  target:targetBefore,proposedTarget:targetAfter,
   original:before,alternative:after,
+  constraints:explainShift(sourceBefore,sourceAfter,targetBefore,targetAfter,after),
   overloadDaysDelta:after.overloadResourceDays-before.overloadResourceDays,
   unavailableDaysDelta:after.unavailableResourceDays-before.unavailableResourceDays,
   startDate:current.startDate,finishDate:current.finishDate,
@@ -115,4 +150,46 @@ export function prepareResourceEditorChoice(snapshot,comparison){
   revision:comparison.revision,
   sourceResourceId:comparison.source.id,targetResourceId:comparison.target.id
  });
+}
+
+/**
+ * Compare an explicitly chosen Work against an entire page of EXISTING
+ * planning resources. Every comparison uses the same schedule and baseline
+ * resource projection. Pages bound the amount of authoritative recalculation
+ * even when the portfolio has many resources.
+ *
+ * Results are ordered by label, not by a fabricated "optimal" ranking.
+ * No choice is made, applied, or saved by this function.
+ */
+export function compareWorkResourceAlternatives(snapshot,
+ {projectId,workId,offset=0,limit=6}={}, {schedule=null,resources=null}={}){
+ if(!snapshot||!Array.isArray(snapshot.projects)||!projectId||!workId)
+  throw Error('Выберите работу для сравнения');
+ if(!Number.isSafeInteger(offset)||offset<0||
+    !Number.isSafeInteger(limit)||limit<1||limit>12)
+  throw Error('Некорректная страница ресурсных вариантов');
+ const project=snapshot.projects.find(p=>p.id===projectId);
+ const work=project?.items?.find(item=>item.id===workId);
+ if(!work)throw Error('Работа не найдена');
+ if(project.status==='cancelled'||work.state==='done')
+  throw Error('Завершённую или отменённую работу не сравниваем');
+ if(!work.resourceId)throw Error('У Work нет действующего планового ресурса');
+ const all=snapshot.resources??[];
+ if(!all.some(r=>r.id===work.resourceId))
+  throw Error('Исходный плановый ресурс не найден');
+ const alternatives=all.filter(r=>r.id!==work.resourceId).sort((a,b)=>
+  a.label.localeCompare(b.label,'ru')||a.id.localeCompare(b.id));
+ const forecast=schedule??portfolioSchedule(snapshot);
+ const baseline=resources??portfolioResources(snapshot,{schedule:forecast});
+ const options=alternatives.slice(offset,offset+limit).map(target=>
+  previewWorkResourceReassignment(snapshot,{projectId,workId,targetResourceId:target.id},
+   {schedule:forecast,resources:baseline}));
+ return {kind:'RESOURCE_ASSIGNMENT_OPTIONS',projectId,workId,workTitle:work.title,
+  revision:snapshot.revision,sourceResourceId:work.resourceId,
+  candidateCount:alternatives.length,offset,limit,
+  options,original:totals(baseline),
+  // A list of alternatives is not a ranked recommendation or a promise
+  // that resource choice alone can achieve a project's deadline.
+  note:'Сопоставление плановых вариантов без переноса дат CPM и без сохранения. '+
+   'Решение принимает пользователь в редакторе Work.'};
 }
