@@ -103,6 +103,7 @@ test('UI presents both baselines and an explicit ordinary Work editor action',()
  const ui=readFileSync(new URL('../desktop/src/ResourceAlternatives.tsx',import.meta.url),'utf8');
  const main=readFileSync(new URL('../desktop/src/main.tsx',import.meta.url),'utf8');
  assert.match(main,/resourceComparisonId===r.id/);
+ assert.match(main,/Сравнить варианты ресурса/);
  assert.match(main,/onOpenWork=\{\(pid,wid,comparison\)=>openEditorFor\(pid,"work:"\+wid,comparison\)\}/);
  assert.match(ui,/Плановая загрузка до и после изменения назначения/);
  assert.match(ui,/aria-label=\{'Варианты ресурсного назначения: '/);
