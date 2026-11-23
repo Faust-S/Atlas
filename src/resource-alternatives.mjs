@@ -45,6 +45,29 @@ function explainShift(sourceBefore,sourceAfter,targetBefore,targetAfter,remainin
    'NO_KNOWN_RESOURCE_CONFLICTS'};
 }
 
+// Compare known calendar forecasts with recorded control dates, not with
+// simulated resource leveling. A resource reassignment alone cannot alter CPM.
+function calendarDeadline(finish,due){
+ const slip=finish&&due?
+  Math.max(0,(Date.parse(finish+'T00:00:00Z')-Date.parse(due+'T00:00:00Z'))/86400000):null;
+ return {forecastFinish:finish??null,controlDate:due??null,slipDays:slip,
+  status:!finish?'FORECAST_UNKNOWN':!due?'CONTROL_DATE_UNKNOWN':
+   slip>0?'CALENDAR_LATE':'CALENDAR_WITHIN_CONTROL'};
+}
+function resourceAssignmentControlDates(project,work,projection,current){
+ if(!projection)throw Error('Расчёт сроков проекта не найден');
+ const baseline=project.planBaselines?.at(-1)??null;
+ return {
+  work:calendarDeadline(current.finishDate,work.dueDate??null),
+  project:calendarDeadline(projection.projectedFinish,project.dueDate??null),
+  baseline:baseline?{name:baseline.name,forecastFinish:baseline.forecastFinish??null}:null,
+  calendarForecastUnchanged:true,
+  note:'Переназначение без выравнивания ресурсов не изменяет даты CPM. '+
+   'Риск превышения контрольного срока остаётся, даже если плановая перегрузка уменьшилась. '+
+   'Фактическая выполнимость требует отдельного подтверждения.'
+ };
+}
+
 function resourceStatus(group){
  if(!group)throw Error('Плановый ресурс не найден');
  return {id:group.id,label:group.label,capacityPct:group.capacityPct,
@@ -105,6 +128,7 @@ export function previewWorkResourceReassignment(snapshot,{projectId,workId,targe
   source:sourceBefore,proposedSource:sourceAfter,
   target:targetBefore,proposedTarget:targetAfter,
   original:before,alternative:after,
+  controlDates:resourceAssignmentControlDates(project,work,forecast.byId.get(projectId),current),
   constraints:explainShift(sourceBefore,sourceAfter,targetBefore,targetAfter,after),
   overloadDaysDelta:after.overloadResourceDays-before.overloadResourceDays,
   unavailableDaysDelta:after.unavailableResourceDays-before.unavailableResourceDays,
