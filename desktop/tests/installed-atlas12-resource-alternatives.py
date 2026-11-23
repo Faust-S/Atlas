@@ -38,8 +38,12 @@ def click_scrollable_button(name,scroll_direction=-2):
     """Scroll the real installed viewport until the user action is visible."""
     for attempt in range(12):
         bounds=win32gui.GetWindowRect(d.handle)
-        possible=native.visible_named(name,'Button')
-        physical=[e for e in possible if e.is_enabled() and
+        # Inspect the public Windows accessibility tree directly. The
+        # preceding helper waits for a visible control, so it cannot be used
+        # while deliberately scrolling an initially offscreen button.
+        possible=[e for e in d.window().descendants(control_type='Button')
+                  if str(e.window_text() or '')==name]
+        physical=[e for e in possible if e.is_visible() and e.is_enabled() and
                   e.rectangle().left>=bounds[0]+4 and
                   e.rectangle().right<=bounds[2]-4 and
                   e.rectangle().top>=bounds[1]+4 and
