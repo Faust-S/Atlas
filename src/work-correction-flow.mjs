@@ -3,6 +3,10 @@
 import {scheduleChangeSummary} from "./planning.mjs";
 import {portfolioScheduleChangeSummary} from "./portfolio-schedule.mjs";
 
+/**
+ * @param {{projectId:string,workId:string,revision:number,beforePlan:any,
+ *  afterPlan:any,beforePortfolio?:any,afterPortfolio?:any}} options
+ */
 export function startWorkCorrection({projectId,workId,revision,beforePlan,afterPlan,
  beforePortfolio=null,afterPortfolio=null}){
  if(!projectId||!workId||!Number.isSafeInteger(revision))
@@ -20,6 +24,11 @@ export function startWorkCorrection({projectId,workId,revision,beforePlan,afterP
 
 // Only extend a session for an actually affected work at the exact current
 // revision. An unrelated edit or a new project must start a fresh comparison.
+/**
+ * @param {any} context
+ * @param {{projectId:string,workId:string,revision:number,nextRevision:number,
+ *  afterPlan:any,recordCorrection?:boolean,afterPortfolio?:any}} options
+ */
 export function continueWorkCorrection(context,{projectId,workId,revision,nextRevision,afterPlan,
  recordCorrection=true,afterPortfolio=null}){
  if(!context||context.projectId!==projectId||context.revision!==revision||
