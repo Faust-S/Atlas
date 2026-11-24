@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import {empty,createProject,createItem,editItem,editProject,serialize,createWorkCalendar} from '../src/core.mjs';
 import {addPlanningResource} from '../src/resource-planning.mjs';
 import {portfolioSchedule} from '../src/portfolio-schedule.mjs';
-import {portfolioResources,projectResourceReassignment} from '../src/portfolio-resources.mjs';
+import {portfolioResources,projectResourceReassignment,resourceConflictPeriods} from '../src/portfolio-resources.mjs';
 import {desktopLoadPortfolio} from './fixtures/desktop-portfolio-120.mjs';
 import {previewWorkResourceReassignment,compareWorkResourceAlternatives,prepareResourceEditorChoice,assertResourceEditorChoiceCurrent} from '../src/resource-alternatives.mjs';
 
@@ -429,4 +429,93 @@ test('First assignment preserves exact working-day occupancy including weekends 
  assert.equal(preview.proposedTarget.maxLoadPct,expected.maxLoadPct);
  assert.equal(preview.finishDate,original.finishDate);
  assert.equal(resources.byId.get(f.lift).itemCount,0);
+});
+
+test('Conflict explanation identifies the exact overlapping Work and dates before and after a transfer',()=>{
+ const f=fixture();
+ const parallel=createItem(f.snapshot,f.pid,{title:'Подача оборудования',resourceId:f.lift,allocationPct:70});
+ f.snapshot=editItem(parallel.state,f.pid,parallel.id,{estimateDays:3});
+ const saved=serialize(f.snapshot),view=portfolioResources(f.snapshot);
+ const group=view.byId.get(f.crane),before=resourceConflictPeriods(group);
+ assert.equal(before.periodCount,1);
+ assert.equal(before.overloadDays,3);
+ assert.equal(before.period.startDate,'2026-11-23');
+ assert.equal(before.period.endDate,'2026-11-25');
+ assert.equal(before.period.loadPct,130);
+ assert.equal(before.period.capacityPct,100);
+ assert.deepEqual(new Set(before.period.works.map(w=>w.workId)),new Set([f.first,f.second]));
+ assert.equal(before.period.projectCount,1);
+ const projected=projectResourceReassignment(view,{projectId:f.pid,workId:f.second,targetResourceId:f.lift});
+ assert.equal(resourceConflictPeriods(projected.sourceAfter).periodCount,0);
+ const after=resourceConflictPeriods(projected.targetAfter);
+ assert.equal(after.period.loadPct,130);
+ assert.deepEqual(new Set(after.period.works.map(w=>w.workId)),new Set([f.second,parallel.id]));
+ assert.equal(after.overloadDays,3);
+ assert.equal(serialize(f.snapshot),saved);
+});
+
+test('Exact conflict segments respect availability boundaries, calendar gaps and zero-day work',()=>{
+ const f=fixture();
+ f.snapshot=editProject(f.snapshot,f.pid,{startDate:'2026-11-20'});
+ const cal=createWorkCalendar(f.snapshot,{name:'График',weekdays:[1,2,3,4,5],
+  excludedDates:['2026-11-23'],additionalWorkingDates:[],source:{kind:'entered_by_user',reference:null}});
+ f.snapshot=editItem(cal.state,f.pid,f.first,{estimateDays:2,durationUnit:'working_days',
+  calendarBasis:{id:cal.id,version:cal.version}});
+ f.snapshot=editItem(f.snapshot,f.pid,f.second,{estimateDays:5});
+ const marker=createItem(f.snapshot,f.pid,{title:'Веха',resourceId:f.crane,allocationPct:100});
+ f.snapshot=editItem(marker.state,f.pid,marker.id,{estimateDays:0});
+ f.snapshot.resources.find(r=>r.id===f.crane).availableFrom='2026-11-21';
+ const g=portfolioResources(f.snapshot).byId.get(f.crane);
+ const first=resourceConflictPeriods(g),second=resourceConflictPeriods(g,{offset:1});
+ assert.equal(first.periodCount,2);
+ assert.equal(first.period.kind,'availability');
+ assert.equal(first.period.startDate,'2026-11-20');
+ assert.equal(first.period.endDate,'2026-11-20');
+ assert.equal(second.period.kind,'overload');
+ assert.equal(second.period.startDate,'2026-11-24');
+ assert.equal(second.period.endDate,'2026-11-24');
+ assert.equal(first.period.days+second.period.days,g.overloadDays+g.unavailableDays);
+ assert.equal(first.period.works.some(w=>w.workId===marker.id),false);
+ assert.equal(resourceConflictPeriods(g,{offset:2}).period,null);
+});
+
+test('Conflict contributors retain project identity and have bounded pages even for duplicate names',()=>{
+ const f=fixture();
+ const newProject=createProject(f.snapshot,{name:'Второй проект',type:'engineering'});
+ f.snapshot=editProject(newProject.state,newProject.id,{startDate:'2026-11-23'});
+ for(let i=0;i<9;i++){
+  const w=createItem(f.snapshot,newProject.id,{title:'Разгрузка',resourceId:f.crane,allocationPct:10});
+  f.snapshot=editItem(w.state,newProject.id,w.id,{estimateDays:3});
+ }
+ const group=portfolioResources(f.snapshot).byId.get(f.crane);
+ const a=resourceConflictPeriods(group,{workLimit:6}),b=resourceConflictPeriods(group,{workLimit:6,workOffset:6});
+ assert.equal(a.period.projectCount,2);
+ assert.equal(a.period.workCount,11);
+ assert.equal(a.period.works.length,6);
+ assert.equal(b.period.works.length,5);
+ const all=[...a.period.works,...b.period.works];
+ assert.equal(new Set(all.map(w=>JSON.stringify([w.projectId,w.workId]))).size,11);
+ assert.equal(all.reduce((n,w)=>n+w.allocationPct,0),a.period.loadPct);
+ assert.equal(resourceConflictPeriods(group,{workOffset:100,workLimit:6}).period.workOffset,6);
+ assert.throws(()=>resourceConflictPeriods(group,{workLimit:31}),/запрос/);
+});
+
+test('Undated projects never produce invented conflict dates',()=>{
+ const f=fixture();f.snapshot.projects[0].startDate=null;
+ const result=resourceConflictPeriods(portfolioResources(f.snapshot).byId.get(f.crane));
+ assert.equal(result.periodCount,0);
+ assert.equal(result.undatedWork,2);
+ assert.equal(result.period,null);
+});
+
+test('Desktop conflict periods use the canonical projection and normal Work editor',()=>{
+ const ui=readFileSync(new URL('../desktop/src/ResourceAlternatives.tsx',import.meta.url),'utf8');
+ const native=readFileSync(new URL('../desktop/tests/installed-atlas12-resource-alternatives.py',import.meta.url),'utf8');
+ assert.match(ui,/resourceConflictPeriods\(group/);
+ assert.match(ui,/if\(!show\)return \[\]/);
+ assert.match(ui,/onOpenWork\(w\.projectId,w\.workId,null\)/);
+ assert.match(native,/GetClientRect/);
+ assert.match(native,/ATLAS12_NATIVE_RESOURCE_CONFLICT_PERIOD_PASS/);
+ assert.match(native,/ATLAS12_NATIVE_TRANSFERRED_CONFLICT_PERIOD_PASS/);
+ assert.doesNotMatch(ui,/applyEditor\(|commitWithReadback\(/);
 });

@@ -35,17 +35,59 @@ def check_archive():
     return snapshot
 
 
-def click_scrollable_button(name):
-    """Use the existing real viewport helper, searching both scroll directions."""
-    control=v.find_control(name,types={'Button'},scroll=True)
+def find_resource_control(name,role=None,contains=False):
+    """Locate a real accessible control in the actual compact client area.
+    No fixed sidebar width: at 820px the collapsed rail is much narrower.
+    Keep physical clicks and search both directions using the real viewport.
+    """
+    def match(e):
+        shown=''.join(str(e.window_text() or '').split())
+        wanted=''.join(name.split())
+        return wanted in shown if contains else shown==wanted
+    def bounds():
+        left,top=win32gui.ClientToScreen(d.handle,(0,0))
+        _,_,width,height=win32gui.GetClientRect(d.handle)
+        return left,top,left+width,top+height
+    def find():
+        left,top,right,bottom=bounds()
+        try:
+            controls=d.window().descendants(control_type=role) if role else d.window().descendants()
+            for e in controls:
+                if not match(e) or not e.is_visible() or not e.is_enabled():continue
+                r=e.rectangle()
+                if (r.left>=left+4 and r.right<=right-4 and
+                    r.top>=top+64 and r.bottom<=bottom-8 and r.width()>0 and r.height()>0):
+                    return e
+        except KeyError:
+            pass
+        return None
     d.activate()
+    found=find()
+    if found is not None:return found
+    left,top,right,bottom=bounds()
+    point=(left+int((right-left)*.66),top+int((bottom-top)*.80))
+    # Start from the top, then scroll in small increments rather than skipping
+    # a button between two viewport positions.
+    mouse.scroll(coords=point,wheel_dist=40)
+    time.sleep(.35)
+    until=time.monotonic()+35
+    while time.monotonic()<until:
+        found=find()
+        if found is not None:return found
+        mouse.scroll(coords=point,wheel_dist=-1)
+        time.sleep(.25)
+    v.capture('atlas12-resource-control-not-visible')
+    raise AssertionError('Resource control not physically reachable: '+name)
+
+def click_scrollable_button(name):
+    control=find_resource_control(name,'Button')
     control.click_input()
     time.sleep(.35)
 
 def reveal_resource_text(name,button):
-    # Bring an adjacent real button into the physical viewport first.
-    # This permits UIA to expose the status text of an initially offscreen block.
-    v.find_control(button,types={'Button'},scroll=True)
+    # Use the physical viewport when possible; the status must exist in the
+    # real UIA tree, not merely in a source file or a test-only label.
+    find_resource_control(button,'Button')
     d.wait_text(name,35)
 
 
@@ -116,9 +158,17 @@ def qualify():
     assert d.head()==saved,'Comparison modified Native Store without explicit Save'
     v.capture('atlas12-resource-alternatives-820')
     print('ATLAS12_NATIVE_RESOURCE_OPTIONS_READ_ONLY_PASS',flush=True)
-    reveal_resource_text('Контрольные сроки и ресурсные ограничения','Показать все варианты (3)')
+    find_resource_control('Контрольные сроки и ресурсные ограничения',contains=True)
     d.wait_text('Work: расчётный финиш 2026-11-26; контрольная дата 2026-11-24.',35)
     v.capture('atlas12-resource-control-dates-820')
+    click_scrollable_button('Показать периоды конфликтов')
+    find_resource_control('Перегрузка: 2026-11-23 по 2026-11-25. Нагрузка 130%, мощность 100%.',contains=True)
+    d.wait_text('Разгрузка материала',35)
+    d.wait_text('Подготовка монтажа',35)
+    assert d.head()==saved,'Conflict explanation wrote to Native Store'
+    v.capture('atlas12-resource-conflict-period-820')
+    print('ATLAS12_NATIVE_RESOURCE_CONFLICT_PERIOD_PASS',flush=True)
+    click_scrollable_button('Скрыть периоды конфликтов')
     click_scrollable_button('Показать все варианты (3)')
     reveal_resource_text('Новый конфликт: Резервный кран','Рассмотреть ресурс Резервный кран')
     assert d.head()==saved,'Showing several comparisons wrote to Native Store'
@@ -126,6 +176,14 @@ def qualify():
     reveal_resource_text('Изменение дней перегрузки: 0. Вне доступности: 0. Сроки Work по CPM не изменятся.',work_action)
     assert d.head()==saved,'Choosing a tradeoff wrote to Native Store'
     v.capture('atlas12-resource-multiple-tradeoff-820')
+    click_scrollable_button('Показать периоды конфликтов')
+    click_scrollable_button('После: Резервный кран')
+    find_resource_control('Перегрузка: 2026-11-23 по 2026-11-25. Нагрузка 140%, мощность 100%.',contains=True)
+    d.wait_text('Подача оборудования',35)
+    assert d.head()==saved,'Projected conflict explanation wrote to Native Store'
+    v.capture('atlas12-resource-transferred-period-820')
+    print('ATLAS12_NATIVE_TRANSFERRED_CONFLICT_PERIOD_PASS',flush=True)
+    click_scrollable_button('Скрыть периоды конфликтов')
     click_scrollable_button('Рассмотреть ресурс Подъёмник')
     reveal_resource_text('Изменение дней перегрузки: -3. Вне доступности: 0. Сроки Work по CPM не изменятся.',work_action)
     assert d.head()==saved,'Restoring the preferred option wrote to Native Store'

@@ -1,5 +1,6 @@
 import React,{useMemo,useState} from 'react';
 import {previewWorkResourceReassignment,compareWorkResourceAlternatives} from '../../src/resource-alternatives.mjs';
+import {projectResourceReassignment,resourceConflictPeriods} from '../../src/portfolio-resources.mjs';
 
 type Props={snapshot:any;forecast:any;resources:any;resourceId:string|null;
  onClose:()=>void;onOpenWork:(projectId:string,workId:string,comparison:any)=>void};
@@ -11,6 +12,76 @@ function deadlineLine(label:string,deadline:{forecastFinish:string|null;controlD
   (deadline.slipDays===null?' Нельзя определить календарное отклонение.':
    deadline.slipDays>0?' Превышение: '+deadline.slipDays+' дн.':
    ' По календарю в пределах срока.');
+}
+
+
+/** On-demand interval explanation; the ordinary editor still owns changes. */
+function ConflictPeriodPage({group,onOpenWork}:{group:any;onOpenWork:Props['onOpenWork']}){
+ const [offset,setOffset]=useState(0),[workOffset,setWorkOffset]=useState(0);
+ const view=useMemo(()=>resourceConflictPeriods(group,{offset,workOffset,workLimit:6}),
+  [group,offset,workOffset]);
+ const p=view.period;
+ const periodLabel=p?(p.kind==='overload'?'Перегрузка':'Вне периода доступности')+
+  ': '+p.startDate+' по '+p.endDate+'. Нагрузка '+p.loadPct+'%, мощность '+p.capacityPct+'%.':'';
+ return <div className="atlas-resource-conflict-page">
+  <p>{'Выше мощности: '+view.overloadDays+' дн. Вне доступности: '+view.unavailableDays+
+   ' дн. Работ без даты: '+view.undatedWork+'.'}</p>
+  {!p?<p>По известным датам конфликтов нет.</p>:<>
+   <div className="atlas-resource-conflict-period">
+    <strong role="status" aria-label={periodLabel}>{periodLabel}</strong>
+    <small>{'Период '+(offset+1)+' из '+view.periodCount+'. Дней: '+p.days+
+     '. Работ: '+p.workCount+'. Проектов: '+p.projectCount+'.'}</small>
+    <div className="atlas-resource-period-nav">
+     <button type="button" disabled={offset===0} onClick={()=>{setOffset(n=>n-1);setWorkOffset(0);}}>Предыдущий период</button>
+     <button type="button" disabled={offset+1>=view.periodCount} onClick={()=>{setOffset(n=>n+1);setWorkOffset(0);}}>Следующий период</button>
+    </div>
+    {p.works.map((w:any)=><div className="atlas-resource-conflict-work" key={key({projectId:w.projectId,id:w.workId})}>
+     <div><strong>{w.title}</strong><small>{w.projectName} · {w.allocationPct}%</small></div>
+     <button type="button" aria-label={'Открыть работу конфликта '+w.projectName+': '+w.title}
+      onClick={()=>onOpenWork(w.projectId,w.workId,null)}>Открыть Work</button>
+    </div>)}
+    {p.workCount>p.workLimit&&<div className="atlas-resource-period-nav">
+     <button type="button" disabled={p.workOffset===0} onClick={()=>setWorkOffset(n=>Math.max(0,n-6))}>Предыдущие работы</button>
+     <small>{'Работы '+(p.workOffset+1)+'-'+(p.workOffset+p.works.length)+' из '+p.workCount}</small>
+     <button type="button" disabled={p.workOffset+p.works.length>=p.workCount}
+      onClick={()=>setWorkOffset(n=>n+6)}>Следующие работы</button>
+    </div>}
+   </div>
+  </>}
+ </div>;
+}
+function ResourceConflictDetails({resources,resourceId,preview,onOpenWork}:{
+ resources:any;resourceId:string|null;preview:any;onOpenWork:Props['onOpenWork']}){
+ const [show,setShow]=useState(false),[selected,setSelected]=useState('source-now');
+ const groups=useMemo(()=>{
+  if(!show)return [];
+  const out:{key:string;label:string;group:any}[]=[];
+  const source=resources.byId.get(resourceId);
+  if(source)out.push({key:'source-now',label:'Сейчас: '+source.label,group:source});
+  if(preview){
+   const v=projectResourceReassignment(resources,{projectId:preview.projectId,
+    workId:preview.workId,targetResourceId:preview.target.id});
+   out.push({key:'target-now',label:'Сейчас: '+v.target.label,group:v.target});
+   if(v.sourceAfter)out.push({key:'source-after',label:'После: '+v.sourceAfter.label,group:v.sourceAfter});
+   out.push({key:'target-after',label:'После: '+v.targetAfter.label,group:v.targetAfter});
+  }
+  return out;
+ },[resources,resourceId,preview,show]);
+ if(resourceId===null&&!preview)return null;
+ const choice=groups.find(g=>g.key===selected)??groups[0];
+ return <section className="atlas-resource-conflicts" aria-label="Периоды ресурсных конфликтов">
+  <button type="button" className="atlas-resource-options-toggle" aria-expanded={show}
+   onClick={()=>setShow(value=>!value)}>{show?'Скрыть периоды конфликтов':'Показать периоды конфликтов'}</button>
+  {show&&choice&&<>
+   <p>Точные интервалы занятости CPM и работы, которые формируют нагрузку. Даты периода включены с обеих сторон.</p>
+   <div className="atlas-resource-period-nav">
+    {groups.map(g=><button type="button" key={g.key} aria-pressed={choice.key===g.key}
+     onClick={()=>setSelected(g.key)}>{g.label}</button>)}
+   </div>
+   <ConflictPeriodPage key={choice.key+':'+choice.group.id+':'+(preview?.workId??'')+':'+(preview?.target.id??'')}
+    group={choice.group} onOpenWork={onOpenWork}/>
+  </>}
+ </section>;
 }
 
 /** Planning choices only. The existing Work editor owns any actual change. */
@@ -59,7 +130,8 @@ export function ResourceAlternatives({snapshot,forecast,resources,resourceId,onC
   <p>Сравните назначение Work. Полный список альтернатив открывается отдельно.
    Прогноз не изменяет проект или сохранённые данные.</p>
   {assigned.length===0?<p>{resourceId===null?'Нет работ без ресурсного назначения.':'К этому ресурсу нет незавершённых работ.'}</p>:
-  alternatives.length===0?<p>Нет доступных для сравнения плановых ресурсов. Добавьте ресурс.</p>:
+  alternatives.length===0?<><p>Нет доступных для сравнения плановых ресурсов. Добавьте ресурс.</p>
+   <ResourceConflictDetails resources={resources} resourceId={resourceId} preview={null} onOpenWork={onOpenWork}/></>:
   <>
    <div className="atlas-resource-alternatives-controls">
     <label>Работа
@@ -96,11 +168,17 @@ export function ResourceAlternatives({snapshot,forecast,resources,resourceId,onC
     </div>
     <p role="status" aria-label={summary}
      className="atlas-resource-alternatives-result">{summary}</p>
+    <div className="atlas-resource-primary-actions">
     <button type="button" className="atlas-resource-alternatives-edit"
      aria-label={'Открыть Work для изменения ресурса '+preview.workTitle}
      onClick={()=>onOpenWork(preview.projectId,preview.workId,preview)}>
       Открыть Work с выбранным ресурсом
     </button>
+    <button type="button" className="atlas-resource-options-toggle"
+     aria-expanded={showAll} onClick={()=>setShowAll(value=>!value)}>
+      {showAll?'Скрыть все варианты':'Показать все варианты ('+alternatives.length+')'}
+    </button>
+    </div>
 
     <section className="atlas-resource-deadlines" role="region" aria-label="Контрольные сроки и ресурсные ограничения">
      <strong>Контрольные сроки и ресурсные ограничения</strong>
@@ -112,11 +190,9 @@ export function ResourceAlternatives({snapshot,forecast,resources,resourceId,onC
      <small>{preview.controlDates.note}</small>
     </section>
     <p className="atlas-resource-alternatives-note">{preview.note}</p>
-    <button type="button" className="atlas-resource-options-toggle"
-     aria-expanded={showAll} onClick={()=>setShowAll(value=>!value)}>
-      {showAll?'Скрыть все варианты':'Показать все варианты ('+alternatives.length+')'}
-    </button>
+
    </>}
+   <ResourceConflictDetails resources={resources} resourceId={resourceId} preview={preview} onOpenWork={onOpenWork}/>
    {showAll&&comparisonError&&<p role="status">{comparisonError}</p>}
    {showAll&&pageData&&<section className="atlas-resource-options" aria-label="Сравнение нескольких ресурсных альтернатив">
     <strong>Все варианты назначения</strong>

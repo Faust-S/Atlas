@@ -10,15 +10,22 @@ const day = value => value ? Date.parse(value+"T00:00:00Z")/DAY : null;
 const date = value => new Date(value*DAY).toISOString().slice(0,10);
 const show = value => value||"—";
 const names = value => value.trim().replace(/\s+/g," ");
-const dayEvents=(group)=>{
+// One sweep for the aggregate and (only on request) its exact conflict periods.
+const dayEvents=(group,onConflict=null)=>{
  const events=new Map();
- const append=(day,load,count)=>{const e=events.get(day)||{load:0,count:0};e.load+=load;e.count+=count;events.set(day,e)};
+ const active=onConflict?new Map():null;
+ const append=(day,load,count,work=null)=>{
+  const e=events.get(day)||{load:0,count:0};
+  e.load+=load;e.count+=count;
+  if(active&&work)(e.changes??=[]).push({work,count});
+  events.set(day,e);
+ };
  for(const w of group.work){
   // The original CPM emits exact occupied intervals for calendar-based Work.
   // Weekend gaps no longer create capacity load or false overload warnings.
   for(const [from,until] of w.activeRanges??[]){
-   append(from,w.allocationPct,1);
-   append(until,-w.allocationPct,-1);
+   append(from,w.allocationPct,1,w);
+   append(until,-w.allocationPct,-1,w);
   }
  }
  const from=day(group.availableFrom),until=day(group.availableUntil);
@@ -30,6 +37,13 @@ const dayEvents=(group)=>{
  for(let i=0;i<boundaries.length;i++){
   const event=events.get(boundaries[i]);
   load+=event.load;concurrent+=event.count;
+  if(active)for(const {work,count} of event.changes??[]){
+   const key=JSON.stringify([work.projectId,work.id]);
+   const previous=active.get(key);
+   const next=(previous?.count??0)+count;
+   if(next>0)active.set(key,{work,count:next});
+   else active.delete(key);
+  }
   maxLoadPct=Math.max(maxLoadPct,load);
   maxConcurrent=Math.max(maxConcurrent,concurrent);
   if(i+1===boundaries.length)continue;
@@ -39,9 +53,49 @@ const dayEvents=(group)=>{
   const outOfWindow=from!==null&&boundaries[i]<from||until!==null&&boundaries[i]>until;
   if(outOfWindow)unavailableDays+=length;
   else if(load>group.capacityPct)overloadDays+=length;
+  if(onConflict&&(outOfWindow||load>group.capacityPct))
+   onConflict({from:boundaries[i],until:boundaries[i+1],
+    kind:outOfWindow?"availability":"overload",loadPct:load,
+    capacityPct:group.capacityPct,concurrent},active);
  }
  return {overlapDays,maxConcurrent,maxLoadPct,overloadDays,unavailableDays};
 };
+
+/**
+ * Exact conflict segments on one resource, with a bounded page of participating
+ * Work references. The sweep uses the same half-open occupied intervals and
+ * availability precedence as the authoritative aggregate; no per-day expansion.
+ * Unknown dates and zero-day work do not create fabricated intervals.
+ *
+ * @param {any} group Resource group from portfolioResources or its projection.
+ * @param {{offset?:number,workOffset?:number,workLimit?:number}} [options]
+ */
+export function resourceConflictPeriods(group,{offset=0,workOffset=0,workLimit=8}={}){
+ if(!group||!Array.isArray(group.work)||
+    !Number.isSafeInteger(offset)||offset<0||
+    !Number.isSafeInteger(workOffset)||workOffset<0||
+    !Number.isSafeInteger(workLimit)||workLimit<1||workLimit>30)
+  throw Error("Некорректный запрос периодов ресурсного конфликта");
+ let periodCount=0,period=null;
+ const aggregate=dayEvents(group,(segment,active)=>{
+  if(periodCount++!==offset)return;
+  const all=[...active.values()].map(x=>x.work).sort((a,b)=>
+   a.projectName.localeCompare(b.projectName,"ru")||a.title.localeCompare(b.title,"ru")||
+   a.projectId.localeCompare(b.projectId)||a.id.localeCompare(b.id));
+  const count=all.length;
+  const safeOffset=Math.min(workOffset,Math.max(0,Math.floor((count-1)/workLimit)*workLimit));
+  period={kind:segment.kind,startDate:date(segment.from),endDate:date(segment.until-1),
+   days:segment.until-segment.from,loadPct:segment.loadPct,capacityPct:segment.capacityPct,
+   workCount:count,projectCount:new Set(all.map(w=>w.projectId)).size,
+   workOffset:safeOffset,workLimit,works:all.slice(safeOffset,safeOffset+workLimit).map(w=>({
+    projectId:w.projectId,projectName:w.projectName,workId:w.id,title:w.title,
+    allocationPct:w.allocationPct}))};
+ });
+ return {resourceId:group.id,resourceLabel:group.label,offset,periodCount,period,
+  overloadDays:aggregate.overloadDays,unavailableDays:aggregate.unavailableDays,
+  undatedWork:group.undatedWork??group.work.filter(w=>w.startDay===null).length};
+}
+
 // The single capacity summarizer is also used for a hypothetical reassignment.
 // It consumes the canonical occupied intervals, never recalculates the CPM.
 function summarizeResourceGroup(r){
