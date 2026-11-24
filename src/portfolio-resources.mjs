@@ -69,6 +69,12 @@ const dayEvents=(group,onConflict=null)=>{
  *
  * @param {any} group Resource group from portfolioResources or its projection.
  * @param {{offset?:number,workOffset?:number,workLimit?:number}} [options]
+ * @returns {{resourceId:string,resourceLabel:string,offset:number,periodCount:number,
+ * period: {kind:string,startDate:string,endDate:string,days:number,loadPct:number,
+ * capacityPct:number,workCount:number,projectCount:number,workOffset:number,
+ * workLimit:number,works:Array<{projectId:string,projectName:string,workId:string,
+ * title:string,allocationPct:number}>}|null,overloadDays:number,unavailableDays:number,
+ * undatedWork:number}}
  */
 export function resourceConflictPeriods(group,{offset=0,workOffset=0,workLimit=8}={}){
  if(!group||!Array.isArray(group.work)||
@@ -76,7 +82,12 @@ export function resourceConflictPeriods(group,{offset=0,workOffset=0,workLimit=8
     !Number.isSafeInteger(workOffset)||workOffset<0||
     !Number.isSafeInteger(workLimit)||workLimit<1||workLimit>30)
   throw Error("Некорректный запрос периодов ресурсного конфликта");
- let periodCount=0,period=null;
+ /** @type {{kind:string,startDate:string,endDate:string,days:number,
+  * loadPct:number,capacityPct:number,workCount:number,projectCount:number,
+  * workOffset:number,workLimit:number,works:Array<{projectId:string,
+  * projectName:string,workId:string,title:string,allocationPct:number}>}|null} */
+ let period=null;
+ let periodCount=0;
  const aggregate=dayEvents(group,(segment,active)=>{
   if(periodCount++!==offset)return;
   const all=[...active.values()].map(x=>x.work).sort((a,b)=>
