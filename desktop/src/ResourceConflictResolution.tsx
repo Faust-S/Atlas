@@ -20,6 +20,7 @@ export function ResourceConflictResolution({snapshot,resourceId,resourceGroup,in
  onDraft:(comparison:any,optionId:string,choice:{rationale:string;confirmTradeoff:boolean;confirmTechnology:boolean})=>boolean}){
  const [focusId,setFocusId]=useState(()=>initialFocus?JSON.stringify([initialFocus.projectId,initialFocus.workId]):""),[companionId,setCompanionId]=useState("");
  const [targetIds,setTargetIds]=useState<string[]>([""]),[workDelay,setWorkDelay]=useState(7),[projectDelay,setProjectDelay]=useState(0);
+ const [companionTargetIds,setCompanionTargetIds]=useState<string[]>([]);
  const [allowSequence,setAllowSequence]=useState(false);
  const [conditionsOpen,setConditionsOpen]=useState(true);
  const [showPeriods,setShowPeriods]=useState(false);
@@ -35,9 +36,14 @@ export function ResourceConflictResolution({snapshot,resourceId,resourceGroup,in
  const participants:any[]=model?.participants??[];
  const focus=focusId?participants.find(w=>w.id===focusId):participants[0];
  const companion=participants.find(w=>w.id===companionId&&w.id!==focus?.id);
- const targetResources:any[]=focus?.canReassign?targetIds.flatMap(id=>{
+ const availableTargets=(ids:string[])=>ids.flatMap(id=>{
   const resource=model?.alternatives.find((r:any)=>r.id===id);return resource?[resource]:[];
- }):[];
+ });
+ const targetResources:any[]=focus?.canReassign?availableTargets(targetIds):[];
+ const companionTargetResources:any[]=companion?.canReassign?availableTargets(companionTargetIds):[];
+ const staleSelection=Boolean(companionId&&!companion||
+  targetIds.some(id=>id&&!targetResources.some(r=>r.id===id))||
+  companionTargetIds.some(id=>id&&!companionTargetResources.some(r=>r.id===id)));
  const result=calculation&&calculation.snapshot===snapshot?calculation.value:null;
  const chosen=result?.options.find((o:any)=>o.id===choice);
  const invalidate=()=>{setCalculation(null);setChoice("");setError("");setConfirmTradeoff(false);setConfirmTechnology(false);setConditionsOpen(true)};
@@ -53,17 +59,18 @@ export function ResourceConflictResolution({snapshot,resourceId,resourceGroup,in
   if(chosen){selectedHeading.current?.focus({preventScroll:true});selectedHeading.current?.scrollIntoView({block:"nearest"});}
  },[chosen]);
  const calculate=()=>{
-  if(!focus)return;
+  if(!focus||staleSelection)return;
   try{
    setError("");setChoice("");setConfirmTradeoff(false);setConfirmTechnology(false);
    const value=compareResourceConflictResolution(snapshot,resourceId,{
     focus:ref(focus),companion:companion?ref(companion):null,targetResourceIds:targetResources.map(r=>r.id),
+    companionTargetResourceIds:companionTargetResources.map(r=>r.id),
     workDelayDays:workDelay,projectDelayDays:projectDelay,allowSequence:allowSequence&&Boolean(companion&&focus.projectId===companion.projectId)
    });
    setCalculation({snapshot,value});setConditionsOpen(false);
   }catch(e){setCalculation(null);setError(e instanceof Error?e.message:"Расчёт недоступен")}
  };
- const canCalculate=Boolean(focus&&(targetResources.length||workDelay||projectDelay||allowSequence&&companion&&focus.projectId===companion.projectId));
+ const canCalculate=Boolean(!staleSelection&&focus&&(targetResources.length||companionTargetResources.length||workDelay||projectDelay||allowSequence&&companion&&focus.projectId===companion.projectId));
  return <section ref={sectionRef} tabIndex={-1} data-atlas-conflict-panel="true" className="atlas-resource-alternatives atlas-conflict-resolution" aria-label="Устранение ресурсного конфликта">
   <div className="atlas-resource-alternatives-header">
    <strong>{"Устранение конфликта: "+(model?.resourceLabel??"ресурс")}</strong>
@@ -73,7 +80,7 @@ export function ResourceConflictResolution({snapshot,resourceId,resourceGroup,in
   {model&&!focus&&participants.length>0&&<>
    <p role="alert">Выбранная ранее работа больше не участвует в конфликте. Выберите другую работу для нового расчёта.</p>
    <label className="atlas-plan-choice-fields">Работа с конфликтом<select aria-label="Работа для устранения конфликта" value=""
-    onChange={e=>{setFocusId(e.target.value);setCompanionId("");setTargetIds([""]);setAllowSequence(false);invalidate()}}>
+    onChange={e=>{setFocusId(e.target.value);setCompanionId("");setTargetIds([""]);setCompanionTargetIds([]);setAllowSequence(false);invalidate()}}>
     <option value="">Выберите работу</option>{participants.map(w=><option key={w.id} value={w.id}>{name(w)}</option>)}
    </select></label>
   </>}
@@ -84,11 +91,11 @@ export function ResourceConflictResolution({snapshot,resourceId,resourceGroup,in
    {(!result||conditionsOpen)?<>
    <div className="atlas-plan-choice-fields">
     <label>Работа с конфликтом<select aria-label="Работа для устранения конфликта" value={focus.id}
-     onChange={e=>{setFocusId(e.target.value);setTargetIds([""]);if(e.target.value===companionId)setCompanionId("");setAllowSequence(false);invalidate()}}>
+     onChange={e=>{setFocusId(e.target.value);setTargetIds([""]);setCompanionTargetIds([]);if(e.target.value===companionId)setCompanionId("");setAllowSequence(false);invalidate()}}>
      {participants.map(w=><option key={w.id} value={w.id}>{name(w)}</option>)}
     </select></label>
     <label>Вторая работа (необязательно)<select aria-label="Вторая конфликтующая работа" value={companion?.id??""}
-     onChange={e=>{setCompanionId(e.target.value);setAllowSequence(false);invalidate()}}>
+     onChange={e=>{setCompanionId(e.target.value);setCompanionTargetIds([]);setAllowSequence(false);invalidate()}}>
      <option value="">Не выбрана</option>
      {participants.filter(w=>w.id!==focus.id).map(w=><option key={w.id} value={w.id}>{name(w)}</option>)}
     </select></label>
@@ -103,7 +110,7 @@ export function ResourceConflictResolution({snapshot,resourceId,resourceGroup,in
    <button type="button" className="atlas-resource-options-toggle" aria-expanded={showPeriods}
     onClick={()=>setShowPeriods(v=>!v)}>{showPeriods?"Скрыть периоды конфликта работы":"Показать периоды конфликта работы"}</button>
    {showPeriods&&<ConflictPeriodPage key={JSON.stringify([snapshot.revision,focus.id])} group={resourceGroup} focus={ref(focus)}
-    onSelectCompanion={w=>{setCompanionId(JSON.stringify([w.projectId,w.workId]));setAllowSequence(false);setShowPeriods(false);invalidate()}}/>}
+    onSelectCompanion={w=>{setCompanionId(JSON.stringify([w.projectId,w.workId]));setCompanionTargetIds([]);setAllowSequence(false);setShowPeriods(false);invalidate()}}/>}
    <strong>Какие изменения допустимы</strong>
    <div className="atlas-plan-choice-fields">
     {targetIds.map((id,index)=><label key={index}>{index===0?"Другое назначение выбранной работы":"Дополнительный ресурс "+(index+1)}
@@ -121,6 +128,27 @@ export function ResourceConflictResolution({snapshot,resourceId,resourceGroup,in
     <label>Предел переноса проектов<select aria-label="Предел переноса конфликтующих проектов" value={projectDelay}
      onChange={e=>{setProjectDelay(Number(e.target.value));invalidate()}}>{delayOptions(7)}</select></label>
    </div>
+   {companion?.canReassign&&model.alternatives.length>0&&<>
+    <button type="button" className="atlas-resource-options-toggle" aria-expanded={companionTargetIds.length>0}
+     onClick={()=>{setCompanionTargetIds(old=>old.length?[]:[""]);invalidate()}}>
+     {companionTargetIds.length?"Исключить переназначение второй работы":"Сравнить переназначение второй работы"}
+    </button>
+    {companionTargetIds.length>0&&<div className="atlas-plan-choice-fields">
+     {companionTargetIds.map((id,index)=><label key={index}>{index===0?"Другое назначение: "+companion.title:"Дополнительный ресурс второй работы "+(index+1)}
+      <select aria-label={index===0?"Ресурс для второй конфликтующей работы":"Дополнительный ресурс второй работы "+(index+1)}
+       value={model.alternatives.some((r:any)=>r.id===id)?id:""} onChange={e=>{setCompanionTargetIds(old=>old.map((v,i)=>i===index?e.target.value:v));invalidate()}}>
+       <option value="">Не сравнивать</option>
+       {model.alternatives.filter((r:any)=>!companionTargetIds.some((v,i)=>i!==index&&v===r.id)).map((r:any)=>
+        <option key={r.id} value={r.id}>{r.label+" ("+r.capacityPct+"%)"}</option>)}
+      </select></label>)}
+     {companionTargetIds.length<Math.min(3,model.alternatives.length)&&companionTargetResources.length===companionTargetIds.length&&
+      <button type="button" className="action-button" onClick={()=>{setCompanionTargetIds(old=>[...old,""]);invalidate()}}>Сравнить ещё ресурс второй работы</button>}
+    </div>}
+   </>}
+   {staleSelection&&<div role="alert" className="atlas-amendment-row">
+    <small>Ранее выбранная работа или назначение больше недоступны. Уточните условия, прежде чем рассчитывать решения.</small>
+    <button type="button" className="action-button" onClick={()=>{if(!companion)setCompanionId("");setTargetIds([""]);setCompanionTargetIds([]);setAllowSequence(false);invalidate()}}>Сбросить выбранные назначения</button>
+   </div>}
    <small>{focus.maxWorkDelay?"Допустимый резерв выбранной работы: до "+focus.maxWorkDelay+" дн.":focus.workReason}
     {companion&&(" Вторая работа: "+(companion.maxWorkDelay?"до "+companion.maxWorkDelay+" дн.":companion.workReason))}</small>
    <label className="atlas-conflict-check"><input type="checkbox" aria-label="Сравнить технологический порядок работ"
@@ -133,7 +161,8 @@ export function ResourceConflictResolution({snapshot,resourceId,resourceGroup,in
    </>:<div className="atlas-conflict-conditions">
     <div><strong>{name(focus)}{companion?"; "+name(companion):""}</strong>
      <small>{[
-      targetResources.length?"Назначения: "+targetResources.map(r=>r.label).join(", "):null,
+      targetResources.length?"Назначения выбранной работы: "+targetResources.map(r=>r.label).join(", "):null,
+      companionTargetResources.length?"Назначения второй работы: "+companionTargetResources.map(r=>r.label).join(", "):null,
       workDelay?"Перенос работ до "+workDelay+" дн.":null,
       allowSequence?"Оба направления зависимости":null,
       projectDelay?"Перенос проектов до "+projectDelay+" дн.":null
@@ -148,7 +177,8 @@ export function ResourceConflictResolution({snapshot,resourceId,resourceGroup,in
     <div className="atlas-amendment-row atlas-conflict-current">
      <strong>Текущий план</strong>
      <small>{"Ресурс: "+result.baseline.current.overloadDays+" / "+result.baseline.current.unavailableDays+
-      " дн.; выбранная работа: "+focus.overloadDays+" / "+focus.unavailableDays+" дн."}</small>
+      " дн.; выбранная работа: "+focus.overloadDays+" / "+focus.unavailableDays+" дн."+
+      (companion?"; вторая: "+companion.overloadDays+" / "+companion.unavailableDays+" дн.":"")}</small>
      <small>{"Портфель: "+result.baseline.portfolio.overloadDays+" / "+result.baseline.portfolio.unavailableDays+
       " ресурс-дн.; превышение мощности "+result.baseline.portfolio.overloadPctDays+" п. п.·дн."+
       (result.options.find((o:any)=>o.valid)?"; работ в конфликтах "+result.options.find((o:any)=>o.valid).assessment.conflictedWorkBefore:"")}</small>
@@ -160,6 +190,7 @@ export function ResourceConflictResolution({snapshot,resourceId,resourceGroup,in
       <strong>{optionTitle(o)}</strong>
       {o.valid?<><span>{classification[o.classification]??"Расчёт"}</span>
        <small>{"Ресурс: "+o.source.after.overloadDays+" / "+o.source.after.unavailableDays+"; работа: "+shown(o.focus[0]?.after)+
+        (o.focus[1]?"; вторая: "+shown(o.focus[1].after):"")+
         "; работ портфеля в конфликтах: "+o.assessment.conflictedWorkAfter}</small>
        <small>{"Портфель: "+o.preview.resourceAfter.overloadDays+" / "+o.preview.resourceAfter.unavailableDays+
         " ресурс-дн.; превышение "+o.preview.resourceAfter.overloadPctDays+" п. п.·дн."}</small>

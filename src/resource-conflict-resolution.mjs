@@ -97,16 +97,21 @@ function normalize(c,input){
   if(!Number.isSafeInteger(value)||value<0||value>7)throw Error("Укажите от 0 до 7 дней: "+name);
   return value;
  };
- const targetResourceIds=input.targetResourceIds;
- if(!Array.isArray(targetResourceIds)||targetResourceIds.length>3||new Set(targetResourceIds).size!==targetResourceIds.length)
-  throw Error("Выберите до трёх разных альтернативных ресурсов");
- if(targetResourceIds.some(id=>!c.alternatives.some(r=>r.id===id)))
-  throw Error("Выберите другой существующий ресурс");
+ const targets=ids=>{
+  if(!Array.isArray(ids)||ids.length>3||new Set(ids).size!==ids.length)
+   throw Error("Выберите до трёх разных альтернативных ресурсов для каждой работы");
+  if(ids.some(id=>!c.alternatives.some(r=>r.id===id)))
+   throw Error("Выберите другой существующий ресурс");
+  return [...ids];
+ };
+ const targetResourceIds=targets(input.targetResourceIds);
+ const companionTargetResourceIds=targets(input.companionTargetResourceIds===undefined?[]:input.companionTargetResourceIds);
+ if(companionTargetResourceIds.length&&!other)throw Error("Для второго назначения выберите вторую конфликтующую работу");
  if(typeof input.allowSequence!=="boolean")throw Error("Укажите, сравнивать ли технологический порядок");
  const workDelayDays=days(input.workDelayDays,"перенос работ"),projectDelayDays=days(input.projectDelayDays,"перенос проектов");
- if(!targetResourceIds.length&&!workDelayDays&&!projectDelayDays&&!input.allowSequence)
+ if(!targetResourceIds.length&&!companionTargetResourceIds.length&&!workDelayDays&&!projectDelayDays&&!input.allowSequence)
   throw Error("Разрешите хотя бы один способ устранения конфликта");
- return {focus:ref(primary),companion:other?ref(other):null,targetResourceIds:[...targetResourceIds],
+ return {focus:ref(primary),companion:other?ref(other):null,targetResourceIds,companionTargetResourceIds,
   workDelayDays,projectDelayDays,allowSequence:input.allowSequence};
 }
 function chosenWorks(c,selection){
@@ -131,22 +136,23 @@ function assess(c,selection,option){
  const {preview,assessment}=option;
  const source=selectedMetrics(c,preview),focus=preview.resourceScope.workChanges.focus;
  const sourceChange=compareMetrics(source.before,source.after),focusEffect=focusChange(focus[0]);
+ const companionEffect=focus[1]?focusChange(focus[1]):null;
  const movedBegun=preview.workRows.filter(r=>{
   const w=c.items.get(key(r.projectId,r.workId)),p=c.projects.get(r.projectId);
   return w&&(!isUnstartedWork(w)||!active(p))&&
    (r.before?.start!==r.after?.start||r.before?.finish!==r.after?.finish);
  }).map(r=>({projectId:r.projectId,workId:r.workId,title:r.title}));
  const w=assessment.warnings;
- const tradeoff=sourceChange.worsened||focusEffect.worsened||Boolean(w.newLate||w.worseLate||
+ const tradeoff=sourceChange.worsened||focusEffect.worsened||Boolean(companionEffect?.worsened)||Boolean(w.newLate||w.worseLate||
   w.newLateWork||w.worseLateWork||w.newConflictWork||w.worseConflictWork||w.movedConflictResource||
   w.newConflictDates||w.changedConflictKind||w.worseResources);
  const lost=preview.rows.some(r=>r.beforeFinish&&!r.afterFinish)||preview.workSummary.newlyUndated||
   w.undatedIncrease||w.unknownDates||focus.some(x=>x.before?.known&&!x.after?.known);
- const relief=sourceChange.improved||focusEffect.improved;
+ const relief=sourceChange.improved||focusEffect.improved||Boolean(companionEffect?.improved);
  const blocker=preview.applicationBlocker??(lost?"Теряются известные даты или ресурсный расчёт.":
   movedBegun.length?"Изменяются даты уже начатых или недоступных работ.":
   !relief?"Не уменьшает известный конфликт выбранного ресурса или работы.":null);
- return {source,focus,sourceChange,focusEffect,tradeoff,
+ return {source,focus,sourceChange,focusEffect,companionEffect,tradeoff,
   classification:blocker?"BLOCKED":tradeoff?"TRADEOFF":focus[0]?.after?.known&&
    !focus[0].after.overloadDays&&!focus[0].after.unavailableDays?"FOCUS_CLEARED":"RELIEVED",
   canDraft:!blocker,blocker,movedBegun};
@@ -176,22 +182,26 @@ function derive(c,selection,onlyId=null){
  const snapshot=c.snapshot,works=chosenWorks(c,selection),primary=works[0],other=works[1];
  const specs=[],options=[];
  const add=spec=>{specs.push(spec);options.push(optionFrom(c,selection,spec))};
- for(const [index,targetResourceId] of selection.targetResourceIds.entries()){
-  const kind="assignment",id=index===0?"assignment":"assignment-"+(index+1);
-  if(onlyId&&onlyId!==id)continue;
-  const resource=c.alternatives.find(r=>r.id===targetResourceId);
-  const changes={...ref(primary),workTitle:primary.title,resourceId:resource.id,resourceLabel:resource.label};
-  const title=titleFor(kind,changes);
-  if(!primary.canReassign)options.push(unavailable(id,kind,title,"Назначение уже начатой или недоступной работы не меняется в этом маршруте."));
-  else{
-   try{
-    previewWorkResourceReassignment(snapshot,{...ref(primary),targetResourceId:resource.id},{schedule:c.schedule,resources:c.resources});
-    add({identity:{id,kind,title,changes},make:rationale=>{
-     const result=addResourcePlanChoice(snapshot,primary.projectId,primary.workId,{title:"Ресурс: "+primary.title,
-      description:rationale,resourceId:resource.id});
-     return {state:result.state,refs:[{projectId:primary.projectId,changeId:result.changeId}]};
-    }});
-   }catch(e){options.push(unavailable(id,kind,title,errorText(e)))}
+ const assignments=[{work:primary,targets:selection.targetResourceIds,prefix:"assignment"},
+  ...(other?[{work:other,targets:selection.companionTargetResourceIds,prefix:"companion-assignment"}]:[])];
+ for(const {work,targets,prefix} of assignments){
+  for(const [index,targetResourceId] of targets.entries()){
+   const kind="assignment",id=index===0?prefix:prefix+"-"+(index+1);
+   if(onlyId&&onlyId!==id)continue;
+   const resource=c.alternatives.find(r=>r.id===targetResourceId);
+   const changes={...ref(work),workTitle:work.title,resourceId:resource.id,resourceLabel:resource.label};
+   const title=work.id===primary.id?titleFor(kind,changes):work.projectName+": "+work.title+" → "+resource.label;
+   if(!work.canReassign)options.push(unavailable(id,kind,title,"Назначение уже начатой или недоступной работы не меняется в этом маршруте."));
+   else{
+    try{
+     previewWorkResourceReassignment(snapshot,{...ref(work),targetResourceId:resource.id},{schedule:c.schedule,resources:c.resources});
+     add({identity:{id,kind,title,changes},make:rationale=>{
+      const result=addResourcePlanChoice(snapshot,work.projectId,work.workId,{title:"Ресурс: "+work.title,
+       description:rationale,resourceId:resource.id});
+      return {state:result.state,refs:[{projectId:work.projectId,changeId:result.changeId}]};
+     }});
+    }catch(e){options.push(unavailable(id,kind,title,errorText(e)))}
+   }
   }
  }
  if(selection.workDelayDays&&(!onlyId||onlyId.startsWith("work-shift-"))){
