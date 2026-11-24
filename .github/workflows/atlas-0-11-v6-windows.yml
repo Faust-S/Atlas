@@ -5,6 +5,7 @@ on:
     branches:
       - work/2026-11-22-atlas-0-11-baseline
       - work/2026-11-23-atlas-0-12-plan-readiness
+      - work/2026-11-24-atlas-calendar-performance
     paths:
       - '.github/workflows/atlas-0-11-v6-windows.yml'
       - 'desktop/tests/installed-atlas11-v6-design.py'

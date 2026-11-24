@@ -5,6 +5,7 @@ on:
     branches:
       - work/2026-11-22-atlas-0-11-baseline
       - work/2026-11-23-atlas-0-12-plan-readiness
+      - work/2026-11-24-atlas-calendar-performance
   workflow_dispatch:
 
 permissions:
