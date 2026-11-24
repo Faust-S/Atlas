@@ -99,7 +99,9 @@ test("Started work and indirect shifts of begun projects are excluded",()=>{
  s=addPortfolioLink(s,{from:f.ids[1],to:child.id});
  const r=compareResourceLeveling(s,f.resourceId,refs([f.ids[1]]));
  assert.equal(r.options.length,0);assert.equal(r.search.admissible,0);
- assert.equal(r.search.reasons.fixedMoved,7);
+ // 24–29 Nov remain within the project deadline. 30 Nov fails the horizon first.
+ assert.equal(r.search.reasons.fixedMoved,6);assert.equal(r.search.reasons.invalidHorizon,1);
+ assert.equal(r.search.evaluated,8);
  assert.ok(r.search.fixedProjects.some(x=>x.id===child.id));
 });
 test("No proposal transfers a new aggregate overload to a different resource",()=>{
@@ -112,10 +114,11 @@ test("No proposal transfers a new aggregate overload to a different resource",()
  const v=createItem(s,p.id,{title:"Занятый подъёмник",resourceId:other.id,allocationPct:100});
  s=editItem(v.state,p.id,v.id,{estimateDays:7});
  const result=compareResourceLeveling(s,f.resourceId,refs([f.ids[1]],7));
- // Every positive move into 24-30 Nov overlaps the independent order;
- // no eligible candidate may increase that resource's aggregate burden.
+ // 24–29 Nov overlap the independent order; 30 Nov exceeds the deadline.
+ // All positive moves are rejected, but their reasons differ.
  assert.equal(result.options.length,0);
- assert.equal(result.search.reasons.worseResources,7);
+ assert.equal(result.search.reasons.worseResources,6);assert.equal(result.search.reasons.invalidHorizon,1);
+ assert.equal(result.search.evaluated,8);
  assert.ok(result.search.worsenedResources.some(x=>x.id===other.id));
 });
 test("Calendar occupancy uses staffed days rather than elapsed weekend span",()=>{
