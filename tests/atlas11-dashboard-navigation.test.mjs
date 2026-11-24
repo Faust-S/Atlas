@@ -10,7 +10,8 @@ test("Atlas 0.11 dashboard opens the real matching portfolio section, not the po
  const coordinated=source("../desktop/src/PortfolioPlanSets.tsx");
  assert.match(ui,/const goPortfolioSection=\(section:"resources"\|"ecosystem"\|"review"\|"plan-sets"\)=>\{/);
  assert.match(ui,/if\(!requireClosedForm\(\)\)return;\s*if\(section==="plan-sets"\)setPortfolioPlanSelection\(old=>\(\{\.\.\.old,expanded:true\}\)\);\s*selectProject\(null\);setHomeOpen\(false\);setSettingsOpen\(false\);setPortfolioJump\(section\)/);
- assert.match(ui,/const destination=rootRef\.current\?\.querySelector<HTMLElement>\("#atlas-portfolio-"\+portfolioJump\)/);
+ assert.match(ui,/const section=rootRef\.current\?\.querySelector<HTMLElement>\("#atlas-portfolio-"\+portfolioJump\)/);
+ assert.match(ui,/const destination=portfolioJump==="resources"\?section\.querySelector<HTMLElement>\("\[data-atlas-conflict-panel\]"\)\?\?section:section/);
  assert.match(ui,/destination\.scrollIntoView\(\{block:"start",behavior:"auto"\}\)/);
  assert.match(ui,/destination\.focus\(\{preventScroll:true\}\)/);
  assert.match(ui,/<section id="atlas-portfolio-resources" tabIndex=\{-1\}/);
@@ -40,4 +41,17 @@ test("Atlas 0.11 portfolio section focus remains UI-only and respects the editor
   ui.indexOf('},[embedded,active,homeOpen,settingsOpen,portfolioJump]);'));
  assert.match(effect,/setPortfolioJump\(null\)/);
  assert.doesNotMatch(effect,/mutate\(|save\(|nativeInvoke\(/);
+});
+
+test("Conflict entry from a project Work or dashboard keeps the exact identity and the ordinary section focus",()=>{
+ const ui=source("../desktop/src/main.tsx"),home=source("../desktop/src/AtlasDashboard.tsx");
+ const panel=source("../desktop/src/ResourceConflictResolution.tsx"),inspector=source("../desktop/src/AtlasInspectorPreview.tsx");
+ assert.match(ui,/const request=resourceConflictEntry\(resources,resourceId,focus\)/);
+ assert.match(ui,/setResourceResolutionFocus\(request.focus\);setResourceResolutionId\(request.resourceId\)/);
+ assert.match(ui,/onClick=\{\(\)=>openResourceConflict\(usage.id,\{projectId:project.id,workId:r.id\}\)\}/);
+ assert.match(ui,/initialFocus=\{resourceResolutionFocus\}/);
+ assert.match(panel,/initialFocus\?JSON.stringify\(\[initialFocus.projectId,initialFocus.workId\]\)/);
+ assert.match(inspector,/onOpenResourceConflict\(work.resourceId,work.id\)/);
+ assert.match(home,/onOpenResourceConflict\(r.id\)/);
+ assert.match(panel,/data-atlas-conflict-panel="true"/);
 });

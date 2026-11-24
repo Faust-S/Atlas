@@ -321,6 +321,9 @@ function compareWorkConflictPeriods(before,after){
  */
 export function comparePlanningResourceScopes(before,after,projectIds,{focusWorks=[]}={}){
  const ids=[...projectIds];
+ if(!Array.isArray(focusWorks)||focusWorks.length>4||focusWorks.some(w=>!w?.projectId||!w?.workId||!ids.includes(w.projectId))||
+  new Set(focusWorks.map(w=>JSON.stringify([w.projectId,w.workId]))).size!==focusWorks.length)
+  throw Error("Работы для точного сравнения должны входить в выбранную область расчёта");
  const a=planningResourceScopeProjection(before,ids,true),b=planningResourceScopeProjection(after,ids,true);
  const blank=()=>({newlyConflicted:0,cleared:0,worsened:0,relieved:0,resourceChanged:0,
   newDateWorks:0,changedKindWorks:0,newConflictDays:0,clearedConflictDays:0,changedKindDays:0,changed:0});

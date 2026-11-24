@@ -2,7 +2,7 @@ import React,{useLayoutEffect,useMemo,useRef,useState} from "react";
 import {inspectResourceConflictResolution,compareResourceConflictResolution} from "../../src/resource-conflict-resolution.mjs";
 import {AmendmentAnalysis} from "./PlanAlternativesComparison";
 
-const labels:Record<string,string>={assignment:"Назначение",work_shift:"Резерв работ",sequence:"Порядок",project_shift:"Старт проектов"};
+const labels:Record<string,string>={assignment:"Переназначение",work_shift:"Резерв работ",sequence:"Порядок",project_shift:"Старт проектов"};
 const classification:Record<string,string>={FOCUS_CLEARED:"Конфликт выбранной работы устранён",RELIEVED:"Ограничение сокращено",
  TRADEOFF:"Компромисс",BLOCKED:"Недоступно"};
 const shown=(w:any)=>w?.known?w.overloadDays+" / "+w.unavailableDays:"не определено";
@@ -20,6 +20,7 @@ export function ResourceConflictResolution({snapshot,resourceId,initialFocus=nul
  const [focusId,setFocusId]=useState(()=>initialFocus?JSON.stringify([initialFocus.projectId,initialFocus.workId]):""),[companionId,setCompanionId]=useState("");
  const [target,setTarget]=useState(""),[workDelay,setWorkDelay]=useState(7),[projectDelay,setProjectDelay]=useState(0);
  const [allowSequence,setAllowSequence]=useState(false);
+ const [conditionsOpen,setConditionsOpen]=useState(true);
  const [calculation,setCalculation]=useState<{snapshot:any;value:any}|null>(null);
  const [choice,setChoice]=useState(""),[error,setError]=useState(""),[rationale,setRationale]=useState("");
  const [confirmTradeoff,setConfirmTradeoff]=useState(false),[confirmTechnology,setConfirmTechnology]=useState(false);
@@ -35,7 +36,7 @@ export function ResourceConflictResolution({snapshot,resourceId,initialFocus=nul
  const targetResource=focus?.canReassign?model?.alternatives.find((r:any)=>r.id===target):null;
  const result=calculation&&calculation.snapshot===snapshot?calculation.value:null;
  const chosen=result?.options.find((o:any)=>o.id===choice);
- const invalidate=()=>{setCalculation(null);setChoice("");setError("");setConfirmTradeoff(false);setConfirmTechnology(false)};
+ const invalidate=()=>{setCalculation(null);setChoice("");setError("");setConfirmTradeoff(false);setConfirmTechnology(false);setConditionsOpen(true)};
  const selectOption=(id:string)=>{setChoice(id);setConfirmTradeoff(false);setConfirmTechnology(false);setRationale("")};
  useLayoutEffect(()=>{
   sectionRef.current?.scrollIntoView({block:"start",behavior:"auto"});
@@ -55,7 +56,7 @@ export function ResourceConflictResolution({snapshot,resourceId,initialFocus=nul
     focus:ref(focus),companion:companion?ref(companion):null,targetResourceId:targetResource?.id??null,
     workDelayDays:workDelay,projectDelayDays:projectDelay,allowSequence:allowSequence&&Boolean(companion&&focus.projectId===companion.projectId)
    });
-   setCalculation({snapshot,value});
+   setCalculation({snapshot,value});setConditionsOpen(false);
   }catch(e){setCalculation(null);setError(e instanceof Error?e.message:"Расчёт недоступен")}
  };
  const canCalculate=Boolean(focus&&(targetResource||workDelay||projectDelay||allowSequence&&companion&&focus.projectId===companion.projectId));
@@ -76,6 +77,7 @@ export function ResourceConflictResolution({snapshot,resourceId,initialFocus=nul
    <p>{"Перегрузка: "+model.current.overloadDays+" дн.; вне доступности: "+model.current.unavailableDays+
     " дн. Известных конфликтующих работ: "+participants.length+"."}</p>
    {model.undatedWork>0&&<p className="minor">{"Работ ресурса без дат: "+model.undatedWork+". Их фактическая загрузка не подтверждена."}</p>}
+   {(!result||conditionsOpen)?<>
    <div className="atlas-plan-choice-fields">
     <label>Работа с конфликтом<select aria-label="Работа для устранения конфликта" value={focus.id}
      onChange={e=>{setFocusId(e.target.value);setTarget("");if(e.target.value===companionId)setCompanionId("");setAllowSequence(false);invalidate()}}>
@@ -115,12 +117,30 @@ export function ResourceConflictResolution({snapshot,resourceId,initialFocus=nul
    {companion&&focus.projectId!==companion.projectId&&<small>Работы разных проектов. Искусственная межпроектная связь не создаётся.</small>}
    <button type="button" className="action-button primary" disabled={disabled||!canCalculate} onClick={calculate}>Сравнить решения конфликта</button>
    <p className="minor">Каждый вариант рассчитывается отдельно на одном текущем портфеле. Подбор не изменяет план или данные. Сопоставляются известные даты и мощность, а не фактическая доступность.</p>
+   </>:<div className="atlas-conflict-conditions">
+    <div><strong>{name(focus)}{companion?"; "+name(companion):""}</strong>
+     <small>{[
+      targetResource?"Ресурс: "+targetResource.label:null,
+      workDelay?"Перенос работ до "+workDelay+" дн.":null,
+      allowSequence?"Оба направления зависимости":null,
+      projectDelay?"Перенос проектов до "+projectDelay+" дн.":null
+     ].filter(Boolean).join(" · ")}</small></div>
+    <button type="button" className="action-button" onClick={()=>setConditionsOpen(true)}>Изменить условия</button>
+   </div>}
    {error&&<p role="alert">{error}</p>}
    {calculation&&!result&&<p role="alert">Портфель изменился. Рассчитайте решения заново.</p>}
    {result&&<>
     <p role="status" tabIndex={-1} ref={resultsHeading}>
      {"Рассчитано решений конфликта: "+result.options.filter((o:any)=>o.valid).length+"; доступны для заявки: "+result.options.filter((o:any)=>o.canDraft).length+"."}</p>
-    <small>В каждой строке дни перегрузки / дни вне доступности. Для оценки смотрите также количество конфликтующих работ всего портфеля.</small>
+    <div className="atlas-amendment-row atlas-conflict-current">
+     <strong>Текущий план</strong>
+     <small>{"Ресурс: "+result.baseline.current.overloadDays+" / "+result.baseline.current.unavailableDays+
+      " дн.; выбранная работа: "+focus.overloadDays+" / "+focus.unavailableDays+" дн."}</small>
+     <small>{"Портфель: "+result.baseline.portfolio.overloadDays+" / "+result.baseline.portfolio.unavailableDays+
+      " ресурс-дн.; превышение мощности "+result.baseline.portfolio.overloadPctDays+" п. п.·дн."+
+      (result.options.find((o:any)=>o.valid)?"; работ в конфликтах "+result.options.find((o:any)=>o.valid).assessment.conflictedWorkBefore:"")}</small>
+    </div>
+    <small>Во всех вариантах: дни перегрузки / дни вне доступности. Сравнивайте также глубину перегрузки и конфликтующие работы всего портфеля.</small>
     <div className="atlas-conflict-options">
      {result.options.map((o:any)=><button key={o.id} type="button" className="atlas-conflict-option" aria-pressed={choice===o.id}
       aria-label={"Рассмотреть решение: "+optionTitle(o)} onClick={()=>selectOption(o.id)}>
@@ -128,6 +148,8 @@ export function ResourceConflictResolution({snapshot,resourceId,initialFocus=nul
       {o.valid?<><span>{classification[o.classification]??"Расчёт"}</span>
        <small>{"Ресурс: "+o.source.after.overloadDays+" / "+o.source.after.unavailableDays+"; работа: "+shown(o.focus[0]?.after)+
         "; работ портфеля в конфликтах: "+o.assessment.conflictedWorkAfter}</small>
+       <small>{"Портфель: "+o.preview.resourceAfter.overloadDays+" / "+o.preview.resourceAfter.unavailableDays+
+        " ресурс-дн.; превышение "+o.preview.resourceAfter.overloadPctDays+" п. п.·дн."}</small>
        <small>{"Новых или усиленных нарушений сроков: "+(o.assessment.warnings.newLate+o.assessment.warnings.worseLate+
         o.assessment.warnings.newLateWork+o.assessment.warnings.worseLateWork)+"; уменьшен резерв работ: "+o.assessment.warnings.reserveReduced}</small>
       </>:<small>{o.reason}</small>}
@@ -136,7 +158,21 @@ export function ResourceConflictResolution({snapshot,resourceId,initialFocus=nul
     {chosen&&<div className="atlas-amendment-row atlas-conflict-selected">
      <h3 tabIndex={-1} ref={selectedHeading}>{optionTitle(chosen)}</h3>
      {!chosen.valid?<><p role="status">{chosen.reason}</p>
-      {chosen.search&&<small>{"Проверено комбинаций: "+chosen.search.evaluated+" из "+chosen.search.space+"."}</small>}</>:<>
+      {chosen.search&&<>
+       <small>{"Проверено комбинаций: "+chosen.search.evaluated+" из "+chosen.search.space+"."}</small>
+       {[
+        ["noReduction","Конфликт ресурса не уменьшается"],
+        ["projectMoved","Изменяются даты проектов"],
+        ["fixedMoved","Затронуты начатые или недоступные проекты"],
+        ["fixedWorkMoved","Затронуты начатые или завершённые работы"],
+        ["reserveExceeded","Превышен резерв или предел переноса"],
+        ["deadlineWorse","Ухудшаются известные сроки"],
+        ["worseResources","Усиливаются другие ресурсные ограничения"],
+        ["lostDates","Теряются известные даты"],
+        ["calculationUnavailable","Расчёт недоступен"],
+        ["invalidHorizon","Выход за пределы календаря"]
+       ].filter(([id])=>chosen.search.reasons[id]>0).map(([id,label])=><small key={id}>{label+": "+chosen.search.reasons[id]}</small>)}
+      </>}</>:<>
       <p role="status">{"Перегрузка выбранного ресурса: "+chosen.source.before.overloadDays+" → "+chosen.source.after.overloadDays+" дн.; вне доступности: "+chosen.source.before.unavailableDays+" → "+chosen.source.after.unavailableDays+" дн."}</p>
       {chosen.focus.map((w:any)=><div className="atlas-amendment-row" key={JSON.stringify([w.projectId,w.workId])}>
        <strong>{w.title}</strong>

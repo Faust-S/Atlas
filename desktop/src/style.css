@@ -1834,6 +1834,11 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .atlas-conflict-check{display:flex;align-items:flex-start;gap:6px;margin:7px 0;font-size:11px;line-height:1.4}
 .atlas-conflict-check input{flex:0 0 auto;margin-top:1px}
 .atlas-conflict-resolution .atlas-amendment-analysis{max-width:100%;overflow-wrap:anywhere}
-@media(max-width:900px){.atlas-conflict-options{grid-template-columns:minmax(0,1fr)}}
+.atlas-conflict-conditions{display:flex;gap:8px;align-items:flex-start;justify-content:space-between;margin:8px 0;min-width:0}
+.atlas-conflict-conditions>div{min-width:0;flex:1;overflow-wrap:anywhere}
+.atlas-conflict-conditions small,.atlas-conflict-conditions strong{display:block}
+.atlas-conflict-conditions button{flex:0 0 auto}
+.atlas-conflict-current small{display:block}
+.atlas-conflict-options{grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr))}
 
 .atlas-conflict-work-link{display:block;margin-top:4px;text-align:left}

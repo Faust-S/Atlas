@@ -76,7 +76,12 @@ export function resourceConflictEntry(resources,resourceId,focus=null){
   throw Error("Выбранная работа больше не участвует в конфликте этого ресурса.");
  return {resourceId,focus:focus?{projectId:focus.projectId,workId:focus.workId}:null};
 }
-/** Keep one directly opened resource visible without rendering every earlier row. */
+/**
+ * Keep one directly opened resource visible without rendering every earlier row.
+ * @param {any[]} people
+ * @param {number} limit
+ * @param {string|null} [resourceId]
+ */
 export function resourceConflictPage(people,limit,resourceId=null){
  const rows=people.slice(0,limit);
  if(!resourceId||limit<1||rows.some(r=>r.id===resourceId))return rows;
@@ -145,7 +150,7 @@ function assess(c,selection,option){
   canDraft:!blocker,blocker,movedBegun};
 }
 function titleFor(kind,changes){
- if(kind==="assignment")return "Назначить "+changes.resourceLabel;
+ if(kind==="assignment")return changes.resourceLabel;
  if(kind==="sequence")return changes.fromTitle+" → "+changes.toTitle;
  if(kind==="work_shift")return changes.title;
  return changes.title;
@@ -165,11 +170,11 @@ function optionFrom(c,selection,spec){
 function unavailable(id,kind,title,reason,search=null){
  return {id,kind,title,valid:false,canDraft:false,reason,...(search?{search}:{})};
 }
-function derive(c,selection){
+function derive(c,selection,onlyId=null){
  const snapshot=c.snapshot,works=chosenWorks(c,selection),primary=works[0],other=works[1];
  const specs=[],options=[];
  const add=spec=>{specs.push(spec);options.push(optionFrom(c,selection,spec))};
- if(selection.targetResourceId){
+ if(selection.targetResourceId&&(!onlyId||onlyId==="assignment")){
   const kind="assignment",id="assignment";
   const resource=c.alternatives.find(r=>r.id===selection.targetResourceId);
   const changes={...ref(primary),workTitle:primary.title,resourceId:resource.id,resourceLabel:resource.label};
@@ -186,7 +191,7 @@ function derive(c,selection){
    }catch(e){options.push(unavailable(id,kind,title,errorText(e)))}
   }
  }
- if(selection.workDelayDays){
+ if(selection.workDelayDays&&(!onlyId||onlyId.startsWith("work-shift-"))){
   const kind="work_shift",title="Перенести отдельные работы";
   const refs=works.filter(w=>w.maxWorkDelay>0).map(w=>({...ref(w),maxDelay:Math.min(w.maxWorkDelay,selection.workDelayDays)}));
   if(!refs.length)options.push(unavailable("work-shift-none",kind,title,"У выбранных работ нет доступного резерва."));
@@ -195,14 +200,16 @@ function derive(c,selection){
     const result=compareWorkResourceLeveling(snapshot,c.resourceId,refs);
     if(!result.options.length)options.push(unavailable("work-shift-none",kind,title,"В проверенных комбинациях нет допустимого переноса в пределах резервов.",result.search));
     for(const option of result.options){
+     const id="work-shift-"+option.id;
+     if(onlyId&&id!==onlyId)continue;
      const changes={title:option.title,shifts:option.shifts,search:result.search,objectives:option.objectives};
-     add({identity:{id:"work-shift-"+option.id,kind,title:titleFor(kind,changes),changes},
+     add({identity:{id,kind,title:titleFor(kind,changes),changes},
       make:rationale=>createWorkResourceLevelingProposals(snapshot,result,option.id,{rationale})});
     }
    }catch(e){options.push(unavailable("work-shift-none",kind,title,errorText(e)))}
   }
  }
- if(selection.allowSequence){
+ if(selection.allowSequence&&(!onlyId||onlyId.startsWith("sequence-"))){
   const kind="sequence",title="Изменить технологический порядок";
   if(!other||other.projectId!==primary.projectId)options.push(unavailable("sequence-none",kind,title,
    "Нужны две конфликтующие работы одного проекта. Межпроектная связь Work не создаётся."));
@@ -213,7 +220,9 @@ function derive(c,selection){
     const result=compareResourceSequenceAlternatives(snapshot,{projectId:primary.projectId,
      firstWorkId:primary.workId,secondWorkId:other.workId},{schedule:c.schedule,resources:c.resources});
     for(const [i,option] of result.alternatives.entries()){
-     const id="sequence-"+(i+1),changes={projectId:option.projectId,from:option.from,to:option.to,
+     const id="sequence-"+(i+1);
+     if(onlyId&&id!==onlyId)continue;
+     const changes={projectId:option.projectId,from:option.from,to:option.to,
       fromTitle:option.fromTitle,toTitle:option.toTitle};
      if(!option.valid){options.push(unavailable(id,kind,titleFor(kind,changes),option.reason));continue}
      add({identity:{id,kind,title:titleFor(kind,changes),changes,requiresTechnologyConfirmation:true},
@@ -226,7 +235,7 @@ function derive(c,selection){
    }catch(e){options.push(unavailable("sequence-none",kind,title,errorText(e)))}
   }
  }
- if(selection.projectDelayDays){
+ if(selection.projectDelayDays&&(!onlyId||onlyId.startsWith("project-shift-"))){
   const kind="project_shift",title="Перенести начало проектов";
   const refs=[...new Set(works.filter(w=>w.canShiftProject).map(w=>w.projectId))].map(projectId=>({projectId,maxDelay:selection.projectDelayDays}));
   if(!refs.length)options.push(unavailable("project-shift-none",kind,title,"Выбранные проекты недоступны для переноса начала."));
@@ -235,8 +244,10 @@ function derive(c,selection){
     const result=compareResourceLeveling(snapshot,c.resourceId,refs);
     if(!result.options.length)options.push(unavailable("project-shift-none",kind,title,"В проверенных комбинациях нет допустимого переноса начала проектов.",result.search));
     for(const option of result.options){
+     const id="project-shift-"+option.id;
+     if(onlyId&&id!==onlyId)continue;
      const changes={title:option.title,shifts:option.shifts,search:result.search,objectives:option.objectives};
-     add({identity:{id:"project-shift-"+option.id,kind,title:titleFor(kind,changes),changes},
+     add({identity:{id,kind,title:titleFor(kind,changes),changes},
       make:rationale=>createResourceLevelingProposals(snapshot,result,option.id,{rationale})});
     }
    }catch(e){options.push(unavailable("project-shift-none",kind,title,errorText(e)))}
@@ -263,7 +274,8 @@ export function createResourceConflictProposals(snapshot,comparison,optionId,{ra
  const selected=comparison.options?.find(o=>o.id===optionId);
  if(!selected?.valid||!selected.canDraft)throw Error("Выберите доступный рассчитанный вариант");
  const c=buildContext(snapshot,comparison.resourceId),selection=normalize(c,comparison.selection);
- const derived=derive(c,selection),fresh=derived.options.find(o=>o.id===optionId),spec=derived.specs.find(s=>s.identity.id===optionId);
+ // Recheck only the selected method, not every unrelated alternative.
+ const derived=derive(c,selection,optionId),fresh=derived.options.find(o=>o.id===optionId),spec=derived.specs.find(s=>s.identity.id===optionId);
  if(!fresh?.valid||!fresh.canDraft||!spec||!equal(fresh,selected))
   throw Error("Последствия варианта изменились. Рассчитайте заново");
  if(fresh.tradeoff&&confirmTradeoff!==true)throw Error("Подтвердите известные ухудшения или перенос конфликта");

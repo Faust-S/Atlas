@@ -19,7 +19,7 @@ base=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(base)
 native,v,d,click,find=base.native,base.v,base.d,base.click,base.find
 ARCHIVE=Path(os.environ['ATLAS12_CONFLICT_RESOLUTION_IWXA'])
-REASON='The owner confirms the available mounting crew can take the first job.'
+REASON='The owner confirms the available mounting crew can take the selected job.'
 
 def launch():
     d.launch()
@@ -93,14 +93,14 @@ def qualify():
     order.click_input()
     click('Сравнить решения конфликта')
     d.wait_text('Рассчитано решений конфликта: 5; доступны для заявки: 5.',35)
-    d.wait_text('Назначение: Назначить Свободная бригада',35)
+    d.wait_text('Переназначение: Свободная бригада',35)
     d.wait_text('Резерв работ: Сократить ограничения в пределах резервов',35)
     d.wait_text('Порядок: Монтаж А → Монтаж Б',35)
     assert d.head()==saved
     click('Рассмотреть решение: Резерв работ: Сократить ограничения в пределах резервов')
     d.wait_text('Перегрузка выбранного ресурса: 2 → 0 дн.; вне доступности: 0 → 0 дн.',35)
     assert d.head()==saved
-    click('Рассмотреть решение: Назначение: Назначить Свободная бригада')
+    click('Рассмотреть решение: Переназначение: Свободная бригада')
     d.wait_text('Назначение: Монтажный участок → Свободная бригада; конфликт: 2 / 0 → 0 / 0 дн.',35)
     fill('Обоснование решения конфликта',REASON)
     assert d.head()==saved
