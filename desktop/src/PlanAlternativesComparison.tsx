@@ -38,6 +38,19 @@ export function AmendmentAnalysis({result,compact=false}:{result:any;compact?:bo
   {result.resourceScope&&<p>{"Работ в ресурсных конфликтах по затронутой цепочке: "+
    result.resourceScope.before.totals.conflictedWork+" → "+result.resourceScope.after.totals.conflictedWork+
    "; работ без привязки с длительностью: "+result.resourceScope.before.totals.positiveUnlinked+" → "+result.resourceScope.after.totals.positiveUnlinked+"."}</p>}
+  {result.resourceScope?.workChanges?.totals.changed>0&&<>
+   <p>{"Новых работ в ресурсных конфликтах: "+result.resourceScope.workChanges.totals.newlyConflicted+
+    "; освобождены: "+result.resourceScope.workChanges.totals.cleared+
+    "; усилены ограничения: "+result.resourceScope.workChanges.totals.worsened+
+    "; конфликт на другом ресурсе: "+result.resourceScope.workChanges.totals.resourceChanged+"."}</p>
+   <details><summary>Какие работы изменили участие в конфликтах</summary>
+    {result.resourceScope.workChanges.examples.map((w:any)=><p key={JSON.stringify([w.projectId,w.workId])}>
+     {w.projectName+": "+w.title+" · "+(w.beforeResource??"без конфликта")+" → "+(w.afterResource??"без конфликта")+
+      "; перегрузка "+w.beforeOverloadDays+" → "+w.afterOverloadDays+" дн.; вне доступности "+
+      w.beforeUnavailableDays+" → "+w.afterUnavailableDays+" дн."}</p>)}
+    {result.resourceScope.workChanges.totals.changed>result.resourceScope.workChanges.examples.length&&
+     <p className="minor">Показаны первые 8 работ с изменениями; итоговые количества учитывают все работы.</p>}
+   </details></>}
   <p>{'Превышение мощности: '+result.resourceBefore.overloadPctDays+' → '+result.resourceAfter.overloadPctDays+
    ' п. п.·дн.; нагрузка вне доступности: '+result.resourceBefore.unavailablePctDays+' → '+result.resourceAfter.unavailablePctDays+' %·дн.'}</p>
   <p role="status" aria-label={summary}>{summary}</p>

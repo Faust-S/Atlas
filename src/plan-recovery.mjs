@@ -117,6 +117,7 @@ function describeOption(preview,projectId){
  const dateEffect=advanceDays===null?'UNKNOWN':advanceDays<0?'LATER':advanceDays===0?'UNCHANGED':
   own.beforeSlip>0&&own.afterSlip===0?'RECOVERED':own.afterSlip>0?'PARTIAL':'EARLIER';
  const beforeScope=preview.resourceScope.before,afterScope=preview.resourceScope.after;
+ const conflictChanges=preview.resourceScope.workChanges.totals;
  const ownBefore=beforeScope.projects.find(p=>p.id===projectId),ownAfter=afterScope.projects.find(p=>p.id===projectId);
  const scopeUnknown=preview.projectSummary.unknown>0||preview.workSummary.unknown>0||afterScope.totals.undated>0;
  const resourceAssessment=afterScope.totals.conflictedWork>0?'CONFLICTS':
@@ -126,7 +127,8 @@ function describeOption(preview,projectId){
  const newlyLateWorks=preview.workSummary.newlyLate,worsenedLateWorks=preview.workSummary.worsenedLate;
  // Even an equal total overload may hide a new conflict on a different
  // resource or date. Use the existing per-resource period comparator.
- const tradeoff=Boolean(worsenedResources||newlyLateProjects||worsenedLateProjects||newlyLateWorks||
+ const tradeoff=Boolean(worsenedResources||conflictChanges.newlyConflicted||conflictChanges.worsened||conflictChanges.resourceChanged||
+  newlyLateProjects||worsenedLateProjects||newlyLateWorks||
   worsenedLateWorks||preview.resourceAfter.unlinked>preview.resourceBefore.unlinked||
   preview.resourceAfter.undated>preview.resourceBefore.undated||preview.workSummary.newlyUndated);
  return {beforeFinish:before,afterFinish:after,deadline:own.beforeDeadline,
@@ -135,6 +137,9 @@ function describeOption(preview,projectId){
   calendarDeadlineMet:own.afterSlip===0,resourceAssessment,
   projectConflictWorksBefore:ownBefore.conflictedWork,projectConflictWorks:ownAfter.conflictedWork,
   affectedConflictWorksBefore:beforeScope.totals.conflictedWork,affectedConflictWorks:afterScope.totals.conflictedWork,
+  newlyConflictedWorks:conflictChanges.newlyConflicted,clearedConflictWorks:conflictChanges.cleared,
+  worsenedConflictWorks:conflictChanges.worsened,relievedConflictWorks:conflictChanges.relieved,
+  changedConflictResourceWorks:conflictChanges.resourceChanged,
   affectedOverloadDays:afterScope.totals.overloadDays,affectedUnavailableDays:afterScope.totals.unavailableDays,
   affectedUnlinked:afterScope.totals.positiveUnlinked,affectedUndated:afterScope.totals.undated,
   unknownDates:scopeUnknown,

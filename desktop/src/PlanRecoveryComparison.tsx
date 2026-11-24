@@ -142,7 +142,10 @@ export function PlanRecoveryComparison({snapshot,projectId,onDraft}:{
         <small>{"Выигрыш календарных дней: "+days(o.effect.advanceDays)}</small>
         <small>{"Работ с ресурсными конфликтами в проекте: "+o.effect.projectConflictWorksBefore+" → "+o.effect.projectConflictWorks+
          "; по цепочке: "+o.effect.affectedConflictWorksBefore+" → "+o.effect.affectedConflictWorks}</small>
-        {o.effect.resourceAssessment==="CONFLICTS"&&<small>{"Остаются ограничения по работам цепочки: перегрузка "+
+        {(o.effect.newlyConflictedWorks>0||o.effect.clearedConflictWorks>0||o.effect.worsenedConflictWorks>0||o.effect.changedConflictResourceWorks>0)&&
+          <small>{"Новых работ в конфликтах: "+o.effect.newlyConflictedWorks+"; освобождены: "+o.effect.clearedConflictWorks+
+           "; ограничения усилились: "+o.effect.worsenedConflictWorks+"; конфликт на другом ресурсе: "+o.effect.changedConflictResourceWorks}</small>}
+         {o.effect.resourceAssessment==="CONFLICTS"&&<small>{"Остаются ограничения по работам цепочки: перегрузка "+
          o.effect.affectedOverloadDays+" ресурс-дн.; вне доступности "+o.effect.affectedUnavailableDays+" ресурс-дн."}</small>}
         {o.effect.calendarDeadlineMet&&o.effect.resourceAssessment==="CONFLICTS"&&
          <small>Календарная цель достигнута, но ресурсные ограничения не устранены.</small>}

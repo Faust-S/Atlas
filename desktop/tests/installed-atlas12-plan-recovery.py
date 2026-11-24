@@ -87,6 +87,7 @@ def qualify():
     find('Рассчитано вариантов: 4 из 4',contains=True)
     find('Контрольный срок достигнут по расчёту',contains=True)
     find('Финиш варианта: 2026-11-25; оставшееся отставание: 0 дн.',contains=True)
+    find('Календарная цель достигнута, но ресурсные ограничения не устранены.',contains=True)
     assert d.head()==saved,'Deadline comparison wrote to Native Store'
     # Explicitly add a sequence alternative on the current plan. A new
     # dependency must be treated as an assumption, not silently applied.

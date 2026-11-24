@@ -217,7 +217,7 @@ export function planningResourceTotals(view){
  * sharing the same resource. One resource-day is counted once per scope,
  * not once per participating Work or project.
  */
-export function planningResourceScope(view,projectIds){
+function planningResourceScopeProjection(view,projectIds){
  const ids=new Set(projectIds);
  const blank=()=>({openWork:0,linked:0,unlinked:0,positiveUnlinked:0,undated:0,
   conflictedWork:0,overloadWork:0,unavailableWork:0,overloadDays:0,unavailableDays:0,conflictResources:0});
@@ -242,7 +242,7 @@ export function planningResourceScope(view,projectIds){
    }
   });
  }
- const examples=[];
+ const examples=[],conflictWorks=new Map();
  for(const work of selected){
   const detail=conflicts.get(JSON.stringify([work.projectId,work.id]));
   for(const stats of [totals,projects.get(work.projectId)]){
@@ -258,15 +258,56 @@ export function planningResourceScope(view,projectIds){
     if(detail.unavailableDays>0)stats.unavailableWork++;
    }
   }
-  if(detail)examples.push({projectId:work.projectId,projectName:work.projectName,workId:work.id,
-   title:work.title,resourceId:work.resourceId,resourceLabel:work.resourceLabel,...detail});
+  if(detail){
+   const row={projectId:work.projectId,projectName:work.projectName,workId:work.id,
+    title:work.title,resourceId:work.resourceId,resourceLabel:work.resourceLabel,...detail};
+   examples.push(row);conflictWorks.set(JSON.stringify([work.projectId,work.id]),row);
+  }
  }
  totals.conflictResources=scopeResources.size;
  for(const [id,stats] of projects)stats.conflictResources=projectResources.get(id).size;
  examples.sort((a,b)=>(b.overloadDays+b.unavailableDays)-(a.overloadDays+a.unavailableDays)||
   a.projectName.localeCompare(b.projectName,"ru")||a.title.localeCompare(b.title,"ru")||
   a.projectId.localeCompare(b.projectId)||a.workId.localeCompare(b.workId));
- return {totals,projects:[...projects.values()],examples:examples.slice(0,8)};
+ return {scope:{totals,projects:[...projects.values()],examples:examples.slice(0,8)},conflictWorks};
+}
+export function planningResourceScope(view,projectIds){
+ return planningResourceScopeProjection(view,projectIds).scope;
+}
+/**
+ * Equal aggregate load may conceal a newly conflicted Work when assignments
+ * exchange places. Complete counts use all participating Works.
+ */
+export function comparePlanningResourceScopes(before,after,projectIds){
+ const ids=[...projectIds];
+ const a=planningResourceScopeProjection(before,ids),b=planningResourceScopeProjection(after,ids);
+ const totals={newlyConflicted:0,cleared:0,worsened:0,relieved:0,resourceChanged:0,changed:0};
+ const examples=[];
+ for(const key of new Set([...a.conflictWorks.keys(),...b.conflictWorks.keys()])){
+  const old=a.conflictWorks.get(key),next=b.conflictWorks.get(key);
+  const newlyConflicted=!old&&!!next,cleared=!!old&&!next;
+  const worsened=!!old&&!!next&&(next.overloadDays>old.overloadDays||next.unavailableDays>old.unavailableDays);
+  const relieved=!!old&&!!next&&(next.overloadDays<old.overloadDays||next.unavailableDays<old.unavailableDays);
+  const resourceChanged=!!old&&!!next&&old.resourceId!==next.resourceId;
+  if(!newlyConflicted&&!cleared&&!worsened&&!relieved&&!resourceChanged)continue;
+  totals.changed++;
+  if(newlyConflicted)totals.newlyConflicted++;
+  if(cleared)totals.cleared++;
+  if(worsened)totals.worsened++;
+  if(relieved)totals.relieved++;
+  if(resourceChanged)totals.resourceChanged++;
+  const work=next??old;
+  examples.push({projectId:work.projectId,projectName:work.projectName,workId:work.workId,title:work.title,
+   beforeResource:old?.resourceLabel??null,afterResource:next?.resourceLabel??null,
+   beforeOverloadDays:old?.overloadDays??0,afterOverloadDays:next?.overloadDays??0,
+   beforeUnavailableDays:old?.unavailableDays??0,afterUnavailableDays:next?.unavailableDays??0,
+   newlyConflicted,cleared,worsened,relieved,resourceChanged});
+ }
+ examples.sort((x,y)=>Number(y.newlyConflicted||y.worsened||y.resourceChanged)-Number(x.newlyConflicted||x.worsened||x.resourceChanged)||
+  Number(y.newlyConflicted)-Number(x.newlyConflicted)||
+  x.projectName.localeCompare(y.projectName,"ru")||x.title.localeCompare(y.title,"ru")||
+  x.projectId.localeCompare(y.projectId)||x.workId.localeCompare(y.workId));
+ return {before:a.scope,after:b.scope,workChanges:{totals,examples:examples.slice(0,8)}};
 }
 export function comparePlanningResourceGroups(before,after){
  const changes=[];

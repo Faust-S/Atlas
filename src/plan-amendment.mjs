@@ -3,7 +3,7 @@
 import {validate,planAmendmentKey as key} from "./core.mjs";
 import {planChange} from "./trace.mjs";
 import {portfolioSchedule} from "./portfolio-schedule.mjs";
-import {portfolioResources,planningResourceTotals,planningResourceScope,comparePlanningResourceGroups} from "./portfolio-resources.mjs";
+import {portfolioResources,planningResourceTotals,comparePlanningResourceScopes,comparePlanningResourceGroups} from "./portfolio-resources.mjs";
 import {scheduleProject} from "./planning.mjs";
 import {planReviewQueue} from "./plan-review.mjs";
 import {recordedWorkAssignment,recordedAssignmentChanges} from "./plan-baseline.mjs";
@@ -499,7 +499,7 @@ function forecastAmendment(snapshot,projectId,changeId,context){
   beforeUnavailable:r.availabilityBefore,afterUnavailable:r.availabilityAfter,
   beforeMaxLoad:r.peakBefore,afterMaxLoad:r.peakAfter}));
  const resourceBefore=planningResourceTotals(beforeResources),resourceAfter=planningResourceTotals(afterResources);
- const resourceScope={before:planningResourceScope(beforeResources,affected),after:planningResourceScope(afterResources,affected)};
+ const resourceScope=comparePlanningResourceScopes(beforeResources,afterResources,affected);
  const work=amendmentWorkComparison(snapshot,candidate,affected,before,after);
  const dependencyRows=actions.filter(a=>a.kind==="dependency").map(a=>{
   const p=projects.get(projectId);
@@ -648,8 +648,9 @@ export function comparePlanRevisions(snapshot,projectId,{baselineId=null,changeI
    const projected=liveRevisionProject(next,nextForecast),projectedWorks=liveRevisionWorks(candidate,next,nextForecast);
    const beforeResources=portfolioResources(snapshot,{schedule:before});
    const affected=affectedPlanProjects(snapshot,projectId);
+   const scope=comparePlanningResourceScopes(beforeResources,afterResources,affected);
    const resources={before:planningResourceTotals(beforeResources),after:planningResourceTotals(afterResources),
-    scopeBefore:planningResourceScope(beforeResources,affected),scopeAfter:planningResourceScope(afterResources,affected)};
+    scopeBefore:scope.before,scopeAfter:scope.after,scopeWorkChanges:scope.workChanges};
    const consequences=before.rows.filter(r=>r.id!==projectId).flatMap(r=>{
     const updated=after.byId.get(r.id);
     if(r.projectedStart===updated.projectedStart&&r.projectedFinish===updated.projectedFinish&&r.deadline===updated.deadline)

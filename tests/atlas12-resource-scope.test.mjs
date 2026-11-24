@@ -75,3 +75,32 @@ test('An outside project sharing a resource still counts when an affected Work a
  assert.equal(result.preview.resourceScope.after.examples[0].projectId,projects[0]);
  assert.equal(result.preview.resourceScope.after.projects.length,1);
 });
+
+test('Equal resource and date totals cannot hide newly conflicted Work after exchanged assignments',()=>{
+ const a=addPlanningResource(empty(),{label:'Кран A',capacityPct:100});
+ const b=addPlanningResource(a.state,{label:'Кран B',capacityPct:100});
+ const p=createProject(b.state,{name:'Монтаж',type:'engineering'});
+ let s=editProject(p.state,p.id,{startDate:'2026-11-23',dueDate:'2026-11-26'});
+ const works=[];
+ for(const [title,r] of [['Работа A',a.id],['Работа B',a.id],['Работа C',b.id]]){
+  const w=createItem(s,p.id,{title,resourceId:r,allocationPct:60});
+  s=editItem(w.state,p.id,w.id,{estimateDays:3});works.push(w.id);
+ }
+ const before=serialize(s);
+ const r=compareDeadlineRecovery(s,p.id,[
+  {itemId:works[1],estimateDays:3,resourceId:b.id},
+  {itemId:works[2],estimateDays:3,resourceId:a.id}
+ ]);
+ const joint=r.options.at(-1);assert.equal(joint.valid,true);
+ assert.deepEqual(joint.preview.resourceBefore,joint.preview.resourceAfter);
+ assert.equal(joint.preview.resourceRows.length,0);
+ assert.equal(joint.effect.affectedConflictWorksBefore,2);
+ assert.equal(joint.effect.affectedConflictWorks,2);
+ assert.equal(joint.effect.worsenedResources,0);
+ assert.equal(joint.effect.newlyConflictedWorks,1);
+ assert.equal(joint.effect.clearedConflictWorks,1);
+ assert.equal(joint.effect.tradeoff,true);
+ assert.equal(joint.preview.resourceScope.workChanges.examples[0].workId,works[2]);
+ assert.equal(joint.preview.resourceScope.workChanges.examples[1].workId,works[1]);
+ assert.equal(serialize(s),before);
+});
