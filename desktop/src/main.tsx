@@ -22,7 +22,7 @@ import {projectScreenSchedule} from "../../src/project-schedule-view.mjs";
 import {portfolioResources,resourceWorkConflicts} from "../../src/portfolio-resources.mjs";
 import {PlanAlternativesComparison,AmendmentAnalysis,AmendmentReview} from "./PlanAlternativesComparison";
 import {PlanRecoveryComparison} from "./PlanRecoveryComparison";
-import {PortfolioPlanSets} from "./PortfolioPlanSets";
+import {PortfolioPlanSets,emptyPortfolioPlanSelection} from "./PortfolioPlanSets";
 import {createDeadlineRecoveryProposal} from "../../src/plan-recovery.mjs";
 import {planReviewQueue,planReviewAction,planProposalAction} from "../../src/plan-review.mjs";
 import {revisionReview,recheckAction} from "../../src/revision-review.mjs";
@@ -449,6 +449,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const routeSuppress=useRef(false);
  const [routeControls,setRouteControls]=useState({back:false,forward:false});
  const [portfolioStatus,setPortfolioStatus]=useState("all");
+ const [portfolioPlanSelection,setPortfolioPlanSelection]=useState(emptyPortfolioPlanSelection);
  const [connectOpen,setConnectOpen]=useState(false);
  const [ecosystemOwner,setEcosystemOwner]=useState("all");
  const [ecosystemQuery,setEcosystemQuery]=useState("");
@@ -1762,6 +1763,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    if(latestSnapshot.current!==candidate.startedWith||dirtyRef.current||editorOpenRef.current)
     throw Error("Черновик изменился после предпросмотра. Импорт не применён.");
    setPendingImport(null);
+   setPortfolioPlanSelection(emptyPortfolioPlanSelection());
    mutate(candidate.snapshot,"Импортированная редакция "+candidate.originalRevision+
     " применена к черновику. Для записи на диск нажмите «Сохранить».");
    selectProject(null,true);
@@ -1791,6 +1793,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    latestSnapshot.current=checked;
    saved.current=snapshotText(checked);
    setData(checked);setGeneration(result.generation);setSavedVersions(null);
+   setPortfolioPlanSelection(emptyPortfolioPlanSelection());
    // React state updates asynchronously. Navigation after an explicitly
    // confirmed restore must not use the prior modal-guard render closure.
    selectProject(null,true);setSelectedHistory(null);
@@ -1805,6 +1808,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    const result=await invoke<OpenResult>("atlas_restore_previous");
    const checked=deserialize(JSON.stringify(result.snapshot));
    saved.current=snapshotText(checked);setData(checked);setGeneration(result.generation);
+   setPortfolioPlanSelection(emptyPortfolioPlanSelection());
    setReady(true);setRecovery(false);setMessage("Предыдущая редакция восстановлена и перечитана.");setError("");
   }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
  };
@@ -2528,13 +2532,14 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
          onOpenAmendment={(pid,wid,comparison)=>openEditorFor(pid,"resource-amendment:"+encodeURIComponent(wid),comparison)}/>}
 
     </section>
-    <PortfolioPlanSets snapshot={data} disabled={busy||!!editor} onOpen={(pid,cid)=>openProjectTab(pid,"changes",cid)}
+    <PortfolioPlanSets snapshot={data} disabled={busy||!!editor} selection={portfolioPlanSelection} onSelection={setPortfolioPlanSelection} onOpen={(pid,cid)=>openProjectTab(pid,"changes",cid)}
      onApply={(comparison,optionId,rationale)=>{
       if(!requireClosedForm()||busyRef.current)return;
       if(!confirmAction("Применить все утверждённые заявки выбранного варианта к черновику портфеля?"))return;
       try{
        const result=applyPortfolioPlanSet(latestSnapshot.current,comparison,optionId,{rationale});
        mutate(result.state,"Согласованный план применён в черновике. Сохраните новую редакцию портфеля.");
+       setPortfolioPlanSelection({...emptyPortfolioPlanSelection(),expanded:true});
       }catch(e){issue(e)}
      }}/>
     <section id="atlas-portfolio-ecosystem" tabIndex={-1} className="surface atlas-ecosystem-overview" aria-label="Карта разработки по проектам и GitHub">

@@ -281,7 +281,8 @@ export function planningResourceScope(view,projectIds){
 export function comparePlanningResourceScopes(before,after,projectIds){
  const ids=[...projectIds];
  const a=planningResourceScopeProjection(before,ids),b=planningResourceScopeProjection(after,ids);
- const totals={newlyConflicted:0,cleared:0,worsened:0,relieved:0,resourceChanged:0,changed:0};
+ const blank=()=>({newlyConflicted:0,cleared:0,worsened:0,relieved:0,resourceChanged:0,changed:0});
+ const totals=blank(),byProject=new Map(ids.map(id=>[id,{id,...blank()}]));
  const examples=[];
  for(const key of new Set([...a.conflictWorks.keys(),...b.conflictWorks.keys()])){
   const old=a.conflictWorks.get(key),next=b.conflictWorks.get(key);
@@ -290,13 +291,15 @@ export function comparePlanningResourceScopes(before,after,projectIds){
   const relieved=!!old&&!!next&&(next.overloadDays<old.overloadDays||next.unavailableDays<old.unavailableDays);
   const resourceChanged=!!old&&!!next&&old.resourceId!==next.resourceId;
   if(!newlyConflicted&&!cleared&&!worsened&&!relieved&&!resourceChanged)continue;
-  totals.changed++;
-  if(newlyConflicted)totals.newlyConflicted++;
-  if(cleared)totals.cleared++;
-  if(worsened)totals.worsened++;
-  if(relieved)totals.relieved++;
-  if(resourceChanged)totals.resourceChanged++;
   const work=next??old;
+  for(const stats of [totals,byProject.get(work.projectId)]){
+   stats.changed++;
+   if(newlyConflicted)stats.newlyConflicted++;
+   if(cleared)stats.cleared++;
+   if(worsened)stats.worsened++;
+   if(relieved)stats.relieved++;
+   if(resourceChanged)stats.resourceChanged++;
+  }
   examples.push({projectId:work.projectId,projectName:work.projectName,workId:work.workId,title:work.title,
    beforeResource:old?.resourceLabel??null,afterResource:next?.resourceLabel??null,
    beforeOverloadDays:old?.overloadDays??0,afterOverloadDays:next?.overloadDays??0,
@@ -307,7 +310,7 @@ export function comparePlanningResourceScopes(before,after,projectIds){
   Number(y.newlyConflicted)-Number(x.newlyConflicted)||
   x.projectName.localeCompare(y.projectName,"ru")||x.title.localeCompare(y.title,"ru")||
   x.projectId.localeCompare(y.projectId)||x.workId.localeCompare(y.workId));
- return {before:a.scope,after:b.scope,workChanges:{totals,examples:examples.slice(0,8)}};
+ return {before:a.scope,after:b.scope,workChanges:{totals,projects:[...byProject.values()],examples:examples.slice(0,8)}};
 }
 export function comparePlanningResourceGroups(before,after){
  const changes=[];

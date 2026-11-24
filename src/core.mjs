@@ -251,7 +251,7 @@ export function validate(s){
  }
  const validAllocation = value=>value===undefined||Number.isSafeInteger(value)&&value>=1&&value<=100;
  const validResource = value=>value==null||resourceIds.has(value);
- const ids=new Set();
+ const ids=new Set(),coordinatedApplications=new Map();
  let baselineRows=0;
  for(const p of s.projects){
   if(!p||typeof p.id!=="string"||!p.id||ids.has(p.id)||!types.has(p.type)||!statuses.has(p.status)||
@@ -362,6 +362,12 @@ export function validate(s){
      !q.members.some(m=>m.projectId===p.id&&m.changeId===d.changeId)||
      !proposal?.planAppliedAt||proposal.planAppliedAt!==d.at||typeof d.text!=="string"||!d.text.trim())
      throw Error("Invalid coordinated plan application");
+    const prior=coordinatedApplications.get(q.id);
+    const signature=JSON.stringify([q.sourceRevision,q.members,d.at,d.text]);
+    if(prior&&(prior.signature!==signature||prior.projects.has(p.id)))
+     throw Error("Inconsistent coordinated plan application");
+    if(prior)prior.projects.add(p.id);
+    else coordinatedApplications.set(q.id,{signature,projects:new Set([p.id])});
    }
   }
 

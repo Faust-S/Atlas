@@ -593,7 +593,7 @@ function inspectPlanSet(snapshot,refs){
 function fixedDeadlineTotals(rows){
  const totals={knownBefore:0,knownAfter:0,lateBefore:0,lateAfter:0,slipBefore:0,slipAfter:0,
   newlyLate:0,worsenedLate:0,resolvedLate:0,newlyUnknown:0,missingDeadline:0,unknownAfter:0,
-  changedDeadline:0};
+  comparable:0,comparableSlipBefore:0,comparableSlipAfter:0,changedDeadline:0};
  for(const r of rows){
   if(r.beforeDeadline!==r.afterDeadline)totals.changedDeadline++;
   if(!r.beforeDeadline){totals.missingDeadline++;continue}
@@ -603,6 +603,7 @@ function fixedDeadlineTotals(rows){
   else totals.unknownAfter++;
   if(a!==null&&b===null)totals.newlyUnknown++;
   if(a===null||b===null)continue;
+  totals.comparable++;totals.comparableSlipBefore+=a;totals.comparableSlipAfter+=b;
   if(a===0&&b>0)totals.newlyLate++;
   if(a>0&&b>a)totals.worsenedLate++;
   if(a>0&&b===0)totals.resolvedLate++;
@@ -616,9 +617,11 @@ function assessPlanSet(preview,roots,chain){
  const scope=preview.resourceScope,conflicts=scope.workChanges.totals;
  const worseResources=preview.resourceRows.filter(r=>r.worsened).length;
  const beforeByProject=new Map(scope.before.projects.map(p=>[p.id,p]));
+ const workChangesByProject=new Map(scope.workChanges.projects.map(p=>[p.id,p]));
  const resourceProjects=scope.after.projects.filter(p=>{
   const b=beforeByProject.get(p.id);
-  return b&&["conflictedWork","overloadDays","unavailableDays","positiveUnlinked","undated"].some(k=>p[k]!==b[k]);
+  return b&&(["conflictedWork","overloadDays","unavailableDays","positiveUnlinked","undated"].some(k=>p[k]!==b[k])||
+   workChangesByProject.get(p.id)?.changed>0);
  }).map(p=>p.id);
  // Resource interference may extend beyond the calendar dependency graph.
  const outsideChain=resourceProjects.filter(id=>!chain.has(id));
@@ -637,6 +640,7 @@ function assessPlanSet(preview,roots,chain){
  return {deadlines,selectedDeadlines,otherDeadlines,warnings,hasTradeoff,resourceState,
   selectedProjects:roots.size,calendarChainProjects:chain.size,resourceProjects,outsideChain,
   conflictedWorkBefore:scope.before.totals.conflictedWork,conflictedWorkAfter:scope.after.totals.conflictedWork,
+  newlyConflicted:conflicts.newlyConflicted,clearedConflict:conflicts.cleared,
   missingResourceWork:scope.after.totals.positiveUnlinked,unknownResourceWork:scope.after.totals.undated};
 }
 function calculatePlanSet(snapshot,refs,context){
@@ -733,6 +737,26 @@ export function applyPortfolioPlanSet(snapshot,comparison,optionId,{rationale}){
  next.revision++;
  validate(next);
  return {state:next,coordinationId};
+}
+
+/** Historical coordination records remain meaningful after a project is removed. */
+export function listPortfolioPlanApplications(snapshot){
+ const groups=new Map(),projects=new Map(snapshot.projects.map(p=>[p.id,p]));
+ for(const project of snapshot.projects)for(const d of project.decisions??[]){
+  const q=d.coordination;
+  if(d.kind!=="plan_application"||!q)continue;
+  let group=groups.get(q.id);
+  if(!group){
+   group={id:q.id,sourceRevision:q.sourceRevision,at:d.at,text:d.text,
+    members:q.members.map(m=>({...m})),recorded:new Set()};
+   groups.set(q.id,group);
+  }
+  group.recorded.add(project.id);
+ }
+ return [...groups.values()].map(({recorded,...group})=>({...group,recordedCount:recorded.size,
+  members:group.members.map(m=>({...m,recorded:recorded.has(m.projectId),
+   available:!!projects.get(m.projectId)?.changes?.some(c=>c.id===m.changeId)}))}))
+  .sort((a,b)=>Date.parse(b.at)-Date.parse(a.at)||a.id.localeCompare(b.id));
 }
 
 // Historical control points never acquire facts or resource assignments that
