@@ -15,12 +15,12 @@ function history(){
  s=editItem(second.state,f.projectId,f.firstId,{estimateDays:5});
  const proposal=planChange(s,f.projectId,{title:'Вернуть длительность'});
  s=setPlanWork(proposal.state,f.projectId,proposal.id,{itemId:f.firstId,estimateDays:3}).state;
- return {...f,snapshot:s,secondId:second.id,proposalId:proposal.id};
+ return {...f,snapshot:s,secondBaselineId:second.id,proposalId:proposal.id};
 }
 test('First, selected, current and proposed revisions separate accumulated and incremental movement',()=>{
  const f=history(),before=serialize(f.snapshot);
  const r=comparePlanRevisions(f.snapshot,f.projectId,{changeId:f.proposalId});
- assert.equal(r.history.length,2);assert.equal(r.reference.id,f.secondId);
+ assert.equal(r.history.length,2);assert.equal(r.reference.id,f.secondBaselineId);
  assert.equal(r.original.finish,'2026-11-26');
  assert.equal(r.reference.finish,'2026-11-27');
  assert.equal(r.current.finish,'2026-11-28');
