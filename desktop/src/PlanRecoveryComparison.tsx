@@ -140,9 +140,19 @@ export function PlanRecoveryComparison({snapshot,projectId,onDraft}:{
         <small>{effectLabel[o.effect.dateEffect]}</small>
         <small>{"Финиш варианта: "+date(o.effect.afterFinish)+"; оставшееся отставание: "+days(o.effect.remainingSlip)}</small>
         <small>{"Выигрыш календарных дней: "+days(o.effect.advanceDays)}</small>
+        <small>{"Работ с ресурсными конфликтами в проекте: "+o.effect.projectConflictWorksBefore+" → "+o.effect.projectConflictWorks+
+         "; по цепочке: "+o.effect.affectedConflictWorksBefore+" → "+o.effect.affectedConflictWorks}</small>
+        {o.effect.resourceAssessment==="CONFLICTS"&&<small>{"Остаются ограничения по работам цепочки: перегрузка "+
+         o.effect.affectedOverloadDays+" ресурс-дн.; вне доступности "+o.effect.affectedUnavailableDays+" ресурс-дн."}</small>}
+        {o.effect.calendarDeadlineMet&&o.effect.resourceAssessment==="CONFLICTS"&&
+         <small>Календарная цель достигнута, но ресурсные ограничения не устранены.</small>}
+        {o.effect.resourceAssessment==="NO_KNOWN_CONFLICTS"&&<small>По записанным датам и назначениям цепочки превышений не обнаружено.</small>}
         {o.effect.tradeoff&&<small>Есть ухудшения сроков или ресурсных ограничений. Проверьте последствия.</small>}
-        {o.effect.unknownDates&&<small>Не все даты или ресурсные периоды определены.</small>}
-        {o.effect.unlinked>0&&<small>{"Работ без плановой привязки в портфеле: "+o.effect.unlinked}</small>}
+        {o.effect.unknownDates&&<small>Не все даты или ресурсные периоды затронутых работ определены.</small>}
+        {o.effect.affectedUnlinked>0&&<small>{"Работ с длительностью без плановой привязки по цепочке: "+o.effect.affectedUnlinked}</small>}
+        {o.preview.resourceScope.after.examples.slice(0,2).map((w:any)=><small key={JSON.stringify([w.projectId,w.workId])}>
+         {w.projectName+": "+w.title+" · "+w.resourceLabel+" · перегрузка "+w.overloadDays+" дн., вне доступности "+w.unavailableDays+" дн."}
+        </small>)}
         <details><summary>Последствия варианта</summary><AmendmentAnalysis result={o.preview} compact/></details>
         <button type="button" className="action-button" disabled={rationale.trim().length<8}
          aria-label={"Подготовить заявку: "+o.title} onClick={()=>onDraft(current,o.id,rationale)}>Подготовить заявку</button>

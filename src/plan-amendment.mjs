@@ -3,7 +3,7 @@
 import {validate,planAmendmentKey as key} from "./core.mjs";
 import {planChange} from "./trace.mjs";
 import {portfolioSchedule} from "./portfolio-schedule.mjs";
-import {portfolioResources,planningResourceTotals,comparePlanningResourceGroups} from "./portfolio-resources.mjs";
+import {portfolioResources,planningResourceTotals,planningResourceScope,comparePlanningResourceGroups} from "./portfolio-resources.mjs";
 import {scheduleProject} from "./planning.mjs";
 import {planReviewQueue} from "./plan-review.mjs";
 import {recordedWorkAssignment,recordedAssignmentChanges} from "./plan-baseline.mjs";
@@ -463,9 +463,7 @@ function amendmentScenario(snapshot,projectId,changeId){
  const after=portfolioSchedule(candidate),afterResources=portfolioResources(candidate,{schedule:after});
  return {actions,candidate,after,afterResources};
 }
-function forecastAmendment(snapshot,projectId,changeId,context){
- const {forecast:before,resources:beforeResources}=context;
- const {actions,candidate,after,afterResources}=amendmentScenario(snapshot,projectId,changeId);
+function affectedPlanProjects(snapshot,projectId){
  const affected=new Set([projectId]),links=snapshot.portfolioLinks||[];
  const outgoing=new Map(snapshot.projects.map(p=>[p.id,[]]));
  for(const edge of links)outgoing.get(edge.from).push(edge.to);
@@ -473,6 +471,12 @@ function forecastAmendment(snapshot,projectId,changeId,context){
  for(let i=0;i<queue.length;i++)for(const id of outgoing.get(queue[i]))if(!affected.has(id)){
   affected.add(id);queue.push(id);
  }
+ return affected;
+}
+function forecastAmendment(snapshot,projectId,changeId,context){
+ const {forecast:before,resources:beforeResources}=context;
+ const {actions,candidate,after,afterResources}=amendmentScenario(snapshot,projectId,changeId);
+ const affected=affectedPlanProjects(snapshot,projectId);
  const projects=new Map(snapshot.projects.map(p=>[p.id,p]));
  const rows=before.rows.filter(r=>affected.has(r.id)).map(r=>{
   const updated=after.byId.get(r.id),baseline=projects.get(r.id).planBaselines?.at(-1)??null;
@@ -495,6 +499,7 @@ function forecastAmendment(snapshot,projectId,changeId,context){
   beforeUnavailable:r.availabilityBefore,afterUnavailable:r.availabilityAfter,
   beforeMaxLoad:r.peakBefore,afterMaxLoad:r.peakAfter}));
  const resourceBefore=planningResourceTotals(beforeResources),resourceAfter=planningResourceTotals(afterResources);
+ const resourceScope={before:planningResourceScope(beforeResources,affected),after:planningResourceScope(afterResources,affected)};
  const work=amendmentWorkComparison(snapshot,candidate,affected,before,after);
  const dependencyRows=actions.filter(a=>a.kind==="dependency").map(a=>{
   const p=projects.get(projectId);
@@ -507,7 +512,7 @@ function forecastAmendment(snapshot,projectId,changeId,context){
   controlChanged:rows.filter(r=>r.beforeDeadline!==r.afterDeadline).length,
   unknown:rows.filter(r=>!r.afterFinish).length
  };
- return {rows,resourceRows,resourceBefore,resourceAfter,projectSummary,dependencyRows,...work,
+ return {rows,resourceRows,resourceBefore,resourceAfter,resourceScope,projectSummary,dependencyRows,...work,
   changed:rows.filter(r=>r.changed).length,affected:rows.length,actions:actions.length};
 }
 export function previewPlanAmendment(snapshot,projectId,changeId) {
@@ -642,7 +647,9 @@ export function comparePlanRevisions(snapshot,projectId,{baselineId=null,changeI
    const next=candidate.projects.find(p=>p.id===projectId),nextForecast=after.byId.get(projectId);
    const projected=liveRevisionProject(next,nextForecast),projectedWorks=liveRevisionWorks(candidate,next,nextForecast);
    const beforeResources=portfolioResources(snapshot,{schedule:before});
-   const resources={before:planningResourceTotals(beforeResources),after:planningResourceTotals(afterResources)};
+   const affected=affectedPlanProjects(snapshot,projectId);
+   const resources={before:planningResourceTotals(beforeResources),after:planningResourceTotals(afterResources),
+    scopeBefore:planningResourceScope(beforeResources,affected),scopeAfter:planningResourceScope(afterResources,affected)};
    const consequences=before.rows.filter(r=>r.id!==projectId).flatMap(r=>{
     const updated=after.byId.get(r.id);
     if(r.projectedStart===updated.projectedStart&&r.projectedFinish===updated.projectedFinish&&r.deadline===updated.deadline)

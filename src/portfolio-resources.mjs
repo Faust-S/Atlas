@@ -211,6 +211,63 @@ export function planningResourceTotals(view){
   overloaded:view.totals.potentialConflicts,unavailable:view.totals.outsideAvailability,
   undated:view.totals.undated,unlinked:view.totals.unlinked};
 }
+/**
+ * Actual resource-conflict participation of an explicitly selected project
+ * scope. Reuse the authoritative sweep, including work in OTHER projects
+ * sharing the same resource. One resource-day is counted once per scope,
+ * not once per participating Work or project.
+ */
+export function planningResourceScope(view,projectIds){
+ const ids=new Set(projectIds);
+ const blank=()=>({openWork:0,linked:0,unlinked:0,positiveUnlinked:0,undated:0,
+  conflictedWork:0,overloadWork:0,unavailableWork:0,overloadDays:0,unavailableDays:0,conflictResources:0});
+ const totals=blank(),projects=new Map([...ids].map(id=>[id,{id,...blank()}]));
+ const selected=view.work.filter(w=>ids.has(w.projectId));
+ const conflicts=new Map(),scopeResources=new Set(),projectResources=new Map([...ids].map(id=>[id,new Set()]));
+ for(const group of view.people){
+  if(!group.overloadDays&&!group.unavailableDays||!group.work.some(w=>ids.has(w.projectId)))continue;
+  dayEvents(group,(segment,active)=>{
+   const participating=new Set(),length=segment.until-segment.from;
+   const metric=segment.kind==="overload"?"overloadDays":"unavailableDays";
+   for(const [key,{work}] of active){
+    if(!ids.has(work.projectId))continue;
+    const detail=conflicts.get(key)??{overloadDays:0,unavailableDays:0};
+    detail[metric]+=length;conflicts.set(key,detail);
+    participating.add(work.projectId);
+   }
+   if(!participating.size)return;
+   totals[metric]+=length;scopeResources.add(group.id);
+   for(const projectId of participating){
+    projects.get(projectId)[metric]+=length;projectResources.get(projectId).add(group.id);
+   }
+  });
+ }
+ const examples=[];
+ for(const work of selected){
+  const detail=conflicts.get(JSON.stringify([work.projectId,work.id]));
+  for(const stats of [totals,projects.get(work.projectId)]){
+   stats.openWork++;
+   if(work.resourceId)stats.linked++;else{
+    stats.unlinked++;
+    if(work.estimateDays>0)stats.positiveUnlinked++;
+   }
+   if(work.startDay===null)stats.undated++;
+   if(detail){
+    stats.conflictedWork++;
+    if(detail.overloadDays>0)stats.overloadWork++;
+    if(detail.unavailableDays>0)stats.unavailableWork++;
+   }
+  }
+  if(detail)examples.push({projectId:work.projectId,projectName:work.projectName,workId:work.id,
+   title:work.title,resourceId:work.resourceId,resourceLabel:work.resourceLabel,...detail});
+ }
+ totals.conflictResources=scopeResources.size;
+ for(const [id,stats] of projects)stats.conflictResources=projectResources.get(id).size;
+ examples.sort((a,b)=>(b.overloadDays+b.unavailableDays)-(a.overloadDays+a.unavailableDays)||
+  a.projectName.localeCompare(b.projectName,"ru")||a.title.localeCompare(b.title,"ru")||
+  a.projectId.localeCompare(b.projectId)||a.workId.localeCompare(b.workId));
+ return {totals,projects:[...projects.values()],examples:examples.slice(0,8)};
+}
 export function comparePlanningResourceGroups(before,after){
  const changes=[];
  for(const old of before.people){

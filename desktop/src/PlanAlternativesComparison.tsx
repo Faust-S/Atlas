@@ -35,6 +35,9 @@ export function AmendmentAnalysis({result,compact=false}:{result:any;compact?:bo
   {focus?.baselineName&&<p>{"Контрольный план "+focus.baselineName+": "+date(focus.baselineFinish)+
    ". Отклонение: "+shift(focus.beforeBaselineShift)+" → "+shift(focus.afterBaselineShift)+"."}</p>}
   <p role="status" aria-label={capacity} className="atlas-amendment-summary">{capacity}</p>
+  {result.resourceScope&&<p>{"Работ в ресурсных конфликтах по затронутой цепочке: "+
+   result.resourceScope.before.totals.conflictedWork+" → "+result.resourceScope.after.totals.conflictedWork+
+   "; работ без привязки с длительностью: "+result.resourceScope.before.totals.positiveUnlinked+" → "+result.resourceScope.after.totals.positiveUnlinked+"."}</p>}
   <p>{'Превышение мощности: '+result.resourceBefore.overloadPctDays+' → '+result.resourceAfter.overloadPctDays+
    ' п. п.·дн.; нагрузка вне доступности: '+result.resourceBefore.unavailablePctDays+' → '+result.resourceAfter.unavailablePctDays+' %·дн.'}</p>
   <p role="status" aria-label={summary}>{summary}</p>
@@ -213,9 +216,13 @@ function PlanRevisionComparison({snapshot,projectId,proposals,onOpenChange}:{
      <strong>{value.proposal.title}</strong>
      {!scenario&&<p role="alert">{"Предлагаемая редакция недоступна: "+value.proposal.reason}</p>}
      {value.proposal.status&&<button type="button" className="action-button" onClick={()=>onOpenChange(value.proposal!.id)}>К заявке</button>}
-     {scenario&&value.resourceChange&&<small>{"Перегрузка портфеля: "+value.resourceChange.before.overloadDays+
-      " → "+value.resourceChange.after.overloadDays+" дн.; вне доступности: "+value.resourceChange.before.unavailableDays+
-      " → "+value.resourceChange.after.unavailableDays+" дн."}</small>}
+     {scenario&&value.resourceChange&&<>
+      <small>{"Перегрузка портфеля: "+value.resourceChange.before.overloadDays+
+       " → "+value.resourceChange.after.overloadDays+" дн.; вне доступности: "+value.resourceChange.before.unavailableDays+
+       " → "+value.resourceChange.after.unavailableDays+" дн."}</small>
+      <small>{"Работ в ресурсных конфликтах по цепочке: "+value.resourceChange.scopeBefore.totals.conflictedWork+
+       " → "+value.resourceChange.scopeAfter.totals.conflictedWork}</small>
+     </>}
     </div>}
     <details>
      <summary>Зафиксированные редакции ({value.history.length})</summary>
