@@ -21,6 +21,8 @@ import {capturePlanBaseline,comparePlanBaseline} from "../../src/plan-baseline.m
 import {projectScreenSchedule} from "../../src/project-schedule-view.mjs";
 import {portfolioResources,resourceWorkConflicts} from "../../src/portfolio-resources.mjs";
 import {PlanAlternativesComparison,AmendmentAnalysis,AmendmentReview} from "./PlanAlternativesComparison";
+import {PlanRecoveryComparison} from "./PlanRecoveryComparison";
+import {createDeadlineRecoveryProposal} from "../../src/plan-recovery.mjs";
 import {planReviewQueue,planReviewAction,planProposalAction} from "../../src/plan-review.mjs";
 import {revisionReview,recheckAction} from "../../src/revision-review.mjs";
 import {previewPlanAmendment,applyPlanAmendment,removePlanAmendment,inspectPlanAmendment} from "../../src/plan-amendment.mjs";
@@ -3414,6 +3416,15 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     {tab==="changes"&&<section className="surface"><div className="section-heading"><div><h2>Предложения и утверждённые изменения</h2>
      <p>Утверждение - отдельное решение человека. Применение конкретного плана также требует подтверждения.</p></div>
      <Action onClick={()=>openEditor("proposal")} primary>＋ Предложение</Action></div>
+     <PlanRecoveryComparison key={"recovery:"+project.id} snapshot={data} projectId={project.id}
+      onDraft={(comparison,optionId,rationale)=>{
+       if(!requireClosedForm()||busyRef.current)return;
+       try{
+        const result=createDeadlineRecoveryProposal(latestSnapshot.current,comparison,optionId,{rationale});
+        mutate(result.state,"Заявка на пересмотр срока подготовлена в черновике. Сохраните её и примите отдельное решение.");
+        setForecastId(result.changeId);setChangeJump({projectId:project.id,changeId:result.changeId});
+       }catch(e){issue(e)}
+      }}/>
      <PlanAlternativesComparison key={project.id} snapshot={data} projectId={project.id}
       onOpenChange={changeId=>{
        if(!requireClosedForm()||busyRef.current)return;

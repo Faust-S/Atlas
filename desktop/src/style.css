@@ -1807,3 +1807,6 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .atlas-amendment-review p{margin:2px 0;font-size:11px;line-height:1.45}
 .atlas-amendment-review-field{border-top:1px solid #d5e3ef;margin-top:7px;padding-top:5px;overflow-wrap:anywhere}
 .atlas-amendment-review .action-button{margin:5px 0}
+
+.atlas-recovery-reason{display:flex;flex-direction:column;gap:4px;margin:8px 0;font-size:11px;min-width:0}
+.atlas-recovery-reason textarea,.atlas-plan-choice-fields input{box-sizing:border-box;width:100%;min-width:0;max-width:100%;font:inherit}

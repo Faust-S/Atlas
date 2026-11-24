@@ -17,6 +17,7 @@ on:
       - 'desktop/src/ProjectOrganizationGuide.tsx'
       - 'desktop/src/ResourceAlternatives.tsx'
       - 'desktop/src/PlanAlternativesComparison.tsx'
+      - 'desktop/src/PlanRecoveryComparison.tsx'
       - 'desktop/src/inspector-work-context.mjs'
       - 'desktop/src/style.css'
       - 'desktop/index.html'
