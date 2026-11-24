@@ -473,14 +473,12 @@ function affectedPlanProjects(snapshot,projectId){
  }
  return affected;
 }
-function forecastAmendment(snapshot,projectId,changeId,context){
+function forecastCandidate(snapshot,candidate,context,{roots,affected,actions,after,afterResources,portfolio=false}){
  const {forecast:before,resources:beforeResources}=context;
- const {actions,candidate,after,afterResources}=amendmentScenario(snapshot,projectId,changeId);
- const affected=affectedPlanProjects(snapshot,projectId);
  const projects=new Map(snapshot.projects.map(p=>[p.id,p]));
  const rows=before.rows.filter(r=>affected.has(r.id)).map(r=>{
   const updated=after.byId.get(r.id),baseline=projects.get(r.id).planBaselines?.at(-1)??null;
-  return {id:r.id,name:r.name,downstream:r.id!==projectId,
+  return {id:r.id,name:r.name,downstream:!roots.has(r.id),
    beforeStart:r.projectedStart,afterStart:updated.projectedStart,
    beforeFinish:r.projectedFinish,afterFinish:updated.projectedFinish,
    beforeDeadline:r.deadline,afterDeadline:updated.deadline,
@@ -501,9 +499,10 @@ function forecastAmendment(snapshot,projectId,changeId,context){
  const resourceBefore=planningResourceTotals(beforeResources),resourceAfter=planningResourceTotals(afterResources);
  const resourceScope=comparePlanningResourceScopes(beforeResources,afterResources,affected);
  const work=amendmentWorkComparison(snapshot,candidate,affected,before,after);
- const dependencyRows=actions.filter(a=>a.kind==="dependency").map(a=>{
+ const dependencyRows=actions.filter(x=>x.action.kind==="dependency").map(({projectId,action:a})=>{
   const p=projects.get(projectId);
-  return {...a,fromTitle:p.items.find(w=>w.id===a.from).title,toTitle:p.items.find(w=>w.id===a.to).title};
+  return {...a,...(portfolio?{projectId,projectName:p.name}:{}),
+   fromTitle:p.items.find(w=>w.id===a.from).title,toTitle:p.items.find(w=>w.id===a.to).title};
  });
  const projectSummary={
   newlyLate:rows.filter(r=>r.beforeDeadline===r.afterDeadline&&r.beforeSlip===0&&r.afterSlip>0).length,
@@ -514,6 +513,12 @@ function forecastAmendment(snapshot,projectId,changeId,context){
  };
  return {rows,resourceRows,resourceBefore,resourceAfter,resourceScope,projectSummary,dependencyRows,...work,
   changed:rows.filter(r=>r.changed).length,affected:rows.length,actions:actions.length};
+}
+function forecastAmendment(snapshot,projectId,changeId,context){
+ const {actions,candidate,after,afterResources}=amendmentScenario(snapshot,projectId,changeId);
+ return forecastCandidate(snapshot,candidate,context,{roots:new Set([projectId]),
+  affected:affectedPlanProjects(snapshot,projectId),actions:actions.map(action=>({projectId,action})),
+  after,afterResources});
 }
 export function previewPlanAmendment(snapshot,projectId,changeId) {
  return forecastAmendment(snapshot,projectId,changeId,amendmentPlanningContext(snapshot));
@@ -539,6 +544,195 @@ export function comparePlanAmendments(snapshot,projectId,firstId,secondId){
   }catch(error){return {...identity,valid:false,reason:error instanceof Error?error.message:"Сценарий недоступен"};}
  });
  return {projectId,revision:snapshot.revision,options};
+}
+
+// Coordinated scenarios are a projection of ordinary existing proposals.
+// No scenario store, assignment authority, or task execution is introduced.
+const PLAN_SET_LIMIT=4;
+const SET_STATUSES=new Set(["proposed","deferred","approved","in_progress"]);
+const SET_APPROVED=new Set(["approved","in_progress"]);
+const SET_PROJECTS=new Set(["planned","active","paused"]);
+export function listPortfolioPlanProposals(snapshot){
+ return snapshot.projects.filter(p=>SET_PROJECTS.has(p.status)).flatMap(p=>
+  (p.changes??[]).filter(c=>SET_STATUSES.has(c.status)&&!c.planAppliedAt&&c.planAmendments?.length)
+   .map(c=>({projectId:p.id,projectName:p.name,changeId:c.id,title:c.title,status:c.status,
+    actionCount:c.planAmendments.length,approved:SET_APPROVED.has(c.status)})));
+}
+function planSetMembers(snapshot,selection){
+ if(!Array.isArray(selection)||!selection.length||selection.length>PLAN_SET_LIMIT)
+  throw Error("Выберите от одной до четырёх заявок разных проектов");
+ const projectIds=new Set();
+ const refs=selection.map(ref=>{
+  if(!ref||typeof ref.projectId!=="string"||!ref.projectId||typeof ref.changeId!=="string"||!ref.changeId||
+   projectIds.has(ref.projectId))throw Error("В одном варианте допускается только одна заявка каждого проекта");
+  projectIds.add(ref.projectId);
+  return {projectId:ref.projectId,changeId:ref.changeId};
+ });
+ // A canonical order makes identical selections independent of click order.
+ const position=new Map(snapshot.projects.map((p,i)=>[p.id,i]));
+ return refs.sort((a,b)=>(position.get(a.projectId)??Infinity)-(position.get(b.projectId)??Infinity)||
+  a.projectId.localeCompare(b.projectId)||a.changeId.localeCompare(b.changeId));
+}
+function inspectPlanSet(snapshot,refs){
+ return refs.map(({projectId,changeId})=>{
+  const project=snapshot.projects.find(p=>p.id===projectId);
+  const change=project?.changes?.find(c=>c.id===changeId);
+  const identity={projectId,projectName:project?.name??"Проект недоступен",changeId,
+   title:change?.title??"Заявка недоступна",status:change?.status??null,approved:false,
+   actionCount:change?.planAmendments?.length??0};
+  try{
+   if(!project||!SET_PROJECTS.has(project.status)||!change||!SET_STATUSES.has(change.status)||change.planAppliedAt)
+    throw Error("Заявка больше недоступна для совместного расчёта");
+   const {actions}=checkPlanAmendment(snapshot,projectId,changeId);
+   return {...identity,valid:true,approved:SET_APPROVED.has(change.status),actions};
+  }catch(error){
+   return {...identity,valid:false,reason:error instanceof Error?error.message:"Расчёт недоступен"};
+  }
+ });
+}
+function fixedDeadlineTotals(rows){
+ const totals={knownBefore:0,knownAfter:0,lateBefore:0,lateAfter:0,slipBefore:0,slipAfter:0,
+  newlyLate:0,worsenedLate:0,resolvedLate:0,newlyUnknown:0,missingDeadline:0,unknownAfter:0,
+  changedDeadline:0};
+ for(const r of rows){
+  if(r.beforeDeadline!==r.afterDeadline)totals.changedDeadline++;
+  if(!r.beforeDeadline){totals.missingDeadline++;continue}
+  const a=slip(r.beforeDeadline,r.beforeFinish),b=slip(r.beforeDeadline,r.afterFinish);
+  if(a!==null){totals.knownBefore++;totals.slipBefore+=a;if(a>0)totals.lateBefore++}
+  if(b!==null){totals.knownAfter++;totals.slipAfter+=b;if(b>0)totals.lateAfter++}
+  else totals.unknownAfter++;
+  if(a!==null&&b===null)totals.newlyUnknown++;
+  if(a===null||b===null)continue;
+  if(a===0&&b>0)totals.newlyLate++;
+  if(a>0&&b>a)totals.worsenedLate++;
+  if(a>0&&b===0)totals.resolvedLate++;
+ }
+ return totals;
+}
+function assessPlanSet(preview,roots,chain){
+ const deadlines=fixedDeadlineTotals(preview.rows);
+ const selectedDeadlines=fixedDeadlineTotals(preview.rows.filter(r=>roots.has(r.id)));
+ const otherDeadlines=fixedDeadlineTotals(preview.rows.filter(r=>!roots.has(r.id)));
+ const scope=preview.resourceScope,conflicts=scope.workChanges.totals;
+ const worseResources=preview.resourceRows.filter(r=>r.worsened).length;
+ const beforeByProject=new Map(scope.before.projects.map(p=>[p.id,p]));
+ const resourceProjects=scope.after.projects.filter(p=>{
+  const b=beforeByProject.get(p.id);
+  return b&&["conflictedWork","overloadDays","unavailableDays","positiveUnlinked","undated"].some(k=>p[k]!==b[k]);
+ }).map(p=>p.id);
+ // Resource interference may extend beyond the calendar dependency graph.
+ const outsideChain=resourceProjects.filter(id=>!chain.has(id));
+ const warnings={
+  newLate:deadlines.newlyLate,worseLate:deadlines.worsenedLate,unknownDates:deadlines.newlyUnknown,
+  changedDeadline:deadlines.changedDeadline,workDeadlineChanges:preview.workSummary.controlChanged,
+  newLateWork:preview.workSummary.newlyLate,worseLateWork:preview.workSummary.worsenedLate,
+  newlyUndatedWork:preview.workSummary.newlyUndated,reserveReduced:preview.workSummary.reserveReduced,
+  newConflictWork:conflicts.newlyConflicted,worseConflictWork:conflicts.worsened,
+  movedConflictResource:conflicts.resourceChanged,worseResources,
+  unlinkedIncrease:Math.max(0,scope.after.totals.positiveUnlinked-scope.before.totals.positiveUnlinked),
+  undatedIncrease:Math.max(0,scope.after.totals.undated-scope.before.totals.undated)};
+ const hasTradeoff=Object.values(warnings).some(n=>n>0);
+ const resourceState=scope.after.totals.conflictedWork?"CONFLICTS":
+  scope.after.totals.positiveUnlinked||scope.after.totals.undated?"INCOMPLETE":"NO_KNOWN_CONFLICTS";
+ return {deadlines,selectedDeadlines,otherDeadlines,warnings,hasTradeoff,resourceState,
+  selectedProjects:roots.size,calendarChainProjects:chain.size,resourceProjects,outsideChain,
+  conflictedWorkBefore:scope.before.totals.conflictedWork,conflictedWorkAfter:scope.after.totals.conflictedWork,
+  missingResourceWork:scope.after.totals.positiveUnlinked,unknownResourceWork:scope.after.totals.undated};
+}
+function calculatePlanSet(snapshot,refs,context){
+ const checked=inspectPlanSet(snapshot,refs);
+ const members=checked.map(({actions,...member})=>member);
+ const invalid=members.find(m=>!m.valid);
+ if(invalid)return {valid:false,members,canApply:false,reason:invalid.projectName+": "+invalid.reason};
+ try{
+  const candidate=structuredClone(snapshot),roots=new Set(refs.map(r=>r.projectId));
+  const chain=new Set(),actions=[];
+  for(const entry of checked){
+   const {project,change}=find(candidate,entry.projectId,entry.changeId);
+   applyToProject(project,change,entry.actions);
+   change.planAmendments=[];
+   for(const id of affectedPlanProjects(snapshot,entry.projectId))chain.add(id);
+   for(const action of entry.actions)actions.push({projectId:entry.projectId,action});
+  }
+  validate(candidate);
+  const after=portfolioSchedule(candidate),afterResources=portfolioResources(candidate,{schedule:after});
+  // Full scope is deliberate: even an independent project can lose access to
+  // a shared resource. Reuse exactly the ordinary amendment projection.
+  const preview=forecastCandidate(snapshot,candidate,context,{roots,affected:new Set(snapshot.projects.map(p=>p.id)),
+   actions,after,afterResources,portfolio:true});
+  preview.scope="portfolio";
+  preview.rows=preview.rows.map(r=>({...r,selected:roots.has(r.id),downstream:!roots.has(r.id)&&chain.has(r.id)}));
+  const assessment=assessPlanSet(preview,roots,chain);
+  // Present selected projects first, then all calendar/resource effects.
+  const involved=new Set([...chain,...assessment.resourceProjects]);
+  preview.rows.sort((a,b)=>Number(b.selected)-Number(a.selected)||Number(b.changed)-Number(a.changed)||
+   Number(involved.has(b.id))-Number(involved.has(a.id)));
+  return {valid:true,members,preview,assessment,canApply:members.length>=2&&members.every(m=>m.approved)};
+ }catch(error){
+  return {valid:false,members,canApply:false,reason:error instanceof Error?error.message:"Расчёт недоступен"};
+ }
+}
+/**
+ * Compare one or two independent sets against precisely the same current
+ * snapshot. One proposal per project avoids hidden field merges. A single
+ * proposal is a useful reference but is still applied by its ordinary route.
+ * @param {any} snapshot
+ * @param {Array<{projectId:string,changeId:string}>} first
+ * @param {Array<{projectId:string,changeId:string}>|null} [second]
+ */
+export function comparePortfolioPlanSets(snapshot,first,second=null){
+ validate(snapshot);
+ const a=planSetMembers(snapshot,first),b=second===null?null:planSetMembers(snapshot,second);
+ if(b&&same(a,b))throw Error("Выберите различающиеся составы вариантов");
+ const context=amendmentPlanningContext(snapshot);
+ const options=[{id:"A",selection:a,...calculatePlanSet(snapshot,a,context)}];
+ if(b)options.push({id:"B",selection:b,...calculatePlanSet(snapshot,b,context)});
+ return {kind:"ATLAS_PORTFOLIO_PLAN_SETS",revision:snapshot.revision,sourceStamp:JSON.stringify(snapshot),options};
+}
+/**
+ * An atomic in-memory edit of the original portfolio. Every chosen proposal
+ * must already be approved separately. Compare again at application, never
+ * trust a UI preview or apply only the first successful member. Save remains
+ * the existing native commit/readback route.
+ * @param {any} snapshot
+ * @param {any} comparison
+ * @param {string} optionId
+ * @param {{rationale:string}} options
+ */
+export function applyPortfolioPlanSet(snapshot,comparison,optionId,{rationale}){
+ validate(snapshot);
+ if(!comparison||comparison.kind!=="ATLAS_PORTFOLIO_PLAN_SETS"||
+  comparison.revision!==snapshot.revision||comparison.sourceStamp!==JSON.stringify(snapshot))
+  throw Error("Портфель изменился. Рассчитайте варианты заново");
+ const option=comparison.options?.find(o=>o.id===optionId);
+ if(!option?.valid)throw Error("Выберите рассчитанный вариант портфеля");
+ if(typeof rationale!=="string"||rationale.trim().length<8||rationale.trim().length>2000)
+  throw Error("Укажите обоснование совместного применения (от 8 до 2000 символов)");
+ const refs=planSetMembers(snapshot,option.selection);
+ if(refs.length<2)throw Error("Для совместного применения выберите минимум два проекта");
+ const fresh=calculatePlanSet(snapshot,refs,amendmentPlanningContext(snapshot));
+ if(!fresh.valid)throw Error(fresh.reason);
+ if(!fresh.canApply)throw Error("Сначала отдельно утвердите каждую выбранную заявку");
+ if(!same(fresh.preview,option.preview)||!same(fresh.assessment,option.assessment)||!same(fresh.members,option.members))
+  throw Error("Последствия варианта изменились. Проверьте их заново");
+ const next=structuredClone(snapshot),now=new Date().toISOString(),coordinationId=crypto.randomUUID();
+ const members=fresh.members.map(m=>({projectId:m.projectId,projectName:m.projectName,changeId:m.changeId,changeTitle:m.title}));
+ const coordination={id:coordinationId,sourceRevision:snapshot.revision,members};
+ const memberText=members.map(m=>m.projectName+": "+m.changeTitle).join("; ");
+ for(const ref of refs){
+  const {project,change}=find(next,ref.projectId,ref.changeId);
+  applyToProject(project,change,change.planAmendments);
+  change.planAppliedAt=now;
+  project.decisions.push({id:crypto.randomUUID(),kind:"plan_application",changeId:change.id,
+   text:"Совместное применение утверждённых заявок ("+members.length+" проекта). "+rationale.trim()+
+    "\nСостав: "+memberText+"\nРасчёт по исходным срокам: просроченных проектов "+
+    fresh.assessment.deadlines.lateBefore+" → "+fresh.assessment.deadlines.lateAfter+
+    "; работ в ресурсных конфликтах "+fresh.assessment.conflictedWorkBefore+" → "+fresh.assessment.conflictedWorkAfter+".",
+   at:now,coordination:structuredClone(coordination)});
+ }
+ next.revision++;
+ validate(next);
+ return {state:next,coordinationId};
 }
 
 // Historical control points never acquire facts or resource assignments that

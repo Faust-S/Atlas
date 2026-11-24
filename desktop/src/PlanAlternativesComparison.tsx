@@ -28,11 +28,13 @@ export function AmendmentAnalysis({result,compact=false}:{result:any;compact?:bo
  const focus=result.rows.find((r:any)=>!r.downstream);
  const capacity="Перегрузка портфеля: "+result.resourceBefore.overloadDays+" → "+result.resourceAfter.overloadDays+
   " дн. Вне доступности: "+result.resourceBefore.unavailableDays+" → "+result.resourceAfter.unavailableDays+" дн.";
- const finish="Финиш проекта: "+date(focus?.beforeFinish)+" → "+date(focus?.afterFinish)+".";
+ const portfolio=result.scope==="portfolio";
+ const finish=portfolio?"Проектов в расчёте: "+result.rows.length+"; изменены календарные показатели: "+result.changed+".":
+  "Финиш проекта: "+date(focus?.beforeFinish)+" → "+date(focus?.afterFinish)+".";
  return <div className="atlas-amendment-analysis">
   {!compact&&<h4>Последствия относительно текущего плана</h4>}
   <p role="status" aria-label={finish} className="atlas-amendment-summary">{finish}</p>
-  {focus?.baselineName&&<p>{"Контрольный план "+focus.baselineName+": "+date(focus.baselineFinish)+
+  {!portfolio&&focus?.baselineName&&<p>{"Контрольный план "+focus.baselineName+": "+date(focus.baselineFinish)+
    ". Отклонение: "+shift(focus.beforeBaselineShift)+" → "+shift(focus.afterBaselineShift)+"."}</p>}
   <p role="status" aria-label={capacity} className="atlas-amendment-summary">{capacity}</p>
   {result.resourceScope&&<p>{"Работ в ресурсных конфликтах по затронутой цепочке: "+
@@ -54,7 +56,7 @@ export function AmendmentAnalysis({result,compact=false}:{result:any;compact?:bo
   <p>{'Превышение мощности: '+result.resourceBefore.overloadPctDays+' → '+result.resourceAfter.overloadPctDays+
    ' п. п.·дн.; нагрузка вне доступности: '+result.resourceBefore.unavailablePctDays+' → '+result.resourceAfter.unavailablePctDays+' %·дн.'}</p>
   <p role="status" aria-label={summary}>{summary}</p>
-  <p>{'Проектов по цепочке: '+result.affected+'; изменено: '+result.changed+
+  <p>{(portfolio?'Проектов в портфеле: ':'Проектов по цепочке: ')+result.affected+'; изменено: '+result.changed+
    '; новых нарушений сроков проектов: '+result.projectSummary.newlyLate+
    '; усилено прежних: '+result.projectSummary.worsenedLate+'.'}</p>
   <p>{'Изменены контрольные даты: проектов '+result.projectSummary.controlChanged+', работ '+result.workSummary.controlChanged+
@@ -67,7 +69,7 @@ export function AmendmentAnalysis({result,compact=false}:{result:any;compact?:bo
     <summary>Проекты и контрольные редакции ({result.rows.length})</summary>
     <div className="atlas-amendment-rows">{result.rows.slice(0,projects).map((r:any)=>
      <div className="atlas-amendment-row" key={r.id}>
-      <strong>{r.name}</strong><small>{"Расчётный финиш: "+date(r.beforeFinish)+" → "+date(r.afterFinish)}</small>
+      <strong>{r.name}{portfolio&&r.selected?" · выбран":""}</strong><small>{"Расчётный финиш: "+date(r.beforeFinish)+" → "+date(r.afterFinish)}</small>
       {r.baselineName&&<small>{"Контрольная редакция "+r.baselineName+": "+date(r.baselineFinish)+
        "; отклонение "+shift(r.beforeBaselineShift)+" → "+shift(r.afterBaselineShift)}</small>}
       <small>{"Срок: "+control(r.beforeDeadline)+" → "+control(r.afterDeadline)+
@@ -79,8 +81,8 @@ export function AmendmentAnalysis({result,compact=false}:{result:any;compact?:bo
    {result.dependencyRows?.length>0&&<details open={!compact}>
     <summary>Изменения порядка работ ({result.dependencyRows.length})</summary>
     <div className="atlas-amendment-rows">{result.dependencyRows.map((r:any)=>
-     <div className="atlas-amendment-row" key={JSON.stringify([r.from,r.to])}>
-      <strong>{r.fromTitle+" → "+r.toTitle}</strong>
+     <div className="atlas-amendment-row" key={JSON.stringify([r.projectId??"",r.from,r.to])}>
+      <strong>{(r.projectName?r.projectName+": ":"")+r.fromTitle+" → "+r.toTitle}</strong>
       <small>{r.after?"Добавить зависимость":"Удалить зависимость"}</small>
      </div>)}</div>
    </details>}

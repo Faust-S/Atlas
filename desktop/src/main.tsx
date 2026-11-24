@@ -22,10 +22,11 @@ import {projectScreenSchedule} from "../../src/project-schedule-view.mjs";
 import {portfolioResources,resourceWorkConflicts} from "../../src/portfolio-resources.mjs";
 import {PlanAlternativesComparison,AmendmentAnalysis,AmendmentReview} from "./PlanAlternativesComparison";
 import {PlanRecoveryComparison} from "./PlanRecoveryComparison";
+import {PortfolioPlanSets} from "./PortfolioPlanSets";
 import {createDeadlineRecoveryProposal} from "../../src/plan-recovery.mjs";
 import {planReviewQueue,planReviewAction,planProposalAction} from "../../src/plan-review.mjs";
 import {revisionReview,recheckAction} from "../../src/revision-review.mjs";
-import {previewPlanAmendment,applyPlanAmendment,removePlanAmendment,inspectPlanAmendment} from "../../src/plan-amendment.mjs";
+import {previewPlanAmendment,applyPlanAmendment,applyPortfolioPlanSet,removePlanAmendment,inspectPlanAmendment} from "../../src/plan-amendment.mjs";
 import {planPublicRefresh,reconcilePublicSources,publicSourceQueue} from "../../src/public-refresh.mjs";
 import {sourceReview,sourceFreshnessLabel} from "../../src/source-review.mjs";
 import {githubPortfolioCatalog,createProjectFromGitHubCatalog,githubPortfolioOverview,
@@ -2527,6 +2528,15 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
          onOpenAmendment={(pid,wid,comparison)=>openEditorFor(pid,"resource-amendment:"+encodeURIComponent(wid),comparison)}/>}
 
     </section>
+    <PortfolioPlanSets snapshot={data} disabled={busy||!!editor} onOpen={(pid,cid)=>openProjectTab(pid,"changes",cid)}
+     onApply={(comparison,optionId,rationale)=>{
+      if(!requireClosedForm()||busyRef.current)return;
+      if(!confirmAction("Применить все утверждённые заявки выбранного варианта к черновику портфеля?"))return;
+      try{
+       const result=applyPortfolioPlanSet(latestSnapshot.current,comparison,optionId,{rationale});
+       mutate(result.state,"Согласованный план применён в черновике. Сохраните новую редакцию портфеля.");
+      }catch(e){issue(e)}
+     }}/>
     <section id="atlas-portfolio-ecosystem" tabIndex={-1} className="surface atlas-ecosystem-overview" aria-label="Карта разработки по проектам и GitHub">
      <div className="section-heading"><div><h2>Карта разработки</h2>
       <p>Продукты, источники и открытые вопросы в одном портфеле. Зелёная сборка не означает принятую поставку.</p></div></div>

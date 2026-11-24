@@ -350,7 +350,20 @@ export function validate(s){
     }
    }
   }
-  for(const d of p.decisions)if(d.changeId!=null&&!changeIds.has(d.changeId))throw Error("Invalid decision changeId");
+  for(const d of p.decisions){
+   if(d.changeId!=null&&!changeIds.has(d.changeId))throw Error("Invalid decision changeId");
+   if(d.coordination!==undefined){
+    const q=d.coordination,proposal=changes.find(c=>c.id===d.changeId);
+    if(d.kind!=="plan_application"||!q||typeof q.id!=="string"||!q.id||
+     !Number.isSafeInteger(q.sourceRevision)||q.sourceRevision<0||
+     !Array.isArray(q.members)||q.members.length<2||q.members.length>4||
+     q.members.some(m=>!m||["projectId","projectName","changeId","changeTitle"].some(k=>typeof m[k]!=="string"||!m[k].trim()))||
+     new Set(q.members.map(m=>m.projectId)).size!==q.members.length||
+     !q.members.some(m=>m.projectId===p.id&&m.changeId===d.changeId)||
+     !proposal?.planAppliedAt||proposal.planAppliedAt!==d.at||typeof d.text!=="string"||!d.text.trim())
+     throw Error("Invalid coordinated plan application");
+   }
+  }
 
   const edges=new Set(),workEdges=[];
   for(const x of p.dependencies){

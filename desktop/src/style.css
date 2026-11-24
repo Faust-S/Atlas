@@ -1810,3 +1810,6 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 
 .atlas-recovery-reason{display:flex;flex-direction:column;gap:4px;margin:8px 0;font-size:11px;min-width:0}
 .atlas-recovery-reason textarea,.atlas-plan-choice-fields input{box-sizing:border-box;width:100%;min-width:0;max-width:100%;font:inherit}
+
+.atlas-plan-set-member{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding:7px 0;border-top:1px solid var(--line);min-width:0}.atlas-plan-set-member>div:first-child{min-width:0;flex:1;overflow-wrap:anywhere}.atlas-plan-set-member small{display:block;overflow-wrap:anywhere}.atlas-plan-set-member .button-row{flex-wrap:wrap}.atlas-plan-set-picker{min-width:0}
+@media(max-width:1000px){.atlas-plan-set-member{flex-wrap:wrap}.atlas-plan-set-member>div:first-child{flex-basis:100%}}
