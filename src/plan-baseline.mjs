@@ -15,7 +15,7 @@ const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 export function recordedWorkAssignment(item,labels){
  if(!item)return null;
  const resourceId=item.resourceId??null;
- return {assignee:item.assignee??"",resourceId,resourceLabel:resourceId===null?null:labels.get(resourceId)??null,
+ return {assignee:String(item.assignee??""),resourceId,resourceLabel:resourceId===null?null:labels.get(resourceId)??null,
   allocationPct:item.allocationPct??100};
 }
 export function recordedAssignmentChanges(before,after){
@@ -130,7 +130,7 @@ export function comparePlanBaseline(snapshot,projectId,baselineId=null,{portfoli
   const referencePredecessors=reference?.predecessors??[];
   const sorted=arr=>[...arr].sort((a,b)=>a.localeCompare(b));
   const reasons=[];
-  const currentAssignment=recordedWorkAssignment(item,labels),referenceAssignment=reference?.assignment??null;
+  const currentAssignment=recordedWorkAssignment(item,labels),referenceAssignment=reference?.assignment?{...reference.assignment}:null;
   if(!reference)reasons.push("Новая работа");
   if(!item)reasons.push("Работа удалена из текущего плана");
   if(item&&reference){

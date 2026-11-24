@@ -1,13 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {createProject,empty,editProject,editItem,createItem,createWorkCalendar,serialize,deserialize} from '../src/core.mjs';
+import {performance} from 'node:perf_hooks';
+import {createProject,empty,editProject,editItem,createItem,createWorkCalendar,connect,serialize,deserialize} from '../src/core.mjs';
 import {inspectDeadlineRecovery,compareDeadlineRecovery,createDeadlineRecoveryProposal} from '../src/plan-recovery.mjs';
 import {portfolioSchedule} from '../src/portfolio-schedule.mjs';
 import {portfolioResources,planningResourceTotals} from '../src/portfolio-resources.mjs';
 import {previewPlanAmendment,applyPlanAmendment} from '../src/plan-amendment.mjs';
 import {decideChange} from '../src/trace.mjs';
 import {atlas12PlanAlternativesPortfolio} from './fixtures/atlas12-plan-alternatives.mjs';
+import {desktopLoadPortfolio} from './fixtures/desktop-portfolio-120.mjs';
 
 const reason={rationale:'Проверить сокращение длительности при подтверждении производителем'};
 function fixture(){
@@ -123,4 +125,67 @@ test('Calendar-aware recovery measures elapsed date gains, not the numeric durat
  const d=createDeadlineRecoveryProposal(s,r,o.id,reason),a=d.state.projects[0].changes[0].planAmendments[0];
  assert.equal(a.before.durationUnit,'working_days');assert.deepEqual(a.before.calendarBasis,{id:c.id,version:c.version});
  assert.equal(a.after.estimateDays,1);assert.equal('calendarBasis' in a.after,false);
+});
+
+test('Explicit sequence and duration alternatives can recover the deadline only in combination',()=>{
+ const f=fixture();
+ let s=editItem(f.snapshot,f.projectId,f.thirdId,{estimateDays:5});
+ s=connect(s,f.projectId,f.firstId,f.secondId);
+ s=editProject(s,f.projectId,{dueDate:'2026-11-27'});
+ const saved=serialize(s),edges=[{from:f.firstId,to:f.secondId,present:false}];
+ const r=compareDeadlineRecovery(s,f.projectId,[{itemId:f.thirdId,estimateDays:4}],{dependencyChanges:edges});
+ assert.equal(r.options.length,3);assert.ok(r.options.every(o=>o.valid));
+ assert.equal(r.context.finish,'2026-11-29');
+ assert.equal(r.options[0].effect.afterFinish,'2026-11-29');
+ assert.equal(r.options[1].effect.afterFinish,'2026-11-28');
+ const combined=r.options.at(-1);
+ assert.equal(combined.effect.afterFinish,'2026-11-27');assert.equal(combined.effect.dateEffect,'RECOVERED');
+ assert.equal(combined.effect.tradeoff,true,'Removing the sequence introduces a real resource trade-off');
+ const draft=createDeadlineRecoveryProposal(s,r,'combined',reason),p=draft.state.projects[0],c=p.changes.at(-1);
+ assert.deepEqual(p.dependencies,s.projects[0].dependencies);
+ assert.deepEqual(p.items,s.projects[0].items);
+ assert.equal(c.planAmendments.length,2);assert.match(c.description,/Исключить зависимость/);
+ const approved=decideChange(draft.state,f.projectId,draft.changeId,{status:'approved',rationale:'Допустим новый порядок работ'}).state;
+ const applied=applyPlanAmendment(approved,f.projectId,draft.changeId).state;
+ assert.deepEqual(applied.projects[0].dependencies,[]);
+ assert.equal(portfolioSchedule(applied).byId.get(f.projectId).projectedFinish,combined.effect.afterFinish);
+ assert.equal(serialize(s),saved);
+});
+test('An invalid isolated edge does not hide a valid combined reversal',()=>{
+ const f=fixture(),s=connect(f.snapshot,f.projectId,f.firstId,f.secondId);
+ const edges=[{from:f.secondId,to:f.firstId,present:true},{from:f.firstId,to:f.secondId,present:false}];
+ const r=compareDeadlineRecovery(s,f.projectId,[],{dependencyChanges:edges});
+ assert.equal(r.options[0].valid,false);assert.equal(r.options[1].valid,true);
+ assert.equal(r.options[2].valid,true);
+ const draft=createDeadlineRecoveryProposal(s,r,'combined',reason),c=draft.state.projects[0].changes.at(-1);
+ assert.deepEqual(c.planAmendments.map(a=>a.after),[false,true]);
+ const approved=decideChange(draft.state,f.projectId,draft.changeId,{status:'approved',rationale:'Утверждён обратный порядок'}).state;
+ const applied=applyPlanAmendment(approved,f.projectId,draft.changeId).state;
+ assert.deepEqual(applied.projects[0].dependencies,[{from:f.secondId,to:f.firstId}]);
+});
+test('Sequence assumptions require a real change, distinct pending endpoints and no duplicate operations',()=>{
+ const f=fixture(),edge={from:f.firstId,to:f.secondId,present:true};
+ assert.throws(()=>compareDeadlineRecovery(f.snapshot,f.projectId,[],{dependencyChanges:[]}),/хотя бы одну/);
+ assert.throws(()=>compareDeadlineRecovery(f.snapshot,f.projectId,[],{dependencyChanges:[edge,edge]}),/повторяться/);
+ assert.throws(()=>compareDeadlineRecovery(f.snapshot,f.projectId,[],{dependencyChanges:[{...edge,present:false}]}),/уже соответствует/);
+ const started=editItem(f.snapshot,f.projectId,f.firstId,{state:'in_progress'});
+ assert.throws(()=>compareDeadlineRecovery(started,f.projectId,[],{dependencyChanges:[edge]}),/ещё не начатые/);
+ assert.throws(()=>compareDeadlineRecovery(f.snapshot,f.projectId,[],{dependencyChanges:[{...edge,to:f.dependentWorkId}]}),/одного проекта/);
+});
+test('Bounded four-Work recovery retains exact preview/application parity on 120 projects and 1200 Works',()=>{
+ const s=desktopLoadPortfolio(),pid=s.projects[0].id,p=s.projects[0];
+ for(const w of p.items.slice(0,4))w.estimateDays=3;
+ p.dueDate='2026-11-12';
+ const inputs=p.items.slice(0,4).map(w=>({itemId:w.id,estimateDays:2})),original=serialize(s);
+ const begin=performance.now(),r=compareDeadlineRecovery(s,pid,inputs),ms=performance.now()-begin;
+ assert.equal(r.options.length,5);assert.ok(r.options.every(o=>o.valid));
+ assert.equal(r.options.at(-1).effect.afterFinish,'2026-11-11');
+ assert.equal(r.options.at(-1).effect.dateEffect,'RECOVERED');
+ assert.equal(r.options.at(-1).preview.rows.length,41);
+ const draft=createDeadlineRecoveryProposal(s,r,'combined',reason);
+ const approved=decideChange(draft.state,pid,draft.changeId,{status:'approved',rationale:'Проверенные плановые длительности'}).state;
+ const applied=applyPlanAmendment(approved,pid,draft.changeId).state,actual=portfolioSchedule(applied);
+ for(const row of r.options.at(-1).preview.rows)assert.equal(actual.byId.get(row.id).projectedFinish,row.afterFinish);
+ assert.equal(serialize(s),original);
+ console.log('ATLAS12_RECOVERY_SCALE projects=120 works=1200 options=5 ms='+ms.toFixed(2));
 });

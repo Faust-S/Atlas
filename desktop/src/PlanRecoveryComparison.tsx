@@ -3,6 +3,7 @@ import {inspectDeadlineRecovery,compareDeadlineRecovery} from "../../src/plan-re
 import {AmendmentAnalysis} from "./PlanAlternativesComparison";
 
 type WorkVariant={itemId:string;estimateDays:string;resourceId:string;allocationPct:string};
+type SequenceVariant={from:string;to:string;present:boolean};
 const effectLabel:Record<string,string>={UNKNOWN:"Даты не определены",LATER:"Финиш позже",UNCHANGED:"Финиш не изменён",
  RECOVERED:"Контрольный срок достигнут по расчёту",PARTIAL:"Отставание сокращено",EARLIER:"Финиш раньше"};
 const date=(x:any)=>x??"не определена";
@@ -13,6 +14,10 @@ export function PlanRecoveryComparison({snapshot,projectId,onDraft}:{
  const [expanded,setExpanded]=useState(false);
  const [candidateId,setCandidateId]=useState("");
  const [variants,setVariants]=useState<WorkVariant[]>([]);
+ const [sequenceOpen,setSequenceOpen]=useState(false);
+ const [fromId,setFromId]=useState("");
+ const [toId,setToId]=useState("");
+ const [edges,setEdges]=useState<SequenceVariant[]>([]);
  const [calculation,setCalculation]=useState<{snapshot:any;value:any}|null>(null);
  const [error,setError]=useState("");
  const [rationale,setRationale]=useState("");
@@ -25,6 +30,12 @@ export function PlanRecoveryComparison({snapshot,projectId,onDraft}:{
  const available=candidates.filter(w=>!variants.some(v=>v.itemId===w.id));
  const chosen=available.find(w=>w.id===candidateId)??available[0];
  const resources=(snapshot.resources??[]) as any[];
+ const sequenceWorks=(info?.sequenceWorks??[]) as any[];
+ const from=sequenceWorks.find(w=>w.id===fromId)??sequenceWorks[0];
+ const successors=sequenceWorks.filter(w=>w.id!==from?.id);
+ const to=successors.find(w=>w.id===toId)??successors[0];
+ const edgeExists=!!(from&&to&&info?.dependencies.some((e:any)=>e.from===from.id&&e.to===to.id));
+ const alreadyStaged=edges.some(e=>e.from===from?.id&&e.to===to?.id);
  const current=calculation&&calculation.snapshot===snapshot?calculation.value:null;
  const stale=!!calculation&&!current;
  const invalidate=()=>{setCalculation(null);setError("")};
@@ -41,7 +52,8 @@ export function PlanRecoveryComparison({snapshot,projectId,onDraft}:{
    setError("");
    const number=(s:string)=>/^\d+$/.test(s.trim())?Number(s):NaN;
    const value=compareDeadlineRecovery(snapshot,projectId,variants.map(v=>({itemId:v.itemId,
-    estimateDays:number(v.estimateDays),resourceId:v.resourceId||null,allocationPct:number(v.allocationPct)})));
+    estimateDays:number(v.estimateDays),resourceId:v.resourceId||null,allocationPct:number(v.allocationPct)})),
+    {dependencyChanges:edges});
    setCalculation({snapshot,value});
   }catch(e){setCalculation(null);setError(e instanceof Error?e.message:"Расчёт недоступен")}
  };
@@ -61,7 +73,7 @@ export function PlanRecoveryComparison({snapshot,projectId,onDraft}:{
      {info.unavailableProjects.length>0&&<small>{"Недоступны проекты: "+info.unavailableProjects.map((p:any)=>p.name).join(", ")}</small>}
     </div>
     {!info.available?<p>{info.reason}</p>:<>
-     <p>Введите реально достижимую длительность и, при необходимости, другой существующий ресурс или долю загрузки. До четырёх ещё не начатых работ. Каждая проверяется отдельно и совместно, без переноса контрольного срока.</p>
+     <p>Введите реально достижимую длительность и, при необходимости, другой существующий ресурс или долю загрузки. До четырёх ещё не начатых работ и двух изменений связей. Каждая корректировка проверяется отдельно и совместно, без переноса контрольного срока.</p>
      {available.length>0&&variants.length<info.maxWorks&&<div className="atlas-plan-choice-fields">
       <label>Работа для проверки<select aria-label="Работа для восстановления срока" value={chosen?.id??""}
        onChange={e=>setCandidateId(e.target.value)}>
@@ -87,7 +99,33 @@ export function PlanRecoveryComparison({snapshot,projectId,onDraft}:{
        <button type="button" className="action-button" onClick={()=>{setVariants(rows=>rows.filter(x=>x.itemId!==v.itemId));invalidate()}}>Убрать из расчёта</button>
       </div>;
      })}</div>
-     <button type="button" className="action-button primary" disabled={!variants.length||variants.some(v=>!candidates.some(w=>w.id===v.itemId))}
+     {sequenceWorks.length>=2&&<button type="button" className="action-button" aria-expanded={sequenceOpen}
+      onClick={()=>setSequenceOpen(v=>!v)}>{sequenceOpen?"Скрыть выбор связей":"Уточнить порядок работ"}</button>}
+     {sequenceOpen&&sequenceWorks.length>=2&&<>
+      <p>Меняйте связь только при известной допустимости нового порядка. Atlas не определяет технологическую возможность и не удаляет зависимости автоматически.</p>
+      {edges.length<(info.maxDependencies??2)&&<div className="atlas-plan-choice-fields">
+       <label>Предшествующая работа<select aria-label="Предшественник варианта" value={from?.id??""}
+        onChange={e=>setFromId(e.target.value)}>
+        {sequenceWorks.map(w=><option key={w.id} value={w.id}>{w.title}</option>)}
+       </select></label>
+       <label>Следующая работа<select aria-label="Следующая работа варианта" value={to?.id??""}
+        onChange={e=>setToId(e.target.value)}>
+        {successors.map(w=><option key={w.id} value={w.id}>{w.title}</option>)}
+       </select></label>
+       <button type="button" className="action-button" disabled={!from||!to||alreadyStaged}
+        onClick={()=>{if(!from||!to||alreadyStaged)return;setEdges(list=>[...list,{from:from.id,to:to.id,present:!edgeExists}]);invalidate()}}>
+        {edgeExists?"Включить исключение связи":"Включить добавление связи"}
+       </button>
+      </div>}
+     </>}
+     {edges.length>0&&<div className="atlas-amendment-rows">{edges.map((e,i)=><div className="atlas-amendment-row" key={JSON.stringify([e.from,e.to])}>
+      <strong>{(e.present?"Добавить связь: ":"Исключить связь: ")+(sequenceWorks.find(w=>w.id===e.from)?.title??"Работа недоступна")+
+       " → "+(sequenceWorks.find(w=>w.id===e.to)?.title??"Работа недоступна")}</strong>
+      <button type="button" className="action-button" aria-label={"Убрать связь из расчёта "+(i+1)}
+       onClick={()=>{setEdges(list=>list.filter(x=>x!==e));invalidate()}}>Убрать связь из расчёта</button>
+     </div>)}</div>}
+     <button type="button" className="action-button primary" disabled={(!variants.length&&!edges.length)||
+      variants.some(v=>!candidates.some(w=>w.id===v.itemId))}
       onClick={calculate}>Рассчитать восстановление срока</button>
      {error&&<p role="alert">{error}</p>}
      {stale&&<p role="alert">План изменился. Рассчитайте варианты заново.</p>}

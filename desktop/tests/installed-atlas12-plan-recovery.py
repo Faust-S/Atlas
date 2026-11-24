@@ -88,6 +88,19 @@ def qualify():
     find('Контрольный срок достигнут по расчёту',contains=True)
     find('Финиш варианта: 2026-11-25; оставшееся отставание: 0 дн.',contains=True)
     assert d.head()==saved,'Deadline comparison wrote to Native Store'
+    # Explicitly add a sequence alternative on the current plan. A new
+    # dependency must be treated as an assumption, not silently applied.
+    click('Уточнить порядок работ')
+    click('Включить добавление связи')
+    click('Рассчитать восстановление срока')
+    find('Рассчитано вариантов: 5 из 5',contains=True)
+    find('Финиш позже',contains=True)
+    assert d.head()==saved
+    click('Убрать связь из расчёта 1')
+    click('Скрыть выбор связей')
+    click('Рассчитать восстановление срока')
+    find('Рассчитано вариантов: 4 из 4',contains=True)
+    find('Контрольный срок достигнут по расчёту',contains=True)
     fill('Обоснование восстановления срока','Three planned estimates reviewed by owner')
     v.capture('atlas-recovery-compare-820')
     click('Подготовить заявку: Совместный вариант')

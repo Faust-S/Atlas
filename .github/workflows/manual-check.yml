@@ -18,6 +18,7 @@ on:
       - work/2026-11-15-atlas08-t3-project-work-result
       - work/2026-11-16-atlas-0-9-t3
       - work/2026-11-22-atlas-0-10-calendar-scenario
+      - work/2026-11-24-atlas-plan-revision
     paths:
       - 'src/**'
       - 'tests/**'

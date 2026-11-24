@@ -5,11 +5,11 @@ import {validate} from './core.mjs';
 import {portfolioSchedule} from './portfolio-schedule.mjs';
 import {scheduleProject} from './planning.mjs';
 import {planChange} from './trace.mjs';
-import {setPlanWork,previewPlanAmendment} from './plan-amendment.mjs';
+import {setPlanWork,setPlanDependency,previewPlanAmendment} from './plan-amendment.mjs';
 
-const MAX_WORK=4;
-const editable=w=>['todo','blocked'].includes(w.state)&&!w.actualStartDate&&!w.actualFinishDate&&
- (w.estimateDays??1)>0;
+const MAX_WORK=4,MAX_DEPENDENCIES=2;
+const pending=w=>w&&['todo','blocked'].includes(w.state)&&!w.actualStartDate&&!w.actualFinishDate;
+const editable=w=>pending(w)&&(w.estimateDays??1)>0;
 const day=86400000;
 const difference=(a,b)=>a&&b?(Date.parse(b+'T00:00:00Z')-Date.parse(a+'T00:00:00Z'))/day:null;
 const identical=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
@@ -24,6 +24,7 @@ function recoveryContext(snapshot,projectId){
  else if(!row.deadline)reason='Сначала установите контрольный срок проекта';
  const plan=row.projectedStart&&row.projectedFinish?
   scheduleProject(project,{calendarLibrary:snapshot.calendarLibrary??[],startDate:row.projectedStart}):null;
+ if(plan&&plan.estimatedFinish!==row.projectedFinish)throw Error('Расчёты плана и портфеля различаются');
  const items=new Map(project.items.map(w=>[w.id,w]));
  const works=(plan?.rows??[]).map(r=>{
   const item=items.get(r.id);
@@ -35,8 +36,10 @@ function recoveryContext(snapshot,projectId){
  }).sort((a,b)=>Number(b.critical)-Number(a.critical)||a.floatDays-b.floatDays||
   b.estimateDays-a.estimateDays||a.title.localeCompare(b.title,'ru')||a.id.localeCompare(b.id));
  const candidates=reason?[]:works.filter(w=>w.eligible);
- return {project,forecast,context:{projectId,revision:snapshot.revision,available:!reason&&candidates.length>0,
-  reason:reason??(!candidates.length?'Нет ещё не начатых работ с положительной длительностью':null),
+ const sequenceWorks=reason?[]:works.filter(w=>pending(items.get(w.id))).map(w=>({id:w.id,title:w.title,state:w.state}));
+ const available=!reason&&(candidates.length>0||sequenceWorks.length>=2);
+ return {project,forecast,context:{projectId,revision:snapshot.revision,available,
+  reason:reason??(!available?'Нет доступных ещё не начатых работ для корректировки плана':null),
   start:row.projectedStart,finish:row.projectedFinish,deadline:row.deadline,
   slipDays:row.deadlineSlipDays,startShiftDays:row.shiftDays,
   limitingProjects:row.limitingParents.map(id=>({id,name:forecast.byId.get(id).name,
@@ -45,15 +48,16 @@ function recoveryContext(snapshot,projectId){
   missingParents:row.missingParents.map(id=>({id,name:forecast.byId.get(id).name})),
   criticalCount:works.filter(w=>w.critical).length,
   fixedCriticalCount:works.filter(w=>w.critical&&!w.eligible).length,
-  candidates,maxWorks:MAX_WORK}};
+  candidates,maxWorks:MAX_WORK,sequenceWorks,maxDependencies:MAX_DEPENDENCIES,
+  dependencies:reason?[]:project.dependencies.map(e=>({from:e.from,to:e.to}))}};
 }
 /** Read the real project deadline and distinguish local critical Work from upstream constraints. */
 export function inspectDeadlineRecovery(snapshot,projectId){
  return recoveryContext(snapshot,projectId).context;
 }
 function normalize(snapshot,project,changes){
- if(!Array.isArray(changes)||changes.length<1||changes.length>MAX_WORK)
-  throw Error('Укажите от одной до четырёх работ');
+ if(!Array.isArray(changes)||changes.length>MAX_WORK)
+  throw Error('Укажите не более четырёх работ');
  const ids=new Set(),resources=new Set((snapshot.resources??[]).map(r=>r.id));
  return changes.map(input=>{
   if(!input||typeof input.itemId!=='string'||ids.has(input.itemId))throw Error('Работы для сравнения не должны повторяться');
@@ -78,10 +82,30 @@ function normalize(snapshot,project,changes){
   return {itemId:work.id,estimateDays,resourceId,allocationPct};
  });
 }
-function ordinaryProposal(snapshot,projectId,changes,{title,description}){
+function normalizeDependencies(project,changes){
+ if(!Array.isArray(changes)||changes.length>MAX_DEPENDENCIES)
+  throw Error('Укажите не более двух изменений связей');
+ const used=new Set(),works=new Map(project.items.map(w=>[w.id,w]));
+ return changes.map(edge=>{
+  if(!edge||typeof edge.from!=='string'||typeof edge.to!=='string'||edge.from===edge.to||
+   typeof edge.present!=='boolean'||!pending(works.get(edge.from))||!pending(works.get(edge.to)))
+   throw Error('Выберите две разные ещё не начатые работы одного проекта');
+  const key=JSON.stringify([edge.from,edge.to]);
+  if(used.has(key))throw Error('Изменения связей не должны повторяться');
+  used.add(key);
+  if(project.dependencies.some(e=>e.from===edge.from&&e.to===edge.to)===edge.present)
+   throw Error('Состояние связи уже соответствует варианту');
+  return {from:edge.from,to:edge.to,present:edge.present};
+ });
+}
+function ordinaryProposal(snapshot,projectId,changes,dependencies,{title,description}){
  const draft=planChange(snapshot,projectId,{title,description});
  let state=draft.state;
  for(const change of changes)state=setPlanWork(state,projectId,draft.id,change).state;
+ // Validate deletions first, then additions. A reversal can be impossible
+ // in isolation yet valid as a combined explicit proposal.
+ for(const edge of [...dependencies].sort((a,b)=>Number(a.present)-Number(b.present)))
+  state=setPlanDependency(state,projectId,draft.id,edge).state;
  return {state,changeId:draft.id};
 }
 function describeOption(preview,projectId){
@@ -108,21 +132,27 @@ function describeOption(preview,projectId){
 }
 /**
  * Calculate the explicitly entered Work variants individually and together
- * against the same current snapshot (at most 5 calculations). Never infer a
+ * against the same current snapshot (at most 7 calculations). Never infer a
  * shorter estimate from float, free capacity, or the number of resources.
  * @param {any} snapshot
  * @param {string} projectId
  * @param {Array<{itemId:string,estimateDays:number,resourceId?:string|null,allocationPct?:number}>} changes
+ * @param {{dependencyChanges?:Array<{from:string,to:string,present:boolean}>}} [options]
  */
-export function compareDeadlineRecovery(snapshot,projectId,changes){
+export function compareDeadlineRecovery(snapshot,projectId,changes,{dependencyChanges=[]}={}){
  const {project,context}=recoveryContext(snapshot,projectId);
  if(!context.available)throw Error(context.reason);
- const selected=normalize(snapshot,project,changes);
- const sets=selected.map((change,i)=>({id:'work-'+(i+1),title:project.items.find(w=>w.id===change.itemId).title,changes:[change]}));
- if(selected.length>1)sets.push({id:'combined',title:'Совместный вариант',changes:selected});
+ const selected=normalize(snapshot,project,changes),edges=normalizeDependencies(project,dependencyChanges);
+ if(!selected.length&&!edges.length)throw Error('Укажите хотя бы одну корректировку плана');
+ const titles=new Map(project.items.map(w=>[w.id,w.title]));
+ const sets=selected.map((change,i)=>({id:'work-'+(i+1),title:titles.get(change.itemId),changes:[change],dependencies:[]}));
+ for(const [i,edge] of edges.entries())sets.push({id:'edge-'+(i+1),
+  title:(edge.present?'Добавить: ':'Исключить: ')+titles.get(edge.from)+' → '+titles.get(edge.to),
+  changes:[],dependencies:[edge]});
+ if(selected.length+edges.length>1)sets.push({id:'combined',title:'Совместный вариант',changes:selected,dependencies:edges});
  const options=sets.map(option=>{
   try{
-   const draft=ordinaryProposal(snapshot,projectId,option.changes,{title:'Расчёт варианта',description:''});
+   const draft=ordinaryProposal(snapshot,projectId,option.changes,option.dependencies,{title:'Расчёт варианта',description:''});
    const preview=previewPlanAmendment(draft.state,projectId,draft.changeId);
    return {...option,valid:true,effect:describeOption(preview,projectId),preview};
   }catch(error){
@@ -146,7 +176,9 @@ export function createDeadlineRecoveryProposal(snapshot,comparison,optionId,{rat
   throw Error('Укажите обоснование варианта (от 8 до 2000 символов)');
  const {project,context}=recoveryContext(snapshot,comparison.projectId);
  if(!context.available)throw Error(context.reason);
- const changes=normalize(snapshot,project,option.changes);
+ const changes=normalize(snapshot,project,option.changes),
+  dependencies=normalizeDependencies(project,option.dependencies??[]);
+ if(!changes.length&&!dependencies.length)throw Error('Укажите хотя бы одну корректировку плана');
  const names=new Map((snapshot.resources??[]).map(r=>[r.id,r.label]));
  const assumptions=changes.map(c=>{
   const w=project.items.find(w=>w.id===c.itemId);
@@ -155,7 +187,11 @@ export function createDeadlineRecoveryProposal(snapshot,comparison,optionId,{rat
    '; ресурс '+(names.get(w.resourceId)??'не назначен')+' → '+(names.get(c.resourceId)??'не назначен')+
    '; загрузка '+(w.allocationPct??100)+' → '+c.allocationPct+'%.';
  });
- const draft=ordinaryProposal(snapshot,project.id,changes,{title:'Пересмотр срока: '+option.title,
+ for(const edge of dependencies){
+  const from=project.items.find(w=>w.id===edge.from),to=project.items.find(w=>w.id===edge.to);
+  assumptions.push((edge.present?'Добавить зависимость: ':'Исключить зависимость: ')+from.title+' → '+to.title+'.');
+ }
+ const draft=ordinaryProposal(snapshot,project.id,changes,dependencies,{title:'Пересмотр срока: '+option.title,
   description:rationale.trim()+'\n'+assumptions.join('\n')+
    '\nРасчёт до утверждения: '+option.effect.beforeFinish+' → '+option.effect.afterFinish+
    '; контрольный срок остаётся '+option.effect.deadline+'.'});

@@ -545,7 +545,7 @@ function historicalWork(work,titles){
   estimateDays:work.estimateDays,durationUnit:work.durationUnit,calendarBasis:revisionCalendar(work.calendarBasis),
   predecessors:revisionPredecessors(work.predecessors),
   predecessorTitles:revisionPredecessors(work.predecessors).map(id=>titles.get(id)??id),
-  critical:work.critical,floatDays:work.floatDays??null,assignment:work.assignment??null};
+  critical:work.critical,floatDays:work.floatDays??null,assignment:work.assignment?{...work.assignment}:null};
 }
 function historicalWorks(baseline){
  const titles=new Map(baseline.work.map(w=>[w.id,w.title]));
