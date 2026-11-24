@@ -187,8 +187,8 @@ export function editorSpec(project,action,snapshot=null){
   const dateAction=(change.planAmendments||[]).find(a=>a.kind==="dates");
   const context="Корректировки фиксируются в заявке до утверждения; текущий план пока не меняется.";
   if(kind==="amend-dates")return {title:"Изменить плановые даты: "+change.title,hint:context,fields:[
-   field("startDate","Плановое начало","date",dateAction?.after.startDate??project.startDate??"",false),
-   field("dueDate","Контрольный срок","date",dateAction?.after.dueDate??project.dueDate??"",false)
+   field("startDate","Плановое начало","date",dateAction?(dateAction.after.startDate??""):(project.startDate??""),false),
+   field("dueDate","Контрольный срок","date",dateAction?(dateAction.after.dueDate??""):(project.dueDate??""),false)
   ]};
   if(kind==="amend-work"){
    if(!project.items.length)throw Error("В проекте пока нет работ");

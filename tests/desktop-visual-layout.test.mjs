@@ -128,15 +128,17 @@ test('desktop workbench actually mounts existing Gantt/DAG and preserves real ed
  assert.doesNotMatch(entry,/className="timeline-line"/);
 });
 
-test("R3 impact preview exposes all affected projects and resources",()=>{
- const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
- assert.match(ui,/const \[projectLimit,setProjectLimit\]=useState\(40\)/);
- assert.match(ui,/const \[resourceLimit,setResourceLimit\]=useState\(30\)/);
- assert.match(ui,/result\.rows\.slice\(0,projectLimit\)/);
- assert.match(ui,/result\.resourceRows\.slice\(0,resourceLimit\)/);
- assert.match(ui,/Показать ещё проекты/);
- assert.match(ui,/Показать ещё ресурсы/);
- assert.match(ui,/Строк последствий: \{result\.rows\.length\}/);
+test("R3 impact preview exposes all affected projects, works and resources",()=>{
+ const main=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
+ const ui=readFileSync(new URL("../desktop/src/PlanAlternativesComparison.tsx",import.meta.url),"utf8");
+ assert.match(main,/<AmendmentAnalysis key=\{changeId\} result=\{calculation.result\}\/>/);
+ assert.match(ui,/result\.rows\.slice\(0,projects\)/);
+ assert.match(ui,/result\.workRows\.slice\(0,works\)/);
+ assert.match(ui,/result\.resourceRows\.slice\(0,resources\)/);
+ assert.match(ui,/Ещё проекты/);
+ assert.match(ui,/Ещё работы/);
+ assert.match(ui,/Ещё ресурсы/);
+ assert.match(ui,/result\.rows\.length/);
 });
 
 test("R4 plan amendments show concrete before/after changes and allow removal before approval",()=>{

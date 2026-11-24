@@ -202,6 +202,47 @@ export function resourceConflictDifference(before,after,{offset=0,limit=4}={}){
  return {resourceId:before.id,resourceLabel:before.label,offset,limit,count,totals,rows};
 }
 
+// Shared impact projections for resource sequence and multi-Work amendments.
+export function planningResourceTotals(view){
+ return {overloadDays:view.people.reduce((n,r)=>n+r.overloadDays,0),
+  unavailableDays:view.people.reduce((n,r)=>n+r.unavailableDays,0),
+  overloadPctDays:view.people.reduce((n,r)=>n+r.overloadPctDays,0),
+  unavailablePctDays:view.people.reduce((n,r)=>n+r.unavailablePctDays,0),
+  overloaded:view.totals.potentialConflicts,unavailable:view.totals.outsideAvailability,
+  undated:view.totals.undated,unlinked:view.totals.unlinked};
+}
+export function comparePlanningResourceGroups(before,after){
+ const changes=[];
+ for(const old of before.people){
+  const next=after.byId.get(old.id);
+  if(!next)throw Error('Ресурс исчез из расчёта');
+  const overloadDelta=next.overloadDays-old.overloadDays;
+  const availabilityDelta=next.unavailableDays-old.unavailableDays;
+  const peakDelta=next.maxLoadPct-old.maxLoadPct;
+  const overloadDepthDelta=next.overloadPctDays-old.overloadPctDays;
+  const availabilityDepthDelta=next.unavailablePctDays-old.unavailablePctDays;
+  const undatedDelta=next.undatedWork-old.undatedWork;
+  const periodChanges=old.overloadDays||next.overloadDays||old.unavailableDays||next.unavailableDays?
+   resourceConflictDifference(old,next,{limit:3}):null;
+  const dates=periodChanges?.totals??{NEW:0,CLEARED:0,WORSENED:0,RELIEVED:0,CHANGED_KIND:0};
+  if(!overloadDelta&&!availabilityDelta&&!peakDelta&&!undatedDelta&&!overloadDepthDelta&&!availabilityDepthDelta&&!periodChanges?.count)continue;
+  changes.push({id:old.id,label:old.label,overloadBefore:old.overloadDays,
+   overloadAfter:next.overloadDays,availabilityBefore:old.unavailableDays,
+   availabilityAfter:next.unavailableDays,peakBefore:old.maxLoadPct,
+   peakAfter:next.maxLoadPct,undatedBefore:old.undatedWork,undatedAfter:next.undatedWork,
+   overloadDelta,availabilityDelta,peakDelta,undatedDelta,overloadDepthDelta,availabilityDepthDelta,
+   overloadDepthBefore:old.overloadPctDays,overloadDepthAfter:next.overloadPctDays,
+   availabilityDepthBefore:old.unavailablePctDays,availabilityDepthAfter:next.unavailablePctDays,
+   periodChanges,
+   worsened:overloadDelta>0||availabilityDelta>0||undatedDelta>0||overloadDepthDelta>0||availabilityDepthDelta>0||
+    next.peakExcessPct>old.peakExcessPct||dates.NEW>0||dates.WORSENED>0||dates.CHANGED_KIND>0,
+   improved:overloadDelta<0||availabilityDelta<0||undatedDelta<0||overloadDepthDelta<0||availabilityDepthDelta<0||
+    next.peakExcessPct<old.peakExcessPct||dates.CLEARED>0||dates.RELIEVED>0});
+ }
+ return changes.sort((a,b)=>Number(b.worsened)-Number(a.worsened)||
+  Math.abs(b.overloadDelta)+Math.abs(b.availabilityDelta)-
+  Math.abs(a.overloadDelta)-Math.abs(a.availabilityDelta)||a.label.localeCompare(b.label,'ru'));
+}
 // The single capacity summarizer is also used for a hypothetical reassignment.
 // It consumes the canonical occupied intervals, never recalculates the CPM.
 function summarizeResourceGroup(r){

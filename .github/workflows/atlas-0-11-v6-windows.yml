@@ -15,6 +15,7 @@ on:
       - 'desktop/src/AtlasInspectorPreview.tsx'
       - 'desktop/src/ProjectOrganizationGuide.tsx'
       - 'desktop/src/ResourceAlternatives.tsx'
+      - 'desktop/src/PlanAlternativesComparison.tsx'
       - 'desktop/src/inspector-work-context.mjs'
       - 'desktop/src/style.css'
       - 'desktop/index.html'
@@ -121,6 +122,17 @@ jobs:
           }
           "ATLAS12_RESOURCE_ALTERNATIVES_IWXA=$archive" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
+      - name: Prepare independent multi-Work amendment IWXA
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $archive = Join-Path $env:RUNNER_TEMP 'atlas12-plan-alternatives.iwxa'
+          node tests/fixtures/atlas12-plan-alternatives.mjs $archive
+          if ($LASTEXITCODE -ne 0 -or !(Test-Path -LiteralPath $archive)) {
+            throw 'ATLAS12_PLAN_ALTERNATIVES_FIXTURE_FAILED'
+          }
+          "ATLAS12_PLAN_ALTERNATIVES_IWXA=$archive" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
       - name: Qualify installed native UI with Windows accessibility API
         shell: pwsh
         timeout-minutes: 25
@@ -128,7 +140,7 @@ jobs:
           $ErrorActionPreference = 'Stop'
           python -m pip install pywinauto==0.6.9 pillow==11.3.0
           if ($LASTEXITCODE -ne 0) { throw 'ATLAS11_NATIVE_UIA_MISSING' }
-          python -m py_compile desktop/tests/installed-atlas11-v6-design.py desktop/tests/installed-atlas11-portfolio-impact.py desktop/tests/installed-atlas12-resource-alternatives.py
+          python -m py_compile desktop/tests/installed-atlas11-v6-design.py desktop/tests/installed-atlas11-portfolio-impact.py desktop/tests/installed-atlas12-resource-alternatives.py desktop/tests/installed-atlas12-plan-alternatives.py
           if ($LASTEXITCODE -ne 0) { throw 'ATLAS11_NATIVE_SCRIPT_SYNTAX' }
           python desktop/tests/installed-atlas11-v6-design.py
           if ($LASTEXITCODE -ne 0) { throw 'ATLAS11_NATIVE_V6_USER_ROUTE_FAIL' }
@@ -136,6 +148,14 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'ATLAS11_NATIVE_PORTFOLIO_IMPACT_FAIL' }
           python desktop/tests/installed-atlas12-resource-alternatives.py
           if ($LASTEXITCODE -ne 0) { throw 'ATLAS12_NATIVE_RESOURCE_ALTERNATIVES_FAIL' }
+
+      - name: Qualify multi-Work scenarios, approved plan application and cold restore
+        shell: pwsh
+        timeout-minutes: 12
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python desktop/tests/installed-atlas12-plan-alternatives.py
+          if ($LASTEXITCODE -ne 0) { throw 'ATLAS12_NATIVE_PLAN_ALTERNATIVES_FAIL' }
 
       - name: Preserve accepted development installer and SHA-256
         if: success()

@@ -2,7 +2,8 @@
 // Preview reuses the single CPM / portfolio dependency projection; no task execution.
 import {validate} from "./core.mjs";
 import {portfolioSchedule} from "./portfolio-schedule.mjs";
-import {portfolioResources} from "./portfolio-resources.mjs";
+import {portfolioResources,planningResourceTotals,comparePlanningResourceGroups} from "./portfolio-resources.mjs";
+import {scheduleProject} from "./planning.mjs";
 import {planReviewQueue} from "./plan-review.mjs";
 
 const esc = x => String(x ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -70,9 +71,12 @@ export function setPlanWork(snapshot,projectId,changeId,{itemId,estimateDays,ass
  return mutableDraft(snapshot,projectId,changeId,(project,change)=>{
   const item=project.items.find(x=>x.id===itemId);
   if(!item)throw Error("Работа для изменения не найдена");
-  const before=workFields(item),after={estimateDays,assignee:String(assignee??"").trim(),dueDate:dueDate||null,
-   resourceId:resourceId===""?null:resourceId??item.resourceId??null,allocationPct:allocationPct??item.allocationPct??100};
-  if(same(amendableWorkFields(item),after))throw Error("Укажите изменённый срок, длительность или ответственного");
+  const before=workFields(item),after={estimateDays,
+   assignee:assignee===undefined?item.assignee||"":String(assignee??"").trim(),
+   dueDate:dueDate===undefined?item.dueDate??null:dueDate||null,
+   resourceId:resourceId===undefined?item.resourceId??null:resourceId||null,
+   allocationPct:allocationPct??item.allocationPct??100};
+  if(same(amendableWorkFields(item),after))throw Error("Укажите изменение срока, длительности, ответственного или планового ресурса");
   upsert(change,{kind:"work",itemId,before,after});
   change.targetIds=[...new Set([...(change.targetIds||[]),...(item.targetIds||[])])];
  });
@@ -129,42 +133,167 @@ function applyToProject(project,change,actions) {
   });
  }
 }
-export function previewPlanAmendment(snapshot,projectId,changeId) {
+const dateDelta=(before,after)=>before&&after?
+ (Date.parse(after+"T00:00:00Z")-Date.parse(before+"T00:00:00Z"))/86400000:null;
+const slip=(due,finish)=>due&&finish?Math.max(0,dateDelta(due,finish)):null;
+
+function amendmentPlanningContext(snapshot){
+ const forecast=portfolioSchedule(snapshot);
+ return {forecast,resources:portfolioResources(snapshot,{schedule:forecast})};
+}
+// Exact project-adjusted CPM rows. A paused project or an unknown upstream
+// finish must not acquire fabricated dates or critical-path claims.
+function amendmentWorkPlan(snapshot,project,forecast){
+ if(!forecast?.projectedStart||!forecast.projectedFinish)return new Map();
+ const plan=scheduleProject(project,{calendarLibrary:snapshot.calendarLibrary??[],
+  startDate:forecast.projectedStart});
+ if(plan.estimatedFinish!==forecast.projectedFinish)throw Error("Расчёты плана и портфеля различаются");
+ return new Map(plan.rows.map(row=>[row.id,row]));
+}
+function workProjection(item,row){
+ if(!item)return null;
+ return {start:row?.startDate??null,finish:row?.finishDate??null,
+  critical:row?.critical??null,floatDays:row?.floatDays??null,
+  estimateDays:item.estimateDays??1,durationUnit:item.durationUnit??"elapsed_days",
+  dueDate:item.dueDate??null,slipDays:slip(item.dueDate,row?.finishDate),
+  assignee:item.assignee||"",resourceId:item.resourceId??null,allocationPct:item.allocationPct??100};
+}
+function amendmentWorkComparison(snapshot,candidate,ids,before,after){
+ const workRows=[],workSummary={affected:0,moved:0,criticalChanged:0,
+  reserveReduced:0,newlyLate:0,worsenedLate:0,resolvedLate:0,
+  controlChanged:0,newlyUndated:0,added:0,unknown:0};
+ const beforeProjects=new Map(snapshot.projects.map(p=>[p.id,p]));
+ const afterProjects=new Map(candidate.projects.map(p=>[p.id,p]));
+ const resourceLabels=new Map((snapshot.resources??[]).map(r=>[r.id,r.label]));
+ for(const projectId of ids){
+  const p=beforeProjects.get(projectId),next=afterProjects.get(projectId);
+  const oldPlan=amendmentWorkPlan(snapshot,p,before.byId.get(projectId));
+  const nextPlan=amendmentWorkPlan(candidate,next,after.byId.get(projectId));
+  const previous=new Map(p.items.map(w=>[w.id,w]));
+  const baseline=p.planBaselines?.at(-1)??null;
+  const reference=new Map((baseline?.work??[]).map(w=>[w.id,w]));
+  for(const item of next.items){
+   const prior=previous.get(item.id),historical=reference.get(item.id);
+   const a=workProjection(prior,oldPlan.get(item.id));
+   const b=workProjection(item,nextPlan.get(item.id));
+   if(!b.finish)workSummary.unknown++;
+   if(a&&same(a,b))continue;
+   const controlChanged=Boolean(a&&a.dueDate!==b.dueDate);
+   const shiftDays=dateDelta(a?.finish,b.finish);
+   const startShiftDays=dateDelta(a?.start,b.start);
+   const criticalChanged=a?.critical!=null&&b.critical!=null&&a.critical!==b.critical;
+   const reserveReduced=a?.floatDays!=null&&b.floatDays!=null&&b.floatDays<a.floatDays;
+   // Changing/removing a deadline must never masquerade as fixing a missed date.
+   const comparableDeadline=Boolean(a&&!controlChanged&&a.slipDays!==null&&b.slipDays!==null);
+   const newlyLate=Boolean(comparableDeadline&&a.slipDays===0&&b.slipDays>0);
+   const worsenedLate=Boolean(comparableDeadline&&a.slipDays>0&&b.slipDays>a.slipDays);
+   const resolvedLate=Boolean(comparableDeadline&&a.slipDays>0&&b.slipDays===0);
+   const newlyUndated=Boolean(a?.finish&&!b.finish);
+   workSummary.affected++;
+   if(shiftDays||startShiftDays)workSummary.moved++;
+   if(!a)workSummary.added++;
+   if(criticalChanged)workSummary.criticalChanged++;
+   if(reserveReduced)workSummary.reserveReduced++;
+   if(newlyLate)workSummary.newlyLate++;
+   if(worsenedLate)workSummary.worsenedLate++;
+   if(resolvedLate)workSummary.resolvedLate++;
+   if(controlChanged)workSummary.controlChanged++;
+   if(newlyUndated)workSummary.newlyUndated++;
+   workRows.push({projectId,projectName:p.name,workId:item.id,title:item.title,before:a,after:b,
+    baselineName:baseline?.name??null,baselineFinish:historical?.finishDate??null,
+    baselineDueDate:historical?.dueDate??null,
+    beforeResource:resourceLabels.get(a?.resourceId)??null,afterResource:resourceLabels.get(b.resourceId)??null,
+    shiftDays,startShiftDays,criticalChanged,reserveReduced,controlChanged,newlyLate,worsenedLate,resolvedLate,newlyUndated,
+    beforeBaselineShift:dateDelta(historical?.finishDate,a?.finish),
+    afterBaselineShift:dateDelta(historical?.finishDate,b.finish)});
+  }
+ }
+ workRows.sort((a,b)=>Number(b.newlyUndated)-Number(a.newlyUndated)||
+  Number(b.newlyLate||b.worsenedLate)-Number(a.newlyLate||a.worsenedLate)||
+  Number(b.controlChanged)-Number(a.controlChanged)||Number(b.reserveReduced)-Number(a.reserveReduced)||
+  Math.abs(b.shiftDays??0)-Math.abs(a.shiftDays??0)||
+  a.projectName.localeCompare(b.projectName,"ru")||a.title.localeCompare(b.title,"ru")||
+  a.projectId.localeCompare(b.projectId)||a.workId.localeCompare(b.workId));
+ return {workRows,workSummary};
+}
+
+function forecastAmendment(snapshot,projectId,changeId,context){
  const {actions}=checkPlanAmendment(snapshot,projectId,changeId);
- const before=portfolioSchedule(snapshot),beforeResources=portfolioResources(snapshot);
+ const {forecast:before,resources:beforeResources}=context;
  const candidate=structuredClone(snapshot);
  const {project,change}=find(candidate,projectId,changeId);
  applyToProject(project,change,actions);
- // Ephemeral what-if: proposed work is intentionally not yet applied in the real snapshot.
+ // Only the ephemeral candidate is modified; all proposed amendments remain
+ // independently recorded on the original change and original snapshot.
  change.planAmendments=[];
  validate(candidate);
- const after=portfolioSchedule(candidate),afterResources=portfolioResources(candidate);
+ const after=portfolioSchedule(candidate),afterResources=portfolioResources(candidate,{schedule:after});
  const affected=new Set([projectId]),links=snapshot.portfolioLinks||[];
+ const outgoing=new Map(snapshot.projects.map(p=>[p.id,[]]));
+ for(const edge of links)outgoing.get(edge.from).push(edge.to);
  const queue=[projectId];
- for(let i=0;i<queue.length;i++)for(const edge of links)if(edge.from===queue[i]&&!affected.has(edge.to)){
-  affected.add(edge.to);queue.push(edge.to);
+ for(let i=0;i<queue.length;i++)for(const id of outgoing.get(queue[i]))if(!affected.has(id)){
+  affected.add(id);queue.push(id);
  }
+ const projects=new Map(snapshot.projects.map(p=>[p.id,p]));
  const rows=before.rows.filter(r=>affected.has(r.id)).map(r=>{
-  const updated=after.byId.get(r.id);
+  const updated=after.byId.get(r.id),baseline=projects.get(r.id).planBaselines?.at(-1)??null;
   return {id:r.id,name:r.name,downstream:r.id!==projectId,
    beforeStart:r.projectedStart,afterStart:updated.projectedStart,
    beforeFinish:r.projectedFinish,afterFinish:updated.projectedFinish,
    beforeDeadline:r.deadline,afterDeadline:updated.deadline,
    beforeSlip:r.deadlineSlipDays,afterSlip:updated.deadlineSlipDays,
    beforeDuration:r.durationDays,afterDuration:updated.durationDays,
+   baselineName:baseline?.name??null,baselineFinish:baseline?.forecastFinish??null,
+   baselineDeadline:baseline?.deadline??null,
+   beforeBaselineShift:dateDelta(baseline?.forecastFinish,r.projectedFinish),
+   afterBaselineShift:dateDelta(baseline?.forecastFinish,updated.projectedFinish),
    changed:r.projectedStart!==updated.projectedStart||r.projectedFinish!==updated.projectedFinish||
-    r.deadline!==updated.deadline||r.durationDays!==updated.durationDays};
+    r.deadline!==updated.deadline||r.durationDays!==updated.durationDays||
+    r.deadlineSlipDays!==updated.deadlineSlipDays};
  });
- const resourceRows=[...new Set([...beforeResources.byId.keys(),...afterResources.byId.keys()])].map(id=>{
-  const prior=beforeResources.byId.get(id),next=afterResources.byId.get(id);
-  return {id,label:next?.label||prior?.label||"Плановый ресурс",
-   beforeOverload:prior?.overloadDays??0,afterOverload:next?.overloadDays??0,
-   beforeUnavailable:prior?.unavailableDays??0,afterUnavailable:next?.unavailableDays??0,
-   beforeMaxLoad:prior?.maxLoadPct??0,afterMaxLoad:next?.maxLoadPct??0};
- }).filter(r=>r.beforeOverload!==r.afterOverload||r.beforeUnavailable!==r.afterUnavailable||
-  r.beforeMaxLoad!==r.afterMaxLoad);
- return {rows,resourceRows,changed:rows.filter(r=>r.changed).length,affected:rows.length,actions:actions.length};
+ const resourceRows=comparePlanningResourceGroups(beforeResources,afterResources).map(r=>({...r,
+  beforeOverload:r.overloadBefore,afterOverload:r.overloadAfter,
+  beforeUnavailable:r.availabilityBefore,afterUnavailable:r.availabilityAfter,
+  beforeMaxLoad:r.peakBefore,afterMaxLoad:r.peakAfter}));
+ const resourceBefore=planningResourceTotals(beforeResources),resourceAfter=planningResourceTotals(afterResources);
+ const work=amendmentWorkComparison(snapshot,candidate,affected,before,after);
+ const projectSummary={
+  newlyLate:rows.filter(r=>r.beforeDeadline===r.afterDeadline&&r.beforeSlip===0&&r.afterSlip>0).length,
+  worsenedLate:rows.filter(r=>r.beforeDeadline===r.afterDeadline&&r.beforeSlip>0&&r.afterSlip>r.beforeSlip).length,
+  resolvedLate:rows.filter(r=>r.beforeDeadline===r.afterDeadline&&r.beforeSlip>0&&r.afterSlip===0).length,
+  controlChanged:rows.filter(r=>r.beforeDeadline!==r.afterDeadline).length,
+  unknown:rows.filter(r=>!r.afterFinish).length
+ };
+ return {rows,resourceRows,resourceBefore,resourceAfter,projectSummary,...work,
+  changed:rows.filter(r=>r.changed).length,affected:rows.length,actions:actions.length};
 }
+export function previewPlanAmendment(snapshot,projectId,changeId) {
+ return forecastAmendment(snapshot,projectId,changeId,amendmentPlanningContext(snapshot));
+}
+
+/**
+ * Compare exactly two independent existing unapplied change proposals on
+ * the SAME current portfolio. No new scenario store or automatically selected
+ * decision. An invalid/stale option does not erase the other option.
+ */
+export function comparePlanAmendments(snapshot,projectId,firstId,secondId){
+ if(!firstId||!secondId||firstId===secondId)throw Error("Выберите две разные заявки");
+ const project=snapshot.projects.find(p=>p.id===projectId);
+ if(!project)throw Error("Проект не найден");
+ const context=amendmentPlanningContext(snapshot);
+ const options=[firstId,secondId].map(id=>{
+  const change=(project.changes??[]).find(c=>c.id===id);
+  const identity={id,title:change?.title??"Заявка не найдена",status:change?.status??null};
+  try{
+   if(!change||change.planAppliedAt||!["proposed","deferred","approved","in_progress"].includes(change.status))
+    throw Error("Заявка больше недоступна для сравнения");
+   return {...identity,valid:true,preview:forecastAmendment(snapshot,projectId,id,context)};
+  }catch(error){return {...identity,valid:false,reason:error instanceof Error?error.message:"Сценарий недоступен"};}
+ });
+ return {projectId,revision:snapshot.revision,options};
+}
+
 export function applyPlanAmendment(snapshot,projectId,changeId) {
  const {change}=checkPlanAmendment(snapshot,projectId,changeId);
  if(!["approved","in_progress"].includes(change.status))

@@ -19,7 +19,8 @@ import {startWorkCorrection,continueWorkCorrection,beginCrossProjectWorkReturn,a
 import {portfolioSchedule,projectedFinishLabel} from "../../src/portfolio-schedule.mjs";
 import {capturePlanBaseline,comparePlanBaseline} from "../../src/plan-baseline.mjs";
 import {projectScreenSchedule} from "../../src/project-schedule-view.mjs";
-import {portfolioResources} from "../../src/portfolio-resources.mjs";
+import {portfolioResources,resourceWorkConflicts} from "../../src/portfolio-resources.mjs";
+import {PlanAlternativesComparison,AmendmentAnalysis} from "./PlanAlternativesComparison";
 import {planReviewQueue,planReviewAction,planProposalAction} from "../../src/plan-review.mjs";
 import {revisionReview,recheckAction} from "../../src/revision-review.mjs";
 import {previewPlanAmendment,applyPlanAmendment,removePlanAmendment} from "../../src/plan-amendment.mjs";
@@ -557,6 +558,15 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const native=embedded||isTauri();
  const dates=useMemo(()=>portfolioSchedule(data),[data]);
  const resources=useMemo(()=>portfolioResources(data,{schedule:dates} as any),[data,dates]);
+ const projectResourceConflictIndex=useMemo(()=>{
+  const index=new Map<string,{overloadDays:number;unavailableDays:number}>();
+  if(project&&tab==="resources")for(const id of new Set(project.items.map((w:any)=>w.resourceId).filter(Boolean))){
+   const group=resources.byId.get(id as string);
+   if(group&&(group.overloadDays||group.unavailableDays))
+    for(const [wid,conflict] of resourceWorkConflicts(group,project.id))index.set(wid,conflict);
+  }
+  return index;
+ },[project,resources,tab]);
  const reviews=useMemo(()=>planReviewQueue(data),[data]);
  const sourceQueue=useMemo(()=>publicSourceQueue(data),[data]);
  const ecosystem=useMemo(()=>githubPortfolioOverview(data),[data]);
@@ -3365,9 +3375,14 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     {tab==="changes"&&<section className="surface"><div className="section-heading"><div><h2>Предложения и утверждённые изменения</h2>
      <p>Утверждение - отдельное решение человека. Применение конкретного плана также требует подтверждения.</p></div>
      <Action onClick={()=>openEditor("proposal")} primary>＋ Предложение</Action></div>
+     <PlanAlternativesComparison key={project.id} snapshot={data} projectId={project.id}
+      onOpenChange={changeId=>{
+       if(!requireClosedForm()||busyRef.current)return;
+       setForecastId(changeId);setChangeJump({projectId:project.id,changeId});
+      }}/>
      {(project.changes||[]).slice().reverse().map((c:any)=><div className="change-card" key={c.id}
       tabIndex={-1} ref={c.id===changeJump?.changeId?changeCardRef:undefined}
-      aria-label={"Изменение: "+c.title+" — "+project.name}>
+      role="group" aria-label={"Изменение: "+c.title+" — "+project.name}>
       <div className="section-heading"><div><h3>{c.title}</h3><p>{c.description}</p></div><Badge>{decisionStatus[c.status]||c.status}</Badge></div>
       <div className="button-row">
        {["proposed","deferred","approved","in_progress"].includes(c.status)&&<Action onClick={()=>openEditor("change:"+c.id)}>Решение</Action>}
@@ -3387,16 +3402,20 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
        <tbody>{c.planAmendments.map((a:any,i:number)=>{
         const key=a.kind==="dates"?"dates":a.kind==="work"?"work:"+a.itemId:"new_work:"+a.id;
         const item=a.kind==="work"?project.items.find((w:any)=>w.id===a.itemId):null;
+        const assignment=(w:any)=>" · ресурс: "+(resources.byId.get(w.resourceId)?.label||"не назначен")+
+         " · доля: "+(w.allocationPct??100)+"%";
         const before=a.kind==="dates"?
          "Начало: "+readable(a.before.startDate)+" · срок: "+readable(a.before.dueDate):
          a.kind==="work"?
-         (a.before.estimateDays??1)+" дн. · срок: "+readable(a.before.dueDate):
+         (a.before.estimateDays??1)+(a.before.durationUnit==="working_days"?" раб. дн.":" кал. дн.")+
+          " · срок: "+readable(a.before.dueDate)+assignment(a.before):
          "Работа отсутствует";
         const after=a.kind==="dates"?
          "Начало: "+readable(a.after.startDate)+" · срок: "+readable(a.after.dueDate):
          a.kind==="work"?
-         (a.after.estimateDays??1)+" дн. · срок: "+readable(a.after.dueDate):
-         (a.estimateDays??1)+" дн. · срок: "+readable(a.dueDate);
+         (a.after.estimateDays??1)+(a.before.durationUnit==="working_days"?" раб. дн.":" кал. дн.")+
+          " · срок: "+readable(a.after.dueDate)+assignment(a.after):
+         (a.estimateDays??1)+" кал. дн. · срок: "+readable(a.dueDate)+assignment(a);
         return <tr key={key+"-"+i}>
          <td>{a.kind==="dates"?"Даты проекта":a.kind==="work"?"Работа: "+(item?.title||"Не найдена"):"Новая работа: "+a.title}</td>
          <td>{before}</td><td>{after}</td>
@@ -3414,9 +3433,13 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      <div className="table-scroll"><table><thead><tr><th>Работа</th><th>Назначение</th><th>Доля</th><th>Начало</th><th>Завершение</th><th>Ограничение</th></tr></thead><tbody>
       {resources.work.filter((r:any)=>r.projectId===project.id).map((r:any)=>{
        const usage=resources.byId.get(r.resourceId);
+       const conflict=projectResourceConflictIndex.get(r.id);
        return <tr key={r.id}><td><button className="text-link" onClick={()=>openEditor("work:"+r.id)}>{r.title}</button></td>
         <td>{usage?.label||"Не привязан"}</td><td>{r.allocationPct}%</td><td>{readable(r.startDate)}</td><td>{readable(r.finishDate)}</td>
-        <td>{!usage?"Требует назначения":usage.overloadDays?"Превышение мощности: "+usage.overloadDays+" дн.":"Не подтверждена фактическая доступность"}</td></tr>})}</tbody></table></div>
+        <td>{!usage?"Нет плановой привязки":!r.startDate?"Даты не определены":
+         conflict?.overloadDays||conflict?.unavailableDays?
+          "Перегрузка: "+(conflict?.overloadDays??0)+" дн.; вне доступности: "+(conflict?.unavailableDays??0)+" дн.":
+          "По известным датам конфликтов нет"}</td></tr>})}</tbody></table></div>
     </section>}
     {tab==="history"&&<section className="surface"><div className="section-heading"><div><h2>История решений и фактов</h2>
       <p>История не равна независимой приёмке результата. Все записи доступны без ограничения первыми 120.</p></div>
@@ -3897,31 +3920,13 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
 function AmendmentForecast({state,projectId,changeId,onApply,canApply,onError}:{
  state:Atlas;projectId:string;changeId:string;onApply:()=>void;canApply:boolean;onError:(e:unknown)=>void
 }){
- const [projectLimit,setProjectLimit]=useState(40);
- const [resourceLimit,setResourceLimit]=useState(30);
- let result:any;
- try{result=previewPlanAmendment(state,projectId,changeId)}catch(e){
-  return <p className="error" role="alert">Сценарий не может быть применён: {deepFreezeError(e)}</p>
- }
+ const calculation=useMemo(()=>{
+  try{return {result:previewPlanAmendment(state,projectId,changeId)}}
+  catch(error){return {error:deepFreezeError(error)}}
+ },[state,projectId,changeId]);
+ if("error" in calculation)return <p className="error" role="alert">Сценарий не может быть применён: {calculation.error}</p>;
  return <div className="forecast">
-  <h4>Последствия относительно текущего плана</h4>
-  <p className="minor">Это предварительная оценка, не разрешение на изменение. Проектов по цепочке: {result.affected}.
-   Строк последствий: {result.rows.length}. Ресурсов: {result.resourceRows.length}.</p>
-  <div className="table-scroll"><table><thead><tr><th>Проект</th><th>Финиш до</th><th>Финиш после</th><th>Риск срока до/после</th></tr></thead>
-   <tbody>{result.rows.slice(0,projectLimit).map((r:any)=><tr key={r.id}><td>{r.name}</td>
-    <td>{readable(r.beforeFinish)}</td><td>{readable(r.afterFinish)}</td>
-    <td>{r.beforeSlip??"?"} / {r.afterSlip??"?"}</td></tr>)}</tbody></table></div>
-  <p className="minor">Показано {Math.min(projectLimit,result.rows.length)} из {result.rows.length} проектов.</p>
-  {result.rows.length>projectLimit&&<Action onClick={()=>setProjectLimit(n=>Math.min(result.rows.length,n+40))}>
-   Показать ещё проекты ({result.rows.length-projectLimit})</Action>}
-  {result.resourceRows.length>0&&<div className="table-scroll"><h4>Последствия для ресурсов</h4>
-   <table><thead><tr><th>Ресурс</th><th>Максимум до / после</th><th>Дни перегрузки</th></tr></thead><tbody>
-    {result.resourceRows.slice(0,resourceLimit).map((r:any)=><tr key={r.id}><td>{r.label}</td><td>{r.beforeMaxLoad}% / {r.afterMaxLoad}%</td>
-     <td>{r.beforeOverload} / {r.afterOverload}</td></tr>)}</tbody></table>
-   <p className="minor">Показано {Math.min(resourceLimit,result.resourceRows.length)} из {result.resourceRows.length} ресурсов.</p>
-   {result.resourceRows.length>resourceLimit&&<Action onClick={()=>setResourceLimit(n=>Math.min(result.resourceRows.length,n+30))}>
-    Показать ещё ресурсы ({result.resourceRows.length-resourceLimit})</Action>}
-  </div>}
+  <AmendmentAnalysis key={changeId} result={calculation.result}/>
   {canApply&&<Action onClick={onApply} primary>Применить утверждённый план</Action>}
  </div>;
 }

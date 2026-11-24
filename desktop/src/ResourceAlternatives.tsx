@@ -97,7 +97,10 @@ function ResourceSequencePanel({snapshot,forecast,resources,period,onOpenSequenc
      ' → '+option.after.overloadDays+' дн. Финиш проекта: '+
      (option.project.beforeFinish||'не определён')+' → '+(option.project.afterFinish||'не определён')+'.';
     return <div className="atlas-resource-option" key={option.from}>
-     <div><strong>{title}</strong><small role="status" aria-label={summary}>{summary}</small>
+     <div><strong>{title}</strong>
+      <button type="button" className="action-button atlas-sequence-open"
+       aria-label={'Открыть порядок '+title} onClick={()=>onOpenSequence(option.projectId,option)}>Открыть зависимость</button>
+      <small role="status" aria-label={summary}>{summary}</small>
       <small>{'Вне доступности по портфелю: '+option.before.unavailableDays+' → '+option.after.unavailableDays+' дн.'}</small>
       <small>{'Превышение мощности: '+option.before.overloadPctDays+' → '+option.after.overloadPctDays+' п. п.·дн.; нагрузка вне доступности: '+option.before.unavailablePctDays+' → '+option.after.unavailablePctDays+' %·дн.'}</small>
       <small>{option.source.label+': перегрузка '+option.source.overloadBefore+' → '+option.source.overloadAfter+' дн.'}</small>
@@ -129,8 +132,6 @@ function ResourceSequencePanel({snapshot,forecast,resources,period,onOpenSequenc
       {option.unknown&&<small>Часть расчётных дат отсутствует.</small>}
       <small>{option.note}</small>
      </div>
-     <button type="button" aria-label={'Открыть порядок '+title}
-      onClick={()=>onOpenSequence(option.projectId,option)}>Открыть зависимость</button>
     </div>;
    })}
   </div>}

@@ -1769,3 +1769,22 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .atlas-resource-sequence .atlas-resource-period-nav button{max-width:100%;white-space:normal;overflow-wrap:anywhere;text-align:left}
 .atlas-resource-sequence .atlas-resource-option{background:#fff}
 .atlas-resource-sequence .atlas-resource-options-toggle:disabled{opacity:.55;cursor:default}
+
+/* Atlas 0.12: decision first, expandable details in the same changes view. */
+.atlas-sequence-open{margin:6px 0 4px;max-width:100%;white-space:normal}
+.atlas-plan-alternatives{border:1px solid #c5d9ec;border-radius:8px;padding:10px;margin:10px 0;background:#f4f8fd;min-width:0}
+.atlas-plan-alternatives h3,.atlas-amendment-analysis h4{margin:0 0 6px;color:#245480;font-size:13px}
+.atlas-plan-alternatives p,.atlas-amendment-analysis p{font-size:11px;line-height:1.45}
+.atlas-plan-choice-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:8px 0}
+.atlas-plan-choice-fields label{display:flex;flex-direction:column;gap:3px;min-width:0;font-size:11px}
+.atlas-plan-choice-fields select{width:100%;min-width:0;max-width:100%;font-size:12px}
+.atlas-amendment-rows{display:grid;gap:6px}
+.atlas-amendment-row{border:1px solid #d5e3ef;background:#fff;border-radius:6px;padding:8px;min-width:0;overflow-wrap:anywhere}
+.atlas-amendment-row strong,.atlas-amendment-row small{display:block;font-size:11px;line-height:1.45}
+.atlas-amendment-row small{font-size:10px;color:#526c84;margin:3px 0}
+.atlas-amendment-analysis details{margin:8px 0}
+.atlas-amendment-analysis summary{font-size:12px;font-weight:600;cursor:pointer;margin-bottom:6px}
+.atlas-amendment-summary{font-size:11px;color:#245480;line-height:1.5}
+.atlas-plan-comparison-cards{display:grid;gap:8px;grid-template-columns:minmax(0,1fr);margin-top:8px}
+.atlas-plan-comparison-cards>.atlas-amendment-row>button{margin:6px 0}
+@media(max-width:900px){.atlas-plan-choice-fields{grid-template-columns:minmax(0,1fr)}}

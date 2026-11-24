@@ -80,9 +80,22 @@ def find_resource_control(name,role=None,contains=False):
     raise AssertionError('Resource control not physically reachable: '+name)
 
 def click_scrollable_button(name):
-    control=find_resource_control(name,'Button')
-    control.click_input()
-    time.sleep(.35)
+    # A WebView2 UIA rectangle may still describe the previous scroll frame.
+    # Wait for the physical geometry to settle, reacquire by exact name and
+    # use the actual screen centre. No InvokePattern or DOM automation.
+    previous=None
+    for _ in range(8):
+        control=find_resource_control(name,'Button')
+        r=control.rectangle()
+        current=(r.left,r.top,r.right,r.bottom)
+        if previous==current:
+            point=((r.left+r.right)//2,(r.top+r.bottom)//2)
+            mouse.click(coords=point)
+            time.sleep(.45)
+            return
+        previous=current
+        time.sleep(.3)
+    raise AssertionError('Resource action did not settle: '+name)
 
 def reveal_resource_text(name,button):
     # Use the physical viewport when possible; the status must exist in the
@@ -230,6 +243,9 @@ def qualify():
     v.capture('atlas12-resource-sequence-options-820')
     print('ATLAS12_NATIVE_SEQUENCE_ALTERNATIVES_PASS',flush=True)
     click_scrollable_button('Открыть порядок '+first_order)
+    # Check the real native window route, not only the presence of text in
+    # the prior resource panel. Fail on a product error instead of hiding it.
+    d.window_title_contains('Форма:',15)
     d.wait_text('Предшествующая работа для: '+second_work,35)
     d.wait_text('Предложенный порядок: '+first_order+'.',35)
     assert d.head()==saved,'Opening dependency form wrote to Native Store'
