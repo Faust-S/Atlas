@@ -527,6 +527,12 @@ export function renderEditor(spec,esc){
  }).join("");
  return '<section class="card atlas-editor" aria-labelledby="atlas-editor-title"><h2 id="atlas-editor-title">'+esc(spec.title)+'</h2>'+(spec.hint?'<p class="muted">'+esc(spec.hint)+'</p>':"")+'<form id="atlas-editor-form"><div class="atlas-form-grid">'+fields+'</div><div class="row"><button type="submit" class="primary">Сохранить</button><button type="button" data-action="cancel-editor">Отмена</button></div></form></section>';
 }
+/**
+ * Every ordinary editor changes the draft snapshot. Navigation metadata is
+ * optional: creation can identify a project or Work; amendment routes can
+ * identify a proposal and report an already satisfied action.
+ * @returns {{state:any,projectId?:string,workId?:string,changeId?:string|null,removed?:boolean}}
+ */
 export function applyEditor(snapshot,projectId,action,input){
  const get=k=>String(input.get(k)??"").trim();
  const integer=k=>{const raw=get(k);if(!/^\d+$/.test(raw))throw Error("Введите неотрицательное целое число");return Number(raw)};
