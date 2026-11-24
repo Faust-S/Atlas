@@ -136,14 +136,20 @@ export function AmendmentReview({view,onOpenEditor}:{view:any;onOpenEditor:(acti
  </div>;
 }
 
-function revisionWorkText(w:any,resources:Record<string,string>){
+function revisionWorkText(w:any,calendars:Record<string,string>){
  if(!w)return "Работа отсутствует";
  const duration=w.estimateDays+" "+(w.durationUnit==="working_days"?"раб. дн.":"кал. дн.");
- const planned=date(w.start)+" → "+date(w.finish)+"; "+duration+
-  "; срок: "+control(w.deadline)+(w.critical===true?"; критическая":"");
+ const basis=w.calendarBasis;
+ const calendar=basis?"; календарь: "+(calendars[JSON.stringify([basis.id,basis.version])]??"название не сохранено")+
+  ", ред. "+basis.version:"";
+ const predecessors=w.predecessorTitles??[];
+ const sequence=predecessors.length?"; после: "+predecessors.slice(0,4).join(", ")+
+  (predecessors.length>4?" и ещё "+(predecessors.length-4):""):"; без предшественников";
+ const planned=date(w.start)+" → "+date(w.finish)+"; "+duration+calendar+
+  "; срок: "+control(w.deadline)+"; резерв: "+shift(w.floatDays)+(w.critical===true?"; критическая":"")+sequence;
  const assignment=w.assignment;
- return planned+(assignment?"; "+(resources[assignment.resourceId]??"без ресурса")+
-  ", "+assignment.allocationPct+"%; "+(assignment.assignee||"без ответственного"):"");
+ return planned+(assignment?"; "+(assignment.resourceLabel??"без ресурса")+
+  ", "+assignment.allocationPct+"%; "+(assignment.assignee||"без ответственного"):"; назначения не записаны");
 }
 function PlanRevisionComparison({snapshot,projectId,proposals,onOpenChange}:{
  snapshot:any;projectId:string;proposals:any[];onOpenChange:(id:string)=>void}){
@@ -154,14 +160,15 @@ function PlanRevisionComparison({snapshot,projectId,proposals,onOpenChange}:{
  const [onlyChanges,setOnlyChanges]=useState(true);
  const [limit,setLimit]=useState(12);
  const baselines=snapshot.projects.find((p:any)=>p.id===projectId)?.planBaselines??[];
- const selected=baselines.find((b:any)=>b.id===baselineId)??baselines.at(-1);
- const chosen=proposalChoice===null?proposals[0]?.id??"":proposalChoice;
- const proposalId=proposals.some(c=>c.id===chosen)?chosen:"";
+ const referenceId=baselineId||baselines.at(-1)?.id||"";
+ const proposalId=proposalChoice===null?proposals[0]?.id??"":proposalChoice;
+ const missingReference=!!referenceId&&!baselines.some((b:any)=>b.id===referenceId);
+ const missingProposal=!!proposalId&&!proposals.some(c=>c.id===proposalId);
  const result=useMemo(()=>{
-  if(!expanded||!calculate||!selected)return null;
-  try{return {value:comparePlanRevisions(snapshot,projectId,{baselineId:selected.id,changeId:proposalId||null})}}
+  if(!expanded||!calculate||!referenceId)return null;
+  try{return {value:comparePlanRevisions(snapshot,projectId,{baselineId:referenceId,changeId:proposalId||null})}}
   catch(error){return {error:error instanceof Error?error.message:"Сравнение недоступно"}}
- },[snapshot,projectId,expanded,calculate,selected?.id,proposalId]);
+ },[snapshot,projectId,expanded,calculate,referenceId,proposalId]);
  if(!baselines.length)return null;
  const value=result&&"value" in result?result.value:null;
  const rows=value?(onlyChanges?value.rows.filter((r:any)=>r.changed):value.rows):[];
@@ -173,17 +180,19 @@ function PlanRevisionComparison({snapshot,projectId,proposals,onOpenChange}:{
   {expanded&&<>
    <p>Сопоставьте первый сохранённый план, выбранную контрольную редакцию, текущий план и одну заявку. История и план не изменяются.</p>
    <div className="atlas-plan-choice-fields">
-    <label>Контрольная редакция<select aria-label="Редакция для сравнения" value={selected?.id??""}
+    <label>Контрольная редакция<select aria-label="Редакция для сравнения" value={referenceId}
      onChange={e=>{setBaselineId(e.target.value);setCalculate(false);setLimit(12)}}>
+     {missingReference&&<option value={referenceId}>Редакция недоступна</option>}
      {baselines.map((b:any)=><option key={b.id} value={b.id}>{b.version+". "+b.name}</option>)}
     </select></label>
     <label>Предлагаемая редакция<select aria-label="Заявка для сравнения редакций" value={proposalId}
      onChange={e=>{setProposalChoice(e.target.value);setCalculate(false);setLimit(12)}}>
      <option value="">Без заявки</option>
+     {missingProposal&&<option value={proposalId}>Выбранная заявка недоступна</option>}
      {proposals.map(c=><option key={c.id} value={c.id}>{c.title}</option>)}
     </select></label>
    </div>
-   <button type="button" className="action-button primary" onClick={()=>setCalculate(true)}>Рассчитать редакции</button>
+   <button type="button" className="action-button primary" onClick={()=>{setBaselineId(referenceId);setProposalChoice(proposalId);setCalculate(true)}}>Рассчитать редакции</button>
    {result&&"error" in result&&<p role="alert">{result.error}</p>}
    {value&&<>
     <div className="atlas-amendment-row">
@@ -203,7 +212,7 @@ function PlanRevisionComparison({snapshot,projectId,proposals,onOpenChange}:{
     {value.proposal&&<div className="atlas-amendment-row">
      <strong>{value.proposal.title}</strong>
      {!scenario&&<p role="alert">{"Предлагаемая редакция недоступна: "+value.proposal.reason}</p>}
-     <button type="button" className="action-button" onClick={()=>onOpenChange(value.proposal!.id)}>К заявке</button>
+     {value.proposal.status&&<button type="button" className="action-button" onClick={()=>onOpenChange(value.proposal!.id)}>К заявке</button>}
      {scenario&&value.resourceChange&&<small>{"Перегрузка портфеля: "+value.resourceChange.before.overloadDays+
       " → "+value.resourceChange.after.overloadDays+" дн.; вне доступности: "+value.resourceChange.before.unavailableDays+
       " → "+value.resourceChange.after.unavailableDays+" дн."}</small>}
@@ -214,6 +223,7 @@ function PlanRevisionComparison({snapshot,projectId,proposals,onOpenChange}:{
       <strong>{b.version+". "+b.name}</strong>
       <small>{date(b.start)+" → "+date(b.finish)+"; срок: "+control(b.deadline)}</small>
       <small>{"Записано: "+b.recordedAt+"; ревизия "+b.sourceRevision}</small>
+      <small>{"Назначения зафиксированы: "+b.recordedAssignments+" из "+b.workCount+"; резервы: "+b.recordedReserves+" из "+b.workCount}</small>
      </div>)}
     </details>
     {scenario&&value.downstream.length>0&&<details>
@@ -230,17 +240,20 @@ function PlanRevisionComparison({snapshot,projectId,proposals,onOpenChange}:{
       (scenario?"; новых по заявке: "+value.totals.proposedAdded+"; без прогноза в варианте: "+value.totals.undatedProposed:"")}</p>
      <div className="atlas-amendment-rows">{rows.slice(0,limit).map((r:any)=><div className="atlas-amendment-row" key={r.workId}>
       <strong>{r.title}</strong>
-      <small>{"Исходный: "+revisionWorkText(r.original,value.resourceLabels)}</small>
-      {distinct&&<small>{"Контрольный: "+revisionWorkText(r.reference,value.resourceLabels)}</small>}
-      <small>{"Текущий: "+revisionWorkText(r.current,value.resourceLabels)}</small>
-      {scenario&&<small>{"Предлагаемый: "+revisionWorkText(r.proposed,value.resourceLabels)}</small>}
+      <small>{"Исходный: "+revisionWorkText(r.original,value.calendarLabels)}</small>
+      {distinct&&<small>{"Контрольный: "+revisionWorkText(r.reference,value.calendarLabels)}</small>}
+      <small>{"Текущий: "+revisionWorkText(r.current,value.calendarLabels)}</small>
+      {scenario&&<small>{"Предлагаемый: "+revisionWorkText(r.proposed,value.calendarLabels)}</small>}
       <small>{"Накопленный сдвиг: "+shift(r.accumulatedShift)+(scenario?"; эффект заявки: "+shift(r.proposalShift):"")}</small>
+      {r.accumulatedReasons.length>0&&<small>{"От исходного: "+r.accumulatedReasons.join("; ")}</small>}
+      {distinct&&r.referenceReasons.length>0&&<small>{"От контрольного: "+r.referenceReasons.join("; ")}</small>}
+      {scenario&&r.proposalReasons.length>0&&<small>{"Эффект заявки: "+r.proposalReasons.join("; ")}</small>}
       {(r.originalDeadlineChanged||r.referenceDeadlineChanged||r.proposalDeadlineChanged)&&<small>Изменена контрольная дата.</small>}
      </div>)}</div>
      {!rows.length&&<p>Нет различий в сравниваемых работах.</p>}
      {rows.length>limit&&<button type="button" className="action-button" onClick={()=>setLimit(n=>n+12)}>{"Ещё работы ("+(rows.length-limit)+")"}</button>}
     </details>
-    <p className="minor">Первый план означает первую зафиксированную редакцию, а не восстановленное прошлое. Исторические назначения ресурсов и исполнителей не записывались. Расчёт не подтверждает факт или право исполнения.</p>
+    <p className="minor">Первый план означает первую зафиксированную редакцию, а не восстановленное прошлое. В прежних контрольных редакциях назначения и резервы могли не записываться. Неизвестные значения не восстанавливаются. Расчёт не подтверждает факт или право исполнения.</p>
    </>}
   </>}
  </section>;

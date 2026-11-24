@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {editItem,editProject,removeItem,serialize,deserialize} from '../src/core.mjs';
-import {capturePlanBaseline} from '../src/plan-baseline.mjs';
+import {capturePlanBaseline,comparePlanBaseline} from '../src/plan-baseline.mjs';
+import {editPlanningResource} from '../src/resource-planning.mjs';
 import {planChange,decideChange} from '../src/trace.mjs';
 import {comparePlanRevisions,setPlanWork,setPlanDates,addPlanWork,setPlanDependency,previewPlanAmendment,applyPlanAmendment} from '../src/plan-amendment.mjs';
 import {portfolioSchedule} from '../src/portfolio-schedule.mjs';
@@ -29,7 +30,7 @@ test('First, selected, current and proposed revisions separate accumulated and i
  assert.equal(r.proposalShift,-2);assert.equal(r.finalShift,0);assert.equal(r.referenceFinalShift,-1);
  const w=r.rows.find(w=>w.workId===f.firstId);
  assert.deepEqual([w.original.estimateDays,w.reference.estimateDays,w.current.estimateDays,w.proposed.estimateDays],[3,4,5,3]);
- assert.equal(w.proposalShift,-2);assert.equal(w.original.assignment,null);
+ assert.equal(w.proposalShift,-2);assert.equal(w.original.assignment.resourceLabel,'Кран');
  assert.equal(r.downstream.find(p=>p.id===f.dependentId).shiftDays,-2);
  assert.equal(r.resourceChange.after.overloadDays,previewPlanAmendment(f.snapshot,f.projectId,f.proposalId).resourceAfter.overloadDays);
  assert.equal(serialize(f.snapshot),before);
@@ -62,7 +63,7 @@ test('Stale or closed proposals never erase historical/current comparison or pro
  const rejected=decideChange(f.snapshot,f.projectId,f.proposalId,{status:'rejected',rationale:'Не принимать это изменение'}).state;
  assert.equal(comparePlanRevisions(rejected,f.projectId,{changeId:f.proposalId}).proposal.valid,false);
 });
-test('Removed and proposed new Work have explicit absence; untouched baseline assignments are unknown',()=>{
+test('Removed and proposed new Work have explicit absence; recorded history is retained',()=>{
  const f=history(),p=f.snapshot.projects.find(p=>p.id===f.projectId),removed=p.items[2].id;
  let s=removeItem(f.snapshot,f.projectId,removed);
  const added=addPlanWork(s,f.projectId,f.proposalId,{title:'Новая проверка',estimateDays:7}).state;
@@ -105,4 +106,59 @@ test('Desktop uses the same comparison and only an existing proposal navigation 
  assert.match(ui,/comparePlanRevisions\(snapshot,projectId,/);
  assert.match(ui,/Сравнить редакции плана/);
  assert.doesNotMatch(ui,/applyPlanAmendment\(|commitWithReadback\(|createTask\(/);
+});
+
+test('New control points preserve resource name, assignment, load and reserve at the actual recorded revision',()=>{
+ const f=atlas12PlanAlternativesPortfolio(),p=f.snapshot.projects[0],w=p.items[0],b=p.planBaselines[0];
+ assert.equal(b.work.find(x=>x.id===f.firstId).assignment.resourceLabel,'Кран');
+ assert.equal(b.work.find(x=>x.id===f.firstId).assignment.allocationPct,70);
+ assert.equal(b.work.find(x=>x.id===f.looseId).floatDays,1);
+ let s=editPlanningResource(f.snapshot,w.resourceId,{label:'Основной кран',capacityPct:100}).state;
+ s=editItem(s,f.projectId,f.firstId,{assignee:'Бригада B',resourceId:f.liftId,allocationPct:60,estimateDays:4});
+ const r=comparePlanRevisions(s,f.projectId),changed=r.rows.find(x=>x.workId===f.firstId),
+  parallel=r.rows.find(x=>x.workId===f.looseId);
+ assert.equal(changed.original.assignment.resourceLabel,'Кран');
+ assert.equal(changed.current.assignment.resourceLabel,'Подъёмник');
+ assert.equal(changed.original.assignment.allocationPct,70);assert.equal(changed.current.assignment.allocationPct,60);
+ assert.ok(changed.accumulatedReasons.includes('Изменён ответственный'));
+ assert.ok(changed.accumulatedReasons.includes('Изменено назначение планового ресурса'));
+ assert.ok(changed.accumulatedReasons.includes('Изменена плановая загрузка'));
+ assert.equal(parallel.original.floatDays,1);assert.equal(parallel.current.floatDays,2);
+ assert.ok(parallel.accumulatedReasons.includes('Изменён расчётный резерв'));
+ assert.deepEqual(s.projects[0].planBaselines,p.planBaselines);
+ const comparison=comparePlanBaseline(s,f.projectId).rows.find(x=>x.id===f.firstId);
+ assert.equal(comparison.referenceAssignment.resourceLabel,'Кран');assert.equal(comparison.currentAssignment.resourceLabel,'Подъёмник');
+ assert.ok(comparison.reasons.includes('Изменено назначение планового ресурса'));
+ const renamed=r.rows.find(x=>x.workId===f.secondId);
+ assert.equal(renamed.original.assignment.resourceLabel,'Кран');
+ assert.equal(renamed.current.assignment.resourceLabel,'Основной кран');
+ assert.ok(renamed.accumulatedReasons.includes('Изменено наименование планового ресурса'));
+ assert.equal(r.history[0].recordedAssignments,4);assert.equal(r.history[0].recordedReserves,4);
+ assert.deepEqual(deserialize(serialize(s)),s);
+});
+test('Legacy control points never borrow a current resource assignment or reserve',()=>{
+ const f=atlas12PlanAlternativesPortfolio(),legacy=structuredClone(f.snapshot);
+ for(const project of legacy.projects)for(const b of project.planBaselines??[])
+  for(const w of b.work){delete w.assignment;delete w.floatDays}
+ const s=editItem(legacy,f.projectId,f.firstId,{resourceId:f.liftId,assignee:'Новая бригада'});
+ const r=comparePlanRevisions(s,f.projectId),w=r.rows.find(x=>x.workId===f.firstId);
+ assert.equal(w.original.assignment,null);assert.equal(w.original.floatDays,null);
+ assert.equal(w.current.assignment.resourceLabel,'Подъёмник');
+ assert.equal(w.accumulatedChanged,false);assert.deepEqual(w.accumulatedReasons,[]);
+ assert.equal(r.history[0].recordedAssignments,0);assert.equal(r.history[0].recordedReserves,0);
+ assert.equal(comparePlanBaseline(s,f.projectId).rows.find(x=>x.id===f.firstId).referenceAssignment,null);
+ const again=capturePlanBaseline(s,f.projectId,{name:'Новый полный контрольный план'});
+ assert.equal(again.baseline.work.find(x=>x.id===f.firstId).assignment.resourceLabel,'Подъёмник');
+ assert.equal(again.state.projects[0].planBaselines[0].work.find(x=>x.id===f.firstId).assignment,undefined);
+});
+test('Malformed historical reserves or assignments are not accepted as recorded control facts',()=>{
+ const f=atlas12PlanAlternativesPortfolio();
+ for(const change of [
+  w=>{w.floatDays=-1},w=>{w.floatDays=w.critical?1:0},
+  w=>{w.assignment.allocationPct=0},w=>{w.assignment.resourceLabel=null},
+  w=>{w.assignment.resourceId=null},w=>{w.assignment.assignee=12}
+ ]){
+  const s=structuredClone(f.snapshot);change(s.projects[0].planBaselines[0].work.find(x=>x.id===f.firstId));
+  assert.throws(()=>serialize(s),/Invalid plan baseline/);
+ }
 });

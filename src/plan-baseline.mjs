@@ -9,6 +9,24 @@ const DAY=86400000;
 const day=value=>value==null?null:Date.parse(value+"T00:00:00Z")/DAY;
 const difference=(current,reference)=>current&&reference?day(current)-day(reference):null;
 const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+
+// Capture the name at the recorded revision, not at the time of viewing it.
+// Legacy control points without assignment are unknown, not unassigned.
+export function recordedWorkAssignment(item,labels){
+ if(!item)return null;
+ const resourceId=item.resourceId??null;
+ return {assignee:item.assignee??"",resourceId,resourceLabel:resourceId===null?null:labels.get(resourceId)??null,
+  allocationPct:item.allocationPct??100};
+}
+export function recordedAssignmentChanges(before,after){
+ if(!before||!after)return [];
+ const reasons=[];
+ if(before.assignee!==after.assignee)reasons.push("Изменён ответственный");
+ if(before.resourceId!==after.resourceId)reasons.push("Изменено назначение планового ресурса");
+ else if(before.resourceLabel!==after.resourceLabel)reasons.push("Изменено наименование планового ресурса");
+ if(before.allocationPct!==after.allocationPct)reasons.push("Изменена плановая загрузка");
+ return reasons;
+}
 const findProject=(snapshot,id)=>{
  const project=snapshot.projects.find(p=>p.id===id);
  if(!project)throw Error("Проект не найден");
@@ -55,6 +73,7 @@ export function capturePlanBaseline(snapshot,projectId,{name=null,recordedAt=new
  const {forecast,plan}=forecastFor(snapshot,project,portfolioSchedule(snapshot));
  if(!plan)throw Error("Нет достоверного календарного прогноза: проверьте дату начала, состояние проекта и предшественников");
  const items=new Map(project.items.map(w=>[w.id,w]));
+ const labels=new Map((snapshot.resources??[]).map(r=>[r.id,r.label]));
  const baseline={
   id:crypto.randomUUID(),version:count+1,name:label,recordedAt,
   sourceRevision:snapshot.revision,
@@ -68,7 +87,7 @@ export function capturePlanBaseline(snapshot,projectId,{name=null,recordedAt=new
     calendarBasis:row.calendarBasis??null,
     startDate:row.startDate,finishDate:row.finishDate,
     dueDate:item.dueDate??null,predecessors:[...row.predecessors],
-    critical:row.critical
+    critical:row.critical,floatDays:row.floatDays,assignment:recordedWorkAssignment(item,labels)
    };
   })
  };
@@ -102,6 +121,7 @@ export function comparePlanBaseline(snapshot,projectId,baselineId=null,{portfoli
  const planned=new Map(baseline.work.map(w=>[w.id,w]));
  const live=new Map(project.items.map(w=>[w.id,w]));
  const projected=new Map((plan?.rows??[]).map(w=>[w.id,w]));
+ const labels=new Map((snapshot.resources??[]).map(r=>[r.id,r.label]));
  const ids=[...baseline.work.map(w=>w.id),...project.items.map(w=>w.id).filter(id=>!planned.has(id))];
  const startShift=difference(forecast.projectedStart,baseline.forecastStart);
  const rows=ids.map(id=>{
@@ -110,9 +130,15 @@ export function comparePlanBaseline(snapshot,projectId,baselineId=null,{portfoli
   const referencePredecessors=reference?.predecessors??[];
   const sorted=arr=>[...arr].sort((a,b)=>a.localeCompare(b));
   const reasons=[];
+  const currentAssignment=recordedWorkAssignment(item,labels),referenceAssignment=reference?.assignment??null;
   if(!reference)reasons.push("Новая работа");
   if(!item)reasons.push("Работа удалена из текущего плана");
   if(item&&reference){
+   if(item.title!==reference.title)reasons.push("Изменено название работы");
+   reasons.push(...recordedAssignmentChanges(referenceAssignment,currentAssignment));
+   if(reference.floatDays!=null&&now?.floatDays!=null&&reference.floatDays!==now.floatDays)
+    reasons.push("Изменён расчётный резерв");
+   if(!now)reasons.push("Расчётные даты недоступны");
    if((item.estimateDays??1)!==reference.estimateDays||
       (item.durationUnit??"elapsed_days")!==reference.durationUnit)
     reasons.push("Изменена длительность");
@@ -139,6 +165,8 @@ export function comparePlanBaseline(snapshot,projectId,baselineId=null,{portfoli
    actualStart,actualFinish,actualSource:actualStart||actualFinish?"entered_by_user":null,
    shiftDays,actualShiftDays,
    baselineCritical:reference?.critical??null,currentCritical:now?.critical??null,
+   baselineFloatDays:reference?.floatDays??null,currentFloatDays:now?.floatDays??null,
+   referenceAssignment,currentAssignment,
    added:!reference,removed:!item,changed,reasons
   };
  });

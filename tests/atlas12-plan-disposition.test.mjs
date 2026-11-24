@@ -98,7 +98,10 @@ test('Direct queue navigation and independent native qualifications preserve a s
  assert.match(wf,/id: compound_qualification\s+continue-on-error: true/);
  assert.match(wf,/steps\.resource_qualification\.outcome/);
  assert.match(wf,/steps\.compound_qualification\.outcome/);
- assert.ok(wf.indexOf('Require both resource and compound native qualifications')<wf.indexOf('Preserve accepted development installer'));
+ assert.match(wf,/id: recovery_qualification\s+continue-on-error: true/);
+ assert.match(wf,/steps\.recovery_qualification\.outcome/);
+ const gate=wf.indexOf('Require all independent native qualifications');
+ assert.ok(gate>=0&&gate<wf.indexOf('Preserve accepted development installer'));
 });
 
 test('Native v6 project tabs use the actual workspace top and selected plan appears before amendment table',()=>{

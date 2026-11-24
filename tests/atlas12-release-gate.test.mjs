@@ -46,7 +46,10 @@ test("Accepted native installer cannot be uploaded before both scenarios, and Ru
  assert.match(win,/steps\.review_qualification\.outcome/);
  assert.match(win,/\$env:REVIEW_OUTCOME -ne 'success'/);
  assert.match(win,/python desktop\/tests\/installed-atlas-plan-amendment-review\.py/);
- const gate=win.indexOf("Require both resource and compound native qualifications");
+ assert.match(win,/steps\.recovery_qualification\.outcome/);
+ assert.match(win,/\$env:RECOVERY_OUTCOME -ne 'success'/);
+ assert.match(win,/python desktop\/tests\/installed-atlas12-plan-recovery\.py/);
+ const gate=win.indexOf("Require all independent native qualifications");
  const accepted=win.indexOf("Preserve accepted development installer");
  assert.ok(gate>0&&accepted>gate);
  assert.match(win,/name: IWXA-Atlas-0\.12\.1-dev\.1-Setup\n/);

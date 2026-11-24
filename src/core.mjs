@@ -207,6 +207,19 @@ function checkPlanBaselines(p){
     w.startDate>w.finishDate||!validDate(w.dueDate)||
     !Array.isArray(w.predecessors)||new Set(w.predecessors).size!==w.predecessors.length)
     throw Error("Invalid plan baseline work");
+   // The original baseline schema remains readable. New control points
+   // retain the actually recorded reserve and assignment, never live links.
+   if(w.floatDays!==undefined&&(!Number.isSafeInteger(w.floatDays)||w.floatDays<0||
+      w.critical!==(w.floatDays===0)))throw Error("Invalid plan baseline reserve");
+   if(w.assignment!==undefined){
+    const a=w.assignment;
+    if(!a||typeof a!=="object"||Array.isArray(a)||typeof a.assignee!=="string"||
+       !Number.isSafeInteger(a.allocationPct)||a.allocationPct<1||a.allocationPct>100||
+       !(a.resourceId===null&&a.resourceLabel===null||
+         typeof a.resourceId==="string"&&a.resourceId.length>0&&
+         typeof a.resourceLabel==="string"&&a.resourceLabel.trim().length>0&&a.resourceLabel.length<=160))
+     throw Error("Invalid plan baseline assignment");
+   }
    if(w.durationUnit==="working_days")calendarBasis(w.calendarBasis);
    else if(w.calendarBasis!==null)throw Error("Invalid plan baseline calendar basis");
    workIds.add(w.id);
