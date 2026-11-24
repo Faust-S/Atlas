@@ -44,7 +44,8 @@ test('Approved concrete plan is pending application, not missing a new Work, and
  assert.deepEqual(r.appliedPlanChanges,[f.cid]);assert.equal(r.needsReview,false);
  assert.equal(applied.totals.appliedPlans,1);
  assert.equal(project(s).items.length,1);
- assert.equal(project(s).items[0].changeId,null);
+ assert.equal(project(s).items[0].changeId,project(f.s).items[0].changeId);
+ assert.ok(!project(s).items[0].changeId);
  const done=responseState(project(s),projectImpact(project(s)));
  assert.equal(done.pendingPlans,0);assert.equal(done.appliedPlans,1);assert.equal(done.approvedWithoutWork,0);
  assert.equal(buildPortfolioCommand(s).totals.pendingPlans,0);
