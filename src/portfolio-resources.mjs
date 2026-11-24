@@ -313,7 +313,13 @@ function compareWorkConflictPeriods(before,after){
  * exchange places, or expose already conflicted Works on different dates.
  * Complete counts use all participating Works; only examples are bounded.
  */
-export function comparePlanningResourceScopes(before,after,projectIds){
+/**
+ * @param {any} before
+ * @param {any} after
+ * @param {Iterable<string>} projectIds
+ * @param {{focusWorks?:Array<{projectId:string,workId:string}>}} [options]
+ */
+export function comparePlanningResourceScopes(before,after,projectIds,{focusWorks=[]}={}){
  const ids=[...projectIds];
  const a=planningResourceScopeProjection(before,ids,true),b=planningResourceScopeProjection(after,ids,true);
  const blank=()=>({newlyConflicted:0,cleared:0,worsened:0,relieved:0,resourceChanged:0,
@@ -354,7 +360,28 @@ export function comparePlanningResourceScopes(before,after,projectIds){
   Number(y.newlyConflicted)-Number(x.newlyConflicted)||
   x.projectName.localeCompare(y.projectName,"ru")||x.title.localeCompare(y.title,"ru")||
   x.projectId.localeCompare(y.projectId)||x.workId.localeCompare(y.workId));
- return {before:a.scope,after:b.scope,workChanges:{totals,projects:[...byProject.values()],examples:examples.slice(0,8)}};
+ // A selected Work must not disappear merely because the eight illustrative
+ // rows were filled by other conflicts. Reuse the complete sweep maps.
+ const describeFocus=(work,detail)=>{
+  if(!work)return null;
+  const dated=Boolean(work.startDate&&work.finishDate);
+  const known=dated&&Boolean(work.resourceId);
+  return {resourceId:work.resourceId,resourceLabel:work.resourceLabel,
+   startDate:work.startDate,finishDate:work.finishDate,dated,known,
+   overloadDays:known?detail?.overloadDays??0:null,
+   unavailableDays:known?detail?.unavailableDays??0:null};
+ };
+ const focus=focusWorks.map(({projectId,workId})=>{
+  const key=JSON.stringify([projectId,workId]);
+  const find=view=>view.work.find(w=>w.projectId===projectId&&w.id===workId);
+  const old=find(before),next=find(after);
+  const periods=compareWorkConflictPeriods(a.periodsByWork.get(key)??[],b.periodsByWork.get(key)??[]);
+  return {projectId,workId,title:old?.title??next?.title??workId,
+   before:describeFocus(old,a.conflictWorks.get(key)),after:describeFocus(next,b.conflictWorks.get(key)),
+   ...periods};
+ });
+ return {before:a.scope,after:b.scope,workChanges:{totals,projects:[...byProject.values()],examples:examples.slice(0,8),
+  ...(focus.length?{focus}:{})}};
 }
 export function comparePlanningResourceGroups(before,after){
  const changes=[];

@@ -536,9 +536,9 @@ function markResourceShiftApplication(snapshot,candidate,preview,actions,context
   guards.some(g=>g.preserveDeadlines)&&worsenedDeadlines?"Перенос ухудшит известные контрольные сроки. Нужен новый расчёт с явным выбором компромисса.":null);
  return preview;
 }
-function amendmentPlanningContext(snapshot){
+function amendmentPlanningContext(snapshot,focusWorks=[]){
  const forecast=portfolioSchedule(snapshot);
- return {forecast,resources:portfolioResources(snapshot,{schedule:forecast})};
+ return {forecast,resources:portfolioResources(snapshot,{schedule:forecast}),focusWorks};
 }
 // Exact project-adjusted CPM rows. A paused project or an unknown upstream
 // finish must not acquire fabricated dates or critical-path claims.
@@ -659,7 +659,7 @@ function forecastCandidate(snapshot,candidate,context,{roots,affected,actions,af
   beforeUnavailable:r.availabilityBefore,afterUnavailable:r.availabilityAfter,
   beforeMaxLoad:r.peakBefore,afterMaxLoad:r.peakAfter}));
  const resourceBefore=planningResourceTotals(beforeResources),resourceAfter=planningResourceTotals(afterResources);
- const resourceScope=comparePlanningResourceScopes(beforeResources,afterResources,affected);
+ const resourceScope=comparePlanningResourceScopes(beforeResources,afterResources,affected,{focusWorks:context.focusWorks??[]});
  const work=amendmentWorkComparison(snapshot,candidate,affected,before,after);
  const dependencyRows=actions.filter(x=>x.action.kind==="dependency").map(({projectId,action:a})=>{
   const p=projects.get(projectId);
@@ -882,14 +882,24 @@ function summarizePortfolioPlanSets(options){
  * @param {Array<{projectId:string,changeId:string}>} first
  * @param {Array<{projectId:string,changeId:string}>|null} [second]
  */
-export function comparePortfolioPlanSets(snapshot,first,second=null){
+/**
+ * @param {any} snapshot
+ * @param {any[]} first
+ * @param {any[]|null} [second]
+ * @param {{focusWorks?:Array<{projectId:string,workId:string}>}} [options]
+ */
+export function comparePortfolioPlanSets(snapshot,first,second=null,{focusWorks=[]}={}){
  validate(snapshot);
+ if(!Array.isArray(focusWorks)||focusWorks.length>4||new Set(focusWorks.map(w=>JSON.stringify([w?.projectId,w?.workId]))).size!==focusWorks.length||
+  focusWorks.some(w=>!snapshot.projects.find(p=>p.id===w?.projectId)?.items.some(item=>item.id===w?.workId)))
+  throw Error("Выберите до четырёх существующих работ для сравнения");
  const a=planSetMembers(snapshot,first),b=second===null?null:planSetMembers(snapshot,second);
  if(b&&same(a,b))throw Error("Выберите различающиеся составы вариантов");
- const context=amendmentPlanningContext(snapshot);
+ const context=amendmentPlanningContext(snapshot,focusWorks);
  const options=[{id:"A",selection:a,...calculatePlanSet(snapshot,a,context)}];
  if(b)options.push({id:"B",selection:b,...calculatePlanSet(snapshot,b,context)});
  return {kind:"ATLAS_PORTFOLIO_PLAN_SETS",revision:snapshot.revision,sourceStamp:JSON.stringify(snapshot),
+  ...(focusWorks.length?{focusWorks:focusWorks.map(w=>({projectId:w.projectId,workId:w.workId}))}:{}),
   options,summary:summarizePortfolioPlanSets(options)};
 }
 /**
@@ -913,7 +923,7 @@ export function applyPortfolioPlanSet(snapshot,comparison,optionId,{rationale}){
   throw Error("Укажите обоснование совместного применения (от 8 до 2000 символов)");
  const refs=planSetMembers(snapshot,option.selection);
  if(refs.length<2)throw Error("Для совместного применения выберите минимум два проекта");
- const fresh=calculatePlanSet(snapshot,refs,amendmentPlanningContext(snapshot));
+ const fresh=comparePortfolioPlanSets(snapshot,refs,null,{focusWorks:comparison.focusWorks??[]}).options[0];
  if(!fresh.valid)throw Error(fresh.reason);
  if(fresh.preview.applicationBlocker)throw Error(fresh.preview.applicationBlocker);
  if(!fresh.canApply)throw Error("Сначала отдельно утвердите каждую выбранную заявку");

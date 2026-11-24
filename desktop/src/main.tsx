@@ -44,6 +44,8 @@ import {AtlasChromeTopbar,AtlasChromeRail,AtlasGlyph} from "./AtlasChrome";
 import {ProjectConnect} from "./ProjectConnect";
 import {ProjectOrganizationGuide} from "./ProjectOrganizationGuide";
 import {ResourceAlternatives} from "./ResourceAlternatives";
+import {ResourceConflictResolution} from "./ResourceConflictResolution";
+import {createResourceConflictProposals} from "../../src/resource-conflict-resolution.mjs";
 import {prepareResourceEditorChoice,assertResourceEditorChoiceCurrent} from "../../src/resource-alternatives.mjs";
 import {prepareResourceSequenceChoice,assertResourceSequenceChoiceCurrent} from "../../src/resource-sequence-alternatives.mjs";
 import {planAmendmentKey} from "../../src/core.mjs";
@@ -518,6 +520,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   host?.t3?.receiveSignedFile&&host?.t3?.readbackSignedFile);
  const [resourceLimit,setResourceLimit]=useState(40);
  const [resourceComparisonId,setResourceComparisonId]=useState<string|null>(null);
+ const [resourceResolutionId,setResourceResolutionId]=useState<string|null>(null);
  const [reviewLimit,setReviewLimit]=useState(20);
  const [sourceLimit,setSourceLimit]=useState(15);
  const [sourceRowLimits,setSourceRowLimits]=useState<Record<string,number>>({});
@@ -2507,10 +2510,28 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       {resources.people.slice(0,resourceLimit).map((r:any)=><React.Fragment key={r.id}>
        <tr><td>{r.label}</td><td>{r.capacityPct}%</td><td>{r.maxLoadPct}%</td>
        <td>{r.overloadDays} дн.</td><td>{r.unavailableDays} дн.</td><td>
-        {r.itemCount>0&&<Action ariaLabel={(resourceComparisonId===r.id?"Скрыть варианты ресурса ":"Сравнить варианты ресурса ")+r.label} onClick={()=>setResourceComparisonId(id=>id===r.id?null:r.id)}>
+        {(r.overloadDays>0||r.unavailableDays>0||resourceResolutionId===r.id)&&<Action
+         ariaLabel={(resourceResolutionId===r.id?"Скрыть устранение конфликта ":"Устранить конфликт ресурса ")+r.label}
+         onClick={()=>{setResourceComparisonId(null);setResourceResolutionId(id=>id===r.id?null:r.id)}}>
+         {resourceResolutionId===r.id?"Скрыть решение":"Устранить конфликт"}</Action>}
+        {r.itemCount>0&&<Action ariaLabel={(resourceComparisonId===r.id?"Скрыть варианты ресурса ":"Сравнить варианты ресурса ")+r.label} onClick={()=>{setResourceResolutionId(null);setResourceComparisonId(id=>id===r.id?null:r.id)}}>
          {resourceComparisonId===r.id?"Скрыть варианты":"Сравнить варианты"}</Action>}
         <Action onClick={()=>openEditor("resource-edit:"+r.id)}>Настроить</Action>
        </td></tr>
+       {resourceResolutionId===r.id&&<tr className="atlas-resource-comparison-row"><td colSpan={6}>
+        <ResourceConflictResolution key={r.id} snapshot={data} resourceId={r.id} disabled={busy||!!editor}
+         onClose={()=>setResourceResolutionId(null)}
+         onDraft={(comparison,optionId,choice)=>{
+          if(!requireClosedForm()||busyRef.current)return false;
+          try{
+           const result=createResourceConflictProposals(latestSnapshot.current,comparison,optionId,choice);
+           mutate(result.state,"Заявки по ресурсному конфликту подготовлены в черновике. Сохраните и рассмотрите их.");
+           setResourceResolutionId(null);setResourceComparisonId(null);
+           setPortfolioPlanSelection({first:result.refs,second:[],expanded:true});
+           setPortfolioJump("plan-sets");return true;
+          }catch(e){issue(e);return false}
+         }}/>
+       </td></tr>}
        {resourceComparisonId===r.id&&<tr className="atlas-resource-comparison-row"><td colSpan={6}>
         <ResourceAlternatives key={r.id} snapshot={data} forecast={dates} resources={resources}
          resourceId={r.id} onClose={()=>setResourceComparisonId(null)}
@@ -2528,7 +2549,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       <div><strong>Работы без планового ресурса: {resources.totals.unlinked}</strong>
        <p>Введённый ответственный не заменяет плановую привязку. Эти работы не включены в нагрузку конкретного ресурса.</p></div>
       {resources.people.length>0&&<Action ariaLabel={resourceComparisonId===""?"Скрыть назначение работ без ресурса":"Рассмотреть назначение работ без ресурса"}
-       onClick={()=>setResourceComparisonId(id=>id===""?null:"")}>
+       onClick={()=>{setResourceResolutionId(null);setResourceComparisonId(id=>id===""?null:"")}}>
        {resourceComparisonId===""?"Скрыть варианты":"Рассмотреть назначение"}</Action>}
      </div>}
      {resources.totals.unlinked>0&&resourceComparisonId===""&&<ResourceAlternatives

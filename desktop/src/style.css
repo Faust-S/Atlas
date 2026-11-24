@@ -1819,3 +1819,19 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 @media(max-width:1000px){.atlas-plan-set-member{flex-wrap:wrap}.atlas-plan-set-member>div:first-child{flex-basis:100%}}
 
 .atlas-plan-set-quick-results{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:6px;margin:6px 0}.atlas-plan-set-quick-results p{margin:3px 0;font-size:12px;overflow-wrap:anywhere}.atlas-plan-set-quick-results [tabindex="-1"]{scroll-margin:12px}.atlas-resource-leveling{margin:12px 0}.atlas-leveling-choice{margin-bottom:6px}.atlas-leveling-choice .button-row{align-items:flex-end}.atlas-plan-set-summary{margin:10px 0;min-width:0}.atlas-plan-set-summary th:not(:first-child),.atlas-plan-set-summary td:not(:first-child){text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}.atlas-coordination-history .atlas-amendment-row p{white-space:pre-line;overflow-wrap:anywhere}
+
+/* A single compact decision panel within the existing resource row. */
+.atlas-conflict-resolution{min-width:0;scroll-margin:14px}
+.atlas-conflict-resolution .atlas-amendment-row{margin:7px 0;min-width:0}
+.atlas-conflict-options{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,235px),1fr));gap:6px;margin:8px 0}
+.atlas-conflict-option{display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:4px;min-width:0;min-height:76px;
+ padding:8px;border:1px solid var(--line);border-radius:6px;background:transparent;color:inherit;overflow-wrap:anywhere}
+.atlas-conflict-option[aria-pressed=true]{border-color:#5287c1;box-shadow:inset 0 0 0 1px #5287c1}
+.atlas-conflict-option span{font-size:11px;font-weight:600}
+.atlas-conflict-option small{line-height:1.4;opacity:.92}
+.atlas-conflict-selected{scroll-margin:14px}
+.atlas-conflict-selected h3{font-size:13px;margin:0 0 4px;scroll-margin:16px;overflow-wrap:anywhere}
+.atlas-conflict-check{display:flex;align-items:flex-start;gap:6px;margin:7px 0;font-size:11px;line-height:1.4}
+.atlas-conflict-check input{flex:0 0 auto;margin-top:1px}
+.atlas-conflict-resolution .atlas-amendment-analysis{max-width:100%;overflow-wrap:anywhere}
+@media(max-width:900px){.atlas-conflict-options{grid-template-columns:minmax(0,1fr)}}
