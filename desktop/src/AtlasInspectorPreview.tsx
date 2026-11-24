@@ -6,6 +6,8 @@ type Tab={key:string;kind:Kind;id:string};
 type Props={
  project:any|null;snapshot:any;plan:any;forecast:any;dirty:boolean;
  comparison:any|null;deadlineRisks:Map<string,any>;onSelectBaseline:(id:string)=>void;
+ resourceConflicts:Map<string,{overloadDays:number;unavailableDays:number}>;
+ onOpenResourceConflict:(resourceId:string,workId:string)=>void;
  localPlan:any|null;correctionContext:any|null;onShowAffected:()=>void;
  onOpenLinkedProject:(projectId:string,sourceWorkId:string)=>void;
  returnContext:{projectTitle:string;workTitle:string;linkedChanges:number;current:boolean}|null;
@@ -35,7 +37,7 @@ const sourceTypes:Record<string,string>={
 export function AtlasInspectorPreview({project,snapshot,plan,forecast,comparison,
  deadlineRisks,onSelectBaseline,dirty,saved,workRequest,
  localPlan,correctionContext,onShowAffected,onOpenLinkedProject,returnContext,onReturnToSource,
- onClose,onEditWork,onEditProject,onOpenTab,onSave,canSave}:Props){
+ onClose,onEditWork,onEditProject,onOpenTab,onSave,canSave,resourceConflicts,onOpenResourceConflict}:Props){
  const defaultId=project?.id??"portfolio";
  const [tabs,setTabs]=useState<Tab[]>([{key:"project:"+defaultId,kind:"project",id:defaultId}]);
  const [active,setActive]=useState("project:"+defaultId);
@@ -99,6 +101,7 @@ export function AtlasInspectorPreview({project,snapshot,plan,forecast,comparison
  },[workSection,correction]);
  const sourceOfWork=facts?.source??null;
  const resourceOfWork=facts?.resource??null;
+ const conflict=work?resourceConflicts.get(work.id):null;
  const source=shown?.kind==="source"?project?.sources.find((s:any)=>s.id===shown.id):null;
  const baseline=shown?.kind==="baseline"?project?.planBaselines?.find((b:any)=>b.id===shown.id):null;
  const title=(tab:Tab)=>{
@@ -167,7 +170,11 @@ export function AtlasInspectorPreview({project,snapshot,plan,forecast,comparison
        onClick={()=>onEditWork(work.id)}>Изменить работу</button>
       <button type="button" className="action-button"
        onClick={()=>onOpenTab("graph")}>Все зависимости</button>
+      {work.resourceId&&conflict&&<button type="button" className="action-button"
+       aria-label={"Устранить конфликт работы "+work.title}
+       onClick={()=>onOpenResourceConflict(work.resourceId,work.id)}>Устранить конфликт</button>}
      </div>
+     {conflict&&<p className="minor">Ресурсное ограничение работы: перегрузка {conflict.overloadDays} дн.; вне доступности {conflict.unavailableDays} дн.</p>}
      <div className={"atlas-v6-work-sections"+(correction?" has-impact":"")} role="tablist" aria-label="Разделы выбранной работы">
        {([
         ["schedule","Сроки"],["baseline","План"],["relations","Связи"],["history","История"]

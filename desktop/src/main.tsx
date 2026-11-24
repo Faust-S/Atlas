@@ -45,7 +45,7 @@ import {ProjectConnect} from "./ProjectConnect";
 import {ProjectOrganizationGuide} from "./ProjectOrganizationGuide";
 import {ResourceAlternatives} from "./ResourceAlternatives";
 import {ResourceConflictResolution} from "./ResourceConflictResolution";
-import {createResourceConflictProposals} from "../../src/resource-conflict-resolution.mjs";
+import {createResourceConflictProposals,resourceConflictEntry,resourceConflictPage} from "../../src/resource-conflict-resolution.mjs";
 import {prepareResourceEditorChoice,assertResourceEditorChoiceCurrent} from "../../src/resource-alternatives.mjs";
 import {prepareResourceSequenceChoice,assertResourceSequenceChoiceCurrent} from "../../src/resource-sequence-alternatives.mjs";
 import {planAmendmentKey} from "../../src/core.mjs";
@@ -424,8 +424,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const [portfolioJump,setPortfolioJump]=useState<"resources"|"ecosystem"|"review"|"plan-sets"|null>(null);
  useEffect(()=>{
   if(embedded||active!==null||homeOpen||settingsOpen||!portfolioJump)return;
-  const destination=rootRef.current?.querySelector<HTMLElement>("#atlas-portfolio-"+portfolioJump);
-  if(!destination)return;
+  const section=rootRef.current?.querySelector<HTMLElement>("#atlas-portfolio-"+portfolioJump);
+  if(!section)return;
+  const destination=portfolioJump==="resources"?section.querySelector<HTMLElement>("[data-atlas-conflict-panel]")??section:section;
   destination.scrollIntoView({block:"start",behavior:"auto"});
   destination.focus({preventScroll:true});
   setPortfolioJump(null);
@@ -521,6 +522,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const [resourceLimit,setResourceLimit]=useState(40);
  const [resourceComparisonId,setResourceComparisonId]=useState<string|null>(null);
  const [resourceResolutionId,setResourceResolutionId]=useState<string|null>(null);
+ const [resourceResolutionFocus,setResourceResolutionFocus]=useState<{projectId:string;workId:string}|null>(null);
  const [reviewLimit,setReviewLimit]=useState(20);
  const [sourceLimit,setSourceLimit]=useState(15);
  const [sourceRowLimits,setSourceRowLimits]=useState<Record<string,number>>({});
@@ -580,13 +582,14 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const resources=useMemo(()=>portfolioResources(data,{schedule:dates} as any),[data,dates]);
  const projectResourceConflictIndex=useMemo(()=>{
   const index=new Map<string,{overloadDays:number;unavailableDays:number}>();
-  if(project&&tab==="resources")for(const id of new Set(project.items.map((w:any)=>w.resourceId).filter(Boolean))){
+  if(project&&(tab==="resources"||inspector&&!embedded))for(const id of new Set(project.items.map((w:any)=>w.resourceId).filter(Boolean))){
    const group=resources.byId.get(id as string);
    if(group&&(group.overloadDays||group.unavailableDays))
     for(const [wid,conflict] of resourceWorkConflicts(group,project.id))index.set(wid,conflict);
   }
   return index;
- },[project,resources,tab]);
+ },[project,resources,tab,inspector,embedded]);
+ const resourceRows=useMemo(()=>resourceConflictPage(resources.people,resourceLimit,resourceResolutionId),[resources,resourceLimit,resourceResolutionId]);
  const reviews=useMemo(()=>planReviewQueue(data),[data]);
  const sourceQueue=useMemo(()=>publicSourceQueue(data),[data]);
  const ecosystem=useMemo(()=>githubPortfolioOverview(data),[data]);
@@ -1773,6 +1776,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    if(latestSnapshot.current!==candidate.startedWith||dirtyRef.current||editorOpenRef.current)
     throw Error("Черновик изменился после предпросмотра. Импорт не применён.");
    setPendingImport(null);
+   setResourceResolutionId(null);setResourceResolutionFocus(null);setResourceComparisonId(null);
    setPortfolioPlanSelection(emptyPortfolioPlanSelection());
    mutate(candidate.snapshot,"Импортированная редакция "+candidate.originalRevision+
     " применена к черновику. Для записи на диск нажмите «Сохранить».");
@@ -1818,6 +1822,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    const result=await invoke<OpenResult>("atlas_restore_previous");
    const checked=deserialize(JSON.stringify(result.snapshot));
    saved.current=snapshotText(checked);setData(checked);setGeneration(result.generation);
+   setResourceResolutionId(null);setResourceResolutionFocus(null);setResourceComparisonId(null);
    setPortfolioPlanSelection(emptyPortfolioPlanSelection());
    setReady(true);setRecovery(false);setMessage("Предыдущая редакция восстановлена и перечитана.");setError("");
   }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
@@ -1977,6 +1982,15 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   if(!requireClosedForm())return;
   if(section==="plan-sets")setPortfolioPlanSelection(old=>({...old,expanded:true}));
   selectProject(null);setHomeOpen(false);setSettingsOpen(false);setPortfolioJump(section);
+ };
+ const openResourceConflict=(resourceId:string,focus:{projectId:string;workId:string}|null=null)=>{
+  if(!requireClosedForm()||busyRef.current)return;
+  try{
+   const request=resourceConflictEntry(resources,resourceId,focus);
+   selectProject(null);setHomeOpen(false);setSettingsOpen(false);setInspector(false);
+   setResourceComparisonId(null);setResourceResolutionFocus(request.focus);setResourceResolutionId(request.resourceId);
+   setPortfolioJump("resources");
+  }catch(e){issue(e)}
  };
  const goSettings=()=>{
   if(!requireClosedForm())return;
@@ -2323,7 +2337,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      onPortfolio={goPortfolio} onNewProject={()=>openEditor("new")}
      onConnect={()=>{goPortfolio();startConnection();}}
      onOpenProject={(id,target="overview")=>openProjectTab(id,target)}
-     onResources={goResources}
+     onResources={goResources} onOpenResourceConflict={id=>openResourceConflict(id)}
      onCalendar={()=>project?goProjectTab("timeline"):data.projects.length?
        openProjectTab(data.projects[0].id,"timeline"):goPortfolio()}
      onReview={()=>reviewRows.length?openProjectTab(reviewRows[0].projectId,"changes"):goPortfolioSection("review")}
@@ -2507,26 +2521,27 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      <div className="section-heading"><div><h2>Плановые ресурсы</h2><p>Ресурсы объединяются только по явному назначению, не по имени человека.</p></div>
       <Action onClick={()=>openEditor("resource-new")}>＋ Плановый ресурс</Action></div>
      {resources.people.length?<div className="table-scroll"><table><thead><tr><th>Ресурс</th><th>Мощность</th><th>Максимум</th><th>Выше мощности</th><th>Вне доступности</th><th></th></tr></thead><tbody>
-      {resources.people.slice(0,resourceLimit).map((r:any)=><React.Fragment key={r.id}>
+      {resourceRows.map((r:any)=><React.Fragment key={r.id}>
        <tr><td>{r.label}</td><td>{r.capacityPct}%</td><td>{r.maxLoadPct}%</td>
        <td>{r.overloadDays} дн.</td><td>{r.unavailableDays} дн.</td><td>
         {(r.overloadDays>0||r.unavailableDays>0||resourceResolutionId===r.id)&&<Action
          ariaLabel={(resourceResolutionId===r.id?"Скрыть устранение конфликта ":"Устранить конфликт ресурса ")+r.label}
-         onClick={()=>{setResourceComparisonId(null);setResourceResolutionId(id=>id===r.id?null:r.id)}}>
+         onClick={()=>{setResourceComparisonId(null);setResourceResolutionFocus(null);setResourceResolutionId(id=>id===r.id?null:r.id)}}>
          {resourceResolutionId===r.id?"Скрыть решение":"Устранить конфликт"}</Action>}
         {r.itemCount>0&&<Action ariaLabel={(resourceComparisonId===r.id?"Скрыть варианты ресурса ":"Сравнить варианты ресурса ")+r.label} onClick={()=>{setResourceResolutionId(null);setResourceComparisonId(id=>id===r.id?null:r.id)}}>
          {resourceComparisonId===r.id?"Скрыть варианты":"Сравнить варианты"}</Action>}
         <Action onClick={()=>openEditor("resource-edit:"+r.id)}>Настроить</Action>
        </td></tr>
        {resourceResolutionId===r.id&&<tr className="atlas-resource-comparison-row"><td colSpan={6}>
-        <ResourceConflictResolution key={r.id} snapshot={data} resourceId={r.id} disabled={busy||!!editor}
-         onClose={()=>setResourceResolutionId(null)}
+        <ResourceConflictResolution key={JSON.stringify([r.id,resourceResolutionFocus])} snapshot={data} resourceId={r.id}
+         initialFocus={resourceResolutionFocus} disabled={busy||!!editor}
+         onClose={()=>{setResourceResolutionId(null);setResourceResolutionFocus(null)}}
          onDraft={(comparison,optionId,choice)=>{
           if(!requireClosedForm()||busyRef.current)return false;
           try{
            const result=createResourceConflictProposals(latestSnapshot.current,comparison,optionId,choice);
            mutate(result.state,"Заявки по ресурсному конфликту подготовлены в черновике. Сохраните и рассмотрите их.");
-           setResourceResolutionId(null);setResourceComparisonId(null);
+           setResourceResolutionId(null);setResourceResolutionFocus(null);setResourceComparisonId(null);
            setPortfolioPlanSelection({first:result.refs,second:[],expanded:true});
            setPortfolioJump("plan-sets");return true;
           }catch(e){issue(e);return false}
@@ -3558,7 +3573,11 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
         <td>{!usage?"Нет плановой привязки":!r.startDate?"Даты не определены":
          conflict?.overloadDays||conflict?.unavailableDays?
           "Перегрузка: "+(conflict?.overloadDays??0)+" дн.; вне доступности: "+(conflict?.unavailableDays??0)+" дн.":
-          "По известным датам конфликтов нет"}</td></tr>})}</tbody></table></div>
+          "По известным датам конфликтов нет"}
+          {usage&&conflict&&<button type="button" className="text-link atlas-conflict-work-link"
+           aria-label={"Устранить конфликт работы "+r.title}
+           onClick={()=>openResourceConflict(usage.id,{projectId:project.id,workId:r.id})}>Устранить конфликт</button>}
+        </td></tr>})}</tbody></table></div>
     </section>}
     {tab==="history"&&<section className="surface"><div className="section-heading"><div><h2>История решений и фактов</h2>
       <p>История не равна независимой приёмке результата. Все записи доступны без ограничения первыми 120.</p></div>
@@ -4010,6 +4029,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      dirty={dirty} saved={persisted} workRequest={previewWorkRequest}
      onClose={()=>setInspector(false)} onEditWork={id=>openEditor("work:"+id,undefined,true)}
      onEditProject={()=>openEditor("project-edit",undefined,true)} onOpenTab={goProjectTab}
+     resourceConflicts={projectResourceConflictIndex} onOpenResourceConflict={(resourceId,workId)=>project&&openResourceConflict(resourceId,{projectId:project.id,workId})}
      onSave={()=>void save()} canSave={dirty&&!busy&&!editor}/>
    </div>}
    {editor?<EditorPanel key={editor.action} editor={editor} onSubmit={submit}

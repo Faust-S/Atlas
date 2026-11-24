@@ -14,10 +14,10 @@ const optionTitle=(o:any)=>(labels[o.kind]??o.kind)+": "+o.title;
 const delayOptions=(max:number)=>Array.from({length:max+1},(_,i)=><option key={i} value={i}>{i?i+" дн.":"Не переносить"}</option>);
 
 /** Same selected conflict, one current portfolio, ordinary plan proposals. */
-export function ResourceConflictResolution({snapshot,resourceId,onClose,onDraft,disabled=false}:{
- snapshot:any;resourceId:string;onClose:()=>void;disabled?:boolean;
+export function ResourceConflictResolution({snapshot,resourceId,initialFocus=null,onClose,onDraft,disabled=false}:{
+ snapshot:any;resourceId:string;initialFocus?:{projectId:string;workId:string}|null;onClose:()=>void;disabled?:boolean;
  onDraft:(comparison:any,optionId:string,choice:{rationale:string;confirmTradeoff:boolean;confirmTechnology:boolean})=>boolean}){
- const [focusId,setFocusId]=useState(""),[companionId,setCompanionId]=useState("");
+ const [focusId,setFocusId]=useState(()=>initialFocus?JSON.stringify([initialFocus.projectId,initialFocus.workId]):""),[companionId,setCompanionId]=useState("");
  const [target,setTarget]=useState(""),[workDelay,setWorkDelay]=useState(7),[projectDelay,setProjectDelay]=useState(0);
  const [allowSequence,setAllowSequence]=useState(false);
  const [calculation,setCalculation]=useState<{snapshot:any;value:any}|null>(null);
@@ -30,10 +30,10 @@ export function ResourceConflictResolution({snapshot,resourceId,onClose,onDraft,
  },[snapshot,resourceId]);
  const model=info&&"value" in info?info.value:null;
  const participants:any[]=model?.participants??[];
- const focus=participants.find(w=>w.id===focusId)??participants[0];
+ const focus=focusId?participants.find(w=>w.id===focusId):participants[0];
  const companion=participants.find(w=>w.id===companionId&&w.id!==focus?.id);
  const targetResource=focus?.canReassign?model?.alternatives.find((r:any)=>r.id===target):null;
- const result=calculation?.snapshot===snapshot?calculation.value:null;
+ const result=calculation&&calculation.snapshot===snapshot?calculation.value:null;
  const chosen=result?.options.find((o:any)=>o.id===choice);
  const invalidate=()=>{setCalculation(null);setChoice("");setError("");setConfirmTradeoff(false);setConfirmTechnology(false)};
  const selectOption=(id:string)=>{setChoice(id);setConfirmTradeoff(false);setConfirmTechnology(false);setRationale("")};
@@ -59,12 +59,19 @@ export function ResourceConflictResolution({snapshot,resourceId,onClose,onDraft,
   }catch(e){setCalculation(null);setError(e instanceof Error?e.message:"Расчёт недоступен")}
  };
  const canCalculate=Boolean(focus&&(targetResource||workDelay||projectDelay||allowSequence&&companion&&focus.projectId===companion.projectId));
- return <section ref={sectionRef} tabIndex={-1} className="atlas-resource-alternatives atlas-conflict-resolution" aria-label="Устранение ресурсного конфликта">
+ return <section ref={sectionRef} tabIndex={-1} data-atlas-conflict-panel="true" className="atlas-resource-alternatives atlas-conflict-resolution" aria-label="Устранение ресурсного конфликта">
   <div className="atlas-resource-alternatives-header">
    <strong>{"Устранение конфликта: "+(model?.resourceLabel??"ресурс")}</strong>
    <button type="button" aria-label="Закрыть устранение конфликта" onClick={onClose}>Закрыть</button>
   </div>
   {info&&"error" in info&&<p role="alert">{info.error}</p>}
+  {model&&!focus&&participants.length>0&&<>
+   <p role="alert">Выбранная ранее работа больше не участвует в конфликте. Выберите другую работу для нового расчёта.</p>
+   <label className="atlas-plan-choice-fields">Работа с конфликтом<select aria-label="Работа для устранения конфликта" value=""
+    onChange={e=>{setFocusId(e.target.value);setCompanionId("");setTarget("");setAllowSequence(false);invalidate()}}>
+    <option value="">Выберите работу</option>{participants.map(w=><option key={w.id} value={w.id}>{name(w)}</option>)}
+   </select></label>
+  </>}
   {model&&focus&&<>
    <p>{"Перегрузка: "+model.current.overloadDays+" дн.; вне доступности: "+model.current.unavailableDays+
     " дн. Известных конфликтующих работ: "+participants.length+"."}</p>

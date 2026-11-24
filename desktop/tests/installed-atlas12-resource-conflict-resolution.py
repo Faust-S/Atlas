@@ -69,9 +69,24 @@ def qualify():
     d.stop()
     launch()
     assert d.head()==saved
+    # The dashboard and resource table must open the same decision surface.
     native.click_named('Ресурсы','Button')
     click('Устранить конфликт ресурса Монтажный участок')
     d.wait_text('Устранение конфликта: Монтажный участок',35)
+    click('Закрыть устранение конфликта')
+    # Now open the exact second Work from its project resource list.
+    native.click_named('Портфель','Button')
+    native.click_named('Показать или скрыть левую панель','Button')
+    d.set_text('Найти проект по работе, этапу или источнику',project['name'])
+    d.wait_text('Найдено проектов: 1',35)
+    native.click_named('Открыть найденный проект '+project['name'],'Button')
+    d.wait_text('Готовность работ по плану',35)
+    native.click_named('Показать или скрыть левую панель','Button')
+    native.click_named('Ресурсы','Button')
+    d.wait_text('Ресурсы проекта',35)
+    click('Устранить конфликт работы Монтаж Б')
+    d.wait_text('Устранение конфликта: Монтажный участок',35)
+    assert d.head()==saved
     select_last('Вторая конфликтующая работа')
     select_last('Ресурс для устранения конфликта')
     order=find('Сравнить технологический порядок работ',role='CheckBox')
@@ -103,8 +118,9 @@ def qualify():
     assert proposal['status']=='proposed' and not proposal.get('planAppliedAt')
     assert REASON in proposal['description'] and len(proposal['planAmendments'])==1
     action=proposal['planAmendments'][0]
-    assert action['kind']=='work' and action['itemId']==a['id']
-    assert action['before']['resourceId']==a['resourceId'] and action['after']['resourceId']==free['id']
+    # Focal Work B came from its direct project link, not a name-based default.
+    assert action['kind']=='work' and action['itemId']==b['id']
+    assert action['before']['resourceId']==b['resourceId'] and action['after']['resourceId']==free['id']
     for k in ('estimateDays','assignee','dueDate','allocationPct'):
         assert action['before'][k]==action['after'][k]
     print('ATLAS12_NATIVE_CONFLICT_RESOLUTION_DRAFT_SAVE_PASS',flush=True)
@@ -124,7 +140,7 @@ def qualify():
     committed=v.await_saved(drafted)
     applied=base.stored_project(committed,project['id'])
     expected=json.loads(json.dumps(project['items']))
-    expected[0]['resourceId']=free['id']
+    expected[1]['resourceId']=free['id']
     assert applied['items']==expected
     assert applied['startDate']==project['startDate'] and applied['dueDate']==project['dueDate']
     assert applied['planBaselines']==project['planBaselines'] and applied['dependencies']==project['dependencies']

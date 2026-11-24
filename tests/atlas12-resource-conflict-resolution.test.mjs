@@ -6,7 +6,7 @@ import {portfolioResources,comparePlanningResourceScopes} from "../src/portfolio
 import {portfolioSchedule} from "../src/portfolio-schedule.mjs";
 import {decideChange} from "../src/trace.mjs";
 import {applyPlanAmendment,comparePortfolioPlanSets} from "../src/plan-amendment.mjs";
-import {inspectResourceConflictResolution,compareResourceConflictResolution,createResourceConflictProposals} from "../src/resource-conflict-resolution.mjs";
+import {resourceConflictEntry,resourceConflictPage,inspectResourceConflictResolution,compareResourceConflictResolution,createResourceConflictProposals} from "../src/resource-conflict-resolution.mjs";
 import {fixture,choice} from "./fixtures/atlas12-resource-conflict-resolution.mjs";
 const rationale="Допустимый способ снижения нагрузки выбранного участка.";
 const compare=(f,overrides={})=>compareResourceConflictResolution(f.snapshot,f.resourceId,choice(f,overrides));
@@ -159,4 +159,22 @@ test("Focused portfolio comparison does not mutate or replace the ordinary amend
  delete focused.preview.resourceScope.workChanges.focus;
  assert.deepEqual(focused.preview,normal.preview);
  assert.deepEqual(focused.assessment,normal.assessment);
+});
+
+test("Direct conflict entry uses the exact current project/Work identity and does not silently choose a replacement",()=>{
+ const f=fixture(),view=portfolioResources(f.snapshot);
+ const entry=resourceConflictEntry(view,f.resourceId,{projectId:f.projectId,workId:f.b});
+ assert.deepEqual(entry,{resourceId:f.resourceId,focus:{projectId:f.projectId,workId:f.b}});
+ assert.throws(()=>resourceConflictEntry(view,f.resourceId,{projectId:f.otherProject,workId:f.b}),/больше не участвует/);
+ assert.throws(()=>resourceConflictEntry(view,f.resourceId,{projectId:f.projectId,workId:f.critical}),/больше не участвует/);
+ assert.throws(()=>resourceConflictEntry(view,f.free),/нет известного конфликта/);
+ const next=editItem(f.snapshot,f.projectId,f.b,{resourceId:f.free});
+ assert.throws(()=>resourceConflictEntry(portfolioResources(next),f.resourceId,entry.focus),/нет известного конфликта/);
+});
+test("Direct resource navigation preserves bounded paging even for a resource beyond the first page",()=>{
+ const rows=Array.from({length:80},(_,i)=>({id:String(i),label:"Участок "+i}));
+ const page=resourceConflictPage(rows,40,"71");
+ assert.equal(page.length,40);assert.equal(page[0],rows[71]);assert.equal(new Set(page.map(r=>r.id)).size,40);
+ assert.deepEqual(resourceConflictPage(rows,80,"71"),rows);
+ assert.deepEqual(resourceConflictPage(rows,40,"missing"),rows.slice(0,40));
 });

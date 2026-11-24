@@ -1835,3 +1835,5 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .atlas-conflict-check input{flex:0 0 auto;margin-top:1px}
 .atlas-conflict-resolution .atlas-amendment-analysis{max-width:100%;overflow-wrap:anywhere}
 @media(max-width:900px){.atlas-conflict-options{grid-template-columns:minmax(0,1fr)}}
+
+.atlas-conflict-work-link{display:block;margin-top:4px;text-align:left}

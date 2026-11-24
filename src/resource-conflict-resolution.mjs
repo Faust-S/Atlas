@@ -59,6 +59,30 @@ function contextView(c){
 export function inspectResourceConflictResolution(snapshot,resourceId){
  return contextView(buildContext(snapshot,resourceId));
 }
+/**
+ * Navigate with exact current Work identity, not just its title or an old
+ * resource name. The same read-only projection used by the resource table
+ * decides whether a conflict still exists.
+ * @param {any} resources
+ * @param {string} resourceId
+ * @param {{projectId:string,workId:string}|null} [focus]
+ */
+export function resourceConflictEntry(resources,resourceId,focus=null){
+ const group=resources?.byId?.get(resourceId);
+ if(!group||!group.overloadDays&&!group.unavailableDays)
+  throw Error("У ресурса больше нет известного конфликта.");
+ if(focus&&(!group.work.some(w=>w.projectId===focus.projectId&&w.id===focus.workId)||
+  !resourceWorkConflicts(group,focus.projectId).has(focus.workId)))
+  throw Error("Выбранная работа больше не участвует в конфликте этого ресурса.");
+ return {resourceId,focus:focus?{projectId:focus.projectId,workId:focus.workId}:null};
+}
+/** Keep one directly opened resource visible without rendering every earlier row. */
+export function resourceConflictPage(people,limit,resourceId=null){
+ const rows=people.slice(0,limit);
+ if(!resourceId||limit<1||rows.some(r=>r.id===resourceId))return rows;
+ const selected=people.find(r=>r.id===resourceId);
+ return selected?[selected,...rows.slice(0,-1)]:rows;
+}
 function normalize(c,input){
  const participant=x=>c.participants.find(w=>w.id===key(x?.projectId,x?.workId));
  const primary=participant(input?.focus),other=input?.companion==null?null:participant(input.companion);

@@ -12,6 +12,7 @@ type Props={
  data:any;dates:any;resources:any;reviews:any[];sourceQueue:any;ecosystemRows:any[];
  dirty:boolean;onPortfolio:()=>void;onNewProject:()=>void;onConnect:()=>void;
  onOpenProject:(id:string,page?:Page)=>void;onResources:()=>void;
+ onOpenResourceConflict:(resourceId:string)=>void;
  onCalendar:()=>void;onReview:()=>void;onEcosystem:()=>void;onPlanSets:()=>void;onHistory:(projectId:string)=>void;
 };
 function initialLayout(){
@@ -27,7 +28,7 @@ const status:Record<string,string>={
 };
 const count=(value:number)=>value.toLocaleString("ru-RU");
 export function AtlasDashboard({data,dates,resources,reviews,sourceQueue,ecosystemRows,dirty,
- onPortfolio,onNewProject,onConnect,onOpenProject,onResources,onCalendar,onReview,onEcosystem,onPlanSets,onHistory}:Props){
+ onPortfolio,onNewProject,onConnect,onOpenProject,onResources,onOpenResourceConflict,onCalendar,onReview,onEcosystem,onPlanSets,onHistory}:Props){
  const [layout,setLayout]=useState<string[]>(initialLayout);
  const [editing,setEditing]=useState(false);
  const [dragged,setDragged]=useState<string|null>(null);
@@ -96,7 +97,9 @@ export function AtlasDashboard({data,dates,resources,reviews,sourceQueue,ecosyst
    </div>:<div className="atlas-dash-empty">Нет новых запросов на пересмотр плана по подтверждённым изменениям источников.</div>;
    case "resources":return (resources.people??[]).length?<div className="atlas-dash-rows">
     {(resources.people??[]).slice(0,5).map((r:any)=><div className="atlas-dash-row" key={r.id}><div>
-     <strong>{r.label}</strong><small>{r.itemCount} работ · мощность {r.capacityPct}%</small></div>
+     {r.overloadDays>0||r.unavailableDays>0?<button type="button" className="atlas-dash-link"
+      aria-label={"Устранить конфликт ресурса "+r.label} onClick={()=>onOpenResourceConflict(r.id)}>{r.label}</button>:<strong>{r.label}</strong>}
+     <small>{r.itemCount} работ · мощность {r.capacityPct}%</small></div>
      <span className={r.overloadDays>0||r.unavailableDays>0?"atlas-dash-warn":"atlas-dash-ok"}>
       {r.overloadDays>0?"Перегрузка "+r.overloadDays+" дн.":r.unavailableDays>0?"Вне доступности "+r.unavailableDays+" дн.":"Без выявленной перегрузки"}
      </span>
