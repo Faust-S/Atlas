@@ -219,13 +219,16 @@ root.addEventListener("click",event=>{
    const projectId=decodeURIComponent(parts[0]||""),panel=parts[1]||"project";
    const selectors={response:"#atlas-project-response",schedule:"#atlas-project-schedule",
     relations:"#atlas-project-relations",evidence:"#atlas-trace",
-    sources:"#atlas-project-sources",project:"#atlas-project-response"};
+    sources:"#atlas-project-sources",project:"#atlas-project-response",changes:"#atlas-plan-amendments"};
    if(!ready||!data.projects.some(p=>p.id===projectId)||!Object.hasOwn(selectors,panel))
     throw Error("Указанный проект или раздел не найден");
-   active=projectId;editorAction=null;traceMode="all";graphMode="all";render();
    const ref=parts.length>2?decodeURIComponent(parts.slice(2).join(":")):"";
+   const change=panel==="changes"&&data.projects.find(p=>p.id===projectId)?.changes?.find(c=>c.id===ref);
+   previewAmendment=change?.planAmendments?.length&&!change.planAppliedAt?ref:null;
+   active=projectId;editorAction=null;traceMode="all";graphMode="all";render();
    const id=ref&&panel==="response"?"atlas-cause-"+encodeURIComponent(ref):
-    ref&&panel==="evidence"?"atlas-target-"+encodeURIComponent(ref):null;
+    ref&&panel==="evidence"?"atlas-target-"+encodeURIComponent(ref):
+    change?"atlas-amendment-"+encodeURIComponent(ref):null;
    const target=(id?document.getElementById?.(id):null)||document.querySelector(selectors[panel]);
    target?.focus?.({preventScroll:true});target?.scrollIntoView?.({block:"start",behavior:"auto"});
    return;

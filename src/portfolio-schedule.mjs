@@ -2,6 +2,7 @@
 // Reuses the existing CPM and the existing project dependency DAG; no new store.
 import {validatePortfolioLinks} from "./portfolio.mjs";
 import {scheduleProject} from "./planning.mjs";
+import {changePlanningState} from "./response.mjs";
 
 const DAY = 86400000;
 const MIN_DAY = Date.parse("0000-01-01T00:00:00Z") / DAY;
@@ -73,8 +74,13 @@ export function portfolioSchedule(snapshot) {
   const deadlineSlipDays=dueDay!==null && projectedFinishDay!==null ? Math.max(0,projectedFinishDay-dueDay) : null;
   const limitingParents=upstreamReadyDay!==null?parents.filter(row=>row.projectedFinishDay===upstreamReadyDay).map(row=>row.id):[];
   const approvedChanges=(p.changes||[]).filter(c=>["approved","in_progress","implemented"].includes(c.status));
-  const changedWork=p.items.filter(item=>item.changeId&&approvedChanges.some(change=>change.id===item.changeId));
-  const unplannedChanges=approvedChanges.filter(change=>["approved","in_progress"].includes(change.status)&&!p.items.some(item=>item.changeId===change.id));
+  const approvedIds=new Set(approvedChanges.map(c=>c.id));
+  const changedWork=p.items.filter(item=>item.changeId&&approvedIds.has(item.changeId));
+  const linkedChangeIds=new Set(p.items.map(item=>item.changeId).filter(Boolean));
+  const states=new Map(approvedChanges.map(c=>[c.id,changePlanningState(c,linkedChangeIds)]));
+  const unplannedChanges=approvedChanges.filter(c=>states.get(c.id)==="work_missing");
+  const pendingPlanChanges=approvedChanges.filter(c=>states.get(c.id)==="plan_pending");
+  const appliedPlanChanges=approvedChanges.filter(c=>states.get(c.id)==="plan_applied");
   const notes=[];
   if(!hasEstimate)notes.push("Работы с оценками длительности отсутствуют");
   if(inactive(p))notes.push(p.status==="cancelled"?
@@ -89,7 +95,9 @@ export function portfolioSchedule(snapshot) {
   if(shiftDays>0)notes.push("Начало потребует пересмотра: +"+shiftDays+" дн. относительно указанного плана");
   if(deadlineSlipDays>0)notes.push("Расчётное превышение дедлайна: "+deadlineSlipDays+" дн.");
   if(dueDay===null)notes.push("Контрольная дата не установлена");
-  if(unplannedChanges.length)notes.push("Утверждённые изменения без открытой работы: "+unplannedChanges.length);
+  if(unplannedChanges.length)notes.push("Утверждённые изменения без связанной работы: "+unplannedChanges.length);
+  if(pendingPlanChanges.length)notes.push("Утверждённые корректировки ожидают применения: "+pendingPlanChanges.length);
+  if(appliedPlanChanges.length)notes.push("Корректировки плана применены: "+appliedPlanChanges.length);
   if(p.status==="completed")notes.push("Завершение проекта заявлено, независимая приёмка не установлена");
   byId.set(id,{
    id,name:p.name,status:p.status,declaredStart:p.startDate||null,deadline:p.dueDate||null,
@@ -101,8 +109,10 @@ export function portfolioSchedule(snapshot) {
    shiftDays,deadlineSlipDays,limitingParents,incoming:[...incoming],
    changedWork:changedWork.map(w=>({id:w.id,title:w.title,estimateDays:w.estimateDays??1,changeId:w.changeId})),
    approvedChanges:approvedChanges.map(c=>({id:c.id,title:c.title,status:c.status})),
-   unplannedChanges:unplannedChanges.map(c=>c.id),notes,
-   needsReview:inactive(p)||shiftDays>0||deadlineSlipDays>0||missingParents.length>0||unplannedChanges.length>0||!hasEstimate||(!incoming.length&&plannedStartDay===null),
+   unplannedChanges:unplannedChanges.map(c=>c.id),
+   pendingPlanChanges:pendingPlanChanges.map(c=>c.id),
+   appliedPlanChanges:appliedPlanChanges.map(c=>c.id),notes,
+   needsReview:inactive(p)||shiftDays>0||deadlineSlipDays>0||missingParents.length>0||unplannedChanges.length>0||pendingPlanChanges.length>0||!hasEstimate||(!incoming.length&&plannedStartDay===null),
    // Explicit dates/requirements can be absent; never invent complete delivery.
    confidence:projectedFinishDay===null?"undated":"calendar_estimate_only"
   });
@@ -112,7 +122,9 @@ export function portfolioSchedule(snapshot) {
   totals:{projects:rows.length,dated:rows.filter(r=>r.projectedFinish!==null).length,
    needsReview:rows.filter(r=>r.needsReview).length,
    deadlineRisks:rows.filter(r=>r.deadlineSlipDays>0).length,
-   unknown:rows.filter(r=>r.projectedFinish===null).length},
+   unknown:rows.filter(r=>r.projectedFinish===null).length,
+   pendingPlans:rows.reduce((n,r)=>n+r.pendingPlanChanges.length,0),
+   appliedPlans:rows.reduce((n,r)=>n+r.appliedPlanChanges.length,0)},
   warning:"Расчётные календарные даты не являются прогнозом фактического выполнения или подтверждённой приёмкой"};
 }
 export function renderPortfolioSchedule(snapshot, escape=escapeHtml){

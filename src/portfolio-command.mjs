@@ -60,9 +60,14 @@ export function buildPortfolioCommand(snapshot,{now=new Date().toISOString(),imp
   if(response.proposed>0)
    add("decisions","Предложения ожидают решения: "+response.proposed,
     "Утверждение требует явного решения и обоснования","response");
-  if(response.approvedWithoutWork>0)
-   add("decisions","Утверждено без связанных работ: "+response.approvedWithoutWork,
-    "Создайте работу по принятому изменению","response");
+  if(schedule.pendingPlanChanges.length>0){
+   const id=schedule.pendingPlanChanges[0];
+   add("decisions","Утверждённый план ожидает применения: "+schedule.pendingPlanChanges.length,
+    "Откройте сценарий, проверьте текущий расчёт и отдельно примените утверждённую корректировку","changes",id,1);
+  }
+  if(schedule.unplannedChanges.length>0)
+   add("decisions","Утверждено без связанных работ: "+schedule.unplannedChanges.length,
+    "Создайте работу по принятому изменению","changes",schedule.unplannedChanges[0]);
   if(response.unplanned>0 && !signals.some(s=>s.kind==="blocked"&&s.panel==="response"))
    add("planning","Причины без активного плана: "+response.unplanned,
     "Предложения не создаются автоматически","response");
@@ -99,6 +104,7 @@ export function buildPortfolioCommand(snapshot,{now=new Date().toISOString(),imp
   return {
    id:project.id,name:project.name,type:project.type,status:project.status,
    required,attention:impact.attention,proposed:response.proposed,
+   pendingPlans:schedule.pendingPlanChanges.length,
    affected:chain.downstreamAll.length,deadline:schedule.deadline,
    projectedFinish:schedule.projectedFinish,slip:schedule.deadlineSlipDays,
    dependencies,signals,primary,rank:primary.priority,
@@ -114,6 +120,7 @@ export function buildPortfolioCommand(snapshot,{now=new Date().toISOString(),imp
   evidence:rows.reduce((n,r)=>n+r.attention,0),
   missingCriteria:rows.filter(r=>r.required===0).length,
   decisions:rows.reduce((n,r)=>n+r.proposed,0),
+  pendingPlans:rows.reduce((n,r)=>n+r.pendingPlans,0),
   unknownDates:schedules.totals.unknown
  },warning:"Это очередь рассмотрения по наблюдаемым сведениям и расчётам; она не подтверждает готовность продуктов"};
 }
@@ -139,7 +146,8 @@ export function renderPortfolioCommandRows(model,{filter="all",search="",escape=
   const flags=[
    row.attention?row.attention+" требований к проверке":null,
    row.affected?row.affected+" зависимых проектов":null,
-   row.proposed?row.proposed+" решений ожидается":null
+   row.proposed?row.proposed+" решений ожидается":null,
+   row.pendingPlans?row.pendingPlans+" корректировок ожидают применения":null
   ].filter(Boolean).join(" · ");
   return '<article class="atlas-command-row"><div class="atlas-command-project">'+
    '<strong>'+escape(row.name)+'</strong><small>'+escape(row.type||"project")+' · '+escape(row.status)+'</small>'+
@@ -163,7 +171,8 @@ export function renderPortfolioCommand(model,{filter="all",search="",escape=esca
   '<div class="atlas-kpis"><div><small>Потенциально затронуты блокировкой</small><strong>'+t.blocked+'</strong></div>'+
   '<div><small>Риск дедлайна</small><strong>'+t.dates+'</strong></div>'+
   '<div><small>Требования к проверке</small><strong>'+t.evidence+'</strong></div>'+
-  '<div><small>Ожидают решения</small><strong>'+t.decisions+'</strong></div></div>'+
+  '<div><small>Ожидают решения</small><strong>'+t.decisions+'</strong></div>'+
+  '<div><small>Ожидают применения</small><strong>'+t.pendingPlans+'</strong></div></div>'+
   '<div class="row atlas-command-controls"><label for="atlas-command-filter">Причина</label><select id="atlas-command-filter">'+
   options.map(([value,title])=>'<option value="'+value+'"'+(value===filter?' selected':'')+'>'+title+'</option>').join("")+'</select>'+
   '<label for="atlas-command-search">Поиск</label><input id="atlas-command-search" type="search" placeholder="Название проекта или проблема" value="'+escape(search)+'"></div>'+

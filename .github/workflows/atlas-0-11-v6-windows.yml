@@ -89,6 +89,16 @@ jobs:
           ./desktop/installer/build-setup-core.ps1 -InstallForQualification
           if ($LASTEXITCODE -ne 0) { throw 'ATLAS11_NATIVE_SETUP_FAILED' }
 
+      - name: Preserve built candidate for diagnosis (not accepted)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Atlas-0.12-unqualified-candidate-${{ github.sha }}
+          path: |
+            artifacts/IWXA-Atlas-0.12.0-dev.1-Setup.exe
+            artifacts/IWXA-Atlas-0.12.0-dev.1-Setup.exe.sha256
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Prepare real 1212 Work user-path IWXA package
         shell: pwsh
         run: |
@@ -146,16 +156,40 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'ATLAS11_NATIVE_V6_USER_ROUTE_FAIL' }
           python desktop/tests/installed-atlas11-portfolio-impact.py
           if ($LASTEXITCODE -ne 0) { throw 'ATLAS11_NATIVE_PORTFOLIO_IMPACT_FAIL' }
+
+      # Collect independent evidence from both routes on the same exact build.
+      # A failing resource scenario must not hide a separate compound scenario.
+      # The final gate below still rejects either failed qualification.
+      - name: Qualify resource choices and dependency routes
+        id: resource_qualification
+        continue-on-error: true
+        shell: pwsh
+        timeout-minutes: 20
+        run: |
+          $ErrorActionPreference = 'Stop'
           python desktop/tests/installed-atlas12-resource-alternatives.py
           if ($LASTEXITCODE -ne 0) { throw 'ATLAS12_NATIVE_RESOURCE_ALTERNATIVES_FAIL' }
 
       - name: Qualify multi-Work scenarios, approved plan application and cold restore
+        id: compound_qualification
+        continue-on-error: true
         shell: pwsh
         timeout-minutes: 12
         run: |
           $ErrorActionPreference = 'Stop'
           python desktop/tests/installed-atlas12-plan-alternatives.py
           if ($LASTEXITCODE -ne 0) { throw 'ATLAS12_NATIVE_PLAN_ALTERNATIVES_FAIL' }
+
+      - name: Require both resource and compound native qualifications
+        shell: pwsh
+        env:
+          RESOURCE_OUTCOME: ${{ steps.resource_qualification.outcome }}
+          COMPOUND_OUTCOME: ${{ steps.compound_qualification.outcome }}
+        run: |
+          if ($env:RESOURCE_OUTCOME -ne 'success' -or $env:COMPOUND_OUTCOME -ne 'success') {
+            throw "ATLAS12_NATIVE_HOLD resource=$env:RESOURCE_OUTCOME compound=$env:COMPOUND_OUTCOME"
+          }
+          Write-Host 'ATLAS12_NATIVE_RESOURCE_AND_COMPOUND_PASS'
 
       - name: Preserve accepted development installer and SHA-256
         if: success()

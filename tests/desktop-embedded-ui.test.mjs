@@ -147,7 +147,8 @@ test("source-bound portfolio cause focuses the exact existing fact card",()=>{
 test("source-bound fact links to the existing response editor, exact change and human decision",()=>{
  assert.match(main,/r\.cause\?\.needsProposal&&<Action onClick=\{\(\)=>openEditor\("respond:"\+encodeURIComponent\(r\.cause\.key\)\)\}/);
  assert.match(main,/r\.cause\?\.activeChange&&<Action onClick=\{\(\)=>openProjectTab\(project\.id,"changes",r\.cause\.activeChange\.id\)\}/);
- assert.match(main,/r\.cause\?\.approvedWithoutWork&&r\.cause\.activeChange/);
+ assert.match(main,/r\.cause\?\.approvedWithoutWork&&r\.cause\.workMissingChangeId/);
+ assert.match(main,/r\.cause\?\.pendingPlanChangeId/);
  assert.match(main,/openEditor\("work-change:"\+r\.cause\.activeChange\.id\)/);
  assert.match(main,/setChangeJump\(\{projectId:id,changeId\}\)/);
  assert.match(main,/aria-label=\{"Изменение: "\+c\.title\+" — "\+project\.name\}/);

@@ -1430,11 +1430,14 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   // reference no longer exists, open the overview without a false selection.
   const target:Tab=signal.panel==="evidence"?"overview":
    signal.panel==="sources"?"sources":signal.panel==="schedule"?"timeline":
+   signal.panel==="changes"?"changes":
    signal.panel==="response"?(signal.kind==="blocked"?"work":"changes"):"overview";
   const validTarget=signal.panel==="evidence"&&Boolean(signal.ref)&&
    data.projects.find((p:any)=>p.id===projectId)?.targets?.some((t:any)=>t.id===signal.ref);
   // Read-only navigation: approval and local native Save remain explicit.
-  openProjectTab(projectId,target);
+  const validChange=signal.panel==="changes"&&signal.ref&&
+   data.projects.find((p:any)=>p.id===projectId)?.changes?.some((c:any)=>c.id===signal.ref);
+  openProjectTab(projectId,target,validChange?signal.ref!:null);
   if(validTarget)setRequirementJump({projectId,targetId:signal.ref!});
   if(signal.panel==="relations"){
    setShowProjectRelations(true);
@@ -2390,7 +2393,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      </div>
      <p className="minor">Блокировки: {portfolioCommand.totals.blocked} · Риски срока: {portfolioCommand.totals.dates} ·
       Требования к проверке: {portfolioCommand.totals.evidence} · Без утверждённых критериев: {portfolioCommand.totals.missingCriteria} ·
-       Предложения к решению: {portfolioCommand.totals.decisions}</p>
+       Предложения к решению: {portfolioCommand.totals.decisions} ·
+       Утверждённые планы к применению: {portfolioCommand.totals.pendingPlans}</p>
      {attentionRows.length?<div className="atlas-command-list">
       {attentionRows.slice(0,attentionLimit).map((row:any)=><article className="atlas-command-entry" key={row.id}>
        <div className="atlas-command-project"><button type="button" className="text-link"
@@ -2695,9 +2699,10 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
             Изменение по причине</Action>}
            {r.change&&r.change.id!==r.cause?.activeChange?.id&&
             <Action onClick={()=>openProjectTab(project.id,"changes",r.change.id)}>Связанное изменение</Action>}
-           {r.cause?.approvedWithoutWork&&r.cause.activeChange&&
-            ["approved","in_progress"].includes(r.cause.activeChange.status)&&
-            <Action onClick={()=>openEditor("work-change:"+r.cause.activeChange.id)}>Добавить работу по решению</Action>}
+           {r.cause?.pendingPlanChangeId&&
+            <Action onClick={()=>openProjectTab(project.id,"changes",r.cause.pendingPlanChangeId)}>Рассмотреть утверждённый план</Action>}
+           {r.cause?.approvedWithoutWork&&r.cause.workMissingChangeId&&
+            <Action onClick={()=>openEditor("work-change:"+r.cause.workMissingChangeId)}>Добавить работу по решению</Action>}
           </div>
          </div>
         </div>

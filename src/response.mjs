@@ -6,6 +6,16 @@ const statusLabel = {proposed:'Предложено',approved:'Утвержде�
 const activeChangeStatuses = new Set(['proposed','approved','in_progress']);
 const signalOrder={blocked:0,review:1,planning:2};
 
+// This is a derived disposition of the existing change record, not a
+// second workflow or execution state. A concrete plan never needs a
+// fabricated linked Work merely to satisfy a dashboard count.
+export function changePlanningState(change,linkedChangeIds){
+ if(change.planAppliedAt)return 'plan_applied';
+ if(!['approved','in_progress'].includes(change.status))return 'inactive';
+ if(change.planAmendments?.length)return 'plan_pending';
+ return linkedChangeIds.has(change.id)?'work_linked':'work_missing';
+}
+
 export function validCauseKey(project,key){
  if(typeof key!=='string'||key.length>180)return false;
  if(['project-stopped','completion-review','criteria-missing'].includes(key))return true;
@@ -74,18 +84,25 @@ export function responseState(project,impact){
  const signals=projectSignals(project,impact);
  const known=new Map(signals.map(s=>[s.key,s]));
  const changes=project.changes||[],work=project.items||[],decisions=project.decisions||[];
+ const linkedChangeIds=new Set(work.map(item=>item.changeId).filter(Boolean));
+ const states=new Map(changes.map(c=>[c.id,changePlanningState(c,linkedChangeIds)]));
  const rows=signals.map(signal=>{
   const related=changes.filter(change=>change.causeKey===signal.key);
   const active=related.filter(change=>activeChangeStatuses.has(change.status));
   const linkedWork=work.filter(item=>related.some(change=>change.id===item.changeId));
   const linkedDecisions=decisions.filter(decision=>related.some(change=>change.id===decision.changeId));
+  const workMissingIds=active.filter(c=>states.get(c.id)==='work_missing').map(c=>c.id);
+  const pendingPlanIds=active.filter(c=>states.get(c.id)==='plan_pending').map(c=>c.id);
+  const appliedPlanIds=related.filter(c=>states.get(c.id)==='plan_applied').map(c=>c.id);
   return {...signal,changes:related,activeChanges:active,work:linkedWork,decisions:linkedDecisions,
-   needsProposal:active.length===0,
-   approvedWithoutWork:active.some(change=>['approved','in_progress'].includes(change.status)&&!linkedWork.some(item=>item.changeId===change.id))};
+   needsProposal:active.length===0,workMissingIds,pendingPlanIds,appliedPlanIds,
+   approvedWithoutWork:workMissingIds.length>0};
  });
  return {rows,signals:signals.length,unplanned:rows.filter(row=>row.needsProposal).length,
   proposed:rows.reduce((sum,row)=>sum+row.activeChanges.filter(c=>c.status==='proposed').length,0),
   approvedWithoutWork:rows.filter(row=>row.approvedWithoutWork).length,
+  pendingPlans:rows.reduce((n,row)=>n+row.pendingPlanIds.length,0),
+  appliedPlans:rows.reduce((n,row)=>n+row.appliedPlanIds.length,0),
   resolved:changes.filter(change=>change.causeKey&&!known.has(change.causeKey)).length};
 }
 
@@ -97,7 +114,9 @@ export function portfolioResponses(snapshot,inspectProject){
  return {rows,signals:rows.reduce((sum,row)=>sum+row.signals,0),
   unplanned:rows.reduce((sum,row)=>sum+row.unplanned,0),
   proposed:rows.reduce((sum,row)=>sum+row.proposed,0),
-  approvedWithoutWork:rows.reduce((sum,row)=>sum+row.approvedWithoutWork,0)};
+  approvedWithoutWork:rows.reduce((sum,row)=>sum+row.approvedWithoutWork,0),
+  pendingPlans:rows.reduce((sum,row)=>sum+row.pendingPlans,0),
+  appliedPlans:rows.reduce((sum,row)=>sum+row.appliedPlans,0)};
 }
 
 export function renderProjectResponses(project,impact,escape=ESCAPE){
@@ -109,7 +128,9 @@ export function renderProjectResponses(project,impact,escape=ESCAPE){
    const status='<span class="tag">'+escape(statusLabel[change.status]||change.status)+'</span>';
    let actions='';
    if(change.status==='proposed'||change.status==='deferred')actions='<button data-action="change:'+escape(change.id)+'">Рассмотреть</button>';
-   if(change.status==='approved'||change.status==='in_progress')actions='<button data-action="work-change:'+escape(change.id)+'">＋ Работа по изменению</button>';
+   if(row.pendingPlanIds.includes(change.id))actions='<button data-action="preview-amendment:'+escape(change.id)+'">Рассмотреть утверждённый план</button>';
+   else if(row.appliedPlanIds.includes(change.id))actions='<span class="muted">План применён</span>';
+   else if(change.status==='approved'||change.status==='in_progress')actions='<button data-action="work-change:'+escape(change.id)+'">＋ Работа по изменению</button>';
    const logs=decisions.map(d=>'<div class="muted">Решение: '+escape(d.text)+' · '+escape(d.at||'')+'</div>').join('');
    const linked=jobs.map(item=>'<div class="muted">Работа: '+escape(item.title)+' · '+escape(item.state)+'</div>').join('');
    return '<div class="atlas-response-plan"><strong>'+escape(change.title)+'</strong> '+status+' '+actions+logs+linked+'</div>';
@@ -118,7 +139,7 @@ export function renderProjectResponses(project,impact,escape=ESCAPE){
   return '<div id="atlas-cause-'+escape(encodeURIComponent(row.key))+'" tabindex="-1" class="atlas-response-row atlas-focus-target"><div><strong>'+escape(row.title)+'</strong><p class="muted">'+escape(row.detail)+'</p></div><div>'+plans+propose+'</div></div>';
  }).join('');
  return '<section class="card atlas-response"><h2>Устранение причин и решения</h2><p class="muted">Сигнал → предлагаемое изменение → решение человека → плановая работа. Никаких автоматических утверждений и запусков исполнителей.</p>'+
-  '<div class="atlas-kpis"><div><small>Сигналы</small><strong>'+state.signals+'</strong></div><div><small>Без активного плана</small><strong>'+state.unplanned+'</strong></div><div><small>Ожидают решения</small><strong>'+state.proposed+'</strong></div><div><small>Утверждено без работы</small><strong>'+state.approvedWithoutWork+'</strong></div></div>'+
+  '<div class="atlas-kpis"><div><small>Сигналы</small><strong>'+state.signals+'</strong></div><div><small>Без активного плана</small><strong>'+state.unplanned+'</strong></div><div><small>Ожидают решения</small><strong>'+state.proposed+'</strong></div><div><small>Утверждено без работы</small><strong>'+state.approvedWithoutWork+'</strong></div><div><small>План ожидает применения</small><strong>'+state.pendingPlans+'</strong></div></div>'+
   (rows?'<div class="atlas-response-list">'+rows+'</div>':'<p class="muted">Активных сигналов для действий не найдено; это не подтверждение готовности.</p>')+
   (state.resolved?'<p class="muted">Исторических изменений, причины которых больше не наблюдаются: '+state.resolved+'. Они остаются в журнале изменений.</p>':'')+
   (state.rows.length>60?'<p class="muted">Показаны первые 60 сигналов.</p>':'')+'</section>';
@@ -128,6 +149,6 @@ export function renderPortfolioResponses(snapshot,inspectProject,escape=ESCAPE){
  const value=portfolioResponses(snapshot,inspectProject);
  const rows=value.rows.filter(r=>r.signals).slice(0,100).map(row=>'<tr><td><button class="atlas-plain-button" data-action="open:'+escape(row.projectId)+'">'+escape(row.name)+'</button></td><td>'+row.signals+'</td><td>'+row.unplanned+'</td><td>'+row.proposed+'</td><td>'+row.approvedWithoutWork+'</td></tr>').join('');
  return '<section class="card"><h2>Решения и устранение проблем</h2><p class="muted">Планы действий привязаны к установленным причинам; окончательное утверждение и выполнение остаются за человеком или уполномоченным исполнителем.</p>'+
- '<div class="atlas-kpis"><div><small>Сигналы</small><strong>'+value.signals+'</strong></div><div><small>Без плана</small><strong>'+value.unplanned+'</strong></div><div><small>Ожидают решения</small><strong>'+value.proposed+'</strong></div><div><small>Утверждены без работ</small><strong>'+value.approvedWithoutWork+'</strong></div></div>'+
+ '<div class="atlas-kpis"><div><small>Сигналы</small><strong>'+value.signals+'</strong></div><div><small>Без плана</small><strong>'+value.unplanned+'</strong></div><div><small>Ожидают решения</small><strong>'+value.proposed+'</strong></div><div><small>Утверждены без работ</small><strong>'+value.approvedWithoutWork+'</strong></div><div><small>План ожидает применения</small><strong>'+value.pendingPlans+'</strong></div></div>'+
  (rows?'<div class="atlas-table-scroll"><table class="atlas-table"><thead><tr><th>Проект</th><th>Сигналы</th><th>Без плана</th><th>Предложено</th><th>Нет работы</th></tr></thead><tbody>'+rows+'</tbody></table></div>':'<p class="muted">Пока нет сигналов, требующих действий. Это не подтверждение готовности.</p>')+'</section>';
 }

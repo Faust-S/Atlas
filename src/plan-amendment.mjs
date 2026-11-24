@@ -439,7 +439,7 @@ export function renderProjectPlanAmendments(snapshot,projectId,{previewId=null,e
  const project=snapshot.projects.find(p=>p.id===projectId);
  if(!project)return "";
  const changes=(project.changes||[]).filter(c=>c.planAmendments?.length||
-  ["proposed","deferred"].includes(c.status)).slice(-25).reverse();
+  ["proposed","deferred","approved","in_progress"].includes(c.status)).slice(-25).reverse();
  if(!changes.length)return "";
  const cards=changes.map(change=>{
   const actions=change.planAmendments||[],canEdit=eligible(change);
@@ -453,6 +453,8 @@ export function renderProjectPlanAmendments(snapshot,projectId,{previewId=null,e
   if(actions.length&&!change.planAppliedAt)buttons+='<button data-action="preview-amendment:'+escape(change.id)+'">'+
    (previewId===change.id?"Скрыть расчёт":"Посмотреть последствия")+'</button> ';
   if(canEdit&&actions.length)buttons+='<button data-action="change:'+escape(change.id)+'">Рассмотреть утверждение</button> ';
+  if(!actions.length&&["approved","in_progress"].includes(change.status))
+   buttons+='<button data-action="work-change:'+escape(change.id)+'">Создать связанную работу</button> ';
   const list=actions.map(a=>'<li>'+escape(describe(project,a))+
    (canEdit?' <button data-action="remove-amendment:'+escape(change.id)+':'+escape(encodeURIComponent(key(a)))+'">Убрать</button>':"")+'</li>').join("");
   let preview="";
@@ -482,7 +484,7 @@ export function renderProjectPlanAmendments(snapshot,projectId,{previewId=null,e
        '<button class="primary" data-action="apply-amendment:'+escape(change.id)+'">Применить утверждённую корректировку</button>':"");
    }catch(e){preview='<p class="atlas-source-error">Применение приостановлено: '+escape(e.message||String(e))+'</p>'}
   }
-  return '<article class="atlas-response-plan"><h3>'+escape(change.title)+'</h3>'+
+  return '<article class="atlas-response-plan" id="atlas-amendment-'+escape(encodeURIComponent(change.id))+'" tabindex="-1"><h3>'+escape(change.title)+'</h3>'+
    '<p class="muted">Статус: '+escape(change.status)+(change.planAppliedAt?" · план изменён "+escape(change.planAppliedAt):"")+'</p>'+
    (list?'<ul>'+list+'</ul>':'<p class="muted">Конкретные параметры пока не указаны.</p>')+
    '<div class="row">'+buttons+'</div>'+preview+'</article>';
