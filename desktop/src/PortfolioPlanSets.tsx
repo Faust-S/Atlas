@@ -86,7 +86,8 @@ export function PortfolioPlanSets({snapshot,onOpen,onApply,selection,onSelection
      <strong>{o.id==="A"?"Вариант А":"Вариант Б"}</strong>
      {o.valid?<><p role="status" tabIndex={-1}>{"Работ с конфликтами ресурсов: "+o.assessment.conflictedWorkBefore+" → "+o.assessment.conflictedWorkAfter}</p>
       <small>{"Перегрузка: "+o.preview.resourceBefore.overloadDays+" → "+o.preview.resourceAfter.overloadDays+" ресурс-дн."}</small>
-      {!o.canApply&&o.members.length>=2&&<p role="status" tabIndex={-1}>Для совместного применения сначала отдельно утвердите все заявки.</p>}</>:<p role="alert">{o.reason}</p>}
+      {o.preview.applicationBlocker?<p role="alert" tabIndex={-1}>{o.preview.applicationBlocker}</p>:
+       !o.canApply&&o.members.length>=2&&<p role="status" tabIndex={-1}>Для совместного применения сначала отдельно утвердите все заявки.</p>}</>:<p role="alert">{o.reason}</p>}
     </div>)}</div>
     {result.summary&&<div className="atlas-plan-set-summary">
      <p>{"Единая база сравнения: "+result.summary.comparableProjects+" из "+result.summary.projectCount+
@@ -154,7 +155,7 @@ export function PortfolioPlanSets({snapshot,onOpen,onApply,selection,onSelection
       </div>)}
       {o.valid&&(o.canApply?<button type="button" className="action-button" disabled={disabled||rationale.trim().length<8}
        onClick={()=>onApply(result,o.id,rationale)} aria-label={"Применить согласованный "+name}>Применить согласованный план</button>:
-       <p className="minor">{o.members.length<2?"Одну заявку применяйте в её проекте.":"Сначала утвердите заявки в соответствующих проектах."}</p>)}
+       <p className="minor">{o.preview.applicationBlocker??(o.members.length<2?"Одну заявку применяйте в её проекте.":"Сначала утвердите заявки в соответствующих проектах.")}</p>)}
      </div>;
     })}</div>
     <p className="minor">Применение всех утверждённых корректировок создаёт одну новую редакцию черновика. После подтверждения сохраните её обычным способом. Расчёт не подтверждает фактическое исполнение или доступность.</p>

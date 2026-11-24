@@ -6,7 +6,7 @@ import {portfolioResources} from "../src/portfolio-resources.mjs";
 import {addPortfolioLink} from "../src/portfolio.mjs";
 import {capturePlanBaseline} from "../src/plan-baseline.mjs";
 import {decideChange} from "../src/trace.mjs";
-import {comparePortfolioPlanSets,applyPortfolioPlanSet,applyPlanAmendment} from "../src/plan-amendment.mjs";
+import {comparePortfolioPlanSets,applyPortfolioPlanSet,applyPlanAmendment,previewPlanAmendment,inspectPlanAmendment,setPlanDates} from "../src/plan-amendment.mjs";
 import {inspectResourceLeveling,compareResourceLeveling,createResourceLevelingProposals} from "../src/resource-leveling.mjs";
 
 const rationale="Руководитель согласовал допустимый перенос начала.";
@@ -49,7 +49,7 @@ test("Ordinary proposals preserve baseline, works, dependencies and explicit app
  assert.equal(p.startDate,old.startDate);assert.equal(p.dueDate,old.dueDate);assert.deepEqual(p.decisions,old.decisions);
  const c=p.changes.at(-1);
  assert.equal(c.status,"proposed");assert.equal(c.planAppliedAt,undefined);
- assert.deepEqual(c.planAmendments,[{kind:"dates",before:{startDate:"2026-11-23",dueDate:"2026-11-29"},after:{startDate:"2026-11-26",dueDate:"2026-11-29"}}]);
+ assert.deepEqual(c.planAmendments,[{kind:"dates",before:{startDate:"2026-11-23",dueDate:"2026-11-29"},after:{startDate:"2026-11-26",dueDate:"2026-11-29"},levelingGuard:{resourceId:f.resourceId,maxDelay:7,preserveDeadlines:true}}]);
  assert.ok(c.description.includes(rationale));
  const comparison=comparePortfolioPlanSets(d.state,d.refs);
  assert.deepEqual(comparison.options[0].preview,r.options[0].preview);
@@ -145,4 +145,96 @@ test("Desktop uses explicit proposal preparation and existing portfolio approval
  assert.match(recovery,/input\.focus\(\{preventScroll:true\}\);input\.scrollIntoView/);
  assert.match(sets,/atlas-plan-set-quick-results/);
  assert.ok(sets.indexOf("atlas-plan-set-quick-results")<sets.indexOf("Сводное сравнение согласованных планов"));
+});
+
+function approvedLeveling(f=fixture()){
+ const r=compareResourceLeveling(f.snapshot,f.resourceId,refs(f.ids));
+ const d=createResourceLevelingProposals(f.snapshot,r,r.options[0].id,{rationale});
+ let state=d.state;
+ for(const ref of d.refs)state=decideChange(state,ref.projectId,ref.changeId,{status:"approved",rationale}).state;
+ return {...f,state,refs:d.refs};
+}
+test("A generated start amendment remains guarded after explicit approval and actual start",()=>{
+ const f=approvedLeveling(),ref=f.refs[0];
+ assert.equal(previewPlanAmendment(f.state,ref.projectId,ref.changeId).applicationBlocker,null);
+ const s=editItem(f.state,ref.projectId,f.works[1],{state:"in_progress",actualStartDate:"2026-11-23"});
+ const raw=serialize(s);
+ assert.throws(()=>previewPlanAmendment(s,ref.projectId,ref.changeId),/уже начат/);
+ assert.throws(()=>applyPlanAmendment(s,ref.projectId,ref.changeId),/уже начат/);
+ const view=inspectPlanAmendment(s,ref.projectId,ref.changeId);
+ assert.equal(view.rows.length,1);assert.equal(view.rows[0].canReview,false);
+ assert.equal(serialize(s),raw);
+});
+test("A later begun downstream project prevents the generated plan from being applied",()=>{
+ const f=approvedLeveling(),ref=f.refs[0];
+ const p=createProject(f.state,{name:"Начатый зависимый проект"});
+ let s=editProject(p.state,p.id,{startDate:"2026-11-23",dueDate:"2026-12-10"});
+ const w=createItem(s,p.id,{title:"Начатая работа"});
+ s=editItem(w.state,p.id,w.id,{state:"in_progress",estimateDays:2});
+ s=addPortfolioLink(s,{from:ref.projectId,to:p.id});
+ const preview=previewPlanAmendment(s,ref.projectId,ref.changeId);
+ assert.match(preview.applicationBlocker,/уже начатого/);
+ assert.throws(()=>applyPlanAmendment(s,ref.projectId,ref.changeId),/уже начатого/);
+});
+test("Resource changes after draft creation cannot transfer the same conflict and apply a stale result",()=>{
+ const f=approvedLeveling(),ref=f.refs[0];
+ const p=createProject(f.state,{name:"Новый заказ"});
+ let s=editProject(p.state,p.id,{startDate:"2026-11-26",dueDate:"2026-12-01"});
+ const w=createItem(s,p.id,{title:"Занять площадку",resourceId:f.resourceId,allocationPct:60});
+ s=editItem(w.state,p.id,w.id,{estimateDays:3});
+ const preview=previewPlanAmendment(s,ref.projectId,ref.changeId);
+ assert.equal(preview.resourceBefore.overloadDays,3);assert.equal(preview.resourceAfter.overloadDays,3);
+ assert.match(preview.applicationBlocker,/больше не уменьшает/);
+ assert.throws(()=>applyPlanAmendment(s,ref.projectId,ref.changeId),/больше не уменьшает/);
+});
+test("Preserving deadlines remains a condition after new pending Work appears",()=>{
+ const f=approvedLeveling(),ref=f.refs[0];
+ const w=createItem(f.state,ref.projectId,{title:"Новая контрольная работа",dueDate:"2026-11-26"});
+ const s=editItem(w.state,ref.projectId,w.id,{estimateDays:3});
+ const preview=previewPlanAmendment(s,ref.projectId,ref.changeId);
+ assert.equal(preview.resourceAfter.overloadDays,0);
+ assert.match(preview.applicationBlocker,/ухудшит известные контрольные сроки/);
+ assert.throws(()=>applyPlanAmendment(s,ref.projectId,ref.changeId),/ухудшит известные/);
+});
+test("An explicitly chosen capacity compromise can still apply with its unchanged known delay",()=>{
+ const f=fixture({dueDates:["2026-11-26","2026-11-27"]});
+ const r=compareResourceLeveling(f.snapshot,f.resourceId,refs(f.ids)),o=r.options.find(x=>x.id==="capacity");
+ const d=createResourceLevelingProposals(f.snapshot,r,o.id,{rationale});
+ const ref=d.refs[0],p=d.state.projects.find(p=>p.id===ref.projectId);
+ assert.equal(p.changes.at(-1).planAmendments[0].levelingGuard.preserveDeadlines,false);
+ const s=decideChange(d.state,ref.projectId,ref.changeId,{status:"approved",rationale}).state;
+ assert.equal(previewPlanAmendment(s,ref.projectId,ref.changeId).applicationBlocker,null);
+ assert.equal(portfolioResources(applyPlanAmendment(s,ref.projectId,ref.changeId).state).byId.get(f.resourceId).overloadDays,0);
+});
+test("The coordinated apply route rechecks the complete set after other resources change",()=>{
+ const f=approvedLeveling(fixture({count:3,dueDates:["2026-12-15","2026-12-15","2026-12-15"],duration:2}));
+ const valid=comparePortfolioPlanSets(f.state,f.refs);
+ assert.equal(valid.options[0].canApply,true);
+ const newResource=addPlanningResource(f.state,{label:"Специальный подъёмник",capacityPct:100});
+ let s=newResource.state;
+ const moving=f.refs[0],own=createItem(s,moving.projectId,{title:"Работа на подъёмнике",resourceId:newResource.id,allocationPct:100});
+ s=editItem(own.state,moving.projectId,own.id,{estimateDays:2});
+ const p=createProject(s,{name:"Независимый заказ подъёмника"});
+ s=editProject(p.state,p.id,{startDate:"2026-11-25",dueDate:"2026-12-05"});
+ const w=createItem(s,p.id,{title:"Другая работа подъёмника",resourceId:newResource.id,allocationPct:100});
+ s=editItem(w.state,p.id,w.id,{estimateDays:6});
+ const comparison=comparePortfolioPlanSets(s,f.refs),o=comparison.options[0];
+ assert.equal(o.valid,true);assert.equal(o.canApply,false);
+ assert.match(o.preview.applicationBlocker,/увеличит агрегированные ресурсные ограничения/);
+ const raw=serialize(s);
+ assert.throws(()=>applyPortfolioPlanSet(s,comparison,"A",{rationale}),/увеличит агрегированные/);
+ assert.equal(serialize(s),raw);
+});
+test("Search never produces dates outside the original valid project horizon",()=>{
+ const f=fixture({dueDates:["2026-11-23","2026-11-23"]});
+ const r=compareResourceLeveling(f.snapshot,f.resourceId,refs(f.ids));
+ assert.equal(r.search.evaluated,64);assert.equal(r.options.length,0);
+});
+test("Generated resource conditions are ordinary immutable draft semantics, not a silent generic date edit",()=>{
+ const f=fixture(),r=compareResourceLeveling(f.snapshot,f.resourceId,refs(f.ids));
+ const d=createResourceLevelingProposals(f.snapshot,r,r.options[0].id,{rationale}),ref=d.refs[0];
+ assert.throws(()=>setPlanDates(d.state,ref.projectId,ref.changeId,{startDate:"2026-11-26",dueDate:"2026-11-30"}),/Invalid resource leveling guard/);
+ const broken=structuredClone(d.state);
+ broken.projects.find(p=>p.id===ref.projectId).changes.at(-1).planAmendments[0].levelingGuard.maxDelay=1;
+ assert.throws(()=>serialize(broken),/Invalid resource leveling guard/);
 });

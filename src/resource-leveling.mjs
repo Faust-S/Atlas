@@ -5,19 +5,17 @@ import {validate} from "./core.mjs";
 import {portfolioSchedule} from "./portfolio-schedule.mjs";
 import {portfolioResources,planningResourceTotals,resourceWorkConflicts} from "./portfolio-resources.mjs";
 import {planChange} from "./trace.mjs";
-import {setPlanDates,comparePortfolioPlanSets} from "./plan-amendment.mjs";
+import {setPlanDates,comparePortfolioPlanSets,canShiftUnstartedProject as eligible,
+ inspectResourceShiftConstraints,resourceShiftMetricKeys as keys} from "./plan-amendment.mjs";
 
 const DAY=86400000;
 const MAX_PROJECTS=4,MAX_DELAY=7,EXACT_LIMIT=128,BEAM_WIDTH=3;
-const pending=w=>["todo","blocked"].includes(w.state)&&!w.actualStartDate&&!w.actualFinishDate;
-const eligible=p=>["planned","active"].includes(p.status)&&p.startDate&&p.items.length&&p.items.every(pending);
 const plus=(date,days)=>{
  const d=new Date(Date.parse(date+"T00:00:00Z")+days*DAY);
  if(!Number.isFinite(d.valueOf())||d.getUTCFullYear()>9999)return null;
  return d.toISOString().slice(0,10);
 };
 const late=(due,finish)=>due&&finish?Math.max(0,(Date.parse(finish+"T00:00:00Z")-Date.parse(due+"T00:00:00Z"))/DAY):null;
-const keys=["overloadDays","unavailableDays","overloadPctDays","unavailablePctDays","peakExcessPct"];
 const metrics=g=>Object.fromEntries(keys.map(k=>[k,g[k]]));
 const cmp=(a,b)=>{for(let i=0;i<a.length;i++){if(a[i]!==b[i])return a[i]-b[i]}return 0};
 const equal=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
@@ -74,21 +72,18 @@ function deadlineIncrease(before,after){
 function evaluate(snapshot,c,selection,vector){
  const shifts=new Map(selection.map((r,i)=>[r.projectId,vector[i]]).filter(([,d])=>d>0));
  const projects=snapshot.projects.map(p=>shifts.has(p.id)?{...p,startDate:plus(p.startDate,shifts.get(p.id))}:p);
- if(projects.some(p=>shifts.has(p.id)&&!p.startDate))return null;
+ if(projects.some(p=>shifts.has(p.id)&&(!p.startDate||p.dueDate&&p.startDate>p.dueDate)))return null;
  const candidate={...snapshot,projects};
  let after,resources;
  try{
   after=portfolioSchedule(candidate);
   resources=portfolioResources(candidate,{schedule:after});
  }catch{return null}
- let projectIncrease=0,workIncrease=0,worsenedProjects=0,worsenedWorks=0,lost=0,fixedMoved=0,unknownMoved=0;
+ const guardState=inspectResourceShiftConstraints(snapshot,c.schedule,after,c.resources,resources,[c.group.id]);
+ const {lost,fixedMoved,unknownMoved,excessIncrease}=guardState;
+ let projectIncrease=0,workIncrease=0,worsenedProjects=0,worsenedWorks=0;
  for(const b of c.schedule.rows){
-  const a=after.byId.get(b.id),p=c.projects.get(b.id);
-  const moved=b.projectedStart!==a.projectedStart||b.projectedFinish!==a.projectedFinish;
-  // A fixed project may not be shifted indirectly through an upstream link.
-  if(moved&&!eligible(p))fixedMoved++;
-  if(b.projectedFinish&&!a.projectedFinish)lost++;
-  if(moved&&!b.deadline)unknownMoved++;
+  const a=after.byId.get(b.id);
   const delta=deadlineIncrease(b.deadlineSlipDays,a.deadlineSlipDays);
   projectIncrease+=delta.increase;
   if(delta.increase)worsenedProjects++;
@@ -96,21 +91,14 @@ function evaluate(snapshot,c,selection,vector){
  const nextWorks=new Map(resources.work.map(w=>[JSON.stringify([w.projectId,w.id]),w]));
  for(const b of c.resources.work){
   const key=JSON.stringify([b.projectId,b.id]),a=nextWorks.get(key);
-  if(b.finishDate&&!a?.finishDate){lost++;continue}
+  if(b.finishDate&&!a?.finishDate)continue;
   const due=c.deadlines.get(key),delta=deadlineIncrease(late(due,b.finishDate),late(due,a?.finishDate));
   workIncrease+=delta.increase;if(delta.increase)worsenedWorks++;
  }
- const target=metrics(resources.byId.get(c.group.id)),original=metrics(c.group);
- let worseResources=0,excessIncrease=0,otherWorse=0;
- for(const g of c.resources.people){
-  const next=resources.byId.get(g.id);
-  if(keys.some(k=>next[k]>g[k])){
-   worseResources++;
-   if(g.id!==c.group.id)otherWorse++;
-   excessIncrease+=Math.max(0,next.overloadPctDays-g.overloadPctDays)+Math.max(0,next.unavailablePctDays-g.unavailablePctDays);
-  }
- }
- const reduced=keys.some(k=>target[k]<original[k])&&keys.every(k=>target[k]<=original[k]);
+ const target=metrics(resources.byId.get(c.group.id));
+ const worseResources=guardState.worsenedResources.length;
+ const otherWorse=guardState.worsenedResources.filter(id=>id!==c.group.id).length;
+ const reduced=!guardState.notImproved.length;
  // Neither missing dates nor moving a conflict to another resource counts
  // as a successful alternative. Intermediate nodes can still be explored.
  const admissible=shifts.size>0&&reduced&&!lost&&!fixedMoved&&!worseResources;
@@ -126,20 +114,21 @@ function evaluate(snapshot,c,selection,vector){
   deadlineRank:[...guard,...dateRank,...resourceRank,...vector,sum],
   resourceRank:[...guard,...resourceRank,...dateRank,...vector,sum]};
 }
-function draftShifts(snapshot,selection,vector,rationale){
+function draftShifts(snapshot,resourceId,selection,vector,rationale,preserveDeadlines){
  let state=snapshot;const refs=[];
  for(const [i,ref] of selection.entries()){
   if(!vector[i])continue;
   const p=state.projects.find(p=>p.id===ref.projectId),startDate=plus(p.startDate,vector[i]);
   const q=planChange(state,p.id,{title:"Выравнивание ресурса: перенос начала проекта",
    description:rationale});
-  state=setPlanDates(q.state,p.id,q.id,{startDate,dueDate:p.dueDate??null}).state;
+  state=setPlanDates(q.state,p.id,q.id,{startDate,dueDate:p.dueDate??null,
+   levelingGuard:{resourceId,maxDelay:ref.maxDelay,preserveDeadlines}}).state;
   refs.push({projectId:p.id,changeId:q.id});
  }
  return {state,refs};
 }
-function detailed(snapshot,selection,entry){
- const d=draftShifts(snapshot,selection,entry.vector,"Расчётный вариант выравнивания планового ресурса.");
+function detailed(snapshot,resourceId,selection,entry){
+ const d=draftShifts(snapshot,resourceId,selection,entry.vector,"Расчётный вариант выравнивания планового ресурса.",entry.strict);
  const result=comparePortfolioPlanSets(d.state,d.refs).options[0];
  if(!result.valid)throw Error(result.reason);
  const shifts=selection.flatMap((ref,i)=>{
@@ -152,7 +141,7 @@ function detailed(snapshot,selection,entry){
  });
  // Full canonical preview validates Work deadlines, calendar unknowns and
  // exact conflict dates; never expose a lightweight score as final evidence.
- if(result.assessment.deadlines.newlyUnknown||result.assessment.warnings.newlyUndatedWork)
+ if(result.preview.applicationBlocker||result.assessment.deadlines.newlyUnknown||result.assessment.warnings.newlyUndatedWork)
   return null;
  return {vector:entry.vector,shifts,target:entry.target,preview:result.preview,
   assessment:result.assessment,projectIncrease:entry.projectIncrease,workIncrease:entry.workIncrease,
@@ -203,7 +192,7 @@ export function compareResourceLeveling(snapshot,resourceId,selection){
  const options=[];
  const add=(list,id,title)=>{
   for(const e of list.slice(0,6)){
-   const result=detailed(snapshot,refs,e);
+   const result=detailed(snapshot,resourceId,refs,e);
    if(!result)continue;
    if(id==="deadlines"&&(result.assessment.deadlines.newlyLate||result.assessment.deadlines.worsenedLate||
     result.assessment.workDeadlines.newlyLate||result.assessment.workDeadlines.worsenedLate))continue;
@@ -234,7 +223,7 @@ export function createResourceLevelingProposals(snapshot,comparison,optionId,{ra
   throw Error("Некорректный вариант переноса");
  const entry=evaluate(snapshot,c,refs,selected.vector);
  if(!entry?.admissible)throw Error("Вариант больше не устраняет ограничения");
- const fresh=detailed(snapshot,refs,entry);
+ const fresh=detailed(snapshot,comparison.resourceId,refs,entry);
  if(!fresh||!equal(fresh.preview,selected.preview)||!equal(fresh.assessment,selected.assessment)||
   !equal(fresh.target,selected.target)||!equal(fresh.shifts,selected.shifts))
   throw Error("Последствия варианта изменились. Рассчитайте заново");
@@ -247,7 +236,7 @@ export function createResourceLevelingProposals(snapshot,comparison,optionId,{ra
   " дн.; вне доступности: "+c.group.unavailableDays+" → "+fresh.target.unavailableDays+
   " дн. Дополнительное отставание проектов: "+entry.projectIncrease+" дн.; работ: "+entry.workIncrease+
   " дн. Контрольные сроки не меняются. Согласование и применение выполняются отдельно.";
- const draft=draftShifts(snapshot,refs,entry.vector,description);
+ const draft=draftShifts(snapshot,comparison.resourceId,refs,entry.vector,description,entry.strict);
  const checked=comparePortfolioPlanSets(draft.state,draft.refs).options[0];
  if(!checked.valid||!equal(checked.preview,fresh.preview)||!equal(checked.assessment,fresh.assessment))
   throw Error("Подготовленные заявки не совпадают с рассчитанным вариантом");

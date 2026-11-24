@@ -86,7 +86,7 @@ def qualify():
     c=p['changes'][-1]
     assert c['status']=='proposed' and not c.get('planAppliedAt')
     assert REASON in c['description']
-    assert c['planAmendments']==[{'kind':'dates','before':{'startDate':'2026-11-23','dueDate':'2026-11-29'},'after':{'startDate':'2026-11-26','dueDate':'2026-11-29'}}]
+    assert c['planAmendments']==[{'kind':'dates','before':{'startDate':'2026-11-23','dueDate':'2026-11-29'},'after':{'startDate':'2026-11-26','dueDate':'2026-11-29'},'levelingGuard':{'resourceId':original['resources'][0]['id'],'maxDelay':7,'preserveDeadlines':True}}]
     print('ATLAS12_NATIVE_LEVELING_DRAFT_SAVE_PASS',flush=True)
     click('Открыть заявку Вариант А 1')
     d.wait_text('Предложения и утверждённые изменения',35)

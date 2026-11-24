@@ -33,6 +33,7 @@ export function AmendmentAnalysis({result,compact=false}:{result:any;compact?:bo
   "Финиш проекта: "+date(focus?.beforeFinish)+" → "+date(focus?.afterFinish)+".";
  return <div className="atlas-amendment-analysis">
   {!compact&&<h4>Последствия относительно текущего плана</h4>}
+  {result.applicationBlocker&&<p role="alert" className="error">{"Применение недоступно: "+result.applicationBlocker}</p>}
   <p role="status" aria-label={finish} className="atlas-amendment-summary">{finish}</p>
   {!portfolio&&focus?.baselineName&&<p>{"Контрольный план "+focus.baselineName+": "+date(focus.baselineFinish)+
    ". Отклонение: "+shift(focus.beforeBaselineShift)+" → "+shift(focus.afterBaselineShift)+"."}</p>}

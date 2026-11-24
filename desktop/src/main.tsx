@@ -4020,7 +4020,7 @@ function AmendmentForecast({state,projectId,changeId,onApply,canApply,onError,on
   <AmendmentReview view={calculation.review} onOpenEditor={onOpenEditor}/></div>;
  return <div className="forecast">
   <AmendmentAnalysis key={changeId} result={calculation.result}/>
-  {canApply&&<Action onClick={onApply} primary>Применить утверждённый план</Action>}
+  {canApply&&!calculation.result.applicationBlocker&&<Action onClick={onApply} primary>Применить утверждённый план</Action>}
  </div>;
 }
 export {AtlasRenderBoundary};

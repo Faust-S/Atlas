@@ -325,10 +325,22 @@ export function validate(s){
     const key=planAmendmentKey(a);
     if(amendmentKeys.has(key))throw Error("Duplicate plan amendment");
     amendmentKeys.add(key);
+    if(a.levelingGuard!==undefined&&a.kind!=="dates")throw Error("Invalid resource leveling guard");
     if(a.kind==="dates"){
      if(!a.before||!a.after||!validDate(a.before.startDate)||!validDate(a.before.dueDate)||
         !validDate(a.after.startDate)||!validDate(a.after.dueDate)||
         a.after.startDate&&a.after.dueDate&&a.after.startDate>a.after.dueDate)throw Error("Invalid amendment dates");
+     if(a.levelingGuard!==undefined){
+      const g=a.levelingGuard,delay=(Date.parse(a.after.startDate+"T00:00:00Z")-Date.parse(a.before.startDate+"T00:00:00Z"))/86400000;
+      // Historical guards retain the planning resource ID, even if the
+      // resource is subsequently removed. Current applicability is checked
+      // against live plan projections, not by rejecting historical data.
+      if(!g||typeof g!=="object"||Array.isArray(g)||typeof g.resourceId!=="string"||!g.resourceId||
+       !Number.isSafeInteger(g.maxDelay)||g.maxDelay<1||g.maxDelay>7||typeof g.preserveDeadlines!=="boolean"||
+       Object.keys(g).some(k=>!["resourceId","maxDelay","preserveDeadlines"].includes(k))||
+       !a.before.startDate||!a.after.startDate||!Number.isSafeInteger(delay)||delay<1||delay>g.maxDelay||
+       (a.before.dueDate??null)!==(a.after.dueDate??null))throw Error("Invalid resource leveling guard");
+     }
     } else if(a.kind==="work"){
      if(!itemIds.has(a.itemId)||!a.before||!a.after)throw Error("Invalid amendment work");
      for(const v of [a.before,a.after])if(!Number.isSafeInteger(v.estimateDays)||v.estimateDays<0||v.estimateDays>36500||
