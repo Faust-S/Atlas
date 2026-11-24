@@ -6,6 +6,7 @@ on:
       - work/2026-11-22-atlas-0-11-baseline
       - work/2026-11-23-atlas-0-12-plan-readiness
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read

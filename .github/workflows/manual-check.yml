@@ -2,6 +2,7 @@ name: Atlas tests and desktop build
 
 on:
   workflow_dispatch:
+  workflow_call:
   push:
     branches:
       - work/2026-11-04-atlas-0-3

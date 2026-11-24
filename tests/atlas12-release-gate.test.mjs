@@ -1,0 +1,55 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+const read=p=>readFileSync(new URL("../"+p,import.meta.url),"utf8");
+
+test("Atlas 0.12 final package preserves the accepted product identity and exact release version",()=>{
+ const desktop=JSON.parse(read("desktop/package.json"));
+ const tauri=JSON.parse(read("desktop/src-tauri/tauri.conf.json"));
+ const setup=JSON.parse(read("desktop/installer/atlas.json"));
+ assert.equal(desktop.version,"0.12.0");
+ assert.equal(tauri.version,desktop.version);
+ assert.equal(setup.version,desktop.version);
+ assert.equal(tauri.identifier,"ru.iwxa.atlas");
+ assert.equal(setup.data_namespace,tauri.identifier);
+ assert.equal(setup.id,"iwxa.atlas");
+ assert.equal(setup.architecture,"windows-x64");
+ assert.equal(setup.install_dir,"IWXA Atlas");
+ assert.equal(setup.entrypoint,"iwxa-atlas-desktop.exe");
+ assert.equal(tauri.bundle.active,false);
+ assert.doesNotMatch(read("desktop/installer/build-setup-core.ps1"),/0\.12\.0-dev/);
+ assert.match(read("desktop/tests/installed-atlas11-v6-design.py"),/d\.wait_text\("0\.12\.0",20\)/);
+});
+test("Stable publication depends on complete source, original integration and native jobs in the same run",()=>{
+ const release=read(".github/workflows/atlas-0-12-release.yml");
+ assert.match(release,/      - release\/0\.12/);
+ assert.match(release,/needs: \[source, integration, native\]/);
+ assert.match(release,/if: success\(\) && github\.ref == 'refs\/heads\/release\/0\.12'/);
+ assert.match(release,/\[publish-release-0\.12\]/);
+ assert.match(release,/uses: actions\/download-artifact@v4/);
+ assert.match(release,/RELEASE_ARTIFACT: IWXA-Atlas-0\.12\.0-Setup/);
+ assert.match(release,/--target "\$GITHUB_SHA"/);
+ assert.match(release,/sha256sum --check "\$RELEASE_ARTIFACT.exe.sha256"/);
+ assert.match(release,/cmp "publish\/\$RELEASE_ARTIFACT.exe" "uploaded\/\$RELEASE_ARTIFACT.exe"/);
+ assert.ok(release.indexOf("--draft")<release.indexOf("ATLAS12_DRAFT_ASSET_BYTES_VERIFIED"));
+ assert.ok(release.indexOf("ATLAS12_DRAFT_ASSET_BYTES_VERIFIED")<release.indexOf("--draft=false --latest"));
+ assert.match(release,/git\/ref\/tags\/\$RELEASE_TAG/);
+ assert.doesNotMatch(release,/npm run desktop:build|cargo build|build-setup-core\.ps1/);
+ for(const path of [".github/workflows/atlas-0-11-baseline.yml",".github/workflows/manual-check.yml",".github/workflows/atlas-0-11-v6-windows.yml"])assert.match(read(path),/  workflow_call:/);
+});
+test("Accepted native installer cannot be uploaded before both scenarios, and Rust and original integrations are qualified",()=>{
+ const win=read(".github/workflows/atlas-0-11-v6-windows.yml");
+ const integration=read(".github/workflows/manual-check.yml");
+ assert.match(win,/cargo test --release --locked --manifest-path desktop\/src-tauri\/Cargo.toml --lib/);
+ assert.match(win,/steps\.resource_qualification\.outcome/);
+ assert.match(win,/steps\.compound_qualification\.outcome/);
+ const gate=win.indexOf("Require both resource and compound native qualifications");
+ const accepted=win.indexOf("Preserve accepted release installer");
+ assert.ok(gate>0&&accepted>gate);
+ assert.match(win,/name: IWXA-Atlas-0\.12\.0-Setup\n/);
+ assert.match(integration,/tests\/atlas-t3-original-d6-qualification.mjs/);
+ assert.match(integration,/tests\/atlas09-original-t3-sender-contract.mjs/);
+ assert.match(integration,/node tests\/atlas-center-interop.mjs/);
+ assert.match(integration,/node tests\/iwxa-python-carrier.mjs/);
+ assert.match(integration,/node tests\/verify-atlas09-host-dist.mjs/);
+});

@@ -1,4 +1,4 @@
-name: IWXA Atlas 0.12 original Windows v6 installed UI qualification
+name: IWXA Atlas 0.12.0 exact Windows release qualification
 
 on:
   push:
@@ -31,6 +31,7 @@ on:
       - 'tests/atlas12-*.test.mjs'
       - 'src/**'
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
@@ -73,6 +74,14 @@ jobs:
           node tests/verify-atlas09-host-dist.mjs
           if ($LASTEXITCODE -ne 0) { throw 'ATLAS11_ORIGINAL_HOST_DIST_FAILED' }
 
+      - name: Verify original Rust Native Store and persisted readback
+        shell: pwsh
+        timeout-minutes: 8
+        run: |
+          $ErrorActionPreference = 'Stop'
+          cargo test --release --locked --manifest-path desktop/src-tauri/Cargo.toml --lib
+          if ($LASTEXITCODE -ne 0) { throw 'ATLAS12_NATIVE_RUST_REGRESSION' }
+
       - name: Checkout original qualified IWXA Setup Core
         uses: actions/checkout@v4
         with:
@@ -94,8 +103,8 @@ jobs:
         with:
           name: Atlas-0.12-unqualified-candidate-${{ github.sha }}
           path: |
-            artifacts/IWXA-Atlas-0.12.0-dev.1-Setup.exe
-            artifacts/IWXA-Atlas-0.12.0-dev.1-Setup.exe.sha256
+            artifacts/IWXA-Atlas-0.12.0-Setup.exe
+            artifacts/IWXA-Atlas-0.12.0-Setup.exe.sha256
           if-no-files-found: error
           retention-days: 7
 
@@ -191,16 +200,16 @@ jobs:
           }
           Write-Host 'ATLAS12_NATIVE_RESOURCE_AND_COMPOUND_PASS'
 
-      - name: Preserve accepted development installer and SHA-256
+      - name: Preserve accepted release installer and SHA-256
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: IWXA-Atlas-0.12.0-dev.1-Setup
+          name: IWXA-Atlas-0.12.0-Setup
           path: |
-            artifacts/IWXA-Atlas-0.12.0-dev.1-Setup.exe
-            artifacts/IWXA-Atlas-0.12.0-dev.1-Setup.exe.sha256
+            artifacts/IWXA-Atlas-0.12.0-Setup.exe
+            artifacts/IWXA-Atlas-0.12.0-Setup.exe.sha256
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 30
 
       - name: Upload installed Atlas UI evidence
         if: always()

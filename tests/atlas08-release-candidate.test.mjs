@@ -3,11 +3,11 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 const read=p=>readFileSync(new URL(p,import.meta.url),"utf8");
 
-test("Atlas 0.11 development packaging leaves historical 0.8 and 0.9 release workflows intact",()=>{
+test("Atlas 0.12 stable candidate packaging leaves historical 0.8 and 0.9 release workflows intact",()=>{
  const pkg=JSON.parse(read("../desktop/package.json"));
  const manifest=JSON.parse(read("../desktop/installer/atlas.json"));
  const tauri=JSON.parse(read("../desktop/src-tauri/tauri.conf.json"));
- assert.equal(pkg.version,"0.12.0-dev.1");
+ assert.equal(pkg.version,"0.12.0");
  assert.equal(manifest.version,pkg.version);
  assert.equal(tauri.version,pkg.version);
  assert.equal(manifest.entrypoint,"iwxa-atlas-desktop.exe");

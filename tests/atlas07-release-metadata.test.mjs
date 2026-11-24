@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 const read=path=>readFileSync(new URL(path,import.meta.url),"utf8");
-test("Atlas 0.11 development has one version across executable, Setup Core and all dependency locks",()=>{
+test("Atlas 0.12 stable candidate has one version across executable, Setup Core and all dependency locks",()=>{
  const pkg=JSON.parse(read("../desktop/package.json"));
  const lock=JSON.parse(read("../desktop/package-lock.json"));
  const tauri=JSON.parse(read("../desktop/src-tauri/tauri.conf.json"));
@@ -11,10 +11,10 @@ test("Atlas 0.11 development has one version across executable, Setup Core and a
  const rustLock=read("../desktop/src-tauri/Cargo.lock");
  const builder=read("../desktop/installer/build-setup-core.ps1");
  for(const value of [pkg.version,lock.version,lock.packages[""].version,tauri.version,profile.version])
-  assert.equal(value,"0.12.0-dev.1");
- assert.match(cargo,/name = "iwxa-atlas-desktop"\nversion = "0\.12\.0-dev\.1"/);
- assert.match(rustLock,/name = "iwxa-atlas-desktop"\nversion = "0\.12\.0-dev\.1"/);
- assert.match(builder,/IWXA-Atlas-0\.12\.0-dev\.1-Setup\.exe/);
+  assert.equal(value,"0.12.0");
+ assert.match(cargo,/name = "iwxa-atlas-desktop"\nversion = "0\.12\.0"/);
+ assert.match(rustLock,/name = "iwxa-atlas-desktop"\nversion = "0\.12\.0"/);
+ assert.match(builder,/IWXA-Atlas-0\.12\.0-Setup\.exe/);
  assert.equal(profile.id,"iwxa.atlas");
  assert.equal(profile.data_namespace,tauri.identifier);
 });

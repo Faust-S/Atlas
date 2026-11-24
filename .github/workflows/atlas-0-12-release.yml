@@ -1,0 +1,113 @@
+name: IWXA Atlas 0.12.0 stable release from exact qualified source
+
+on:
+  push:
+    branches:
+      - release/0.12
+
+permissions:
+  contents: read
+
+concurrency:
+  group: atlas012-stable-release
+  cancel-in-progress: false
+
+jobs:
+  source:
+    if: contains(github.event.head_commit.message, '[publish-release-0.12]')
+    uses: ./.github/workflows/atlas-0-11-baseline.yml
+
+  integration:
+    if: contains(github.event.head_commit.message, '[publish-release-0.12]')
+    uses: ./.github/workflows/manual-check.yml
+
+  native:
+    if: contains(github.event.head_commit.message, '[publish-release-0.12]')
+    uses: ./.github/workflows/atlas-0-11-v6-windows.yml
+
+  publish:
+    needs: [source, integration, native]
+    if: success() && github.ref == 'refs/heads/release/0.12' && contains(github.event.head_commit.message, '[publish-release-0.12]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: v0.12.0
+      RELEASE_ARTIFACT: IWXA-Atlas-0.12.0-Setup
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Confirm exact accepted source and stable product identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/release/0.12" --jq .object.sha)" = "$GITHUB_SHA"
+          test "$(jq -r .version desktop/package.json)" = 0.12.0
+          test "$(jq -r .version desktop/src-tauri/tauri.conf.json)" = 0.12.0
+          test "$(jq -r .version desktop/installer/atlas.json)" = 0.12.0
+          test "$(jq -r .id desktop/installer/atlas.json)" = iwxa.atlas
+          test "$(jq -r .data_namespace desktop/installer/atlas.json)" = ru.iwxa.atlas
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo ATLAS12_RELEASE_ALREADY_EXISTS
+            exit 1
+          fi
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+            echo ATLAS12_RELEASE_TAG_ALREADY_EXISTS
+            exit 1
+          fi
+          echo "ATLAS12_EXACT_QUALIFIED_SOURCE_PASS $GITHUB_SHA"
+
+      - name: Download the accepted Windows installer from this exact run
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.RELEASE_ARTIFACT }}
+          path: publish
+
+      - name: Verify accepted installer and prepare release notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s "publish/$RELEASE_ARTIFACT.exe"
+          test -s "publish/$RELEASE_ARTIFACT.exe.sha256"
+          (cd publish && sha256sum --check "$RELEASE_ARTIFACT.exe.sha256")
+          cp docs/ATLAS_0_12_RELEASE_RU.md release-notes.txt
+          printf '\n## Принятый выпуск\n\n- Исходный SHA: `%s`\n- Полная исходная, интеграционная и Windows-квалификация: %s/%s/actions/runs/%s\n- SHA-256 установщика: `%s`\n' "$GITHUB_SHA" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" "$(sha256sum "publish/$RELEASE_ARTIFACT.exe" | cut -d' ' -f1)" >> release-notes.txt
+          echo ATLAS12_ACCEPTED_INSTALLER_SHA256_PASS
+
+      - name: Stage exact release and verify uploaded asset bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create "$RELEASE_TAG" "publish/$RELEASE_ARTIFACT.exe" "publish/$RELEASE_ARTIFACT.exe.sha256" \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title 'IWXA Atlas 0.12.0' \
+            --notes-file release-notes.txt --draft
+          release="$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft,isPrerelease,targetCommitish,assets)"
+          test "$(jq -r .targetCommitish <<<"$release")" = "$GITHUB_SHA"
+          test "$(jq -r .isDraft <<<"$release")" = true
+          test "$(jq -r .isPrerelease <<<"$release")" = false
+          test "$(jq '.assets | length' <<<"$release")" = 2
+          mkdir -p uploaded
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --dir uploaded --pattern "$RELEASE_ARTIFACT.exe*"
+          cmp "publish/$RELEASE_ARTIFACT.exe" "uploaded/$RELEASE_ARTIFACT.exe"
+          cmp "publish/$RELEASE_ARTIFACT.exe.sha256" "uploaded/$RELEASE_ARTIFACT.exe.sha256"
+          (cd uploaded && sha256sum --check "$RELEASE_ARTIFACT.exe.sha256")
+          test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/release/0.12" --jq .object.sha)" = "$GITHUB_SHA"
+          echo ATLAS12_DRAFT_ASSET_BYTES_VERIFIED
+
+      - name: Publish stable release on the qualified commit only
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+          release="$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft,isPrerelease,targetCommitish)"
+          test "$(jq -r .isDraft <<<"$release")" = false
+          test "$(jq -r .isPrerelease <<<"$release")" = false
+          test "$(jq -r .targetCommitish <<<"$release")" = "$GITHUB_SHA"
+          test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" --jq .object.sha)" = "$GITHUB_SHA"
+          echo "ATLAS12_STABLE_RELEASE_PUBLISHED $GITHUB_SHA"
