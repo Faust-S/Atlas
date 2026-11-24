@@ -17,18 +17,20 @@ export const TRADEOFF='Резервный кран';
 export const FREE='Свободная площадка';
 export function atlas12ResourceAlternativesPortfolio(){
  const p=createProject(empty(),{name:PROJECT,type:'engineering'});
- let state=editProject(p.state,p.id,{startDate:'2026-11-23'});
+ let state=editProject(p.state,p.id,{startDate:'2026-11-23',dueDate:'2026-11-25'});
  const firstResource=addPlanningResource(state,{label:SOURCE,capacityPct:100});
  const otherResource=addPlanningResource(firstResource.state,{label:TARGET,capacityPct:100});
  const shared=addPlanningResource(otherResource.state,{label:TRADEOFF,capacityPct:100});
  const free=addPlanningResource(shared.state,{label:FREE,capacityPct:100});
  const a=createItem(free.state,p.id,{title:FIRST,resourceId:firstResource.id,allocationPct:70});
- state=editItem(a.state,p.id,a.id,{estimateDays:3});
+ state=editItem(a.state,p.id,a.id,{estimateDays:3,dueDate:'2026-11-24'});
  const b=createItem(state,p.id,{title:SECOND,resourceId:firstResource.id,allocationPct:60});
  state=editItem(b.state,p.id,b.id,{estimateDays:3});
  const c=createItem(state,p.id,{title:'Подача оборудования',
   resourceId:shared.id,allocationPct:70});
  state=editItem(c.state,p.id,c.id,{estimateDays:3});
+ const loose=createItem(state,p.id,{title:'Подготовка площадки',allocationPct:30});
+ state=editItem(loose.state,p.id,loose.id,{estimateDays:2});
  validate(state);
  const compare=previewWorkResourceReassignment(state,{projectId:p.id,workId:b.id,
   targetResourceId:otherResource.id});
@@ -50,5 +52,5 @@ if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  const loaded=await readIwxaPortfolio(bytes);
  if(serialize(snapshot)!==serialize(loaded.snapshot))throw Error('IWXA resource roundtrip mismatch');
  writeFileSync(file,bytes);
- process.stdout.write('ATLAS12_RESOURCE_ALTERNATIVES_IWXA_PASS projects=1 works=3 resources=4 overload_days=3 bytes='+bytes.length+'\n');
+ process.stdout.write('ATLAS12_RESOURCE_ALTERNATIVES_IWXA_PASS projects=1 works=4 resources=4 overload_days=3 bytes='+bytes.length+'\n');
 }

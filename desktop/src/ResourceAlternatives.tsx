@@ -1,10 +1,17 @@
 import React,{useMemo,useState} from 'react';
 import {previewWorkResourceReassignment,compareWorkResourceAlternatives} from '../../src/resource-alternatives.mjs';
 
-type Props={snapshot:any;forecast:any;resources:any;resourceId:string;
+type Props={snapshot:any;forecast:any;resources:any;resourceId:string|null;
  onClose:()=>void;onOpenWork:(projectId:string,workId:string,comparison:any)=>void};
 const key=(w:any)=>JSON.stringify([w.projectId,w.id]);
 const change=(value:number)=>value>0?'+'+value:String(value);
+function deadlineLine(label:string,deadline:{forecastFinish:string|null;controlDate:string|null;slipDays:number|null}){
+ return label+': расчётный финиш '+(deadline.forecastFinish||'не определён')+
+  '; контрольная дата '+(deadline.controlDate||'не задана')+'.'+
+  (deadline.slipDays===null?' Нельзя определить календарное отклонение.':
+   deadline.slipDays>0?' Превышение: '+deadline.slipDays+' дн.':
+   ' По календарю в пределах срока.');
+}
 
 /** Planning choices only. The existing Work editor owns any actual change. */
 export function ResourceAlternatives({snapshot,forecast,resources,resourceId,onClose,onOpenWork}:Props){
@@ -36,6 +43,7 @@ export function ResourceAlternatives({snapshot,forecast,resources,resourceId,onC
  const preview=result&&'value' in result?result.value:null;
  const failure=result&&'error' in result?result.error:null;
  const original=resources.byId.get(resourceId);
+ const resourceLabel=original?.label||(resourceId===null?'Без привязки к ресурсу':'ресурс');
  const summary=preview?[
   'Изменение дней перегрузки: '+change(preview.overloadDaysDelta)+'.',
   'Вне доступности: '+change(preview.unavailableDaysDelta)+'.',
@@ -43,15 +51,15 @@ export function ResourceAlternatives({snapshot,forecast,resources,resourceId,onC
    'Сроки Work по CPM не изменятся.'
  ].join(' '):'';
  return <section className="atlas-resource-alternatives" role="region"
-  aria-label={'Варианты ресурсного назначения: '+(original?.label||'ресурс')}>
+  aria-label={'Варианты ресурсного назначения: '+resourceLabel}>
   <div className="atlas-resource-alternatives-header">
    <strong>Варианты ресурсного назначения</strong>
    <button type="button" onClick={onClose} aria-label="Закрыть сравнение ресурсных вариантов">Закрыть</button>
   </div>
   <p>Сравните назначение Work. Полный список альтернатив открывается отдельно.
    Прогноз не изменяет проект или сохранённые данные.</p>
-  {assigned.length===0?<p>К этому ресурсу нет незавершённых работ.</p>:
-  alternatives.length===0?<p>Других плановых ресурсов пока нет. Добавьте ресурс, чтобы сравнить назначения.</p>:
+  {assigned.length===0?<p>{resourceId===null?'Нет работ без ресурсного назначения.':'К этому ресурсу нет незавершённых работ.'}</p>:
+  alternatives.length===0?<p>Нет доступных для сравнения плановых ресурсов. Добавьте ресурс.</p>:
   <>
    <div className="atlas-resource-alternatives-controls">
     <label>Работа
@@ -60,7 +68,7 @@ export function ResourceAlternatives({snapshot,forecast,resources,resourceId,onC
       {assigned.map((w:any)=><option key={key(w)} value={key(w)}>{w.projectName}: {w.title}</option>)}
      </select>
     </label>
-    <label>Другой ресурс
+    <label>{resourceId===null?'Первое назначение':'Другой ресурс'}
      <select aria-label="Выбрать альтернативный плановый ресурс"
       value={target.id} onChange={event=>setChosenTarget(event.target.value)}>
       {alternatives.map((r:any)=><option key={r.id} value={r.id}>{r.label} (до {r.capacityPct}%)</option>)}
@@ -77,8 +85,10 @@ export function ResourceAlternatives({snapshot,forecast,resources,resourceId,onC
         <td>{preview.original.overloadResourceDays}</td><td>{preview.alternative.overloadResourceDays}</td></tr>
        <tr><th scope="row">Дней вне доступности</th>
         <td>{preview.original.unavailableResourceDays}</td><td>{preview.alternative.unavailableResourceDays}</td></tr>
-       <tr><th scope="row">{preview.source.label}: превышение</th>
-        <td>{preview.source.overloadDays}</td><td>{preview.proposedSource.overloadDays}</td></tr>
+       {preview.source.id!==null?<tr><th scope="row">{preview.source.label}: превышение</th>
+        <td>{preview.source.overloadDays}</td><td>{preview.proposedSource.overloadDays}</td></tr>:
+        <tr><th scope="row">Работ без привязки к ресурсу</th>
+         <td>{preview.original.unlinkedWork}</td><td>{preview.alternative.unlinkedWork}</td></tr>}
        <tr><th scope="row">{preview.target.label}: превышение</th>
         <td>{preview.target.overloadDays}</td><td>{preview.proposedTarget.overloadDays}</td></tr>
       </tbody>
@@ -92,20 +102,10 @@ export function ResourceAlternatives({snapshot,forecast,resources,resourceId,onC
       Открыть Work с выбранным ресурсом
     </button>
 
-    <section className="atlas-resource-deadlines" aria-label="Контрольные сроки при выборе ресурса">
+    <section className="atlas-resource-deadlines" role="region" aria-label="Контрольные сроки и ресурсные ограничения">
      <strong>Контрольные сроки и ресурсные ограничения</strong>
-     <p>Work: расчётный финиш {preview.controlDates.work.forecastFinish||'не определён'};
-      контрольная дата {preview.controlDates.work.controlDate||'не задана'}.
-      {preview.controlDates.work.slipDays!==null&&preview.controlDates.work.slipDays>0?
-       ' Превышение: '+preview.controlDates.work.slipDays+' дн.':
-       preview.controlDates.work.slipDays===0?' По календарю в пределах срока.':
-       ' Нельзя определить календарное отклонение.'}</p>
-     <p>Проект: расчётный финиш {preview.controlDates.project.forecastFinish||'не определён'};
-      контрольная дата {preview.controlDates.project.controlDate||'не задана'}.
-      {preview.controlDates.project.slipDays!==null&&preview.controlDates.project.slipDays>0?
-       ' Превышение: '+preview.controlDates.project.slipDays+' дн.':
-       preview.controlDates.project.slipDays===0?' По календарю в пределах срока.':
-       ' Нельзя определить календарное отклонение.'}</p>
+     <p>{deadlineLine('Work',preview.controlDates.work)}</p>
+     <p>{deadlineLine('Проект',preview.controlDates.project)}</p>
      {preview.controlDates.baseline&&<p>Контрольный план:
       {preview.controlDates.baseline.name}, финиш
       {preview.controlDates.baseline.forecastFinish||'не определён'}.</p>}
@@ -130,14 +130,15 @@ export function ResourceAlternatives({snapshot,forecast,resources,resourceId,onC
        c.classification==='IMPROVED'?'Улучшение':'Без измеримого изменения';
       return <div className="atlas-resource-option" key={option.target.id}>
        <div><strong>{option.target.label}</strong>
+        {c.assignmentAdded&&<small>Первое плановое назначение Work.</small>}
         <small>{label}. Перегрузка {change(option.overloadDaysDelta)} дн.;
          вне доступности {change(option.unavailableDaysDelta)} дн.</small>
         <small>Устранено или сокращено: {c.relieved.length};
          новых конфликтов: {c.introduced.length};
          усилено существующих: {c.worsened.length}.</small>
         {c.introduced.map((x:any)=><small key={x.resourceId+x.kind}>
-         Новый конфликт: {x.resourceLabel},
-         {x.kind==='overload'?' перегрузка':' вне периода доступности'} {x.days} дн.</small>)}
+         {'Новый конфликт: '+x.resourceLabel+', '+
+         (x.kind==='overload'?'перегрузка':'вне периода доступности')+' '+x.days+' дн.'}</small>)}
         {c.worsened.map((x:any)=><small key={x.resourceId+x.kind}>
          Усиление: {x.resourceLabel}, {x.days} дн.</small>)}
         {c.relieved.map((x:any)=><small key={x.resourceId+x.kind}>
@@ -146,6 +147,7 @@ export function ResourceAlternatives({snapshot,forecast,resources,resourceId,onC
         <small>{c.outlook==='KNOWN_RESOURCE_CONFLICTS'?
          'В портфеле остаются известные ресурсные конфликты.':
          c.outlook==='DATES_INCOMPLETE'?'Сроки части работ неизвестны.':
+         c.outlook==='ASSIGNMENTS_INCOMPLETE'?'Не все работы имеют плановые ресурсные назначения.':
          'По известным датам ресурсных конфликтов не обнаружено.'}</small>
        </div>
        <button type="button" onClick={()=>setChosenTarget(option.target.id)}

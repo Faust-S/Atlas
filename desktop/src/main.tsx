@@ -2439,6 +2439,18 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       <Fallback message="Плановые ресурсы пока не добавлены. Назначения ответственных в текстовых полях не считаются подтверждёнными ресурсами."/>}
      {resources.people.length>0&&<p className="minor">Показано {Math.min(resourceLimit,resources.people.length)} из {resources.people.length} ресурсов.</p>}
      {resources.people.length>resourceLimit&&<Action onClick={()=>setResourceLimit(n=>Math.min(resources.people.length,n+40))}>Показать ещё ресурсы</Action>}
+     {resources.totals.unlinked>0&&<div className="atlas-resource-unlinked">
+      <div><strong>Работы без планового ресурса: {resources.totals.unlinked}</strong>
+       <p>Введённый ответственный не заменяет плановую привязку. Эти работы не включены в нагрузку конкретного ресурса.</p></div>
+      {resources.people.length>0&&<Action ariaLabel={resourceComparisonId===""?"Скрыть назначение работ без ресурса":"Рассмотреть назначение работ без ресурса"}
+       onClick={()=>setResourceComparisonId(id=>id===""?null:"")}>
+       {resourceComparisonId===""?"Скрыть варианты":"Рассмотреть назначение"}</Action>}
+     </div>}
+     {resources.totals.unlinked>0&&resourceComparisonId===""&&<ResourceAlternatives
+      key="unlinked" snapshot={data} forecast={dates} resources={resources} resourceId={null}
+      onClose={()=>setResourceComparisonId(null)}
+      onOpenWork={(pid,wid,comparison)=>openEditorFor(pid,"work:"+wid,comparison)}/>}
+
     </section>
     <section id="atlas-portfolio-ecosystem" tabIndex={-1} className="surface atlas-ecosystem-overview" aria-label="Карта разработки по проектам и GitHub">
      <div className="section-heading"><div><h2>Карта разработки</h2>

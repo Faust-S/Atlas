@@ -4,7 +4,8 @@ import {readFileSync} from 'node:fs';
 import {empty,createProject,createItem,editItem,editProject,serialize} from '../src/core.mjs';
 import {addPlanningResource} from '../src/resource-planning.mjs';
 import {portfolioSchedule} from '../src/portfolio-schedule.mjs';
-import {portfolioResources} from '../src/portfolio-resources.mjs';
+import {portfolioResources,projectResourceReassignment} from '../src/portfolio-resources.mjs';
+import {desktopLoadPortfolio} from './fixtures/desktop-portfolio-120.mjs';
 import {previewWorkResourceReassignment,compareWorkResourceAlternatives,prepareResourceEditorChoice,assertResourceEditorChoiceCurrent} from '../src/resource-alternatives.mjs';
 
 function fixture(){
@@ -118,7 +119,7 @@ test('Installed Windows resource comparison follows native Work editing without 
  const native=readFileSync(new URL('../desktop/tests/installed-atlas12-resource-alternatives.py',import.meta.url),'utf8');
  const workflow=readFileSync(new URL('../.github/workflows/atlas-0-11-v6-windows.yml',import.meta.url),'utf8');
  assert.match(native,/first_work=original\['projects'\]\[0\]\['items'\]\[0\]\['title'\]/);
- assert.match(native,/click_scrollable_button\(work_action,scroll_direction=2\)/);
+ assert.match(native,/click_scrollable_button\(work_action\)/);
  assert.match(native,/ATLAS12_NATIVE_RESOURCE_TO_WORK_EDITOR_PASS/);
  assert.doesNotMatch(native,/\+FIRST\b/,'No undefined Python Work label may enter the installed scenario');
  assert.match(workflow,/desktop\/tests\/installed-atlas12-\*\.py/);
@@ -312,4 +313,93 @@ test('The multiple-choice view is on-demand and keeps the Work editor action fir
  assert.match(style,/\.atlas-resource-deadlines\{/);
  assert.match(native,/ATLAS12_NATIVE_MULTIPLE_OPTIONS_TRADEOFF_PASS/);
  assert.match(native,/820,650,True/);
+});
+
+test('First resource assignment decreases the number of unlinked works without editing the snapshot',()=>{
+ const f=fixture();
+ const loose=createItem(f.snapshot,f.pid,{title:'Не назначено',assignee:'Сотрудник',allocationPct:30});
+ f.snapshot=editItem(loose.state,f.pid,loose.id,{estimateDays:3});
+ const saved=serialize(f.snapshot);
+ const selection={projectId:f.pid,workId:loose.id,targetResourceId:f.lift};
+ const result=previewWorkResourceReassignment(f.snapshot,selection);
+ assert.equal(result.source.id,null);
+ assert.equal(result.original.unlinkedWork,1);
+ assert.equal(result.alternative.unlinkedWork,0);
+ assert.equal(result.constraints.assignmentAdded,true);
+ assert.equal(result.proposedTarget.itemCount,1);
+ assert.equal(result.proposedTarget.maxLoadPct,30);
+ const choice=prepareResourceEditorChoice(f.snapshot,result);
+ assert.equal(choice.sourceResourceId,null);
+ assert.equal(choice.sourceLabel,'Без привязки к ресурсу');
+ assert.deepEqual(assertResourceEditorChoiceCurrent(f.snapshot,choice),choice);
+ assert.equal(serialize(f.snapshot),saved);
+ assert.equal(compareWorkResourceAlternatives(f.snapshot,{projectId:f.pid,workId:loose.id}).candidateCount,2);
+ const applied=editItem(f.snapshot,f.pid,loose.id,{resourceId:f.lift});
+ assert.throws(()=>assertResourceEditorChoiceCurrent(applied,choice),/устарел/);
+ assert.equal(portfolioResources(applied).byId.get(f.lift).maxLoadPct,result.proposedTarget.maxLoadPct);
+});
+
+test('An otherwise clean resource plan with remaining unlinked Work must not claim full coverage',()=>{
+ const f=fixture(),loose=createItem(f.snapshot,f.pid,{title:'Без ресурса'});
+ f.snapshot=loose.state;
+ const result=run(f);
+ assert.equal(result.alternative.overloadResourceDays,0);
+ assert.equal(result.alternative.unlinkedWork,1);
+ assert.equal(result.constraints.outlook,'ASSIGNMENTS_INCOMPLETE');
+});
+
+test('Fast resource projection matches canonical portfolio calculations for 120 projects, 1200 Work and 12 alternatives',()=>{
+ const snapshot=desktopLoadPortfolio();
+ snapshot.resources=Array.from({length:16},(_,i)=>({
+  id:'res-'+i,label:'Ресурс '+String(i).padStart(2,'0'),capacityPct:80+(i%4)*20,
+  availableFrom:i%3===0?'2026-11-04':null,availableUntil:i%5===0?'2026-11-14':null
+ }));
+ for(const [i,p] of snapshot.projects.entries()){
+  for(const [j,w] of p.items.entries()){
+   w.resourceId='res-'+((i+j)%16);
+   w.allocationPct=20+((i+j)%5)*15;
+  }
+ }
+ const projectId=snapshot.projects[0].id,workId=snapshot.projects[0].items[0].id;
+ const schedule=portfolioSchedule(snapshot),resources=portfolioResources(snapshot,{schedule});
+ const saved=serialize(snapshot),before=JSON.stringify(resources.work);
+ const start=performance.now();
+ const page=compareWorkResourceAlternatives(snapshot,{projectId,workId,limit:12},{schedule,resources});
+ const optimizedMs=performance.now()-start;
+ assert.equal(page.options.length,12);
+ const keys=['itemCount','projectCount','scheduledDays','occupiedCalendarDays','datedWork','undatedWork',
+  'maxLoadPct','maxConcurrent','overlapDays','overloadDays','unavailableDays'];
+ const canonicalStart=performance.now();
+ for(const option of page.options){
+  const projected=projectResourceReassignment(resources,{projectId,workId,targetResourceId:option.target.id});
+  const candidate=editItem(snapshot,projectId,workId,{resourceId:option.target.id});
+  const expected=portfolioResources(candidate,{schedule});
+  for(const [observed,id] of [[projected.sourceAfter,option.source.id],[projected.targetAfter,option.target.id]]){
+   const group=expected.byId.get(id);
+   for(const k of keys)assert.equal(observed[k],group[k],id+' '+k);
+  }
+  assert.equal(option.alternative.overloadResourceDays,expected.people.reduce((n,r)=>n+r.overloadDays,0));
+  assert.equal(option.alternative.unavailableResourceDays,expected.people.reduce((n,r)=>n+r.unavailableDays,0));
+  assert.equal(option.alternative.overloadedResources,expected.totals.potentialConflicts);
+  assert.equal(option.alternative.unavailableResources,expected.totals.outsideAvailability);
+  assert.equal(option.alternative.unlinkedWork,expected.totals.unlinked);
+  assert.equal(option.datesUnchanged,true);
+ }
+ const canonicalMs=performance.now()-canonicalStart;
+ console.log('ATLAS12_RESOURCE_SCALE_PARITY options=12 projects=120 works=1200 fast_ms='+optimizedMs.toFixed(2)+
+  ' canonical_ms='+canonicalMs.toFixed(2));
+ assert.equal(serialize(snapshot),saved);
+ assert.equal(JSON.stringify(resources.work),before);
+});
+
+test('Unlinked resource coverage has its own accessible entry in the existing resource view',()=>{
+ const main=readFileSync(new URL('../desktop/src/main.tsx',import.meta.url),'utf8');
+ const ui=readFileSync(new URL('../desktop/src/ResourceAlternatives.tsx',import.meta.url),'utf8');
+ assert.match(main,/Работы без планового ресурса:/);
+ assert.match(main,/resourceId=\{null\}/);
+ assert.match(main,/Рассмотреть назначение работ без ресурса/);
+ assert.match(ui,/ASSIGNMENTS_INCOMPLETE/);
+ assert.match(ui,/Первое назначение/);
+ assert.match(ui,/role="region" aria-label="Контрольные сроки и ресурсные ограничения"/);
+ assert.doesNotMatch(ui,/commitWithReadback\(|applyEditor\(|save\(\)/);
 });

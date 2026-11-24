@@ -1734,3 +1734,11 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
  color:#285a86;font-size:11px;padding:6px 10px}
 .atlas-resource-options-toggle[aria-expanded=true]{background:#dceeff;border-color:#74a6d6}
 .atlas-resource-options-toggle:focus-visible{outline:2px solid #246fd3;outline-offset:2px}
+
+/* The unlinked count describes plan coverage, not the availability of a person. */
+.atlas-resource-unlinked{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;
+ margin:8px 0;padding:8px 10px;border:1px solid #cadcec;border-radius:7px;background:#f4f8fd;min-width:0}
+.atlas-resource-unlinked>div{flex:1 1 180px;min-width:0}
+.atlas-resource-unlinked strong{font-size:11px;color:#285a86}
+.atlas-resource-unlinked p{font-size:10px;line-height:1.4;margin:4px 0;overflow-wrap:anywhere}
+.atlas-resource-unlinked .action-button{min-height:30px;font-size:11px}

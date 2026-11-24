@@ -2,7 +2,7 @@
 // A proposed planning-resource assignment is NOT proof of employee availability
 // or a decision by Admin Center / a domain system.
 import {portfolioSchedule} from './portfolio-schedule.mjs';
-import {portfolioResources} from './portfolio-resources.mjs';
+import {portfolioResources,projectResourceReassignment} from './portfolio-resources.mjs';
 
 function totals(view){
  return {
@@ -10,7 +10,8 @@ function totals(view){
   unavailableResources:view.people.filter(p=>p.unavailableDays>0).length,
   overloadResourceDays:view.people.reduce((n,p)=>n+p.overloadDays,0),
   unavailableResourceDays:view.people.reduce((n,p)=>n+p.unavailableDays,0),
-  undatedWork:view.totals.undated
+  undatedWork:view.totals.undated,
+  unlinkedWork:view.totals.unlinked
  };
 }
 
@@ -21,8 +22,10 @@ function totals(view){
  * disappears. No resource leveling or new scheduling authority is introduced.
  */
 function explainShift(sourceBefore,sourceAfter,targetBefore,targetAfter,remaining){
+ const assignmentAdded=sourceBefore.id===null;
  const relieved=[],introduced=[],worsened=[];
  for(const [prior,next] of [[sourceBefore,sourceAfter],[targetBefore,targetAfter]]){
+  if(prior.id===null)continue; // unlinked Work is not a virtual resource
   for(const [metric,kind] of [['overloadDays','overload'],['unavailableDays','availability']]){
    const beforeDays=prior[metric],afterDays=next[metric];
    if(afterDays<beforeDays)relieved.push({resourceId:prior.id,resourceLabel:prior.label,
@@ -35,14 +38,15 @@ function explainShift(sourceBefore,sourceAfter,targetBefore,targetAfter,remainin
    }
   }
  }
- return {relieved,introduced,worsened,remaining,
+ return {relieved,introduced,worsened,remaining,assignmentAdded,
   classification:introduced.length||worsened.length?
-   relieved.length?'TRADEOFF':'WORSENED':relieved.length?'IMPROVED':'UNCHANGED',
+   (relieved.length||assignmentAdded)?'TRADEOFF':'WORSENED':
+   (relieved.length||assignmentAdded)?'IMPROVED':'UNCHANGED',
   // Even a fully clean *planning* result is not an assertion that a real
   // person, machine, or delivery slot has been committed.
   outlook:remaining.overloadResourceDays>0||remaining.unavailableResourceDays>0?
    'KNOWN_RESOURCE_CONFLICTS':remaining.undatedWork>0?'DATES_INCOMPLETE':
-   'NO_KNOWN_RESOURCE_CONFLICTS'};
+   remaining.unlinkedWork>0?'ASSIGNMENTS_INCOMPLETE':'NO_KNOWN_RESOURCE_CONFLICTS'};
 }
 
 // Compare known calendar forecasts with recorded control dates, not with
@@ -68,6 +72,24 @@ function resourceAssignmentControlDates(project,work,projection,current){
  };
 }
 
+function unlinkedStatus(count){
+ return {id:null,label:'Без привязки к ресурсу',capacityPct:null,maxLoadPct:null,
+  overloadDays:0,unavailableDays:0,undatedWork:null,itemCount:count};
+}
+function adjustedTotals(before,sourceBefore,sourceAfter,targetBefore,targetAfter){
+ return {...before,
+  overloadedResources:before.overloadedResources+
+   Number(sourceAfter.overloadDays>0)-Number(sourceBefore.overloadDays>0)+
+   Number(targetAfter.overloadDays>0)-Number(targetBefore.overloadDays>0),
+  unavailableResources:before.unavailableResources+
+   Number(sourceAfter.unavailableDays>0)-Number(sourceBefore.unavailableDays>0)+
+   Number(targetAfter.unavailableDays>0)-Number(targetBefore.unavailableDays>0),
+  overloadResourceDays:before.overloadResourceDays+sourceAfter.overloadDays-
+   sourceBefore.overloadDays+targetAfter.overloadDays-targetBefore.overloadDays,
+  unavailableResourceDays:before.unavailableResourceDays+sourceAfter.unavailableDays-
+   sourceBefore.unavailableDays+targetAfter.unavailableDays-targetBefore.unavailableDays,
+  unlinkedWork:before.unlinkedWork-(sourceBefore.id===null?1:0)};
+}
 function resourceStatus(group){
  if(!group)throw Error('Плановый ресурс не найден');
  return {id:group.id,label:group.label,capacityPct:group.capacityPct,
@@ -76,10 +98,9 @@ function resourceStatus(group){
   itemCount:group.itemCount};
 }
 /**
- * Compare ONE explicit change of a Work's existing planning-resource link.
- * The hypothetical assignment is projected onto a shallow, isolated Work
- * copy. The authoritative calendar and capacity calculations remain the
- * original portfolioSchedule / portfolioResources. Applying the choice is
+ * Compare ONE explicit change or first assignment of a Work resource link.
+ * Reuse the already calculated canonical calendar occupancy. Only the
+ * affected resource groups are projected by the original capacity engine. Applying the choice is
  * only possible through the ordinary Work editor and Native Store flow.
  * Nothing is applied to the caller's snapshot or to Native Store.
  *
@@ -93,35 +114,28 @@ export function previewWorkResourceReassignment(snapshot,{projectId,workId,targe
   throw Error('Выберите работу и другой плановый ресурс');
  const project=snapshot.projects.find(p=>p.id===projectId);
  const work=project?.items?.find(item=>item.id===workId);
- const sourceId=work?.resourceId;
+ const sourceId=work?.resourceId??null;
  if(!project||!work)throw Error('Работа не найдена');
  if(project.status==='cancelled'||work.state==='done')
   throw Error('Завершённую или отменённую работу не сравниваем');
- if(!sourceId||sourceId===targetResourceId)
+ if(sourceId===targetResourceId)
   throw Error('Требуется другое действующее назначение');
  const availableIds=new Set((snapshot.resources??[]).map(x=>x.id));
- if(!availableIds.has(sourceId)||!availableIds.has(targetResourceId))
+ if((sourceId!==null&&!availableIds.has(sourceId))||!availableIds.has(targetResourceId))
   throw Error('Плановый ресурс не найден');
  const forecast=schedule??portfolioSchedule(snapshot);
  const baseline=resources??portfolioResources(snapshot,{schedule:forecast});
- if(!baseline.byId.has(sourceId)||!baseline.byId.has(targetResourceId))
+ if((sourceId!==null&&!baseline.byId.has(sourceId))||!baseline.byId.has(targetResourceId))
   throw Error('Нет расчёта выбранных ресурсов');
  const before=totals(baseline);
- // The comparison is read-only. Copy only the selected Work and its
- // containing project instead of cloning and validating the full portfolio.
- // Capacity values still use the single canonical portfolioResources engine.
- const candidate={...snapshot,projects:snapshot.projects.map(p=>p.id===projectId?
-  {...p,items:p.items.map(item=>item.id===workId?
-   {...item,resourceId:targetResourceId}:item)}:p)};
- const result=portfolioResources(candidate,{schedule:forecast});
- const after=totals(result);
- const current=baseline.work.find(row=>row.projectId===projectId&&row.id===workId);
- const alternative=result.work.find(row=>row.projectId===projectId&&row.id===workId);
- if(!current||!alternative)throw Error('Нет расчёта выбранной работы');
- const sourceBefore=resourceStatus(baseline.byId.get(sourceId));
- const sourceAfter=resourceStatus(result.byId.get(sourceId));
- const targetBefore=resourceStatus(baseline.byId.get(targetResourceId));
- const targetAfter=resourceStatus(result.byId.get(targetResourceId));
+ const result=projectResourceReassignment(baseline,{projectId,workId,targetResourceId});
+ const {current,alternative}=result;
+ if(current.resourceId!==sourceId)throw Error('Ресурсный прогноз устарел');
+ const sourceBefore=result.source?resourceStatus(result.source):unlinkedStatus(before.unlinkedWork);
+ const sourceAfter=result.sourceAfter?resourceStatus(result.sourceAfter):unlinkedStatus(before.unlinkedWork-1);
+ const targetBefore=resourceStatus(result.target);
+ const targetAfter=resourceStatus(result.targetAfter);
+ const after=adjustedTotals(before,sourceBefore,sourceAfter,targetBefore,targetAfter);
  return {
   kind:'RESOURCE_ASSIGNMENT_COMPARISON',
   projectId,workId,workTitle:work.title,revision:snapshot.revision,
@@ -136,7 +150,7 @@ export function previewWorkResourceReassignment(snapshot,{projectId,workId,targe
   datesUnchanged:current.startDate===alternative.startDate&&
    current.finishDate===alternative.finishDate,
   unverified:!current.startDate||!current.finishDate,
-  note:'Сравнение двух плановых назначений. Даты CPM не выравниваются по ресурсам. '+
+  note:'Сравнение плановых назначений. Даты CPM не выравниваются по ресурсам. '+
    'Проверка реальной доступности и исполнение принадлежат исходным владельцам. '+
    'Изменения можно внести только через карточку Work и отдельно сохранить.'
  };
@@ -150,24 +164,25 @@ export function previewWorkResourceReassignment(snapshot,{projectId,workId,targe
 export function assertResourceEditorChoiceCurrent(snapshot,choice){
  if(!snapshot||!choice||!Array.isArray(snapshot.projects)||
     snapshot.revision!==choice.revision||!choice.projectId||!choice.workId||
-    !choice.sourceResourceId||!choice.targetResourceId||
+    (choice.sourceResourceId!==null&&!choice.sourceResourceId)||!choice.targetResourceId||
     choice.sourceResourceId===choice.targetResourceId)
   throw Error('Ресурсный вариант устарел. Повторите сравнение.');
  const project=snapshot.projects.find(p=>p.id===choice.projectId);
  const work=project?.items?.find(w=>w.id===choice.workId);
  if(!work||project.status==='cancelled'||work.state==='done'||
-    work.resourceId!==choice.sourceResourceId)
+    (work.resourceId??null)!==choice.sourceResourceId)
   throw Error('Назначение Work изменилось. Повторите сравнение.');
  const source=(snapshot.resources??[]).find(r=>r.id===choice.sourceResourceId);
  const target=(snapshot.resources??[]).find(r=>r.id===choice.targetResourceId);
- if(!source||!target)throw Error('Плановый ресурс изменился. Повторите сравнение.');
- return {...choice,sourceLabel:source.label,targetLabel:target.label};
+ if((choice.sourceResourceId!==null&&!source)||!target)
+  throw Error('Плановый ресурс изменился. Повторите сравнение.');
+ return {...choice,sourceLabel:source?.label??'Без привязки к ресурсу',targetLabel:target.label};
 }
 
 /** Turn a previously calculated read-only comparison into a form-only choice. */
 export function prepareResourceEditorChoice(snapshot,comparison){
  if(comparison?.kind!=='RESOURCE_ASSIGNMENT_COMPARISON'||
-    !comparison.source?.id||!comparison.target?.id)
+    (comparison.source?.id!==null&&!comparison.source?.id)||!comparison.target?.id)
   throw Error('Нет рассчитанного ресурсного варианта');
  return assertResourceEditorChoiceCurrent(snapshot,{
   projectId:comparison.projectId,workId:comparison.workId,
@@ -197,9 +212,8 @@ export function compareWorkResourceAlternatives(snapshot,
  if(!work)throw Error('Работа не найдена');
  if(project.status==='cancelled'||work.state==='done')
   throw Error('Завершённую или отменённую работу не сравниваем');
- if(!work.resourceId)throw Error('У Work нет действующего планового ресурса');
  const all=snapshot.resources??[];
- if(!all.some(r=>r.id===work.resourceId))
+ if(work.resourceId&&!all.some(r=>r.id===work.resourceId))
   throw Error('Исходный плановый ресурс не найден');
  const alternatives=all.filter(r=>r.id!==work.resourceId).sort((a,b)=>
   a.label.localeCompare(b.label,'ru')||a.id.localeCompare(b.id));
@@ -209,7 +223,7 @@ export function compareWorkResourceAlternatives(snapshot,
   previewWorkResourceReassignment(snapshot,{projectId,workId,targetResourceId:target.id},
    {schedule:forecast,resources:baseline}));
  return {kind:'RESOURCE_ASSIGNMENT_OPTIONS',projectId,workId,workTitle:work.title,
-  revision:snapshot.revision,sourceResourceId:work.resourceId,
+  revision:snapshot.revision,sourceResourceId:work.resourceId??null,
   candidateCount:alternatives.length,offset,limit,
   options,original:totals(baseline),
   // A list of alternatives is not a ranked recommendation or a promise

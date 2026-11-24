@@ -42,6 +42,39 @@ const dayEvents=(group)=>{
  }
  return {overlapDays,maxConcurrent,maxLoadPct,overloadDays,unavailableDays};
 };
+// The single capacity summarizer is also used for a hypothetical reassignment.
+// It consumes the canonical occupied intervals, never recalculates the CPM.
+function summarizeResourceGroup(r){
+ const projects=new Set(r.work.map(w=>w.projectId));
+ return {...r,projects,projectCount:projects.size,itemCount:r.work.length,
+  scheduledDays:r.work.reduce((n,w)=>n+w.estimateDays,0),
+  occupiedCalendarDays:r.work.reduce((n,w)=>n+w.activeRanges.reduce((total,[from,until])=>total+until-from,0),0),
+  datedWork:r.work.filter(w=>w.startDay!==null).length,
+  undatedWork:r.work.filter(w=>w.startDay===null).length,
+  ...dayEvents(r)};
+}
+
+/**
+ * Project a resource-link-only change on existing authoritative calendar rows.
+ * Recalculate at most two resource groups, including the unlinked-to-resource
+ * case. No clone of the whole portfolio, no new CPM and no persistent change.
+ */
+export function projectResourceReassignment(view,{projectId,workId,targetResourceId}){
+ const current=view.work.find(w=>w.projectId===projectId&&w.id===workId);
+ if(!current)throw Error("Нет расчёта выбранной работы");
+ const source=current.resourceId?view.byId.get(current.resourceId):null;
+ const target=view.byId.get(targetResourceId);
+ if(!target||(current.resourceId&&!source)||current.resourceId===targetResourceId)
+  throw Error("Нет расчёта выбранных ресурсов");
+ const alternative={...current,resourceId:targetResourceId,resourceLabel:target.label};
+ const sameWork=w=>w.projectId===projectId&&w.id===workId;
+ const sourceAfter=source?summarizeResourceGroup({
+  ...source,work:source.work.filter(w=>!sameWork(w))
+ }):null;
+ const targetAfter=summarizeResourceGroup({...target,work:[...target.work,alternative]});
+ return {current,alternative,source,sourceAfter,target,targetAfter};
+}
+
 export function portfolioResources(snapshot,{schedule=null}={}){
  const forecast=schedule||portfolioSchedule(snapshot);
  const groups=new Map((snapshot.resources||[]).map(r=>[r.id,{
@@ -80,15 +113,7 @@ export function portfolioResources(snapshot,{schedule=null}={}){
    if(linked){linked.work.push(row);linked.projects.add(project.id)}
   }
  }
- const people=[...groups.values()].map(r=>{
-  const load=dayEvents(r);
-  return {...r,projectCount:r.projects.size,itemCount:r.work.length,
-   scheduledDays:r.work.reduce((n,w)=>n+w.estimateDays,0),
-   occupiedCalendarDays:r.work.reduce((n,w)=>n+w.activeRanges.reduce((total,[from,until])=>total+until-from,0),0),
-   datedWork:r.work.filter(w=>w.startDay!==null).length,
-   undatedWork:r.work.filter(w=>w.startDay===null).length,
-   ...load};
- }).sort((a,b)=>(b.overloadDays+b.unavailableDays)-(a.overloadDays+a.unavailableDays)||
+ const people=[...groups.values()].map(summarizeResourceGroup).sort((a,b)=>(b.overloadDays+b.unavailableDays)-(a.overloadDays+a.unavailableDays)||
   b.undatedWork-a.undatedWork||a.label.localeCompare(b.label,"ru"));
  totals.potentialConflicts=people.filter(r=>r.overloadDays>0).length;
  totals.outsideAvailability=people.filter(r=>r.unavailableDays>0).length;
