@@ -7,14 +7,18 @@ const source=path=>readFileSync(new URL(path,import.meta.url),"utf8");
 test("Atlas 0.11 dashboard opens the real matching portfolio section, not the portfolio top",()=>{
  const ui=source("../desktop/src/main.tsx");
  const home=source("../desktop/src/AtlasDashboard.tsx");
- assert.match(ui,/const goPortfolioSection=\(section:"resources"\|"ecosystem"\|"review"\)=>\{/);
- assert.match(ui,/if\(!requireClosedForm\(\)\)return;\s*selectProject\(null\);setHomeOpen\(false\);setSettingsOpen\(false\);setPortfolioJump\(section\)/);
+ const coordinated=source("../desktop/src/PortfolioPlanSets.tsx");
+ assert.match(ui,/const goPortfolioSection=\(section:"resources"\|"ecosystem"\|"review"\|"plan-sets"\)=>\{/);
+ assert.match(ui,/if\(!requireClosedForm\(\)\)return;\s*if\(section==="plan-sets"\)setPortfolioPlanSelection\(old=>\(\{\.\.\.old,expanded:true\}\)\);\s*selectProject\(null\);setHomeOpen\(false\);setSettingsOpen\(false\);setPortfolioJump\(section\)/);
  assert.match(ui,/const destination=rootRef\.current\?\.querySelector<HTMLElement>\("#atlas-portfolio-"\+portfolioJump\)/);
  assert.match(ui,/destination\.scrollIntoView\(\{block:"start",behavior:"auto"\}\)/);
  assert.match(ui,/destination\.focus\(\{preventScroll:true\}\)/);
  assert.match(ui,/<section id="atlas-portfolio-resources" tabIndex=\{-1\}/);
  assert.match(ui,/<section id="atlas-portfolio-ecosystem" tabIndex=\{-1\}/);
  assert.match(ui,/<section id="atlas-portfolio-review" tabIndex=\{-1\}/);
+ assert.match(coordinated,/<section id="atlas-portfolio-plan-sets" tabIndex=\{-1\}/);
+ assert.match(ui,/onPlanSets=\{\(\)=>goPortfolioSection\("plan-sets"\)\}/);
+ assert.match(home,/<button className="atlas-dash-secondary" onClick=\{onPlanSets\}>Сравнить планы<\/button>/);
  assert.match(ui,/onResources=\{goResources\}/);
  assert.match(ui,/onEcosystem=\{\(\)=>goPortfolioSection\("ecosystem"\)\}/);
  assert.match(ui,/onReview=\{\(\)=>reviewRows\.length\?openProjectTab\(reviewRows\[0\]\.projectId,"changes"\):goPortfolioSection\("review"\)\}/);
@@ -26,7 +30,7 @@ test("Atlas 0.11 dashboard opens the real matching portfolio section, not the po
 
 test("Atlas 0.11 portfolio section focus remains UI-only and respects the editor guard",()=>{
  const ui=source("../desktop/src/main.tsx");
- const start=ui.indexOf('const goPortfolioSection=(section:"resources"|"ecosystem"|"review")');
+ const start=ui.indexOf('const goPortfolioSection=(section:"resources"|"ecosystem"|"review"|"plan-sets")');
  const end=ui.indexOf("const goSettings=()=>",start);
  assert.ok(start>=0&&end>start);
  const route=ui.slice(start,end);
