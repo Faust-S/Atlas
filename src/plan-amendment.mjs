@@ -455,12 +455,16 @@ function amendmentWorkComparison(snapshot,candidate,ids,before,after){
  return {workRows,workSummary};
 }
 
-function forecastAmendment(snapshot,projectId,changeId,context){
+// All proposal comparisons use the same validated candidate and scheduler.
+function amendmentScenario(snapshot,projectId,changeId){
  const {actions}=checkPlanAmendment(snapshot,projectId,changeId);
- const {forecast:before,resources:beforeResources}=context;
- // Preview and actual application share the same plan operations.
  const candidate=amendmentCandidate(snapshot,projectId,changeId,actions);
  const after=portfolioSchedule(candidate),afterResources=portfolioResources(candidate,{schedule:after});
+ return {actions,candidate,after,afterResources};
+}
+function forecastAmendment(snapshot,projectId,changeId,context){
+ const {forecast:before,resources:beforeResources}=context;
+ const {actions,candidate,after,afterResources}=amendmentScenario(snapshot,projectId,changeId);
  const affected=new Set([projectId]),links=snapshot.portfolioLinks||[];
  const outgoing=new Map(snapshot.projects.map(p=>[p.id,[]]));
  for(const edge of links)outgoing.get(edge.from).push(edge.to);
@@ -529,6 +533,124 @@ export function comparePlanAmendments(snapshot,projectId,firstId,secondId){
   }catch(error){return {...identity,valid:false,reason:error instanceof Error?error.message:"Сценарий недоступен"};}
  });
  return {projectId,revision:snapshot.revision,options};
+}
+
+// Historical control points never acquire facts or resource assignments that
+// were not captured in the original schema. A missing Work is not an undated Work.
+const revisionCalendar=basis=>basis?{id:basis.id,version:basis.version}:null;
+const revisionPredecessors=ids=>[...ids].sort();
+function historicalWork(work){
+ return {title:work.title,start:work.startDate,finish:work.finishDate,deadline:work.dueDate,
+  estimateDays:work.estimateDays,durationUnit:work.durationUnit,calendarBasis:revisionCalendar(work.calendarBasis),
+  predecessors:revisionPredecessors(work.predecessors),critical:work.critical,assignment:null};
+}
+function liveRevisionWorks(snapshot,project,forecast){
+ const plan=amendmentWorkPlan(snapshot,project,forecast);
+ const incoming=new Map(project.items.map(w=>[w.id,[]]));
+ for(const edge of project.dependencies)incoming.get(edge.to).push(edge.from);
+ return new Map(project.items.map(w=>{
+  const row=plan.get(w.id),p=workProjection(w,row);
+  return [w.id,{title:w.title,start:p.start,finish:p.finish,deadline:p.dueDate,
+   estimateDays:p.estimateDays,durationUnit:p.durationUnit,calendarBasis:revisionCalendar(w.calendarBasis),
+   predecessors:revisionPredecessors(incoming.get(w.id)),critical:p.critical,
+   assignment:{assignee:p.assignee,resourceId:p.resourceId,allocationPct:p.allocationPct}}];
+ }));
+}
+const historicalProject=b=>({id:b.id,name:b.name,version:b.version,recordedAt:b.recordedAt,
+ sourceRevision:b.sourceRevision,projectStart:b.projectStart,deadline:b.deadline,
+ start:b.forecastStart,finish:b.forecastFinish});
+const liveRevisionProject=(p,f)=>({projectStart:p.startDate??null,deadline:p.dueDate??null,
+ start:f.projectedStart??null,finish:f.projectedFinish??null});
+const historicalComparable=w=>w?{...w,assignment:null}:null;
+const revisionDeadlineChanged=(a,b)=>Boolean(a&&b&&a.deadline!==b.deadline);
+function revisionEffect(original,reference,current,proposed,proposalAvailable){
+ return {
+  accumulatedShift:dateDelta(original?.finish,current?.finish),
+  referenceShift:dateDelta(reference?.finish,current?.finish),
+  proposalShift:proposalAvailable?dateDelta(current?.finish,proposed?.finish):null,
+  finalShift:proposalAvailable?dateDelta(original?.finish,proposed?.finish):null,
+  referenceFinalShift:proposalAvailable?dateDelta(reference?.finish,proposed?.finish):null,
+  originalDeadlineChanged:revisionDeadlineChanged(original,current),
+  referenceDeadlineChanged:revisionDeadlineChanged(reference,current),
+  proposalDeadlineChanged:proposalAvailable&&revisionDeadlineChanged(current,proposed)
+ };
+}
+
+/**
+ * Compare the first actually recorded baseline, one selected recorded baseline,
+ * the current draft, and optionally ONE unapplied proposal. No invented history,
+ * no automatic approval/application and no additional persistence.
+ * @param {any} snapshot
+ * @param {string} projectId
+ * @param {{baselineId?:string|null,changeId?:string|null}} [options]
+ */
+export function comparePlanRevisions(snapshot,projectId,{baselineId=null,changeId=null}={}){
+ validate(snapshot);
+ const project=snapshot.projects.find(p=>p.id===projectId);
+ if(!project)throw Error("Проект не найден");
+ const baselines=project.planBaselines??[],first=baselines[0];
+ if(!first)throw Error("Сначала зафиксируйте контрольную редакцию плана");
+ const reference=baselineId===null?baselines.at(-1):baselines.find(b=>b.id===baselineId);
+ if(!reference)throw Error("Контрольная редакция не найдена");
+ const before=portfolioSchedule(snapshot),currentForecast=before.byId.get(projectId);
+ const current=liveRevisionProject(project,currentForecast);
+ const currentWorks=liveRevisionWorks(snapshot,project,currentForecast);
+ const original=historicalProject(first),selected=historicalProject(reference);
+ const originalWorks=new Map(first.work.map(w=>[w.id,historicalWork(w)]));
+ const referenceWorks=new Map(reference.work.map(w=>[w.id,historicalWork(w)]));
+ let proposedWorks=new Map(),proposal=null,proposed=null,downstream=[],resourceChange=null;
+ if(changeId!==null){
+  const change=(project.changes??[]).find(c=>c.id===changeId);
+  const identity={id:changeId,title:change?.title??"Заявка не найдена",status:change?.status??null};
+  try{
+   if(!change||change.planAppliedAt||!["proposed","deferred","approved","in_progress"].includes(change.status))
+    throw Error("Заявка больше недоступна для сравнения");
+   const {candidate,after,afterResources}=amendmentScenario(snapshot,projectId,changeId);
+   const next=candidate.projects.find(p=>p.id===projectId),nextForecast=after.byId.get(projectId);
+   const projected=liveRevisionProject(next,nextForecast),projectedWorks=liveRevisionWorks(candidate,next,nextForecast);
+   const beforeResources=portfolioResources(snapshot,{schedule:before});
+   const resources={before:planningResourceTotals(beforeResources),after:planningResourceTotals(afterResources)};
+   const consequences=before.rows.filter(r=>r.id!==projectId).flatMap(r=>{
+    const updated=after.byId.get(r.id);
+    if(r.projectedStart===updated.projectedStart&&r.projectedFinish===updated.projectedFinish&&r.deadline===updated.deadline)
+     return [];
+    return [{id:r.id,name:r.name,beforeStart:r.projectedStart,afterStart:updated.projectedStart,
+     beforeFinish:r.projectedFinish,afterFinish:updated.projectedFinish,
+     shiftDays:dateDelta(r.projectedFinish,updated.projectedFinish)}];
+   });
+   proposed=projected;proposedWorks=projectedWorks;resourceChange=resources;downstream=consequences;
+   proposal={...identity,valid:true,reason:null};
+  }catch(error){
+   proposal={...identity,valid:false,reason:error instanceof Error?error.message:"Сценарий недоступен"};
+  }
+ }
+ const proposalAvailable=proposal?.valid===true;
+ const ids=new Set([...originalWorks.keys(),...referenceWorks.keys(),...currentWorks.keys(),...proposedWorks.keys()]);
+ const rows=[...ids].map(workId=>{
+  const a=originalWorks.get(workId)??null,b=referenceWorks.get(workId)??null,
+   c=currentWorks.get(workId)??null,d=proposedWorks.get(workId)??null;
+  const accumulatedChanged=!same(a,historicalComparable(c));
+  const referenceChanged=!same(b,historicalComparable(c));
+  const proposalChanged=proposalAvailable&&!same(c,d);
+  const effect=revisionEffect(a,b,c,d,proposalAvailable);
+  return {workId,title:c?.title??d?.title??b?.title??a?.title??workId,
+   original:a,reference:b,current:c,proposed:d,...effect,
+   accumulatedChanged,referenceChanged,proposalChanged,
+   changed:accumulatedChanged||referenceChanged||proposalChanged};
+ });
+ const resourceLabels=Object.fromEntries((snapshot.resources??[]).map(r=>[r.id,r.label]));
+ return {projectId,revision:snapshot.revision,history:baselines.map(historicalProject),
+  original,reference:selected,current,proposed,proposal,downstream,resourceChange,resourceLabels,rows,
+  ...revisionEffect(original,selected,current,proposed,proposalAvailable),
+  totals:{work:rows.length,changed:rows.filter(r=>r.changed).length,
+   accumulatedChanged:rows.filter(r=>r.accumulatedChanged).length,
+   referenceChanged:rows.filter(r=>r.referenceChanged).length,
+   proposalChanged:proposalAvailable?rows.filter(r=>r.proposalChanged).length:null,
+   addedSinceOriginal:rows.filter(r=>!r.original&&r.current).length,
+   removedSinceOriginal:rows.filter(r=>r.original&&!r.current).length,
+   proposedAdded:proposalAvailable?rows.filter(r=>!r.current&&r.proposed).length:null,
+   undatedCurrent:rows.filter(r=>r.current&&!r.current.finish).length,
+   undatedProposed:proposalAvailable?rows.filter(r=>r.proposed&&!r.proposed.finish).length:null}};
 }
 
 export function applyPlanAmendment(snapshot,projectId,changeId) {
