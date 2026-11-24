@@ -25,6 +25,7 @@ import {PlanRecoveryComparison} from "./PlanRecoveryComparison";
 import {PortfolioPlanSets,emptyPortfolioPlanSelection} from "./PortfolioPlanSets";
 import {ResourceLeveling} from "./ResourceLeveling";
 import {createResourceLevelingProposals} from "../../src/resource-leveling.mjs";
+import {createWorkResourceLevelingProposals} from "../../src/work-resource-leveling.mjs";
 import {createDeadlineRecoveryProposal} from "../../src/plan-recovery.mjs";
 import {planReviewQueue,planReviewAction,planProposalAction} from "../../src/plan-review.mjs";
 import {revisionReview,recheckAction} from "../../src/revision-review.mjs";
@@ -2540,7 +2541,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      onDraft={(comparison,optionId,rationale)=>{
       if(!requireClosedForm()||busyRef.current)return;
       try{
-       const result=createResourceLevelingProposals(latestSnapshot.current,comparison,optionId,{rationale});
+       const result=comparison.kind==="ATLAS_WORK_RESOURCE_LEVELING"?
+        createWorkResourceLevelingProposals(latestSnapshot.current,comparison,optionId,{rationale}):
+        createResourceLevelingProposals(latestSnapshot.current,comparison,optionId,{rationale});
        mutate(result.state,"Заявки на выравнивание подготовлены в черновике. Сохраните и рассмотрите их.");
        setPortfolioPlanSelection({first:result.refs,second:[],expanded:true});
        setPortfolioJump("plan-sets");

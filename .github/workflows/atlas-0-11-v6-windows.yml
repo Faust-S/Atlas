@@ -50,7 +50,7 @@ concurrency:
 jobs:
   installed-native-ui:
     runs-on: windows-latest
-    timeout-minutes: 110
+    timeout-minutes: 124
     steps:
       - name: Checkout exact Atlas 0.12 source revision
         uses: actions/checkout@v4
@@ -191,6 +191,17 @@ jobs:
           }
           "ATLAS12_RESOURCE_LEVELING_IWXA=$archive" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
+      - name: Prepare independent Work resource-leveling IWXA
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $archive = Join-Path $env:RUNNER_TEMP 'atlas12-work-resource-leveling.iwxa'
+          node tests/fixtures/atlas12-work-resource-leveling.mjs $archive
+          if ($LASTEXITCODE -ne 0 -or !(Test-Path -LiteralPath $archive)) {
+            throw 'ATLAS12_WORK_LEVELING_FIXTURE_FAILED'
+          }
+          "ATLAS12_WORK_LEVELING_IWXA=$archive" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
       - name: Qualify installed native UI with Windows accessibility API
         shell: pwsh
         timeout-minutes: 25
@@ -198,7 +209,7 @@ jobs:
           $ErrorActionPreference = 'Stop'
           python -m pip install pywinauto==0.6.9 pillow==11.3.0
           if ($LASTEXITCODE -ne 0) { throw 'ATLAS11_NATIVE_UIA_MISSING' }
-          python -m py_compile desktop/tests/installed-atlas11-v6-design.py desktop/tests/installed-atlas11-portfolio-impact.py desktop/tests/installed-atlas12-resource-alternatives.py desktop/tests/installed-atlas12-plan-alternatives.py desktop/tests/installed-atlas-plan-amendment-review.py desktop/tests/installed-atlas12-plan-recovery.py desktop/tests/installed-atlas12-portfolio-plan-sets.py desktop/tests/installed-atlas12-resource-leveling.py
+          python -m py_compile desktop/tests/installed-atlas11-v6-design.py desktop/tests/installed-atlas11-portfolio-impact.py desktop/tests/installed-atlas12-resource-alternatives.py desktop/tests/installed-atlas12-plan-alternatives.py desktop/tests/installed-atlas-plan-amendment-review.py desktop/tests/installed-atlas12-plan-recovery.py desktop/tests/installed-atlas12-portfolio-plan-sets.py desktop/tests/installed-atlas12-resource-leveling.py desktop/tests/installed-atlas12-work-resource-leveling.py
           if ($LASTEXITCODE -ne 0) { throw 'ATLAS11_NATIVE_SCRIPT_SYNTAX' }
           python desktop/tests/installed-atlas11-v6-design.py
           if ($LASTEXITCODE -ne 0) { throw 'ATLAS11_NATIVE_V6_USER_ROUTE_FAIL' }
@@ -268,6 +279,16 @@ jobs:
           python desktop/tests/installed-atlas12-resource-leveling.py
           if ($LASTEXITCODE -ne 0) { throw 'ATLAS12_NATIVE_LEVELING_FAIL' }
 
+      - name: Qualify Work reserve leveling and ordinary proposal application
+        id: work_leveling_qualification
+        continue-on-error: true
+        shell: pwsh
+        timeout-minutes: 14
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python desktop/tests/installed-atlas12-work-resource-leveling.py
+          if ($LASTEXITCODE -ne 0) { throw 'ATLAS12_NATIVE_WORK_LEVELING_FAIL' }
+
       - name: Require all independent native qualifications
         shell: pwsh
         env:
@@ -277,15 +298,17 @@ jobs:
           RECOVERY_OUTCOME: ${{ steps.recovery_qualification.outcome }}
           COORDINATED_OUTCOME: ${{ steps.coordinated_qualification.outcome }}
           LEVELING_OUTCOME: ${{ steps.leveling_qualification.outcome }}
+          WORK_LEVELING_OUTCOME: ${{ steps.work_leveling_qualification.outcome }}
         run: |
-          if ($env:RESOURCE_OUTCOME -ne 'success' -or $env:COMPOUND_OUTCOME -ne 'success' -or $env:REVIEW_OUTCOME -ne 'success' -or $env:RECOVERY_OUTCOME -ne 'success' -or $env:COORDINATED_OUTCOME -ne 'success' -or $env:LEVELING_OUTCOME -ne 'success') {
-            throw "ATLAS12_NATIVE_HOLD resource=$env:RESOURCE_OUTCOME compound=$env:COMPOUND_OUTCOME review=$env:REVIEW_OUTCOME recovery=$env:RECOVERY_OUTCOME coordinated=$env:COORDINATED_OUTCOME leveling=$env:LEVELING_OUTCOME"
+          if ($env:RESOURCE_OUTCOME -ne 'success' -or $env:COMPOUND_OUTCOME -ne 'success' -or $env:REVIEW_OUTCOME -ne 'success' -or $env:RECOVERY_OUTCOME -ne 'success' -or $env:COORDINATED_OUTCOME -ne 'success' -or $env:LEVELING_OUTCOME -ne 'success' -or $env:WORK_LEVELING_OUTCOME -ne 'success') {
+            throw "ATLAS12_NATIVE_HOLD resource=$env:RESOURCE_OUTCOME compound=$env:COMPOUND_OUTCOME review=$env:REVIEW_OUTCOME recovery=$env:RECOVERY_OUTCOME coordinated=$env:COORDINATED_OUTCOME leveling=$env:LEVELING_OUTCOME work_leveling=$env:WORK_LEVELING_OUTCOME"
           }
           Write-Host 'ATLAS12_NATIVE_RESOURCE_AND_COMPOUND_PASS'
           Write-Host 'ATLAS_NATIVE_PLAN_REVIEW_PASS'
           Write-Host 'ATLAS12_NATIVE_PLAN_RECOVERY_PASS'
           Write-Host 'ATLAS12_NATIVE_PORTFOLIO_PLAN_SET_PASS'
           Write-Host 'ATLAS12_NATIVE_LEVELING_PASS'
+          Write-Host 'ATLAS12_NATIVE_WORK_LEVELING_PASS'
 
       - name: Preserve accepted development installer and SHA-256
         if: success()

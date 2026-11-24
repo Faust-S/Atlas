@@ -55,6 +55,9 @@ test("Accepted native installer cannot be uploaded before both scenarios, and Ru
  assert.match(win,/steps\.leveling_qualification\.outcome/);
  assert.match(win,/\$env:LEVELING_OUTCOME -ne 'success'/);
  assert.match(win,/python desktop\/tests\/installed-atlas12-resource-leveling\.py/);
+ assert.match(win,/steps\.work_leveling_qualification\.outcome/);
+ assert.match(win,/\$env:WORK_LEVELING_OUTCOME -ne 'success'/);
+ assert.match(win,/python desktop\/tests\/installed-atlas12-work-resource-leveling\.py/);
  const gate=win.indexOf("Require all independent native qualifications");
  const accepted=win.indexOf("Preserve accepted development installer");
  assert.ok(gate>0&&accepted>gate);

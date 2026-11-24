@@ -76,7 +76,7 @@ export function setPlanDates(snapshot,projectId,changeId,{startDate,dueDate,leve
   upsert(change,{kind:"dates",before,after,...(guard!==undefined?{levelingGuard:structuredClone(guard)}:{})});
  });
 }
-export function setPlanWork(snapshot,projectId,changeId,{itemId,estimateDays,assignee,dueDate,resourceId,allocationPct,notBeforeDate}) {
+export function setPlanWork(snapshot,projectId,changeId,{itemId,estimateDays,assignee,dueDate,resourceId,allocationPct,notBeforeDate,levelingGuard=undefined}) {
  return mutableDraft(snapshot,projectId,changeId,(project,change)=>{
   const item=project.items.find(x=>x.id===itemId);
   if(!item)throw Error("Работа для изменения не найдена");
@@ -97,7 +97,13 @@ export function setPlanWork(snapshot,projectId,changeId,{itemId,estimateDays,ass
   }
   if(same(priorFields,after))throw Error("Укажите изменение срока, длительности, ответственного или планового ресурса либо ограничения начала");
   assertExistingActionCurrent(project,change,"work:"+itemId);
-  upsert(change,{kind:"work",itemId,before,after});
+  const existing=change.planAmendments.find(a=>a.kind==="work"&&a.itemId===itemId);
+  if(existing?.levelingGuard&&(!same(existing.after,after)||levelingGuard!==undefined&&!same(existing.levelingGuard,levelingGuard)))
+   throw Error("Ресурсный перенос работы нельзя изменять без нового расчёта");
+  const guard=existing?.levelingGuard??levelingGuard;
+  if(guard!==undefined&&(!pendingWork(item)||!["planned","active"].includes(project.status)))
+   throw Error("Работа недоступна для ресурсного переноса");
+  upsert(change,{kind:"work",itemId,before,after,...(guard!==undefined?{levelingGuard:structuredClone(guard)}:{})});
   change.targetIds=[...new Set([...(change.targetIds||[]),...(item.targetIds||[])])];
  });
 }
@@ -213,6 +219,8 @@ function assertPlanActionCurrent(project,action){
    throw Error("Исходная работа изменилась после подготовки заявки: требуется пересмотр");
   if(Object.hasOwn(action.after,"notBeforeDate")&&(item.notBeforeDate??null)!==(action.after.notBeforeDate??null)&&!pendingWork(item))
    throw Error("Ограничение начала уже начатой работы не меняется");
+  if(action.levelingGuard&&(!pendingWork(item)||!["planned","active"].includes(project.status)))
+   throw Error("Работа недоступна для ресурсного переноса: нужен новый расчёт");
  }
  if(action.kind==="dependency"){
   dependencyEndpoints(project,action.from,action.to);
@@ -445,18 +453,87 @@ export function inspectResourceShiftConstraints(snapshot,before,after,beforeReso
  }
  return {lost,fixedMoved,unknownMoved,worsenedResources,notImproved,excessIncrease,fixedMovedProjects};
 }
-function markResourceShiftApplication(snapshot,preview,actions,context,after,afterResources){
+/**
+ * Strict work-level shifting uses one canonical CPM. No project date may
+ * move, no started Work (including completed Work) may move, and the
+ * actual calendar displacement must fit both the current reserve and
+ * the human-selected bound. An absolute lower limit is not a duration.
+ * @param {any} snapshot
+ * @param {any} candidate
+ * @param {any} before
+ * @param {any} after
+ * @param {Array<{projectId:string,action:any}>} actions
+ * @param {{scheduleMemo?:any}} [options]
+ */
+export function inspectWorkShiftConditions(snapshot,candidate,before,after,actions,{scheduleMemo=null}={}){
+ const issues={mixed:0,projectMoved:0,fixedWorkMoved:0,lost:0,stale:0,reserveExceeded:0,deadlineWorse:0};
+ const affectedProjects=new Set(),fixedWorks=[],moves=[];
+ for(const b of before.rows){
+  const n=after.byId.get(b.id);
+  if(b.projectedStart!==n?.projectedStart||b.projectedFinish!==n?.projectedFinish)issues.projectMoved++;
+ }
+ const byProject=new Map();
+ for(const {projectId,action} of actions){
+  if(action.kind!=="work"||!action.levelingGuard?.sourceStart){issues.mixed++;continue}
+  if(!byProject.has(projectId))byProject.set(projectId,[]);
+  byProject.get(projectId).push(action);
+ }
+ for(const [id,changes] of byProject){
+  const p=snapshot.projects.find(p=>p.id===id),n=candidate.projects.find(p=>p.id===id);
+  const b=before.byId.get(id),next=after.byId.get(id);
+  if(!p||!n||!["planned","active"].includes(p.status)||!b?.projectedStart||!b?.projectedFinish||
+   !next?.projectedStart||!next?.projectedFinish){issues.stale++;continue}
+  const old=scheduleProject(p,{calendarLibrary:snapshot.calendarLibrary??[],startDate:b.projectedStart,memo:scheduleMemo});
+  const updated=scheduleProject(n,{calendarLibrary:candidate.calendarLibrary??[],startDate:next.projectedStart,memo:scheduleMemo});
+  const oldRows=new Map(old.rows.map(w=>[w.id,w])),newRows=new Map(updated.rows.map(w=>[w.id,w]));
+  const oldItems=new Map(p.items.map(w=>[w.id,w]));
+  for(const row of old.rows){
+   const w=oldItems.get(row.id),q=newRows.get(row.id);
+   if(row.finishDate&&!q?.finishDate){issues.lost++;continue}
+   if(!q)continue;
+   const moved=row.startDate!==q.startDate||row.finishDate!==q.finishDate;
+   if(moved&&!pendingWork(w)){issues.fixedWorkMoved++;fixedWorks.push({projectId:id,workId:w.id,title:w.title});}
+   if(moved)affectedProjects.add(id);
+   const was=slip(w.dueDate,row.finishDate),will=slip(w.dueDate,q.finishDate);
+   if(was!==null&&will!==null&&will>was)issues.deadlineWorse++;
+  }
+  for(const action of changes){
+   const g=action.levelingGuard,w=oldItems.get(action.itemId),b=oldRows.get(action.itemId),n=newRows.get(action.itemId);
+   if(!pendingWork(w)||w.resourceId!==g.resourceId||!b?.startDate||!n?.startDate||
+    b.startDate!==g.sourceStart){issues.stale++;continue}
+   const shift=dateDelta(b.startDate,n.startDate);
+   if(shift<=0||shift>g.maxDelay||shift>b.floatDays){issues.reserveExceeded++;continue}
+   moves.push({projectId:id,workId:w.id,title:w.title,projectName:p.name,days:shift,
+    beforeStart:b.startDate,afterStart:n.startDate,beforeFinish:b.finishDate,afterFinish:n.finishDate,
+    notBeforeDate:action.after.notBeforeDate,beforeReserve:b.floatDays,afterReserve:n.floatDays,
+    deadline:w.dueDate??null});
+  }
+ }
+ const valid=!Object.values(issues).some(n=>n>0);
+ return {valid,issues,moves,fixedWorks,affectedProjects:[...affectedProjects]};
+}
+function markResourceShiftApplication(snapshot,candidate,preview,actions,context,after,afterResources){
  const guards=actions.flatMap(({action})=>action.levelingGuard?[action.levelingGuard]:[]);
  if(!guards.length)return preview;
  const result=inspectResourceShiftConstraints(snapshot,context.forecast,after,context.resources,afterResources,
   new Set(guards.map(g=>g.resourceId)));
  const deadlines=fixedDeadlineTotals(preview.rows),work=preview.fixedWorkDeadlines;
  const worsenedDeadlines=deadlines.newlyLate||deadlines.worsenedLate||work.newlyLate||work.worsenedLate;
- preview.applicationBlocker=result.fixedMoved?"Перенос изменит даты уже начатого или недоступного проекта. Нужен новый расчёт.":
+ const workGuards=guards.some(g=>g.sourceStart);
+ const conditions=workGuards?inspectWorkShiftConditions(snapshot,candidate,context.forecast,after,actions):null;
+ const why=conditions?.issues;
+ const workBlocker=why?.mixed?"Перенос работ в пределах резервов требует отдельного состава заявок без других корректировок.":
+  why?.projectMoved?"Перенос изменит расчётные даты проекта. Нужен новый расчёт в пределах резервов.":
+  why?.fixedWorkMoved?"Перенос затронет уже начатую или завершённую работу. Нужен новый расчёт.":
+  why?.lost?"Перенос приведёт к потере известных расчётных дат работ. Нужен новый расчёт.":
+  why?.stale?"Исходное начало или состояние переносимой работы изменилось. Нужен новый расчёт.":
+  why?.reserveExceeded?"Перенос превышает доступный резерв или допустимый сдвиг работы. Нужен новый расчёт.":
+  why?.deadlineWorse?"Перенос ухудшит известный контрольный срок работы. Нужен новый расчёт.":null;
+ preview.applicationBlocker=workBlocker??(result.fixedMoved?"Перенос изменит даты уже начатого или недоступного проекта. Нужен новый расчёт.":
   result.lost?"Перенос приведёт к потере известных расчётных дат. Нужен новый расчёт.":
   result.worsenedResources.length?"Состав заявок увеличит агрегированные ресурсные ограничения. Проверьте совместный план или пересчитайте его.":
   result.notImproved.length?"Состав заявок больше не уменьшает исходное ограничение выбранного ресурса. Проверьте совместный план или пересчитайте его.":
-  guards.some(g=>g.preserveDeadlines)&&worsenedDeadlines?"Перенос ухудшит известные контрольные сроки. Нужен новый расчёт с явным выбором компромисса.":null;
+  guards.some(g=>g.preserveDeadlines)&&worsenedDeadlines?"Перенос ухудшит известные контрольные сроки. Нужен новый расчёт с явным выбором компромисса.":null);
  return preview;
 }
 function amendmentPlanningContext(snapshot){
@@ -604,7 +681,7 @@ function forecastAmendment(snapshot,projectId,changeId,context){
  const scoped=actions.map(action=>({projectId,action}));
  const preview=forecastCandidate(snapshot,candidate,context,{roots:new Set([projectId]),
   affected:affectedPlanProjects(snapshot,projectId),actions:scoped,after,afterResources});
- return markResourceShiftApplication(snapshot,preview,scoped,context,after,afterResources);
+ return markResourceShiftApplication(snapshot,candidate,preview,scoped,context,after,afterResources);
 }
 export function previewPlanAmendment(snapshot,projectId,changeId) {
  return forecastAmendment(snapshot,projectId,changeId,amendmentPlanningContext(snapshot));
@@ -755,7 +832,7 @@ function calculatePlanSet(snapshot,refs,context){
    actions,after,afterResources,portfolio:true});
   preview.scope="portfolio";
   preview.rows=preview.rows.map(r=>({...r,selected:roots.has(r.id),downstream:!roots.has(r.id)&&chain.has(r.id)}));
-  markResourceShiftApplication(snapshot,preview,actions,context,after,afterResources);
+  markResourceShiftApplication(snapshot,candidate,preview,actions,context,after,afterResources);
   const assessment=assessPlanSet(preview,roots,chain);
   // Present selected projects first, then all calendar/resource effects.
   const involved=new Set([...chain,...assessment.resourceProjects]);

@@ -151,23 +151,14 @@ function detailed(snapshot,resourceId,selection,entry){
   assessment:result.assessment,projectIncrease:entry.projectIncrease,workIncrease:entry.workIncrease,
   strict:entry.strict};
 }
-/**
- * Full enumeration up to 128 combinations, otherwise deterministic beam
- * search. Input order gives priority: among equal outcome metrics, minimize
- * the delay of earlier projects first. No optimality claim for beam search.
- * @param {any} snapshot
- * @param {string} resourceId
- * @param {Array<{projectId:string,maxDelay:number}>} selection
- */
-export function compareResourceLeveling(snapshot,resourceId,selection){
- validate(snapshot);
- const c=resourceContext(snapshot,resourceId),refs=normalize(c,selection);
- if(!c.group.overloadDays&&!c.group.unavailableDays)throw Error("По известным датам у ресурса нет конфликта");
+// Shared bounded search for project and Work shift candidates. Each caller
+// supplies one canonical projection and explicit admissibility/ranking.
+export function enumerateResourceShiftVectors(refs,evaluateVector){
  const space=refs.reduce((n,r)=>n*(r.maxDelay+1),1),exact=space<=EXACT_LIMIT;
  const visited=new Map();
  const get=vector=>{
   const key=vector.join(",");
-  if(!visited.has(key))visited.set(key,evaluate(snapshot,c,refs,vector));
+  if(!visited.has(key))visited.set(key,evaluateVector(vector));
   return visited.get(key);
  };
  const zero=refs.map(()=>0);get(zero);
@@ -193,7 +184,23 @@ export function compareResourceLeveling(snapshot,resourceId,selection){
     .filter(e=>e?.deadlineRank).map(e=>[e.vector.join(","),e])).values()];
   }
  }
- const checked=[...visited.values()];
+
+ return {space,exact,checked:[...visited.values()]};
+}
+/**
+ * Full enumeration up to 128 combinations, otherwise deterministic beam
+ * search. Input order gives priority: among equal outcome metrics, minimize
+ * the delay of earlier projects first. No optimality claim for beam search.
+ * @param {any} snapshot
+ * @param {string} resourceId
+ * @param {Array<{projectId:string,maxDelay:number}>} selection
+ */
+export function compareResourceLeveling(snapshot,resourceId,selection){
+ validate(snapshot);
+ const c=resourceContext(snapshot,resourceId),refs=normalize(c,selection);
+ if(!c.group.overloadDays&&!c.group.unavailableDays)throw Error("По известным датам у ресурса нет конфликта");
+ const {space,exact,checked}=enumerateResourceShiftVectors(refs,vector=>evaluate(snapshot,c,refs,vector));
+
  const reasons={invalidHorizon:0,calculationUnavailable:0,noReduction:0,fixedMoved:0,lostDates:0,worseResources:0,deadlineCompromise:0};
  const fixedIds=new Set(),resourceIds=new Set();
  for(const e of checked){
@@ -225,7 +232,7 @@ export function compareResourceLeveling(snapshot,resourceId,selection){
  add(strict,"deadlines","Не ухудшать известные сроки");
  add(resource,"capacity","Сократить ресурсные ограничения");
  return {kind:"ATLAS_RESOURCE_LEVELING",sourceStamp:JSON.stringify(snapshot),revision:snapshot.revision,
-  resourceId,resourceLabel:c.group.label,selection:refs,before:metrics(c.group),search:{exact,space,evaluated:visited.size,
+  resourceId,resourceLabel:c.group.label,selection:refs,before:metrics(c.group),search:{exact,space,evaluated:checked.length,
    admissible:entries.length,deadlinePreserving:strict.length,reasons,
    fixedProjects:[...fixedIds].map(id=>({id,name:c.projects.get(id)?.name??id})),
    worsenedResources:[...resourceIds].map(id=>({id,name:c.resources.byId.get(id)?.label??id})),

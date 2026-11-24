@@ -335,7 +335,7 @@ export function validate(s){
     const key=planAmendmentKey(a);
     if(amendmentKeys.has(key))throw Error("Duplicate plan amendment");
     amendmentKeys.add(key);
-    if(a.levelingGuard!==undefined&&a.kind!=="dates")throw Error("Invalid resource leveling guard");
+    if(a.levelingGuard!==undefined&&!["dates","work"].includes(a.kind))throw Error("Invalid resource leveling guard");
     if(a.kind==="dates"){
      if(!a.before||!a.after||!validDate(a.before.startDate)||!validDate(a.before.dueDate)||
         !validDate(a.after.startDate)||!validDate(a.after.dueDate)||
@@ -358,6 +358,19 @@ export function validate(s){
       v.notBeforeDate!=null&&!calendarDate(v.notBeforeDate))throw Error("Invalid amendment work fields");
      if(Object.hasOwn(a.after,"notBeforeDate")&&!Object.hasOwn(a.before,"notBeforeDate"))
       throw Error("Missing original work start limit");
+     if(a.levelingGuard!==undefined){
+      const g=a.levelingGuard;
+      const delay=(Date.parse(a.after.notBeforeDate+"T00:00:00Z")-Date.parse(g?.sourceStart+"T00:00:00Z"))/86400000;
+      if(!g||typeof g!=="object"||Array.isArray(g)||typeof g.resourceId!=="string"||!g.resourceId||
+       !calendarDate(g.sourceStart)||!Number.isSafeInteger(g.maxDelay)||g.maxDelay<1||g.maxDelay>7||
+       g.preserveDeadlines!==true||Object.keys(g).some(k=>!["resourceId","sourceStart","maxDelay","preserveDeadlines"].includes(k))||
+       !calendarDate(a.after.notBeforeDate)||!Number.isSafeInteger(delay)||delay<1||delay>g.maxDelay||
+       a.before.notBeforeDate&&a.before.notBeforeDate>=a.after.notBeforeDate||
+       a.before.resourceId!==g.resourceId||a.after.resourceId!==g.resourceId||
+       ["estimateDays","assignee","dueDate","resourceId","allocationPct"].some(k=>a.before[k]!==a.after[k])||
+       Object.keys(a.after).some(k=>!["estimateDays","assignee","dueDate","resourceId","allocationPct","notBeforeDate"].includes(k)))
+       throw Error("Invalid work resource leveling guard");
+     }
     } else if(a.kind==="dependency"){
      if(typeof a.from!=="string"||typeof a.to!=="string"||a.from===a.to||
         !itemIds.has(a.from)||!itemIds.has(a.to)||typeof a.before!=="boolean"||
