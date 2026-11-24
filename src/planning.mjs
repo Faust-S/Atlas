@@ -3,7 +3,8 @@
  * Uses Marcel Klehr's MIT topological sort; does not execute tasks, alter
  * external sources or infer accepted project/release readiness.
  * Elapsed and explicit pinned working-day durations share one CPM.
- * Resource leveling, lags and constrained deadlines are NOT implemented.
+ * Resource leveling uses repeated canonical CPM projections in a separate
+ * bounded what-if calculation; this function never assigns resources.
  */
 import toposort from './vendor/toposort.mjs';
 const MAX_DAYS = 36500;
@@ -39,7 +40,9 @@ function daysFrom(start,days) {
  * durationDays at project level is also civil days, whereas row.durationDays
  * is a work's entered amount in its declared unit.
  */
-export function scheduleProject(p,{calendarLibrary=[],startDate=undefined,includeResourceOccupancy=false}={}) {
+export function scheduleProject(p,{calendarLibrary=[],startDate=undefined,includeResourceOccupancy=false,memo=null}={}) {
+  if(memo instanceof ScheduleProjectionMemo)
+    return memo.read(p,{calendarLibrary,startDate,includeResourceOccupancy});
   if (!p || !Array.isArray(p.items) || !Array.isArray(p.dependencies))
     throw new Error('Invalid project');
   const items=p.items;
@@ -191,6 +194,52 @@ export function scheduleProject(p,{calendarLibrary=[],startDate=undefined,includ
     warning:rows.some(row=>row.durationUnit==='working_days')?
       'Calendar-aware CPM estimate; not resource-leveled, not execution authority, not release acceptance':
       'Calendar-day CPM estimate; not resource-leveled, not execution authority, not release acceptance'};
+}
+
+/**
+ * Ephemeral memo for ONE immutable planning calculation. No global cache,
+ * persisted projections, alternate graph or scheduler. Date-only candidate
+ * clones share the original item and dependency arrays; a different graph,
+ * calendar catalog or effective start necessarily takes a separate entry.
+ * The cap bounds retained rows even in large portfolios.
+ */
+class ScheduleProjectionMemo{
+ #items=new WeakMap();
+ #emptyCalendar=[];
+ #entries=0;
+ #rows=0;
+ #hits=0;
+ #misses=0;
+ #maxEntries;
+ #maxRows;
+ constructor(maxEntries,maxRows){this.#maxEntries=maxEntries;this.#maxRows=maxRows}
+ read(project,{calendarLibrary=[],startDate=undefined,includeResourceOccupancy=false}={}){
+  if(!project||!Array.isArray(project.items)||!Array.isArray(project.dependencies))
+   return scheduleProject(project,{calendarLibrary,startDate,includeResourceOccupancy});
+  const library=calendarLibrary?.length?calendarLibrary:this.#emptyCalendar;
+  let graphs=this.#items.get(project.items);
+  if(!graphs){graphs=new WeakMap();this.#items.set(project.items,graphs)}
+  let calendars=graphs.get(project.dependencies);
+  if(!calendars){calendars=new WeakMap();graphs.set(project.dependencies,calendars)}
+  let dates=calendars.get(library);
+  if(!dates){dates=new Map();calendars.set(library,dates)}
+  const date=startDate===undefined?project.startDate??null:startDate;
+  const key=JSON.stringify([date||null,includeResourceOccupancy===true]);
+  if(dates.has(key)){this.#hits++;return dates.get(key)}
+  this.#misses++;
+  const result=scheduleProject(project,{calendarLibrary,startDate,includeResourceOccupancy});
+  if(this.#entries<this.#maxEntries&&this.#rows+result.rows.length<=this.#maxRows){
+   dates.set(key,result);this.#entries++;this.#rows+=result.rows.length;
+  }
+  return result;
+ }
+ stats(){return {hits:this.#hits,misses:this.#misses,entries:this.#entries,rows:this.#rows}}
+}
+/** Use only inside one read-only scenario search; do not retain across edits. */
+export function createScheduleProjectionMemo({maxEntries=2048,maxRows=60000}={}){
+ if(!Number.isSafeInteger(maxEntries)||maxEntries<1||maxEntries>4096||
+    !Number.isSafeInteger(maxRows)||maxRows<1||maxRows>120000)throw Error("Invalid projection memo bounds");
+ return new ScheduleProjectionMemo(maxEntries,maxRows);
 }
 
 /** One existing limiting link from a terminal critical chain, without asserting uniqueness.

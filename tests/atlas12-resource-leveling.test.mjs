@@ -11,6 +11,10 @@ import {inspectResourceLeveling,compareResourceLeveling,createResourceLevelingPr
 
 const rationale="Руководитель согласовал допустимый перенос начала.";
 import {fixture} from "./fixtures/atlas12-resource-leveling.mjs";
+import {desktopLoadPortfolio} from "./fixtures/desktop-portfolio-120.mjs";
+import {scheduleProject,createScheduleProjectionMemo} from "../src/planning.mjs";
+import {portfolioSchedule} from "../src/portfolio-schedule.mjs";
+import {performance} from "node:perf_hooks";
 const refs=(ids,maxDelay=7)=>ids.map(projectId=>({projectId,maxDelay}));
 test("Exact calendar search respects priority and preserves the complete original plan",()=>{
  const f=fixture(),s=f.snapshot,raw=serialize(s);
@@ -95,6 +99,8 @@ test("Started work and indirect shifts of begun projects are excluded",()=>{
  s=addPortfolioLink(s,{from:f.ids[1],to:child.id});
  const r=compareResourceLeveling(s,f.resourceId,refs([f.ids[1]]));
  assert.equal(r.options.length,0);assert.equal(r.search.admissible,0);
+ assert.equal(r.search.reasons.fixedMoved,7);
+ assert.ok(r.search.fixedProjects.some(x=>x.id===child.id));
 });
 test("No proposal transfers a new aggregate overload to a different resource",()=>{
  const f=fixture(),other=addPlanningResource(f.snapshot,{label:"Подъёмник",capacityPct:100});
@@ -109,6 +115,8 @@ test("No proposal transfers a new aggregate overload to a different resource",()
  // Every positive move into 24-30 Nov overlaps the independent order;
  // no eligible candidate may increase that resource's aggregate burden.
  assert.equal(result.options.length,0);
+ assert.equal(result.search.reasons.worseResources,7);
+ assert.ok(result.search.worsenedResources.some(x=>x.id===other.id));
 });
 test("Calendar occupancy uses staffed days rather than elapsed weekend span",()=>{
  const f=fixture({starts:["2026-11-20","2026-11-20"],duration:2});
@@ -229,6 +237,7 @@ test("Search never produces dates outside the original valid project horizon",()
  const f=fixture({dueDates:["2026-11-23","2026-11-23"]});
  const r=compareResourceLeveling(f.snapshot,f.resourceId,refs(f.ids));
  assert.equal(r.search.evaluated,64);assert.equal(r.options.length,0);
+ assert.equal(r.search.reasons.invalidHorizon,63);
 });
 test("Generated resource conditions are ordinary immutable draft semantics, not a silent generic date edit",()=>{
  const f=fixture(),r=compareResourceLeveling(f.snapshot,f.resourceId,refs(f.ids));
@@ -237,4 +246,50 @@ test("Generated resource conditions are ordinary immutable draft semantics, not 
  const broken=structuredClone(d.state);
  broken.projects.find(p=>p.id===ref.projectId).changes.at(-1).planAmendments[0].levelingGuard.maxDelay=1;
  assert.throws(()=>serialize(broken),/Invalid resource leveling guard/);
+});
+
+test("Temporary memo preserves exact CPM with pinned calendars, dates and separate graph versions",()=>{
+ const f=fixture({starts:["2026-11-20","2026-11-20"],duration:2});
+ const cal=createWorkCalendar(f.snapshot,{name:"Пятидневка",weekdays:[1,2,3,4,5],excludedDates:["2026-11-23"],additionalWorkingDates:["2026-11-21"],source:{kind:"entered_by_user",reference:null}});
+ const s=editItem(cal.state,f.ids[0],f.works[0],{durationUnit:"working_days",calendarBasis:{id:cal.id,version:cal.version}});
+ const p=s.projects[0],memo=createScheduleProjectionMemo({maxEntries:8,maxRows:20}),lib=s.calendarLibrary;
+ for(const startDate of ["2026-11-20","2026-11-21","2026-11-23"]){
+  for(const includeResourceOccupancy of [false,true]){
+   const options={calendarLibrary:lib,startDate,includeResourceOccupancy};
+   const expected=scheduleProject(p,options),actual=scheduleProject(p,{...options,memo});
+   assert.deepEqual(actual,expected);
+   assert.deepEqual(scheduleProject({...p,startDate},{...options,memo}),expected);
+  }
+ }
+ assert.equal(memo.stats().hits,6);
+ const changed=editItem(s,p.id,p.items[0].id,{estimateDays:3});
+ assert.deepEqual(scheduleProject(changed.projects[0],{calendarLibrary:lib,memo}),scheduleProject(changed.projects[0],{calendarLibrary:lib}));
+ const independent=portfolioSchedule(s),cached=portfolioSchedule(s,{scheduleMemo:memo});
+ assert.deepEqual(cached,independent);
+ assert.deepEqual(portfolioResources(s,{scheduleMemo:memo}),portfolioResources(s));
+ assert.ok(memo.stats().entries<=8&&memo.stats().rows<=20);
+});
+test("Bounded large portfolio search retains highest priority and avoids repeated CPM work",()=>{
+ let s=desktopLoadPortfolio();
+ const resource=addPlanningResource(s,{label:"Shared qualified planning resource",capacityPct:100});
+ s=resource.state;
+ const ids=s.projects.slice(50,54).map(p=>p.id);
+ for(const id of ids){
+  const p=s.projects.find(p=>p.id===id);
+  s=editItem(s,id,p.items[0].id,{resourceId:resource.id,allocationPct:60,estimateDays:2});
+ }
+ const raw=serialize(s),start=performance.now();
+ const r=compareResourceLeveling(s,resource.id,refs(ids));
+ const ms=performance.now()-start;
+ assert.equal(r.search.exact,false);assert.equal(r.search.space,4096);
+ assert.ok(r.search.evaluated<256);
+ const o=r.options[0];assert.ok(o);
+ assert.equal(o.target.overloadDays,0);assert.equal(o.vector[0],0);
+ assert.ok(r.search.memo.hits>r.search.memo.misses*5);
+ const d=createResourceLevelingProposals(s,r,o.id,{rationale}),actual=comparePortfolioPlanSets(d.state,d.refs);
+ assert.deepEqual(actual.options[0].preview,o.preview);
+ assert.equal(serialize(s),raw);
+ console.log("ATLAS12_LEVELING_SCALE projects=120 works=1200 combinations="+r.search.evaluated+
+  " ms="+ms.toFixed(2)+" memo_hits="+r.search.memo.hits+" misses="+r.search.memo.misses+
+  " shifts="+JSON.stringify(o.vector));
 });

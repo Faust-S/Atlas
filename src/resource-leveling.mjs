@@ -3,6 +3,7 @@
 // No execution, calendars of actual availability, new scheduler or scenario store.
 import {validate} from "./core.mjs";
 import {portfolioSchedule} from "./portfolio-schedule.mjs";
+import {createScheduleProjectionMemo} from "./planning.mjs";
 import {portfolioResources,planningResourceTotals,resourceWorkConflicts} from "./portfolio-resources.mjs";
 import {planChange} from "./trace.mjs";
 import {setPlanDates,comparePortfolioPlanSets,canShiftUnstartedProject as eligible,
@@ -21,7 +22,8 @@ const cmp=(a,b)=>{for(let i=0;i<a.length;i++){if(a[i]!==b[i])return a[i]-b[i]}re
 const equal=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 
 function resourceContext(snapshot,resourceId){
- const schedule=portfolioSchedule(snapshot),resources=portfolioResources(snapshot,{schedule});
+ const scheduleMemo=createScheduleProjectionMemo();
+ const schedule=portfolioSchedule(snapshot,{scheduleMemo}),resources=portfolioResources(snapshot,{schedule,scheduleMemo});
  const group=resources.byId.get(resourceId);
  if(!group)throw Error("Плановый ресурс не найден");
  const projects=new Map(snapshot.projects.map(p=>[p.id,p]));
@@ -40,7 +42,7 @@ function resourceContext(snapshot,resourceId){
  });
  candidates.sort((a,b)=>Number(b.available)-Number(a.available)||a.name.localeCompare(b.name,"ru")||a.id.localeCompare(b.id));
  const deadlines=new Map(snapshot.projects.flatMap(p=>p.items.map(w=>[JSON.stringify([p.id,w.id]),w.dueDate??null])));
- return {schedule,resources,group,projects,candidates,deadlines};
+ return {schedule,resources,group,projects,candidates,deadlines,scheduleMemo};
 }
 /** Resource choice and explicit list of movable projects. No mutation. */
 export function inspectResourceLeveling(snapshot,resourceId){
@@ -72,13 +74,14 @@ function deadlineIncrease(before,after){
 function evaluate(snapshot,c,selection,vector){
  const shifts=new Map(selection.map((r,i)=>[r.projectId,vector[i]]).filter(([,d])=>d>0));
  const projects=snapshot.projects.map(p=>shifts.has(p.id)?{...p,startDate:plus(p.startDate,shifts.get(p.id))}:p);
- if(projects.some(p=>shifts.has(p.id)&&(!p.startDate||p.dueDate&&p.startDate>p.dueDate)))return null;
+ if(projects.some(p=>shifts.has(p.id)&&(!p.startDate||p.dueDate&&p.startDate>p.dueDate)))
+  return {vector:[...vector],invalid:"HORIZON"};
  const candidate={...snapshot,projects};
  let after,resources;
  try{
-  after=portfolioSchedule(candidate);
-  resources=portfolioResources(candidate,{schedule:after});
- }catch{return null}
+  after=portfolioSchedule(candidate,{scheduleMemo:c.scheduleMemo});
+  resources=portfolioResources(candidate,{schedule:after,scheduleMemo:c.scheduleMemo});
+ }catch{return {vector:[...vector],invalid:"CALCULATION"}}
  const guardState=inspectResourceShiftConstraints(snapshot,c.schedule,after,c.resources,resources,[c.group.id]);
  const {lost,fixedMoved,unknownMoved,excessIncrease}=guardState;
  let projectIncrease=0,workIncrease=0,worsenedProjects=0,worsenedWorks=0;
@@ -110,7 +113,8 @@ function evaluate(snapshot,c,selection,vector){
  const guard=[lost,fixedMoved,worseResources,excessIncrease];
  return {vector:[...vector],admissible,strict:admissible&&!projectIncrease&&!workIncrease,
   target,projectIncrease,workIncrease,worsenedProjects,worsenedWorks,unknownMoved,
-  lost,fixedMoved,otherWorse,worseResources,totals,
+  lost,fixedMoved,otherWorse,worseResources,totals,reduced,
+  fixedProjectIds:guardState.fixedMovedProjects,worsenedResourceIds:guardState.worsenedResources,
   deadlineRank:[...guard,...dateRank,...resourceRank,...vector,sum],
   resourceRank:[...guard,...resourceRank,...dateRank,...vector,sum]};
 }
@@ -176,17 +180,34 @@ export function compareResourceLeveling(snapshot,resourceId,selection){
   // each objective. Invalid intermediate states are ranked, not discarded.
   for(const [i,r] of refs.entries())for(let n=1;n<=r.maxDelay;n++){const v=[...zero];v[i]=n;get(v)}
   let frontier=[get(zero)];
-  for(const [i,r] of refs.entries()){
+  // Consider the least protected project first. Retain the unchanged
+  // path as a diversification seed, so a promising single shift never
+  // prunes every option preserving higher-priority projects.
+  for(const [i,r] of [...refs.entries()].reverse()){
    const layer=new Map();
-   for(const parent of frontier.filter(Boolean))for(let n=0;n<=r.maxDelay;n++){
-    const v=[...parent.vector];v[i]=n;const e=get(v);if(e)layer.set(v.join(","),e);
+   for(const parent of frontier.filter(e=>e?.deadlineRank))for(let n=0;n<=r.maxDelay;n++){
+    const v=[...parent.vector];v[i]=n;const e=get(v);if(e?.deadlineRank)layer.set(v.join(","),e);
    }
    const all=[...layer.values()];
-   frontier=[...new Map(["deadlineRank","resourceRank"].flatMap(rank=>[...all].sort((a,b)=>cmp(a[rank],b[rank])).slice(0,BEAM_WIDTH))
-    .map(e=>[e.vector.join(","),e])).values()];
+   frontier=[...new Map([get(zero),...["deadlineRank","resourceRank"].flatMap(rank=>[...all].sort((a,b)=>cmp(a[rank],b[rank])).slice(0,BEAM_WIDTH))]
+    .filter(e=>e?.deadlineRank).map(e=>[e.vector.join(","),e])).values()];
   }
  }
- const entries=[...visited.values()].filter(e=>e?.admissible);
+ const checked=[...visited.values()];
+ const reasons={invalidHorizon:0,calculationUnavailable:0,noReduction:0,fixedMoved:0,lostDates:0,worseResources:0,deadlineCompromise:0};
+ const fixedIds=new Set(),resourceIds=new Set();
+ for(const e of checked){
+  if(!e||!e.vector.some(Boolean))continue;
+  if(e.invalid){reasons[e.invalid==="HORIZON"?"invalidHorizon":"calculationUnavailable"]++;continue}
+  if(!e.reduced)reasons.noReduction++;
+  if(e.fixedMoved)reasons.fixedMoved++;
+  if(e.lost)reasons.lostDates++;
+  if(e.worseResources)reasons.worseResources++;
+  if(e.admissible&&!e.strict)reasons.deadlineCompromise++;
+  for(const id of e.fixedProjectIds)fixedIds.add(id);
+  for(const id of e.worsenedResourceIds)resourceIds.add(id);
+ }
+ const entries=checked.filter(e=>e?.admissible);
  const strict=entries.filter(e=>e.strict).sort((a,b)=>cmp(a.deadlineRank,b.deadlineRank));
  const resource=[...entries].sort((a,b)=>cmp(a.resourceRank,b.resourceRank));
  const options=[];
@@ -205,7 +226,10 @@ export function compareResourceLeveling(snapshot,resourceId,selection){
  add(resource,"capacity","Сократить ресурсные ограничения");
  return {kind:"ATLAS_RESOURCE_LEVELING",sourceStamp:JSON.stringify(snapshot),revision:snapshot.revision,
   resourceId,resourceLabel:c.group.label,selection:refs,before:metrics(c.group),search:{exact,space,evaluated:visited.size,
-   admissible:entries.length,deadlinePreserving:strict.length},options};
+   admissible:entries.length,deadlinePreserving:strict.length,reasons,
+   fixedProjects:[...fixedIds].map(id=>({id,name:c.projects.get(id)?.name??id})),
+   worsenedResources:[...resourceIds].map(id=>({id,name:c.resources.byId.get(id)?.label??id})),
+   memo:c.scheduleMemo.stats()},options};
 }
 
 /** Prepare ordinary unapproved date amendments; do not apply or write them. */

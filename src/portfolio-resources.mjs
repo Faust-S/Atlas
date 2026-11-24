@@ -421,8 +421,8 @@ export function projectResourceReassignment(view,{projectId,workId,targetResourc
  return {current,alternative,source,sourceAfter,target,targetAfter};
 }
 
-export function portfolioResources(snapshot,{schedule=null}={}){
- const forecast=schedule||portfolioSchedule(snapshot);
+export function portfolioResources(snapshot,{schedule=null,scheduleMemo=null}={}){
+ const forecast=schedule||portfolioSchedule(snapshot,{scheduleMemo});
  const groups=new Map((snapshot.resources||[]).map(r=>[r.id,{
   id:r.id,label:r.label,capacityPct:r.capacityPct,availableFrom:r.availableFrom||null,
   availableUntil:r.availableUntil||null,work:[],projects:new Set()
@@ -435,7 +435,7 @@ export function portfolioResources(snapshot,{schedule=null}={}){
   const start=day(forecast.byId.get(project.id)?.projectedStart);
   const own=scheduleProject(project,{calendarLibrary:snapshot.calendarLibrary??[],
    startDate:start===null?project.startDate:forecast.byId.get(project.id)?.projectedStart,
-   includeResourceOccupancy:true});
+   includeResourceOccupancy:true,memo:scheduleMemo});
   const items=new Map(project.items.map(x=>[x.id,x]));
   for(const planned of own.rows){
    if(planned.state==="done")continue;

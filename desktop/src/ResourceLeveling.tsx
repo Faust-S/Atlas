@@ -89,6 +89,21 @@ export function ResourceLeveling({snapshot,resources,onDraft,disabled=false}:{
    {result&&<>
     <p role="status" tabIndex={-1} ref={resultHeading}>{"Вариантов выравнивания: "+result.options.length+". Проверено комбинаций: "+result.search.evaluated+" из "+result.search.space+"."}</p>
     {!result.search.exact&&<p className="minor">Использован ограниченный поиск. Не гарантируется нахождение всех допустимых решений.</p>}
+    <details open={!result.options.length}><summary>Почему варианты ограничены</summary>
+     <p className="minor">Причины относятся к проверенным комбинациям и могут пересекаться.</p>
+     {[
+      ["invalidHorizon","Перенос выходит за допустимые даты проекта"],
+      ["calculationUnavailable","Календарный расчёт недоступен"],
+      ["noReduction","Выбранный ресурс не получает улучшения"],
+      ["fixedMoved","Изменяются даты уже начатых или недоступных проектов"],
+      ["lostDates","Теряются известные расчётные даты"],
+      ["worseResources","Увеличиваются ограничения хотя бы одного ресурса"],
+      ["deadlineCompromise","Допустимо по ресурсам, но ухудшаются известные сроки"]
+     ].filter(([key])=>result.search.reasons[key]>0).map(([key,label])=>
+      <p key={key}>{label+": "+result.search.reasons[key]}</p>)}
+     {result.search.fixedProjects.length>0&&<p>{"Затронуты фиксированные проекты: "+result.search.fixedProjects.map((p:any)=>p.name).join(", ")}</p>}
+     {result.search.worsenedResources.length>0&&<p>{"Ресурсы, ограничения которых могут усилиться: "+result.search.worsenedResources.map((r:any)=>r.name).join(", ")}</p>}
+    </details>
     {!result.options.length?<p>В проверенных комбинациях не найдено уменьшения ограничений без роста агрегированной перегрузки других ресурсов и без переноса уже начатых проектов. Уточните пределы или подготовьте другие корректировки в обычных заявках.</p>:<>
      <label className="atlas-recovery-reason">Обоснование переноса
       <textarea aria-label="Обоснование выравнивания ресурсов" rows={2} maxLength={2000} value={rationale} onChange={e=>setRationale(e.target.value)}/>

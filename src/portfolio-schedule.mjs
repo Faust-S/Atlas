@@ -34,7 +34,7 @@ export function projectedFinishLabel(row){
 
 // A dependency means successor may start only after the predecessor's CPM finish.
 // The estimate uses the canonical calendar-aware CPM, not capacity or acceptance.
-export function portfolioSchedule(snapshot) {
+export function portfolioSchedule(snapshot,{scheduleMemo=null}={}) {
  const order=validatePortfolioLinks(snapshot), projects=new Map(snapshot.projects.map(p=>[p.id,p]));
  const inputs=new Map(order.map(id=>[id,[]]));
  for(const link of snapshot.portfolioLinks||[])inputs.get(link.to).push(link.from);
@@ -42,7 +42,7 @@ export function portfolioSchedule(snapshot) {
  for(const id of order){
   const p=projects.get(id),incoming=inputs.get(id);
   const plannedStartDay=day(p.startDate),dueDay=day(p.dueDate);
-  const plannedPlan=scheduleProject(p,{calendarLibrary:snapshot.calendarLibrary??[]});
+  const plannedPlan=scheduleProject(p,{calendarLibrary:snapshot.calendarLibrary??[],memo:scheduleMemo});
   const hasEstimate=p.items.length>0;
   const parents=incoming.map(from=>byId.get(from));
   const missingParents=parents.filter(row=>row.projectedFinishDay===null);
@@ -65,7 +65,7 @@ export function portfolioSchedule(snapshot) {
   // Never add the original duration to an unrelated projected calendar date.
   const projectedPlan=projectedStartDay!==null&&hasEstimate?
    scheduleProject(p,{calendarLibrary:snapshot.calendarLibrary??[],
-    startDate:dateOf(projectedStartDay)}):null;
+    startDate:dateOf(projectedStartDay),memo:scheduleMemo}):null;
   const projectedFinishDay=projectedPlan?.estimatedFinish?
    day(projectedPlan.estimatedFinish):null;
   const plannedFinishDay=plannedStartDay!==null&&hasEstimate&&plannedPlan.estimatedFinish?

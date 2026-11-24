@@ -397,11 +397,11 @@ export const resourceShiftMetricKeys=Object.freeze(["overloadDays","unavailableD
 export function inspectResourceShiftConstraints(snapshot,before,after,beforeResources,afterResources,resourceIds){
  const projects=new Map(snapshot.projects.map(p=>[p.id,p]));
  let lost=0,fixedMoved=0,excessIncrease=0,unknownMoved=0;
- const worsenedResources=[],notImproved=[];
+ const worsenedResources=[],notImproved=[],fixedMovedProjects=[];
  for(const b of before.rows){
   const a=after.byId.get(b.id),p=projects.get(b.id);
   const moved=b.projectedStart!==a?.projectedStart||b.projectedFinish!==a?.projectedFinish;
-  if(moved&&!canShiftUnstartedProject(p))fixedMoved++;
+  if(moved&&!canShiftUnstartedProject(p)){fixedMoved++;fixedMovedProjects.push(b.id)}
   if(b.projectedFinish&&!a?.projectedFinish)lost++;
   if(moved&&!b.deadline)unknownMoved++;
  }
@@ -418,7 +418,7 @@ export function inspectResourceShiftConstraints(snapshot,before,after,beforeReso
   const b=beforeResources.byId.get(id),n=afterResources.byId.get(id);
   if(!b||!n||!resourceShiftMetricKeys.some(k=>n[k]<b[k])||resourceShiftMetricKeys.some(k=>n[k]>b[k]))notImproved.push(id);
  }
- return {lost,fixedMoved,unknownMoved,worsenedResources,notImproved,excessIncrease};
+ return {lost,fixedMoved,unknownMoved,worsenedResources,notImproved,excessIncrease,fixedMovedProjects};
 }
 function markResourceShiftApplication(snapshot,preview,actions,context,after,afterResources){
  const guards=actions.flatMap(({action})=>action.levelingGuard?[action.levelingGuard]:[]);
