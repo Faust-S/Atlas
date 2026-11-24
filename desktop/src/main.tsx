@@ -188,8 +188,8 @@ function EditorPanel({editor,onSubmit,onCancel,onDirtyChange,busy,project,plan,c
     durationUnit:fields.durationUnit,calendarBasis:fields.calendarBasis,notBeforeDate:fields.notBeforeDate},
    plan,correctionBaseline,{calendarLibrary,portfolioSnapshot,portfolioBefore,cumulativePortfolioBaseline});
  },[editor.action,project,plan,fields.estimateDays,fields.dueDate,
-    fields.durationUnit,fields.calendarBasis,fields.notBeforeDate,correctionBaseline,calendarLibrary,
-    portfolioSnapshot,portfolioBefore,cumulativePortfolioBaseline]);
+    fields.durationUnit,fields.calendarBasis,correctionBaseline,calendarLibrary,
+    portfolioSnapshot,portfolioBefore,cumulativePortfolioBaseline,fields.notBeforeDate]);
  useEffect(()=>{
   const defaults=Object.fromEntries(editor.spec.fields.map(f=>[f.name,String(f.value??"")]));
   // The proposal is preselected ONLY in this local form. It remains unapplied

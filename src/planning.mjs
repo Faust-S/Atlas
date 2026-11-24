@@ -387,11 +387,12 @@ export function scheduleChangeSummary(before,after,{limit=4}={}){
   // A work can enter or leave the critical path without its own finish
   // moving. The work list must not silently omit that decision-relevant fact.
   const startLimitChanged=(old.notBeforeDate??null)!==(row.notBeforeDate??null);
-  const startChanged=row.earlyStart!==old.earlyStart;
-  if(!shiftDays&&!startChanged&&!dueDateChanged&&!criticalChanged&&!startLimitChanged)continue;
-  if(shiftDays||startChanged){
+  // Preserve the established finish-shift metric. A newly entered start
+  // limit is also a decision-relevant change even if its finish is unchanged.
+  if(!startLimitChanged){if(!shiftDays&&!dueDateChanged&&!criticalChanged)continue;}
+  if(shiftDays){
    movedTotal++;
-   if((shiftDays||row.earlyStart-old.earlyStart)>0)delayedTotal++;else earlierTotal++;
+   if(shiftDays>0)delayedTotal++;else earlierTotal++;
   }
   if(missedDeadline)deadlineMissedTotal++;
   affected.push({

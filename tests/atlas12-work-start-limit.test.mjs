@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {empty,createProject,editProject,createItem,editItem,createWorkCalendar,addDependency,serialize,deserialize} from "../src/core.mjs";
+import {empty,createProject,editProject,createItem,editItem,createWorkCalendar,connect,serialize,deserialize} from "../src/core.mjs";
 import {scheduleProject,scheduleDeadlineExplanations} from "../src/planning.mjs";
 import {portfolioResources} from "../src/portfolio-resources.mjs";
 import {portfolioSchedule} from "../src/portfolio-schedule.mjs";
@@ -24,7 +24,7 @@ function fixture(){
  const b=add("Монтаж Б",2,{resourceId:r.id,allocationPct:60});
  const c=add("Приёмка",1);
  const critical=add("Подготовка площадки",6);
- s=addDependency(s,p.id,a,c);s=addDependency(s,p.id,b,c);
+ s=connect(s,p.id,a,c);s=connect(s,p.id,b,c);
  return {s,p:p.id,a,b,c,critical,resource:r.id};
 }
 const row=(s,p,id)=>scheduleProject(s.projects.find(x=>x.id===p),{calendarLibrary:s.calendarLibrary??[],includeResourceOccupancy:true}).rows.find(w=>w.id===id);
@@ -101,7 +101,7 @@ test("Constraints survive ordinary approval, export and historical control point
  assert.throws(()=>applyPlanAmendment(started,f.p,proposal.id),/уже начатой/);
 });
 test("Manual constraint is visible in Work form and in its before-save forecast",()=>{
- const f=fixture(),p=f.s.projects[0],spec=editorSpec("work:"+f.b,p,f.s);
+ const f=fixture(),p=f.s.projects[0],spec=editorSpec(p,"work:"+f.b,f.s);
  const field=spec.fields.find(x=>x.name==="notBeforeDate");
  assert.equal(field.label,"Начало не ранее");
  const input=new Map(spec.fields.map(x=>[x.name,x.value]));
