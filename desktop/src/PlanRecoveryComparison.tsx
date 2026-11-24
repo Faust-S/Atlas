@@ -1,4 +1,4 @@
-import React,{useMemo,useState} from "react";
+import React,{useLayoutEffect,useMemo,useRef,useState} from "react";
 import {inspectDeadlineRecovery,compareDeadlineRecovery} from "../../src/plan-recovery.mjs";
 import {AmendmentAnalysis} from "./PlanAlternativesComparison";
 
@@ -21,6 +21,9 @@ export function PlanRecoveryComparison({snapshot,projectId,onDraft}:{
  const [calculation,setCalculation]=useState<{snapshot:any;value:any}|null>(null);
  const [error,setError]=useState("");
  const [rationale,setRationale]=useState("");
+ const [focusWork,setFocusWork]=useState<string|null>(null);
+ const workInputs=useRef(new Map<string,HTMLInputElement>());
+ const resultsHeading=useRef<HTMLParagraphElement|null>(null);
  const context=useMemo(()=>{
   if(!expanded)return null;
   try{return {value:inspectDeadlineRecovery(snapshot,projectId)}}catch(e){return {error:e instanceof Error?e.message:"Расчёт недоступен"}}
@@ -38,6 +41,15 @@ export function PlanRecoveryComparison({snapshot,projectId,onDraft}:{
  const alreadyStaged=edges.some(e=>e.from===from?.id&&e.to===to?.id);
  const current=calculation&&calculation.snapshot===snapshot?calculation.value:null;
  const stale=!!calculation&&!current;
+ useLayoutEffect(()=>{
+  if(!focusWork)return;
+  const input=workInputs.current.get(focusWork);
+  if(input){input.focus({preventScroll:true});input.scrollIntoView({block:"nearest"});}
+  setFocusWork(null);
+ },[focusWork]);
+ useLayoutEffect(()=>{
+  if(current&&expanded){resultsHeading.current?.focus({preventScroll:true});resultsHeading.current?.scrollIntoView({block:"nearest"});}
+ },[current,expanded]);
  const invalidate=()=>{setCalculation(null);setError("")};
  const patch=(id:string,values:Partial<WorkVariant>)=>{
   setVariants(rows=>rows.map(v=>v.itemId===id?{...v,...values}:v));invalidate();
@@ -45,7 +57,7 @@ export function PlanRecoveryComparison({snapshot,projectId,onDraft}:{
  const add=()=>{
   if(!chosen||variants.length>=(info?.maxWorks??4))return;
   setVariants(rows=>[...rows,{itemId:chosen.id,estimateDays:String(chosen.estimateDays),
-   resourceId:chosen.resourceId??"",allocationPct:String(chosen.allocationPct)}]);invalidate();
+   resourceId:chosen.resourceId??"",allocationPct:String(chosen.allocationPct)}]);setFocusWork(chosen.id);invalidate();
  };
  const calculate=()=>{
   try{
@@ -88,6 +100,7 @@ export function PlanRecoveryComparison({snapshot,projectId,onDraft}:{
        {w&&<small>{w.estimateDays+" "+unit(w.durationUnit)+" · "+(w.critical?"критическая":"резерв "+w.floatDays+" дн.")+(w.state==="blocked"?" · заблокирована":"")}</small>}
        <div className="atlas-plan-choice-fields">
         <label>Длительность ({unit(w?.durationUnit)})<input type="number" min="1" max="36500" step="1"
+         ref={node=>{if(node)workInputs.current.set(v.itemId,node);else workInputs.current.delete(v.itemId)}}
          aria-label={"Длительность варианта "+(i+1)} value={v.estimateDays} onChange={e=>patch(v.itemId,{estimateDays:e.target.value})}/></label>
         <label>Плановый ресурс<select aria-label={"Ресурс варианта "+(i+1)} value={v.resourceId} onChange={e=>patch(v.itemId,{resourceId:e.target.value})}>
          {!w?.resourceId&&<option value="">Не назначен</option>}
@@ -130,7 +143,7 @@ export function PlanRecoveryComparison({snapshot,projectId,onDraft}:{
      {error&&<p role="alert">{error}</p>}
      {stale&&<p role="alert">План изменился. Рассчитайте варианты заново.</p>}
      {current&&<>
-      <p role="status">{"Рассчитано вариантов: "+current.options.filter((o:any)=>o.valid).length+" из "+current.options.length}</p>
+      <p role="status" tabIndex={-1} ref={resultsHeading}>{"Рассчитано вариантов: "+current.options.filter((o:any)=>o.valid).length+" из "+current.options.length}</p>
       <label className="atlas-recovery-reason">Обоснование выбранного варианта
        <textarea aria-label="Обоснование восстановления срока" rows={2} maxLength={2000} value={rationale} onChange={e=>setRationale(e.target.value)}/>
       </label>

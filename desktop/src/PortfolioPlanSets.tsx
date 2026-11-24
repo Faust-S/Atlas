@@ -1,4 +1,4 @@
-import React,{useMemo,useState} from "react";
+import React,{useLayoutEffect,useMemo,useRef,useState} from "react";
 import {listPortfolioPlanProposals,comparePortfolioPlanSets,listPortfolioPlanApplications} from "../../src/plan-amendment.mjs";
 import {AmendmentAnalysis} from "./PlanAlternativesComparison";
 
@@ -52,9 +52,13 @@ export function PortfolioPlanSets({snapshot,onOpen,onApply,selection,onSelection
  const [comparison,setComparison]=useState<{snapshot:any;value:any}|null>(null);
  const [rationale,setRationale]=useState("");
  const [error,setError]=useState("");
+ const resultsHeading=useRef<HTMLParagraphElement|null>(null);
  const choices=useMemo(()=>expanded?listPortfolioPlanProposals(snapshot):[],[expanded,snapshot]);
  const history=useMemo(()=>expanded?listPortfolioPlanApplications(snapshot):[],[expanded,snapshot]);
  const result=comparison&&comparison.snapshot===snapshot?comparison.value:null;
+ useLayoutEffect(()=>{
+  if(result&&expanded){resultsHeading.current?.focus({preventScroll:true});resultsHeading.current?.scrollIntoView({block:"nearest"});}
+ },[result,expanded]);
  const invalidate=()=>{setComparison(null);setError("")};
  const calculate=()=>{
   try{setError("");setComparison({snapshot,value:comparePortfolioPlanSets(snapshot,first,second.length?second:null)})}
@@ -77,11 +81,17 @@ export function PortfolioPlanSets({snapshot,onOpen,onApply,selection,onSelection
    {error&&<p role="alert">{error}</p>}
    {comparison&&!result&&first.length>0&&<p role="alert">Портфель изменился. Рассчитайте варианты заново.</p>}
    {result&&<>
-    <p role="status">{"Рассчитано вариантов портфеля: "+result.options.filter((o:any)=>o.valid).length+" из "+result.options.length}</p>
+    <p role="status" tabIndex={-1} ref={resultsHeading}>{"Рассчитано вариантов портфеля: "+result.options.filter((o:any)=>o.valid).length+" из "+result.options.length}</p>
+    <div className="atlas-plan-set-quick-results">{result.options.map((o:any)=><div className="atlas-amendment-row" key={o.id}>
+     <strong>{o.id==="A"?"Вариант А":"Вариант Б"}</strong>
+     {o.valid?<><p role="status" tabIndex={-1}>{"Работ с конфликтами ресурсов: "+o.assessment.conflictedWorkBefore+" → "+o.assessment.conflictedWorkAfter}</p>
+      <small>{"Перегрузка: "+o.preview.resourceBefore.overloadDays+" → "+o.preview.resourceAfter.overloadDays+" ресурс-дн."}</small>
+      {!o.canApply&&o.members.length>=2&&<p role="status" tabIndex={-1}>Для совместного применения сначала отдельно утвердите все заявки.</p>}</>:<p role="alert">{o.reason}</p>}
+    </div>)}</div>
     {result.summary&&<div className="atlas-plan-set-summary">
      <p>{"Единая база сравнения: "+result.summary.comparableProjects+" из "+result.summary.projectCount+
       " проектов имеют исходную контрольную дату и прогноз во всех рассчитанных вариантах."}</p>
-     <div className="table-scroll"><table aria-label="Сводное сравнение согласованных планов">
+     <details><summary>Все показатели сравнения</summary><div className="table-scroll"><table aria-label="Сводное сравнение согласованных планов">
       <thead><tr><th>Показатель</th>{result.summary.columns.map((c:any)=><th key={c.id}>{c.id==="current"?"Текущий":c.id==="A"?"А":"Б"}</th>)}</tr></thead>
       <tbody>{[
        ["late","Просрочено из сопоставимых проектов"],["slip","Сумма дней отставания по прежним срокам"],
@@ -92,7 +102,7 @@ export function PortfolioPlanSets({snapshot,onOpen,onApply,selection,onSelection
        ["newConflictWorkDays","Добавлено конфликтных дней работ"],["clearedConflictWorkDays","Устранено конфликтных дней работ"],["unlinked","Работ с длительностью без ресурса"],["undated","Работ без дат"]
       ].map(([key,label])=><tr key={key}><td>{label}</td>{result.summary.columns.map((c:any)=><td key={c.id}>
        {(key==="late"||key==="slip")&&!result.summary.comparableProjects?"Нет данных":c[key]}</td>)}</tr>)}</tbody>
-     </table></div>
+     </table></div></details>
      <small className="minor">Календарное сравнение использует контрольные сроки, действующие до расчёта. Ресурсные показатели относятся ко всему портфелю, даже если сроки известны не для всех проектов.</small>
     </div>}
     {result.options.some((o:any)=>o.canApply)&&<label className="atlas-recovery-reason">Обоснование совместного применения
@@ -113,7 +123,7 @@ export function PortfolioPlanSets({snapshot,onOpen,onApply,selection,onSelection
        {p.deadlines.changedDeadline>0&&<small>Контрольные сроки изменены; оценка выше сохраняет сроки, действовавшие до расчёта.</small>}
        <small>{"Сроки работ: просрочено "+p.workDeadlines.lateBefore+" → "+p.workDeadlines.lateAfter+
         "; по сопоставимым датам дней отставания "+p.workDeadlines.comparableSlipBefore+" → "+p.workDeadlines.comparableSlipAfter}</small>
-       <small>{"Работ с конфликтами ресурсов: "+p.conflictedWorkBefore+" → "+p.conflictedWorkAfter}</small>
+       <small>{"Участие работ в конфликтах: "+p.conflictedWorkBefore+" → "+p.conflictedWorkAfter}</small>
        <small>{"Новые конфликтующие работы: "+p.newlyConflicted+"; освобождены: "+p.clearedConflict}</small>
        {(p.newConflictWorkDays>0||p.clearedConflictWorkDays>0||p.changedConflictKindWorks>0)&&
         <small>{"Новые даты конфликта у ранее конфликтующих работ: "+p.newConflictDateWorks+
@@ -144,7 +154,7 @@ export function PortfolioPlanSets({snapshot,onOpen,onApply,selection,onSelection
       </div>)}
       {o.valid&&(o.canApply?<button type="button" className="action-button" disabled={disabled||rationale.trim().length<8}
        onClick={()=>onApply(result,o.id,rationale)} aria-label={"Применить согласованный "+name}>Применить согласованный план</button>:
-       <p className="minor">{o.members.length<2?"Одну заявку применяйте в её проекте.":"Для совместного применения сначала отдельно утвердите все заявки."}</p>)}
+       <p className="minor">{o.members.length<2?"Одну заявку применяйте в её проекте.":"Сначала утвердите заявки в соответствующих проектах."}</p>)}
      </div>;
     })}</div>
     <p className="minor">Применение всех утверждённых корректировок создаёт одну новую редакцию черновика. После подтверждения сохраните её обычным способом. Расчёт не подтверждает фактическое исполнение или доступность.</p>

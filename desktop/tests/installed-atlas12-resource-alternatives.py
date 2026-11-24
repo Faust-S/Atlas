@@ -69,18 +69,41 @@ def find_resource_control(name,role=None,contains=False,require_hit=False):
     d.activate()
     found=find()
     if found is not None:return found
+    # Native UIA scrolling is a real accessibility action, not DOM/IPC.
+    # A uniquely named element can request visibility. Physical input still
+    # requires a live, uncovered hit; no InvokePattern is used.
+    try:
+        controls=d.window().descendants(control_type=role) if role else d.window().descendants()
+        named=[e for e in controls if match(e) and e.is_enabled()]
+        if len(named)==1:
+            target=named[0]
+            try:
+                target.iface_scroll_item.ScrollIntoView()
+            except Exception:
+                # WebView2 may expose only keyboard focus for input/buttons.
+                # The ordinary focus operation scrolls those controls into view.
+                if target.element_info.control_type in ('Button','Edit','Spinner','ComboBox'):
+                    try:target.set_focus()
+                    except (COMError,AttributeError):pass
+            time.sleep(.4)
+            found=find()
+            if found is not None:return found
+    except (COMError,KeyError):
+        pass
     left,top,right,bottom=bounds()
-    point=(left+int((right-left)*.66),top+int((bottom-top)*.80))
-    # Start from the top, then scroll in small increments rather than skipping
-    # a button between two viewport positions.
-    mouse.scroll(coords=point,wheel_dist=40)
-    time.sleep(.35)
-    until=time.monotonic()+35
-    while time.monotonic()<until:
-        found=find()
-        if found is not None:return found
-        mouse.scroll(coords=point,wheel_dist=-1)
-        time.sleep(.25)
+    # The central workspace is not at a fixed width: the inspector and
+    # navigation panel can occupy either edge. Scan at several horizontal
+    # points, and do not restart a long document before testing visibility.
+    points=[(left+int((right-left)*x),top+int((bottom-top)*.80)) for x in (.52,.42,.64)]
+    for point in points:
+        mouse.scroll(coords=point,wheel_dist=40)
+        time.sleep(.35)
+        until=time.monotonic()+35
+        while time.monotonic()<until:
+            found=find()
+            if found is not None:return found
+            mouse.scroll(coords=point,wheel_dist=-2)
+            time.sleep(.22)
     v.capture('atlas12-resource-control-not-visible')
     raise AssertionError('Resource control not physically reachable: '+name)
 

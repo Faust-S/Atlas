@@ -1,0 +1,148 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {empty,createProject,editProject,createItem,editItem,serialize,deserialize,createWorkCalendar} from "../src/core.mjs";
+import {addPlanningResource} from "../src/resource-planning.mjs";
+import {portfolioResources} from "../src/portfolio-resources.mjs";
+import {addPortfolioLink} from "../src/portfolio.mjs";
+import {capturePlanBaseline} from "../src/plan-baseline.mjs";
+import {decideChange} from "../src/trace.mjs";
+import {comparePortfolioPlanSets,applyPortfolioPlanSet,applyPlanAmendment} from "../src/plan-amendment.mjs";
+import {inspectResourceLeveling,compareResourceLeveling,createResourceLevelingProposals} from "../src/resource-leveling.mjs";
+
+const rationale="Руководитель согласовал допустимый перенос начала.";
+import {fixture} from "./fixtures/atlas12-resource-leveling.mjs";
+const refs=(ids,maxDelay=7)=>ids.map(projectId=>({projectId,maxDelay}));
+test("Exact calendar search respects priority and preserves the complete original plan",()=>{
+ const f=fixture(),s=f.snapshot,raw=serialize(s);
+ const i=inspectResourceLeveling(s,f.resourceId);
+ assert.equal(i.before.overloadDays,3);assert.equal(i.candidates.length,2);
+ assert.ok(i.candidates.every(c=>c.available&&c.reserveDays===3));
+ const r=compareResourceLeveling(s,f.resourceId,refs(f.ids));
+ assert.equal(r.search.exact,true);assert.equal(r.search.space,64);assert.equal(r.search.evaluated,64);
+ assert.equal(r.options.length,1);
+ const o=r.options[0];
+ assert.deepEqual(o.vector,[0,3]);assert.equal(o.target.overloadDays,0);
+ assert.equal(o.target.overloadPctDays,0);assert.equal(o.projectIncrease,0);assert.equal(o.workIncrease,0);
+ assert.deepEqual(o.objectives,["deadlines","capacity"]);
+ assert.equal(o.preview.rows.find(p=>p.id===f.ids[1]).afterFinish,"2026-11-29");
+ assert.equal(serialize(s),raw);
+ const reversed=compareResourceLeveling(s,f.resourceId,refs([...f.ids].reverse()));
+ assert.deepEqual(reversed.options[0].shifts.map(x=>x.projectId),[f.ids[0]]);
+});
+test("Different objectives retain a real resource versus deadline tradeoff",()=>{
+ const f=fixture({dueDates:["2026-11-26","2026-11-27"]});
+ const r=compareResourceLeveling(f.snapshot,f.resourceId,refs(f.ids));
+ assert.equal(r.options.length,2);
+ const [safe,capacity]=r.options;
+ assert.deepEqual(safe.vector,[0,1]);assert.equal(safe.target.overloadDays,2);
+ assert.equal(safe.assessment.deadlines.newlyLate,0);assert.equal(safe.assessment.workDeadlines.newlyLate,0);
+ assert.deepEqual(capacity.vector,[0,3]);assert.equal(capacity.target.overloadDays,0);
+ assert.equal(capacity.projectIncrease,2);assert.equal(capacity.workIncrease,2);
+ assert.equal(capacity.assessment.deadlines.newlyLate,1);assert.equal(capacity.assessment.workDeadlines.newlyLate,1);
+});
+test("Ordinary proposals preserve baseline, works, dependencies and explicit approval",async()=>{
+ const f=fixture(),s=f.snapshot,raw=serialize(s),r=compareResourceLeveling(s,f.resourceId,refs(f.ids));
+ const d=createResourceLevelingProposals(s,r,r.options[0].id,{rationale});
+ assert.equal(d.refs.length,1);
+ const id=d.refs[0].projectId,old=s.projects.find(p=>p.id===id),p=d.state.projects.find(p=>p.id===id);
+ assert.deepEqual(p.items,old.items);assert.deepEqual(p.dependencies,old.dependencies);assert.deepEqual(p.planBaselines,old.planBaselines);
+ assert.equal(p.startDate,old.startDate);assert.equal(p.dueDate,old.dueDate);assert.deepEqual(p.decisions,old.decisions);
+ const c=p.changes.at(-1);
+ assert.equal(c.status,"proposed");assert.equal(c.planAppliedAt,undefined);
+ assert.deepEqual(c.planAmendments,[{kind:"dates",before:{startDate:"2026-11-23",dueDate:"2026-11-29"},after:{startDate:"2026-11-26",dueDate:"2026-11-29"}}]);
+ assert.ok(c.description.includes(rationale));
+ const comparison=comparePortfolioPlanSets(d.state,d.refs);
+ assert.deepEqual(comparison.options[0].preview,r.options[0].preview);
+ assert.throws(()=>applyPlanAmendment(d.state,id,c.id),/утвержд/);
+ const approved=decideChange(d.state,id,c.id,{status:"approved",rationale}).state;
+ const applied=applyPlanAmendment(approved,id,c.id).state;
+ assert.equal(portfolioResources(applied).byId.get(f.resourceId).overloadDays,0);
+ assert.deepEqual(applied.projects.find(p=>p.id===id).planBaselines,old.planBaselines);
+ assert.deepEqual(deserialize(serialize(applied)),applied);
+ const {buildIwxaPortfolio,readIwxaPortfolio}=await import("../desktop/src/iwxa-portfolio.mjs");
+ const imported=await readIwxaPortfolio(await buildIwxaPortfolio(d.state,{now:"2026-11-24T12:00:00.000Z"}));
+ assert.deepEqual(imported.snapshot,d.state);assert.equal(serialize(s),raw);
+});
+test("Three projects can yield ordinary coordinated approvals and one atomic application",()=>{
+ const f=fixture({count:3,dueDates:["2026-12-15","2026-12-15","2026-12-15"],duration:2});
+ const r=compareResourceLeveling(f.snapshot,f.resourceId,refs(f.ids,4));
+ assert.equal(r.search.exact,true);
+ const o=r.options[0];
+ assert.deepEqual(o.vector,[0,2,4]);assert.equal(o.target.overloadDays,0);
+ const d=createResourceLevelingProposals(f.snapshot,r,o.id,{rationale});
+ assert.equal(d.refs.length,2);
+ const proposed=comparePortfolioPlanSets(d.state,d.refs);
+ assert.equal(proposed.options[0].canApply,false);
+ let s=d.state;
+ for(const ref of d.refs)s=decideChange(s,ref.projectId,ref.changeId,{status:"approved",rationale}).state;
+ const comparison=comparePortfolioPlanSets(s,d.refs);
+ assert.equal(comparison.options[0].canApply,true);
+ const result=applyPortfolioPlanSet(s,comparison,"A",{rationale});
+ assert.equal(result.state.revision,s.revision+1);
+ assert.equal(portfolioResources(result.state).byId.get(f.resourceId).overloadDays,0);
+ for(const p of result.state.projects)assert.deepEqual(p.planBaselines,f.snapshot.projects.find(x=>x.id===p.id).planBaselines);
+});
+test("Started work and indirect shifts of begun projects are excluded",()=>{
+ const f=fixture();
+ let s=editItem(f.snapshot,f.ids[0],f.works[0],{state:"in_progress"});
+ let i=inspectResourceLeveling(s,f.resourceId);
+ assert.equal(i.candidates.find(p=>p.id===f.ids[0]).available,false);
+ assert.throws(()=>compareResourceLeveling(s,f.resourceId,refs(f.ids)),/недоступен/);
+ const child=createProject(s,{name:"Уже начатый связанный проект"});
+ s=editProject(child.state,child.id,{startDate:"2026-11-23",dueDate:"2026-12-05"});
+ const w=createItem(s,child.id,{title:"Начатая работа"});
+ s=editItem(w.state,child.id,w.id,{estimateDays:2,state:"in_progress"});
+ s=addPortfolioLink(s,{from:f.ids[1],to:child.id});
+ const r=compareResourceLeveling(s,f.resourceId,refs([f.ids[1]]));
+ assert.equal(r.options.length,0);assert.equal(r.search.admissible,0);
+});
+test("No proposal transfers a new aggregate overload to a different resource",()=>{
+ const f=fixture(),other=addPlanningResource(f.snapshot,{label:"Подъёмник",capacityPct:100});
+ let s=other.state;
+ const w=createItem(s,f.ids[1],{title:"Работа на подъёмнике",resourceId:other.id,allocationPct:100});
+ s=editItem(w.state,f.ids[1],w.id,{estimateDays:3});
+ const p=createProject(s,{name:"Независимый заказ"});
+ s=editProject(p.state,p.id,{startDate:"2026-11-26",dueDate:"2026-12-10"});
+ const v=createItem(s,p.id,{title:"Занятый подъёмник",resourceId:other.id,allocationPct:100});
+ s=editItem(v.state,p.id,v.id,{estimateDays:7});
+ const result=compareResourceLeveling(s,f.resourceId,refs([f.ids[1]],7));
+ // Every positive move into 24-30 Nov overlaps the independent order;
+ // no eligible candidate may increase that resource's aggregate burden.
+ assert.equal(result.options.length,0);
+});
+test("Calendar occupancy uses staffed days rather than elapsed weekend span",()=>{
+ const f=fixture({starts:["2026-11-20","2026-11-20"],duration:2});
+ const calendar=createWorkCalendar(f.snapshot,{name:"Пятидневка",weekdays:[1,2,3,4,5],excludedDates:[],additionalWorkingDates:[],source:{kind:"entered_by_user",reference:null}});
+ const s=editItem(calendar.state,f.ids[0],f.works[0],{durationUnit:"working_days",calendarBasis:{id:calendar.id,version:calendar.version}});
+ const r=compareResourceLeveling(s,f.resourceId,refs([f.ids[1]],7));
+ assert.equal(r.before.overloadDays,1);
+ assert.equal(r.options[0].target.overloadDays,0);
+ assert.deepEqual(r.options[0].vector,[1]); // continuous Sat/Sun, staffed Fri/Mon
+});
+test("Limits, incomplete search and stale/tampered variants are explicit",()=>{
+ const f=fixture({count:4,dueDates:["2026-12-15","2026-12-15","2026-12-15","2026-12-15"],duration:2});
+ const r=compareResourceLeveling(f.snapshot,f.resourceId,refs(f.ids));
+ assert.equal(r.search.exact,false);assert.equal(r.search.space,4096);
+ assert.ok(r.search.evaluated<256);assert.ok(r.options.length);
+ assert.ok(r.options.every(o=>o.vector.every(d=>d>=0&&d<=7)));
+ const changed=structuredClone(f.snapshot);changed.projects[0].goal="Изменено";
+ assert.throws(()=>createResourceLevelingProposals(changed,r,r.options[0].id,{rationale}),/Портфель изменился/);
+ const bad=structuredClone(r);bad.options[0].preview.resourceAfter.overloadDays=999;
+ assert.throws(()=>createResourceLevelingProposals(f.snapshot,bad,r.options[0].id,{rationale}),/Последствия варианта изменились/);
+ assert.throws(()=>compareResourceLeveling(f.snapshot,f.resourceId,refs(f.ids,8)),/от 1 до 7/);
+ assert.throws(()=>compareResourceLeveling(f.snapshot,f.resourceId,refs([f.ids[0],f.ids[0]])),/уникальный/);
+ assert.throws(()=>compareResourceLeveling(f.snapshot,f.resourceId,[]),/от одного/);
+});
+
+test("Desktop uses explicit proposal preparation and existing portfolio approval navigation",async()=>{
+ const {readFileSync}=await import("node:fs");
+ const read=p=>readFileSync(new URL("../"+p,import.meta.url),"utf8");
+ const ui=read("desktop/src/ResourceLeveling.tsx"),main=read("desktop/src/main.tsx"),recovery=read("desktop/src/PlanRecoveryComparison.tsx"),sets=read("desktop/src/PortfolioPlanSets.tsx");
+ assert.match(ui,/compareResourceLeveling\(snapshot,resource.id,choice.map/);
+ assert.match(main,/createResourceLevelingProposals\(latestSnapshot.current,comparison,optionId,\{rationale\}\)/);
+ assert.match(main,/setPortfolioPlanSelection\(\{first:result.refs,second:\[\],expanded:true\}\)/);
+ assert.doesNotMatch(ui,/commitWithReadback\(|applyPlanAmendment\(|decideChange\(/);
+ assert.match(recovery,/input\.focus\(\{preventScroll:true\}\);input\.scrollIntoView/);
+ assert.match(sets,/atlas-plan-set-quick-results/);
+ assert.ok(sets.indexOf("atlas-plan-set-quick-results")<sets.indexOf("Сводное сравнение согласованных планов"));
+});
