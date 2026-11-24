@@ -217,13 +217,14 @@ export function planningResourceTotals(view){
  * sharing the same resource. One resource-day is counted once per scope,
  * not once per participating Work or project.
  */
-function planningResourceScopeProjection(view,projectIds){
+function planningResourceScopeProjection(view,projectIds,trackPeriods=false){
  const ids=new Set(projectIds);
  const blank=()=>({openWork:0,linked:0,unlinked:0,positiveUnlinked:0,undated:0,
   conflictedWork:0,overloadWork:0,unavailableWork:0,overloadDays:0,unavailableDays:0,conflictResources:0});
  const totals=blank(),projects=new Map([...ids].map(id=>[id,{id,...blank()}]));
  const selected=view.work.filter(w=>ids.has(w.projectId));
  const conflicts=new Map(),scopeResources=new Set(),projectResources=new Map([...ids].map(id=>[id,new Set()]));
+ const periodsByWork=trackPeriods?new Map():null;
  for(const group of view.people){
   if(!group.overloadDays&&!group.unavailableDays||!group.work.some(w=>ids.has(w.projectId)))continue;
   dayEvents(group,(segment,active)=>{
@@ -233,6 +234,15 @@ function planningResourceScopeProjection(view,projectIds){
     if(!ids.has(work.projectId))continue;
     const detail=conflicts.get(key)??{overloadDays:0,unavailableDays:0};
     detail[metric]+=length;conflicts.set(key,detail);
+    if(periodsByWork){
+     const ranges=periodsByWork.get(key)??[];
+     const last=ranges.at(-1);
+     // Coalesce adjacent intervals of the same conflict kind. Occupied
+     // calendar gaps remain gaps, regardless of the resource load there.
+     if(last&&last.until===segment.from&&last.kind===segment.kind)last.until=segment.until;
+     else ranges.push({from:segment.from,until:segment.until,kind:segment.kind});
+     periodsByWork.set(key,ranges);
+    }
     participating.add(work.projectId);
    }
    if(!participating.size)return;
@@ -269,19 +279,45 @@ function planningResourceScopeProjection(view,projectIds){
  examples.sort((a,b)=>(b.overloadDays+b.unavailableDays)-(a.overloadDays+a.unavailableDays)||
   a.projectName.localeCompare(b.projectName,"ru")||a.title.localeCompare(b.title,"ru")||
   a.projectId.localeCompare(b.projectId)||a.workId.localeCompare(b.workId));
- return {scope:{totals,projects:[...projects.values()],examples:examples.slice(0,8)},conflictWorks};
+ return {scope:{totals,projects:[...projects.values()],examples:examples.slice(0,8)},conflictWorks,periodsByWork};
 }
 export function planningResourceScope(view,projectIds){
  return planningResourceScopeProjection(view,projectIds).scope;
 }
+// Compare the civil-day unions of one Work's conflict intervals. Count Work-days,
+// not unique resource-days: different Works can be affected on the same day.
+// Each sweep produces ordered, disjoint half-open ranges; no per-day expansion.
+function compareWorkConflictPeriods(before,after){
+ const boundaries=[...new Set([...before,...after].flatMap(r=>[r.from,r.until]))].sort((a,b)=>a-b);
+ let i=0,j=0,newConflictDays=0,clearedConflictDays=0,changedKindDays=0,firstNewPeriod=null;
+ let newStart=null,newUntil=null,newKind=null;
+ for(let k=0;k+1<boundaries.length;k++){
+  const from=boundaries[k],until=boundaries[k+1];
+  while(i<before.length&&before[i].until<=from)i++;
+  while(j<after.length&&after[j].until<=from)j++;
+  const old=before[i]?.from<=from?before[i]:null;
+  const next=after[j]?.from<=from?after[j]:null;
+  const length=until-from;
+  if(!old&&next){
+   newConflictDays+=length;
+   if(newStart===null){newStart=from;newUntil=until;newKind=next.kind;}
+   else if(newUntil===from&&newKind===next.kind)newUntil=until;
+  }else if(old&&!next)clearedConflictDays+=length;
+  else if(old&&next&&old.kind!==next.kind)changedKindDays+=length;
+ }
+ if(newStart!==null)firstNewPeriod={startDate:date(newStart),endDate:date(newUntil-1),kind:newKind};
+ return {newConflictDays,clearedConflictDays,changedKindDays,firstNewPeriod};
+}
 /**
  * Equal aggregate load may conceal a newly conflicted Work when assignments
- * exchange places. Complete counts use all participating Works.
+ * exchange places, or expose already conflicted Works on different dates.
+ * Complete counts use all participating Works; only examples are bounded.
  */
 export function comparePlanningResourceScopes(before,after,projectIds){
  const ids=[...projectIds];
- const a=planningResourceScopeProjection(before,ids),b=planningResourceScopeProjection(after,ids);
- const blank=()=>({newlyConflicted:0,cleared:0,worsened:0,relieved:0,resourceChanged:0,changed:0});
+ const a=planningResourceScopeProjection(before,ids,true),b=planningResourceScopeProjection(after,ids,true);
+ const blank=()=>({newlyConflicted:0,cleared:0,worsened:0,relieved:0,resourceChanged:0,
+  newDateWorks:0,changedKindWorks:0,newConflictDays:0,clearedConflictDays:0,changedKindDays:0,changed:0});
  const totals=blank(),byProject=new Map(ids.map(id=>[id,{id,...blank()}]));
  const examples=[];
  for(const key of new Set([...a.conflictWorks.keys(),...b.conflictWorks.keys()])){
@@ -290,7 +326,10 @@ export function comparePlanningResourceScopes(before,after,projectIds){
   const worsened=!!old&&!!next&&(next.overloadDays>old.overloadDays||next.unavailableDays>old.unavailableDays);
   const relieved=!!old&&!!next&&(next.overloadDays<old.overloadDays||next.unavailableDays<old.unavailableDays);
   const resourceChanged=!!old&&!!next&&old.resourceId!==next.resourceId;
-  if(!newlyConflicted&&!cleared&&!worsened&&!relieved&&!resourceChanged)continue;
+  const periods=compareWorkConflictPeriods(a.periodsByWork.get(key)??[],b.periodsByWork.get(key)??[]);
+  const newDate=!!old&&!!next&&periods.newConflictDays>0;
+  const changedKind=periods.changedKindDays>0;
+  if(!newlyConflicted&&!cleared&&!worsened&&!relieved&&!resourceChanged&&!newDate&&!changedKind&&!periods.clearedConflictDays)continue;
   const work=next??old;
   for(const stats of [totals,byProject.get(work.projectId)]){
    stats.changed++;
@@ -299,14 +338,19 @@ export function comparePlanningResourceScopes(before,after,projectIds){
    if(worsened)stats.worsened++;
    if(relieved)stats.relieved++;
    if(resourceChanged)stats.resourceChanged++;
+   if(newDate)stats.newDateWorks++;
+   if(changedKind)stats.changedKindWorks++;
+   stats.newConflictDays+=periods.newConflictDays;
+   stats.clearedConflictDays+=periods.clearedConflictDays;
+   stats.changedKindDays+=periods.changedKindDays;
   }
   examples.push({projectId:work.projectId,projectName:work.projectName,workId:work.workId,title:work.title,
    beforeResource:old?.resourceLabel??null,afterResource:next?.resourceLabel??null,
    beforeOverloadDays:old?.overloadDays??0,afterOverloadDays:next?.overloadDays??0,
    beforeUnavailableDays:old?.unavailableDays??0,afterUnavailableDays:next?.unavailableDays??0,
-   newlyConflicted,cleared,worsened,relieved,resourceChanged});
+   newlyConflicted,cleared,worsened,relieved,resourceChanged,newDate,changedKind,...periods});
  }
- examples.sort((x,y)=>Number(y.newlyConflicted||y.worsened||y.resourceChanged)-Number(x.newlyConflicted||x.worsened||x.resourceChanged)||
+ examples.sort((x,y)=>Number(y.newlyConflicted||y.worsened||y.resourceChanged||y.newDate||y.changedKind)-Number(x.newlyConflicted||x.worsened||x.resourceChanged||x.newDate||x.changedKind)||
   Number(y.newlyConflicted)-Number(x.newlyConflicted)||
   x.projectName.localeCompare(y.projectName,"ru")||x.title.localeCompare(y.title,"ru")||
   x.projectId.localeCompare(y.projectId)||x.workId.localeCompare(y.workId));

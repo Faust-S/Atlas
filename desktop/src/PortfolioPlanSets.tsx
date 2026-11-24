@@ -88,7 +88,8 @@ export function PortfolioPlanSets({snapshot,onOpen,onApply,selection,onSelection
        ["unknownProjects","Проектов без прогноза"],["changedDeadline","Изменено сроков проектов"],
        ["overloadDays","Перегрузка, ресурс-дн."],["unavailableDays","Вне доступности, ресурс-дн."],
        ["overloadDepth","Превышение мощности, п. п.·дн."],["conflictWorks","Работ с конфликтами ресурсов"],
-       ["newConflicts","Новых конфликтующих работ"],["unlinked","Работ с длительностью без ресурса"],["undated","Работ без дат"]
+       ["newConflicts","Новых конфликтующих работ"],["newConflictDates","Работ с новыми датами конфликта"],
+       ["newConflictWorkDays","Добавлено конфликтных дней работ"],["clearedConflictWorkDays","Устранено конфликтных дней работ"],["unlinked","Работ с длительностью без ресурса"],["undated","Работ без дат"]
       ].map(([key,label])=><tr key={key}><td>{label}</td>{result.summary.columns.map((c:any)=><td key={c.id}>
        {(key==="late"||key==="slip")&&!result.summary.comparableProjects?"Нет данных":c[key]}</td>)}</tr>)}</tbody>
      </table></div>
@@ -114,6 +115,10 @@ export function PortfolioPlanSets({snapshot,onOpen,onApply,selection,onSelection
         "; по сопоставимым датам дней отставания "+p.workDeadlines.comparableSlipBefore+" → "+p.workDeadlines.comparableSlipAfter}</small>
        <small>{"Работ с конфликтами ресурсов: "+p.conflictedWorkBefore+" → "+p.conflictedWorkAfter}</small>
        <small>{"Новые конфликтующие работы: "+p.newlyConflicted+"; освобождены: "+p.clearedConflict}</small>
+       {(p.newConflictWorkDays>0||p.clearedConflictWorkDays>0||p.changedConflictKindWorks>0)&&
+        <small>{"Новые даты конфликта у ранее конфликтующих работ: "+p.newConflictDateWorks+
+         "; добавлено дней работ: "+p.newConflictWorkDays+"; устранено: "+p.clearedConflictWorkDays+
+         "; изменился вид ограничения у работ: "+p.changedConflictKindWorks}</small>}
        <small>{"Работ без привязки ресурса: "+p.missingResourceWork+"; без расчётных дат: "+p.unknownResourceWork}</small>
        {p.outsideChain.length>0&&<details><summary>{"Изменения ресурсной ситуации вне цепочек: "+p.outsideChain.length+" проектов"}</summary>
         {p.outsideChain.map((id:string)=>{
@@ -121,7 +126,8 @@ export function PortfolioPlanSets({snapshot,onOpen,onApply,selection,onSelection
          const before=scope.before.projects.find((r:any)=>r.id===id),after=scope.after.projects.find((r:any)=>r.id===id);
          const changes=scope.workChanges.projects.find((r:any)=>r.id===id);
          return <small key={id}>{row?.name+": конфликтующих работ "+before?.conflictedWork+" → "+after?.conflictedWork+
-          "; новых "+changes?.newlyConflicted+"; освобождены "+changes?.cleared}</small>;
+          "; новых "+changes?.newlyConflicted+"; освобождены "+changes?.cleared+
+          "; добавлено конфликтных дней работ "+changes?.newConflictDays}</small>;
         })}
        </details>}
        <small>{p.hasTradeoff?"Есть ухудшения или пересмотр контрольных сроков. Изучите последствия.":

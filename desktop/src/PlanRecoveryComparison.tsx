@@ -145,6 +145,10 @@ export function PlanRecoveryComparison({snapshot,projectId,onDraft}:{
         {(o.effect.newlyConflictedWorks>0||o.effect.clearedConflictWorks>0||o.effect.worsenedConflictWorks>0||o.effect.changedConflictResourceWorks>0)&&
           <small>{"Новых работ в конфликтах: "+o.effect.newlyConflictedWorks+"; освобождены: "+o.effect.clearedConflictWorks+
            "; ограничения усилились: "+o.effect.worsenedConflictWorks+"; конфликт на другом ресурсе: "+o.effect.changedConflictResourceWorks}</small>}
+         {(o.effect.newConflictWorkDays>0||o.effect.clearedConflictWorkDays>0||o.effect.changedConflictKindWorks>0)&&
+          <small>{"Новые даты у ранее конфликтующих работ: "+o.effect.newConflictDateWorks+
+           "; добавлено конфликтных дней работ: "+o.effect.newConflictWorkDays+"; устранено: "+o.effect.clearedConflictWorkDays+
+           "; изменился вид ограничения у работ: "+o.effect.changedConflictKindWorks}</small>}
          {o.effect.resourceAssessment==="CONFLICTS"&&<small>{"Остаются ограничения по работам цепочки: перегрузка "+
          o.effect.affectedOverloadDays+" ресурс-дн.; вне доступности "+o.effect.affectedUnavailableDays+" ресурс-дн."}</small>}
         {o.effect.calendarDeadlineMet&&o.effect.resourceAssessment==="CONFLICTS"&&

@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {empty,createProject,editProject,createItem,editItem,serialize} from '../src/core.mjs';
-import {addPlanningResource} from '../src/resource-planning.mjs';
-import {portfolioResources,planningResourceScope,resourceWorkConflicts} from '../src/portfolio-resources.mjs';
+import {empty,createProject,editProject,createItem,editItem,serialize,createWorkCalendar} from '../src/core.mjs';
+import {addPlanningResource,editPlanningResource} from '../src/resource-planning.mjs';
+import {portfolioResources,planningResourceScope,resourceWorkConflicts,comparePlanningResourceScopes,resourceConflictDifference} from '../src/portfolio-resources.mjs';
 import {compareDeadlineRecovery} from '../src/plan-recovery.mjs';
 import {atlas12PlanAlternativesPortfolio} from './fixtures/atlas12-plan-alternatives.mjs';
 
@@ -103,4 +103,79 @@ test('Equal resource and date totals cannot hide newly conflicted Work after exc
  assert.equal(joint.preview.resourceScope.workChanges.examples[0].workId,works[2]);
  assert.equal(joint.preview.resourceScope.workChanges.examples[1].workId,works[1]);
  assert.equal(serialize(s),before);
+});
+
+function sharedIntervals(){
+ const r=addPlanningResource(empty(),{label:'Монтажная площадка',capacityPct:100});
+ let state=r.state;const ids=[];
+ for(const [name,start,duration] of [['Заказ A','2026-11-23',2],['Заказ B','2026-11-25',2],['Непрерывная операция','2026-11-23',4]]){
+  const p=createProject(state,{name,type:'engineering'});
+  state=editProject(p.state,p.id,{startDate:start,dueDate:'2026-11-29'});
+  const w=createItem(state,p.id,{title:'Работа '+name,resourceId:r.id,allocationPct:60});
+  state=editItem(w.state,p.id,w.id,{estimateDays:duration});
+  ids.push({projectId:p.id,workId:w.id});
+ }
+ return {state,ids,resourceId:r.id};
+}
+test('Coordinated date exchange detects new conflict dates even when every resource total and period is identical',async()=>{
+ const {planChange}=await import('../src/trace.mjs');
+ const {setPlanDates,comparePortfolioPlanSets}=await import('../src/plan-amendment.mjs');
+ const f=sharedIntervals();let state=f.state;const refs=[];
+ for(const [i,startDate] of ['2026-11-25','2026-11-23'].entries()){
+  const projectId=f.ids[i].projectId,q=planChange(state,projectId,{title:'Согласовать начало'});
+  state=setPlanDates(q.state,projectId,q.id,{startDate,dueDate:'2026-11-29'}).state;
+  refs.push({projectId,changeId:q.id});
+ }
+ const saved=serialize(state),comparison=comparePortfolioPlanSets(state,refs),option=comparison.options[0];
+ assert.equal(option.valid,true);assert.deepEqual(option.preview.resourceBefore,option.preview.resourceAfter);
+ assert.equal(option.preview.resourceRows.length,0);
+ const c=option.preview.resourceScope.workChanges;
+ assert.equal(c.totals.newlyConflicted,0);assert.equal(c.totals.cleared,0);
+ assert.equal(c.totals.worsened,0);assert.equal(c.totals.relieved,0);assert.equal(c.totals.resourceChanged,0);
+ assert.equal(c.totals.newDateWorks,2);assert.equal(c.totals.changed,2);
+ assert.equal(c.totals.newConflictDays,4);assert.equal(c.totals.clearedConflictDays,4);
+ assert.equal(c.totals.changedKindDays,0);
+ assert.deepEqual(c.examples.find(x=>x.workId===f.ids[0].workId).firstNewPeriod,
+  {startDate:'2026-11-25',endDate:'2026-11-26',kind:'overload'});
+ assert.deepEqual(c.examples.find(x=>x.workId===f.ids[1].workId).firstNewPeriod,
+  {startDate:'2026-11-23',endDate:'2026-11-24',kind:'overload'});
+ assert.equal(c.projects.find(x=>x.id===f.ids[2].projectId).changed,0);
+ assert.equal(option.assessment.hasTradeoff,true);
+ assert.equal(option.assessment.newConflictDateWorks,2);
+ assert.equal(option.assessment.warnings.newConflictDates,2);
+ assert.equal(comparison.summary.columns[1].newConflictWorkDays,4);
+ assert.equal(serialize(state),saved);
+});
+test('Work conflict date differences exclude nonworking calendar gaps and preserve overlapping days',()=>{
+ const r=addPlanningResource(empty(),{label:'Бригада',capacityPct:100});
+ const a=createProject(r.state,{name:'Рабочие смены',type:'engineering'});
+ const b=createProject(a.state,{name:'Непрерывное производство',type:'engineering'});
+ let s=editProject(b.state,a.id,{startDate:'2026-11-20'});
+ s=editProject(s,b.id,{startDate:'2026-11-20'});
+ const cal=createWorkCalendar(s,{name:'Пятидневка',weekdays:[1,2,3,4,5],excludedDates:[],additionalWorkingDates:[],
+  source:{kind:'entered_by_user',reference:null}});
+ const w=createItem(cal.state,a.id,{title:'Две смены',resourceId:r.id,allocationPct:60});
+ s=editItem(w.state,a.id,w.id,{estimateDays:2,durationUnit:'working_days',calendarBasis:{id:cal.id,version:cal.version}});
+ const base=createItem(s,b.id,{title:'Постоянная операция',resourceId:r.id,allocationPct:60});
+ s=editItem(base.state,b.id,base.id,{estimateDays:6});
+ const before=portfolioResources(s),after=portfolioResources(editProject(s,a.id,{startDate:'2026-11-23'}));
+ const c=comparePlanningResourceScopes(before,after,[a.id]);
+ assert.equal(c.before.totals.overloadDays,2);assert.equal(c.after.totals.overloadDays,2);
+ assert.equal(c.workChanges.totals.newConflictDays,1);assert.equal(c.workChanges.totals.clearedConflictDays,1);
+ assert.equal(c.workChanges.totals.newDateWorks,1);
+ assert.deepEqual(c.workChanges.examples[0].firstNewPeriod,{startDate:'2026-11-24',endDate:'2026-11-24',kind:'overload'});
+ const unchanged=comparePlanningResourceScopes(before,before,[a.id,b.id]);
+ assert.equal(unchanged.workChanges.totals.changed,0);assert.equal(unchanged.workChanges.totals.newConflictDays,0);
+ assert.deepEqual(unchanged.workChanges.examples,[]);
+});
+test('Changing a conflict kind on the same day is not double-counted as a new or cleared conflict day',()=>{
+ const f=sharedIntervals(),before=portfolioResources(f.state);
+ const updated=editPlanningResource(f.state,f.resourceId,{label:'Монтажная площадка',capacityPct:100,availableUntil:'2026-11-23'}).state;
+ const after=portfolioResources(updated),ids=f.ids.map(x=>x.projectId),c=comparePlanningResourceScopes(before,after,ids);
+ assert.equal(c.workChanges.totals.newConflictDays,0);assert.equal(c.workChanges.totals.clearedConflictDays,0);
+ assert.equal(c.workChanges.totals.changedKindWorks,3);assert.equal(c.workChanges.totals.changedKindDays,6);
+ assert.equal(c.workChanges.totals.newDateWorks,0);
+ assert.ok(c.workChanges.examples.every(x=>x.firstNewPeriod===null));
+ const d=resourceConflictDifference(before.byId.get(f.resourceId),after.byId.get(f.resourceId));
+ assert.equal(d.totals.CHANGED_KIND,3,'Unique resource-days differ from participating Work-days');
 });

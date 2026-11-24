@@ -44,12 +44,20 @@ export function AmendmentAnalysis({result,compact=false}:{result:any;compact?:bo
    <p>{"Новых работ в ресурсных конфликтах: "+result.resourceScope.workChanges.totals.newlyConflicted+
     "; освобождены: "+result.resourceScope.workChanges.totals.cleared+
     "; усилены ограничения: "+result.resourceScope.workChanges.totals.worsened+
-    "; конфликт на другом ресурсе: "+result.resourceScope.workChanges.totals.resourceChanged+"."}</p>
+    "; конфликт на другом ресурсе: "+result.resourceScope.workChanges.totals.resourceChanged+
+    "; новые даты у ранее конфликтующих работ: "+result.resourceScope.workChanges.totals.newDateWorks+"."}</p>
+   <p>{"Добавлено конфликтных дней работ: "+result.resourceScope.workChanges.totals.newConflictDays+
+    "; устранено: "+result.resourceScope.workChanges.totals.clearedConflictDays+
+    "; дней с изменённым видом ограничения: "+result.resourceScope.workChanges.totals.changedKindDays+". Это дни отдельных работ, а не уникальные ресурс-дни."}</p>
    <details><summary>Какие работы изменили участие в конфликтах</summary>
     {result.resourceScope.workChanges.examples.map((w:any)=><p key={JSON.stringify([w.projectId,w.workId])}>
      {w.projectName+": "+w.title+" · "+(w.beforeResource??"без конфликта")+" → "+(w.afterResource??"без конфликта")+
       "; перегрузка "+w.beforeOverloadDays+" → "+w.afterOverloadDays+" дн.; вне доступности "+
-      w.beforeUnavailableDays+" → "+w.afterUnavailableDays+" дн."}</p>)}
+      w.beforeUnavailableDays+" → "+w.afterUnavailableDays+" дн.; добавлено "+w.newConflictDays+
+      " конфликтных дней работы, устранено "+w.clearedConflictDays+
+      (w.firstNewPeriod?"; первый новый период: "+w.firstNewPeriod.startDate+" – "+w.firstNewPeriod.endDate+
+       (w.firstNewPeriod.kind==="availability"?" (вне доступности)":" (перегрузка)"):"")+
+      (w.changedKindDays?"; изменён вид ограничения: "+w.changedKindDays+" дн.":"")}</p>)}
     {result.resourceScope.workChanges.totals.changed>result.resourceScope.workChanges.examples.length&&
      <p className="minor">Показаны первые 8 работ с изменениями; итоговые количества учитывают все работы.</p>}
    </details></>}

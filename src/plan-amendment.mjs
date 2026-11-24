@@ -632,7 +632,8 @@ function assessPlanSet(preview,roots,chain){
   newLateWork:workDeadlines.newlyLate,worseLateWork:workDeadlines.worsenedLate,
   newlyUndatedWork:preview.workSummary.newlyUndated,reserveReduced:preview.workSummary.reserveReduced,
   newConflictWork:conflicts.newlyConflicted,worseConflictWork:conflicts.worsened,
-  movedConflictResource:conflicts.resourceChanged,worseResources,
+  movedConflictResource:conflicts.resourceChanged,newConflictDates:conflicts.newDateWorks,
+  changedConflictKind:conflicts.changedKindWorks,worseResources,
   unlinkedIncrease:Math.max(0,scope.after.totals.positiveUnlinked-scope.before.totals.positiveUnlinked),
   undatedIncrease:Math.max(0,scope.after.totals.undated-scope.before.totals.undated)};
  const hasTradeoff=Object.values(warnings).some(n=>n>0);
@@ -642,6 +643,8 @@ function assessPlanSet(preview,roots,chain){
   selectedProjects:roots.size,calendarChainProjects:chain.size,resourceProjects,outsideChain,
   conflictedWorkBefore:scope.before.totals.conflictedWork,conflictedWorkAfter:scope.after.totals.conflictedWork,
   newlyConflicted:conflicts.newlyConflicted,clearedConflict:conflicts.cleared,
+  newConflictDateWorks:conflicts.newDateWorks,changedConflictKindWorks:conflicts.changedKindWorks,
+  newConflictWorkDays:conflicts.newConflictDays,clearedConflictWorkDays:conflicts.clearedConflictDays,
   missingResourceWork:scope.after.totals.positiveUnlinked,unknownResourceWork:scope.after.totals.undated};
 }
 function calculatePlanSet(snapshot,refs,context){
@@ -692,7 +695,7 @@ function summarizePortfolioPlanSets(options){
   unknownProjects:base.rows.filter(r=>!r.beforeFinish).length,overloadDays:base.resourceBefore.overloadDays,
   unavailableDays:base.resourceBefore.unavailableDays,overloadDepth:base.resourceBefore.overloadPctDays,
   conflictWorks:before.conflictedWork,unlinked:before.positiveUnlinked,undated:before.undated,
-  changedDeadline:0,newConflicts:0}];
+  changedDeadline:0,newConflicts:0,newConflictDates:0,newConflictWorkDays:0,clearedConflictWorkDays:0}];
  for(const [i,o] of valid.entries()){
   const calendar=common.reduce((t,r)=>{const n=slip(r.beforeDeadline,lookups[i].get(r.id).afterFinish);
    t.late+=Number(n>0);t.slip+=n;return t},{late:0,slip:0});
@@ -701,7 +704,9 @@ function summarizePortfolioPlanSets(options){
    unknownProjects:o.preview.projectSummary.unknown,overloadDays:resource.overloadDays,
    unavailableDays:resource.unavailableDays,overloadDepth:resource.overloadPctDays,
    conflictWorks:scope.conflictedWork,unlinked:scope.positiveUnlinked,undated:scope.undated,
-   changedDeadline:o.assessment.deadlines.changedDeadline,newConflicts:o.assessment.newlyConflicted});
+   changedDeadline:o.assessment.deadlines.changedDeadline,newConflicts:o.assessment.newlyConflicted,
+   newConflictDates:o.assessment.newConflictDateWorks,newConflictWorkDays:o.assessment.newConflictWorkDays,
+   clearedConflictWorkDays:o.assessment.clearedConflictWorkDays});
  }
  return {projectCount:base.rows.length,comparableProjects:common.length,columns};
 }

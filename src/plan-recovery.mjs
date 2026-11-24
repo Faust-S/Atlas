@@ -128,6 +128,7 @@ function describeOption(preview,projectId){
  // Even an equal total overload may hide a new conflict on a different
  // resource or date. Use the existing per-resource period comparator.
  const tradeoff=Boolean(worsenedResources||conflictChanges.newlyConflicted||conflictChanges.worsened||conflictChanges.resourceChanged||
+  conflictChanges.newDateWorks||conflictChanges.changedKindWorks||
   newlyLateProjects||worsenedLateProjects||newlyLateWorks||
   worsenedLateWorks||preview.resourceAfter.unlinked>preview.resourceBefore.unlinked||
   preview.resourceAfter.undated>preview.resourceBefore.undated||preview.workSummary.newlyUndated);
@@ -140,6 +141,8 @@ function describeOption(preview,projectId){
   newlyConflictedWorks:conflictChanges.newlyConflicted,clearedConflictWorks:conflictChanges.cleared,
   worsenedConflictWorks:conflictChanges.worsened,relievedConflictWorks:conflictChanges.relieved,
   changedConflictResourceWorks:conflictChanges.resourceChanged,
+  newConflictDateWorks:conflictChanges.newDateWorks,changedConflictKindWorks:conflictChanges.changedKindWorks,
+  newConflictWorkDays:conflictChanges.newConflictDays,clearedConflictWorkDays:conflictChanges.clearedConflictDays,
   affectedOverloadDays:afterScope.totals.overloadDays,affectedUnavailableDays:afterScope.totals.unavailableDays,
   affectedUnlinked:afterScope.totals.positiveUnlinked,affectedUndated:afterScope.totals.undated,
   unknownDates:scopeUnknown,
