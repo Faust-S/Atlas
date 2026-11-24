@@ -736,7 +736,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   if(!(project.changes||[]).some((c:any)=>c.id===changeJump.changeId)){setChangeJump(null);return;}
   const card=changeCardRef.current;
   if(!card)return;
-  card.scrollIntoView({block:"center",behavior:"auto"});
+  card.scrollIntoView({block:"start",behavior:"auto"});
   card.focus({preventScroll:true});
   setChangeJump(null);
  },[changeJump,ready,active,tab,project]);
@@ -3432,6 +3432,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
        {!!c.planAmendments?.length&&!c.planAppliedAt&&<Action onClick={()=>setForecastId(forecastId===c.id?null:c.id)}>Сценарий до / после</Action>}
       </div>
       {!!c.planAmendments?.length&&<div className="minor">Корректировок: {c.planAmendments.length} · {c.planAppliedAt?"Применено "+c.planAppliedAt:"Пока не применено"}</div>}
+      {forecastId===c.id&&!!c.planAmendments?.length&&!c.planAppliedAt&&<AmendmentForecast state={data} projectId={project.id} changeId={c.id} onApply={()=>applyAmendment(c.id)}
+       canApply={["approved","in_progress"].includes(c.status)} onError={issue}/>}
       {!!c.planAmendments?.length&&<div className="table-scroll"><table>
        <thead><tr><th>Корректировка</th><th>Было</th><th>Предлагается</th><th>Действие</th></tr></thead>
        <tbody>{c.planAmendments.map((a:any,i:number)=>{
@@ -3462,9 +3464,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
           <Action onClick={()=>removeAmendment(c.id,key)}>Убрать</Action>:"—"}</td>
         </tr>;
        })}</tbody></table></div>}
-      {forecastId===c.id&&<AmendmentForecast state={data} projectId={project.id} changeId={c.id} onApply={()=>applyAmendment(c.id)}
-       canApply={["approved","in_progress"].includes(c.status)} onError={issue}/>}
-     </div>)}
+      </div>)}
      {!(project.changes||[]).length&&<Fallback message="Предложений пока нет. Вы можете создать изменение, затем подготовить сценарий и принять решение."/>}
     </section>}
     {tab==="resources"&&<section className="surface"><div className="section-heading"><div><h2>Ресурсы проекта</h2><p>Явно назначенные плановые ресурсы не равны учётным записям сотрудников.</p></div>

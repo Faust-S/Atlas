@@ -1378,7 +1378,12 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .atlas-v6-shell .page-heading>div>small:first-child{font-size:11px}
 .atlas-v6-shell .surface{background:#ffffffee;border:1px solid #dbe5f1;border-radius:13px;
  box-shadow:0 6px 18px #7791b11c}
-.atlas-v6-shell .atlas-compact-tabs{display:none}
+/* v6 has an external title bar, not the original 73px sticky command bar.
+   Keep the compact tabs at the actual top of the workspace. Programmatic
+   navigation must leave the card heading below the sticky tab row. */
+.atlas-v6-shell .atlas-compact-tabs{display:none;top:0}
+.atlas-v6-shell .workspace:has(.atlas-compact-tabs){scroll-padding-top:64px}
+.atlas-v6-shell .change-card{scroll-margin-top:8px}
 .atlas-v6-shell .sidebar.atlas-v6-sidebar-collapsed~.workspace .atlas-compact-tabs{display:flex}
 .app-shell.atlas-v6-shell .inspector{
  position:relative;inset:auto;transform:none;z-index:9;flex:0 0 var(--atlas-v6-dock-width,390px);

@@ -12,7 +12,8 @@ import zipfile
 from pathlib import Path
 
 import win32gui
-from pywinauto import mouse
+from comtypes import COMError
+from pywinauto import Desktop, mouse
 
 sys.stdout.reconfigure(encoding='utf-8',errors='replace')
 source=Path(__file__).with_name('installed-atlas11-v6-design.py')
@@ -35,7 +36,26 @@ def check_archive():
     return snapshot
 
 
-def find_resource_control(name,role=None,contains=False):
+def physical_button_point(control):
+    """Return an actual uncovered point of this UIA button, never a point
+    in a sticky navigation overlay or a stale accessibility rectangle."""
+    rect=control.rectangle()
+    wanted=control.element_info
+    x=(rect.left+rect.right)//2
+    for y in ((rect.top+rect.bottom)//2,rect.top+rect.height()//4,rect.bottom-rect.height()//4):
+        try:
+            hit=Desktop(backend='uia').from_point(x,y).element_info
+            for _ in range(12):
+                if hit is None:break
+                if hit==wanted:return (x,y)
+                hit=hit.parent
+        except (KeyError,COMError):
+            # A transient native accessibility repaint is not a hit.
+            continue
+    return None
+
+
+def find_resource_control(name,role=None,contains=False,require_hit=False):
     """Locate a real accessible control in the actual compact client area.
     No fixed sidebar width: at 820px the collapsed rail is much narrower.
     Keep physical clicks and search both directions using the real viewport.
@@ -57,8 +77,9 @@ def find_resource_control(name,role=None,contains=False):
                 r=e.rectangle()
                 if (r.left>=left+4 and r.right<=right-4 and
                     r.top>=top+64 and r.bottom<=bottom-8 and r.width()>0 and r.height()>0):
-                    return e
-        except KeyError:
+                    if not require_hit or physical_button_point(e) is not None:
+                        return e
+        except (KeyError,COMError):
             pass
         return None
     d.activate()
@@ -81,18 +102,19 @@ def find_resource_control(name,role=None,contains=False):
 
 def click_scrollable_button(name):
     # A WebView2 UIA rectangle may still describe the previous scroll frame.
-    # Wait for the physical geometry to settle, reacquire by exact name and
-    # use the actual screen centre. No InvokePattern or DOM automation.
+    # Wait for the physical geometry to settle and verify the target by
+    # native UIA hit-testing immediately before the actual mouse click.
     previous=None
     for _ in range(8):
-        control=find_resource_control(name,'Button')
+        control=find_resource_control(name,'Button',require_hit=True)
         r=control.rectangle()
         current=(r.left,r.top,r.right,r.bottom)
         if previous==current:
-            point=((r.left+r.right)//2,(r.top+r.bottom)//2)
-            mouse.click(coords=point)
-            time.sleep(.45)
-            return
+            point=physical_button_point(control)
+            if point is not None:
+                mouse.click(coords=point)
+                time.sleep(.45)
+                return
         previous=current
         time.sleep(.3)
     raise AssertionError('Resource action did not settle: '+name)

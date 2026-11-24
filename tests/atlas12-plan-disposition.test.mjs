@@ -100,3 +100,21 @@ test('Direct queue navigation and independent native qualifications preserve a s
  assert.match(wf,/steps\.compound_qualification\.outcome/);
  assert.ok(wf.indexOf('Require both resource and compound native qualifications')<wf.indexOf('Preserve accepted development installer'));
 });
+
+test('Native v6 project tabs use the actual workspace top and selected plan appears before amendment table',()=>{
+ const main=readFileSync(new URL('../desktop/src/main.tsx',import.meta.url),'utf8');
+ const css=readFileSync(new URL('../desktop/src/style.css',import.meta.url),'utf8');
+ const driver=readFileSync(new URL('../desktop/tests/installed-atlas12-resource-alternatives.py',import.meta.url),'utf8');
+ assert.match(css,/\.atlas-v6-shell \.atlas-compact-tabs\{display:none;top:0\}/);
+ assert.match(css,/\.workspace:has\(\.atlas-compact-tabs\)\{scroll-padding-top:64px\}/);
+ const jump=main.slice(main.indexOf('const card=changeCardRef.current;'),main.indexOf('const portfolioSearchIndex='));
+ assert.match(jump,/scrollIntoView\(\{block:"start",behavior:"auto"\}\)/);
+ const card=main.slice(main.indexOf('role="group" aria-label={"Изменение: "+c.title'));
+ const forecast=card.indexOf('forecastId===c.id&&!!c.planAmendments?.length&&!c.planAppliedAt&&<AmendmentForecast');
+ const table=card.indexOf('!!c.planAmendments?.length&&<div className="table-scroll"><table>');
+ assert.ok(forecast>=0&&table>forecast);
+ assert.match(driver,/\.from_point\(x,y\)\.element_info/);
+ assert.match(driver,/find_resource_control\(name,'Button',require_hit=True\)/);
+ assert.match(driver,/point=physical_button_point\(control\)/);
+ assert.match(driver,/mouse\.click\(coords=point\)/);
+});
