@@ -1792,7 +1792,11 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .atlas-amendment-summary{font-size:11px;color:#245480;line-height:1.5}
 .atlas-plan-comparison-cards{display:grid;gap:8px;grid-template-columns:minmax(0,1fr);margin-top:8px}
 .atlas-plan-comparison-cards>.atlas-amendment-row>button{margin:6px 0}
-@media(max-width:900px){.atlas-plan-choice-fields{grid-template-columns:minmax(0,1fr)}}
+.atlas-plan-choice-fields{grid-template-columns:repeat(auto-fit,minmax(min(100%,170px),1fr))}
+.atlas-plan-set-count{font-size:12px;margin:0 0 5px;scroll-margin:20px}
+.atlas-plan-set-picker .atlas-plan-set-member{flex-wrap:nowrap}
+.atlas-plan-set-picker .atlas-plan-set-member>div:first-child{flex-basis:auto}
+@media(max-width:900px){.atlas-plan-set-picker .atlas-plan-set-member .button-row{flex-shrink:0}}
 
 /* Keep both sequencing decisions and their main cost visible before detail. */
 .atlas-resource-sequence .atlas-resource-primary-actions{margin:6px 0;gap:6px}

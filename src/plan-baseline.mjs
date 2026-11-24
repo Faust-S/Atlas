@@ -85,6 +85,7 @@ export function capturePlanBaseline(snapshot,projectId,{name=null,recordedAt=new
     id:row.id,title:row.title,estimateDays:row.durationDays,
     durationUnit:row.durationUnit,
     calendarBasis:row.calendarBasis??null,
+    ...(item.notBeforeDate?{notBeforeDate:item.notBeforeDate}:{}),
     startDate:row.startDate,finishDate:row.finishDate,
     dueDate:item.dueDate??null,predecessors:[...row.predecessors],
     critical:row.critical,floatDays:row.floatDays,assignment:recordedWorkAssignment(item,labels)
@@ -142,6 +143,8 @@ export function comparePlanBaseline(snapshot,projectId,baselineId=null,{portfoli
    if((item.estimateDays??1)!==reference.estimateDays||
       (item.durationUnit??"elapsed_days")!==reference.durationUnit)
     reasons.push("Изменена длительность");
+   if((item.notBeforeDate??null)!==(reference.notBeforeDate??null))
+    reasons.push("Изменено ограничение начала работы");
    if(!same(item.calendarBasis??null,reference.calendarBasis??null))
     reasons.push("Изменён рабочий календарь");
    if(!same(sorted(predecessors),sorted(referencePredecessors)))

@@ -116,7 +116,12 @@ export function scheduleProject(p,{calendarLibrary=[],startDate=undefined,includ
     const item=byId.get(id),duration=plannedDuration(item);
     const unit=item.durationUnit??'elapsed_days';
     if(unit!=='elapsed_days'&&unit!=='working_days')throw Error('Invalid work duration unit');
-    const ready=Math.max(0,...incoming.get(id).map(parent=>times.get(parent).earlyFinish));
+    const dependencyReady=Math.max(0,...incoming.get(id).map(parent=>times.get(parent).earlyFinish));
+    const constraint=item.notBeforeDate==null?null:optionalStartDate(item.notBeforeDate);
+    if(item.notBeforeDate!=null&&(!constraint||startMs===null))
+      throw Error('Для ограничения начала работы установите дату начала проекта');
+    const ready=Math.max(dependencyReady,constraint?(constraint.getTime()-startMs)/DAY:0);
+    if(ready>MAX_DAYS)throw Error('Project schedule exceeds supported horizon');
     let es=ready,ef=ready;
     // Resource occupancy is an opt-in projection from this same canonical CPM,
     // never a parallel planner. Compact ranges skip nonworking dates and cost
@@ -157,6 +162,7 @@ export function scheduleProject(p,{calendarLibrary=[],startDate=undefined,includ
     times.set(id,{durationDays:duration,durationUnit:unit,
       calendarBasis:unit==='working_days'?{...item.calendarBasis}:null,
       elapsedDays:ef-es,earlyStart:es,earlyFinish:ef,
+      ...(constraint?{notBeforeDate:item.notBeforeDate,constraintWaitDays:ready-dependencyReady}:{}),
       ...(forResource?{activeRanges:activeRanges??[]}: {})});
     durationDays=Math.max(durationDays,ef);
   }
@@ -318,7 +324,8 @@ export function scheduleDeadlineExplanations(plan,{limit=2}={}){
   const predecessors=(Array.isArray(row.predecessors)?row.predecessors:[])
    .map(id=>byId.get(id)).filter(Boolean);
   const ready=Math.max(0,...predecessors.map(prior=>prior.earlyFinish));
-  const calendarWaitDays=Math.max(0,row.earlyStart-ready);
+  const constraintWaitDays=row.constraintWaitDays??0;
+  const calendarWaitDays=Math.max(0,row.earlyStart-ready-constraintWaitDays);
   // A predecessor with the latest physical finish constrains the ready date.
   // A calendar-critical predecessor may also bind the successor despite a
   // nonworking gap (and despite another predecessor finishing later).
@@ -329,7 +336,7 @@ export function scheduleDeadlineExplanations(plan,{limit=2}={}){
   details.set(row.id,{
    daysLate:(finish-due)/86400000,finishDate:row.finishDate,dueDate:row.dueDate,
    durationDays:row.durationDays,durationUnit:row.durationUnit??"elapsed_days",
-   calendarWaitDays,critical:Boolean(row.critical),
+   calendarWaitDays,...(row.notBeforeDate?{notBeforeDate:row.notBeforeDate,constraintWaitDays}:{}),critical:Boolean(row.critical),
    driverTotal:limiting.length,
    drivers:limiting.slice(0,limit).map(prior=>({
     id:prior.id,title:prior.title,recordedDone:prior.state==='done'
@@ -379,14 +386,17 @@ export function scheduleChangeSummary(before,after,{limit=4}={}){
   const shiftDays=row.earlyFinish-old.earlyFinish;
   // A work can enter or leave the critical path without its own finish
   // moving. The work list must not silently omit that decision-relevant fact.
-  if(!shiftDays&&!dueDateChanged&&!criticalChanged)continue;
-  if(shiftDays){
+  const startLimitChanged=(old.notBeforeDate??null)!==(row.notBeforeDate??null);
+  const startChanged=row.earlyStart!==old.earlyStart;
+  if(!shiftDays&&!startChanged&&!dueDateChanged&&!criticalChanged&&!startLimitChanged)continue;
+  if(shiftDays||startChanged){
    movedTotal++;
-   if(shiftDays>0)delayedTotal++;else earlierTotal++;
+   if((shiftDays||row.earlyStart-old.earlyStart)>0)delayedTotal++;else earlierTotal++;
   }
   if(missedDeadline)deadlineMissedTotal++;
   affected.push({
    id:row.id,title:row.title,shiftDays,
+   ...(startLimitChanged?{startLimitChanged,previousNotBeforeDate:old.notBeforeDate??null,notBeforeDate:row.notBeforeDate??null}:{}),
    previousFinishOffset:old.earlyFinish,finishOffset:row.earlyFinish,
    previousFinishDate:old.finishDate??null,finishDate:row.finishDate??null,
    previousDueDate,dueDate,dueDateChanged,missedDeadline,

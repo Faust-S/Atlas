@@ -60,7 +60,7 @@ def find_resource_control(name,role=None,contains=False,require_hit=False):
                 if not match(e) or not e.is_visible() or not e.is_enabled():continue
                 r=e.rectangle()
                 if (r.left>=left+4 and r.right<=right-4 and
-                    r.top>=top+64 and r.bottom<=bottom-8 and r.width()>0 and r.height()>0):
+                    r.top>=top+4 and r.bottom<=bottom-4 and r.width()>0 and r.height()>0):
                     if not require_hit or physical_button_point(e) is not None:
                         return e
         except (KeyError,COMError):
@@ -96,14 +96,26 @@ def find_resource_control(name,role=None,contains=False,require_hit=False):
     # points, and do not restart a long document before testing visibility.
     points=[(left+int((right-left)*x),top+int((bottom-top)*.80)) for x in (.52,.42,.64)]
     for point in points:
+        # Seek from the current geometry in both directions first. Then
+        # scan with small wheel steps to avoid skipping a short control.
+        for direction,steps in ((1,8),(-1,16)):
+            for _ in range(steps):
+                found=find()
+                if found is not None:return found
+                mouse.scroll(coords=point,wheel_dist=direction)
+                time.sleep(.12)
         mouse.scroll(coords=point,wheel_dist=40)
         time.sleep(.35)
         until=time.monotonic()+35
         while time.monotonic()<until:
             found=find()
             if found is not None:return found
-            mouse.scroll(coords=point,wheel_dist=-2)
-            time.sleep(.22)
+            mouse.scroll(coords=point,wheel_dist=-1)
+            time.sleep(.16)
+    try:
+        named=[e for e in d.window().descendants() if match(e)]
+        print('ATLAS12_CONTROL_GEOMETRY',repr(name),bounds(),[(e.element_info.control_type,str(e.rectangle()),e.is_enabled(),e.is_visible()) for e in named[:12]],flush=True)
+    except (KeyError,COMError):pass
     v.capture('atlas12-resource-control-not-visible')
     raise AssertionError('Resource control not physically reachable: '+name)
 

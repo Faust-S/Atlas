@@ -80,6 +80,12 @@ export function previewWorkingWeek(plan,{startDate=null,weekdays=DEFAULT_WEEKDAY
    rows:[],projectBaselineLastDate:null,projectScenarioLastDate:null,shiftDays:null};
  }
  const start=civilDate(startDate,"project start date");
+ if(plan.rows.some(row=>row.notBeforeDate)){
+  const mixed=previewOperationCalendars(plan,{startDate,weekdays,holidays,defaultMode:"working_days"});
+  return {...mixed,kind:"WORKDAY_HYPOTHESIS",calendarName:"working-week",
+   inputDurationMeaning:"HYPOTHETIC_WORKDAYS_NOT_PERSISTED",weekdays:config.weekdays,holidaysCount:config.excluded.size,
+   rows:mixed.rows.map(r=>({...r,durationWorkdays:r.durationDays}))};
+ }
  const allowed=new Set(config.weekdays);
  const dates=[];
  let daysScanned=0,skippedHolidays=0;
@@ -242,6 +248,7 @@ export function previewOperationCalendars(plan,{
     throw Error("Invalid canonical predecessor order");
    ready=Math.max(ready,ends.get(predecessor));
   }
+  if(row.notBeforeDate)ready=Math.max(ready,civilDate(row.notBeforeDate,"work start limit"));
   const mode=Object.hasOwn(modeByWork,row.id)?modeByWork[row.id]:defaultMode;
   const count=row.durationDays;
   let first=ready,last=ready,finishBoundary=ready;

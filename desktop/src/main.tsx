@@ -185,10 +185,10 @@ function EditorPanel({editor,onSubmit,onCancel,onDirtyChange,busy,project,plan,c
      fields.estimateDays===undefined||fields.dueDate===undefined)return null;
   return previewWorkScheduleEdit(project,editor.action.slice(5),
    {estimateDays:fields.estimateDays,dueDate:fields.dueDate,
-    durationUnit:fields.durationUnit,calendarBasis:fields.calendarBasis},
+    durationUnit:fields.durationUnit,calendarBasis:fields.calendarBasis,notBeforeDate:fields.notBeforeDate},
    plan,correctionBaseline,{calendarLibrary,portfolioSnapshot,portfolioBefore,cumulativePortfolioBaseline});
  },[editor.action,project,plan,fields.estimateDays,fields.dueDate,
-    fields.durationUnit,fields.calendarBasis,correctionBaseline,calendarLibrary,
+    fields.durationUnit,fields.calendarBasis,fields.notBeforeDate,correctionBaseline,calendarLibrary,
     portfolioSnapshot,portfolioBefore,cumulativePortfolioBaseline]);
  useEffect(()=>{
   const defaults=Object.fromEntries(editor.spec.fields.map(f=>[f.name,String(f.value??"")]));
@@ -3127,6 +3127,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
        </td>
        <td data-label="Ответственный">{w.assignee||"Не назначен"}</td>
        <td data-label="Срок">{readable(w.dueDate)}
+        {w.notBeforeDate&&<small className="atlas-work-plan-dates">Начало не ранее: {w.notBeforeDate}</small>}
         {planRowsById.has(w.id)&&<small className="atlas-work-plan-dates">
          {(scheduleView?.mode==="portfolio_forecast"?"Прогноз по портфелю":"CPM по плану")+
           ": "+(planRowsById.get(w.id).startDate||"начало не задано")+" → "+
@@ -3139,6 +3140,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
          role="group" aria-label={"Почему нарушается срок работы "+w.title}>
          <small>Отставание от контрольного срока: {deadlineRiskDetails.get(w.id)!.daysLate} дн.
           {" "}Оценка длительности: {deadlineRiskDetails.get(w.id)!.durationDays} {deadlineRiskDetails.get(w.id)!.durationUnit==="working_days"?"раб. дн.":"кал. дн."}</small>
+         {(deadlineRiskDetails.get(w.id)!.constraintWaitDays??0)>0&&<small>
+          Ожидание допустимого начала: {deadlineRiskDetails.get(w.id)!.constraintWaitDays} кал. дн.</small>}
          {deadlineRiskDetails.get(w.id)!.calendarWaitDays>0&&<small>
           Ожидание ближайшего рабочего дня: {deadlineRiskDetails.get(w.id)!.calendarWaitDays} кал. дн.
          </small>}
@@ -3497,13 +3500,13 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
          "Начало: "+readable(a.before.startDate)+" · срок: "+readable(a.before.dueDate):
          a.kind==="work"?
          (a.before.estimateDays??1)+(a.before.durationUnit==="working_days"?" раб. дн.":" кал. дн.")+
-          " · срок: "+readable(a.before.dueDate)+assignment(a.before):
+          " · срок: "+readable(a.before.dueDate)+assignment(a.before)+(Object.hasOwn(a.after,"notBeforeDate")?" · начало не ранее: "+readable(a.before.notBeforeDate):""):
          a.kind==="dependency"?(a.before?"Связь есть":"Связи нет"):"Работа отсутствует";
         const after=a.kind==="dates"?
          "Начало: "+readable(a.after.startDate)+" · срок: "+readable(a.after.dueDate):
          a.kind==="work"?
          (a.after.estimateDays??1)+(a.before.durationUnit==="working_days"?" раб. дн.":" кал. дн.")+
-          " · срок: "+readable(a.after.dueDate)+assignment(a.after):
+          " · срок: "+readable(a.after.dueDate)+assignment(a.after)+(Object.hasOwn(a.after,"notBeforeDate")?" · начало не ранее: "+readable(a.after.notBeforeDate):""):
          a.kind==="dependency"?(a.after?"Добавить связь":"Удалить связь"):
          (a.estimateDays??1)+" кал. дн. · срок: "+readable(a.dueDate)+assignment(a);
         return <tr key={key+"-"+i}>

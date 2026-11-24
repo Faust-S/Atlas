@@ -28,6 +28,13 @@ const validDate=value=>{if(value==null||value==="")return true;if(typeof value!=
 const calendarDate=value=>typeof value==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(value)&&
  validDate(value);
 const durationUnits=new Set(["elapsed_days","working_days"]);
+export const isUnstartedWork=w=>Boolean(w&&["todo","blocked"].includes(w.state)&&!w.actualStartDate&&!w.actualFinishDate);
+function validateWorkStartLimit(value,projectStart){
+ if(value==null)return;
+ if(!calendarDate(value)||!calendarDate(projectStart))throw Error("Для ограничения начала работы укажите действительные даты работы и проекта");
+ if((Date.parse(value+"T00:00:00Z")-Date.parse(projectStart+"T00:00:00Z"))/86400000>36500)
+  throw Error("Ограничение начала работы выходит за расчётный горизонт");
+}
 const calendarDates=(dates,label)=>{
  if(!Array.isArray(dates)||dates.length>1000||dates.some(d=>!calendarDate(d))||
   new Set(dates).size!==dates.length)throw Error("Invalid "+label);
@@ -209,6 +216,8 @@ function checkPlanBaselines(p){
     throw Error("Invalid plan baseline work");
    // The original baseline schema remains readable. New control points
    // retain the actually recorded reserve and assignment, never live links.
+   if(w.notBeforeDate!=null&&(!calendarDate(w.notBeforeDate)||w.startDate<w.notBeforeDate))
+    throw Error("Invalid plan baseline work start limit");
    if(w.floatDays!==undefined&&(!Number.isSafeInteger(w.floatDays)||w.floatDays<0||
       w.critical!==(w.floatDays===0)))throw Error("Invalid plan baseline reserve");
    if(w.assignment!==undefined){
@@ -274,6 +283,7 @@ export function validate(s){
   if(itemIds.size!==p.items.length||stageIds.size!==p.stages.length||sourceIds.size!==p.sources.length)throw Error("Duplicate ID");
   for(const x of p.items){if(!x||typeof x.id!=="string"||!x.id||typeof x.title!=="string"||!x.title.trim()||
     !workStates.has(x.state)||!priorities.has(x.priority)||x.stageId&&!stageIds.has(x.stageId)||x.sourceId&&!sourceIds.has(x.sourceId))throw Error("Invalid work item");if(x.estimateDays!==undefined&&(!Number.isSafeInteger(x.estimateDays)||x.estimateDays<0||x.estimateDays>36500))throw Error("Invalid work estimateDays");
+   validateWorkStartLimit(x.notBeforeDate,p.startDate);
    const unit=x.durationUnit??"elapsed_days";
    if(!durationUnits.has(unit))throw Error("Invalid work duration unit");
    if(unit==="working_days"){
@@ -344,7 +354,10 @@ export function validate(s){
     } else if(a.kind==="work"){
      if(!itemIds.has(a.itemId)||!a.before||!a.after)throw Error("Invalid amendment work");
      for(const v of [a.before,a.after])if(!Number.isSafeInteger(v.estimateDays)||v.estimateDays<0||v.estimateDays>36500||
-      typeof v.assignee!=="string"||!validDate(v.dueDate)||!validResource(v.resourceId)||!validAllocation(v.allocationPct))throw Error("Invalid amendment work fields");
+      typeof v.assignee!=="string"||!validDate(v.dueDate)||!validResource(v.resourceId)||!validAllocation(v.allocationPct)||
+      v.notBeforeDate!=null&&!calendarDate(v.notBeforeDate))throw Error("Invalid amendment work fields");
+     if(Object.hasOwn(a.after,"notBeforeDate")&&!Object.hasOwn(a.before,"notBeforeDate"))
+      throw Error("Missing original work start limit");
     } else if(a.kind==="dependency"){
      if(typeof a.from!=="string"||typeof a.to!=="string"||a.from===a.to||
         !itemIds.has(a.from)||!itemIds.has(a.to)||typeof a.before!=="boolean"||
@@ -587,9 +600,17 @@ export function removeStage(s,pid,id){return change(s,x=>{
 })}
 export function createItem(s,pid,data){const id=uid();return{id,state:change(s,x=>{const p=project(x,pid);
  if(data.stageId&&!p.stages.some(st=>st.id===data.stageId))throw Error("Unknown stage");
- p.items.push({id,title:nonempty(data.title,"Work title"),state:"todo",stageId:data.stageId||null,priority:"normal",assignee:String(data.assignee||""),dueDate:data.dueDate||null,resourceId:data.resourceId||null,allocationPct:data.allocationPct??100,executor:null,sourceId:null,estimateDays:1,targetIds:data.targetIds===undefined?[]:Array.isArray(data.targetIds)?[...data.targetIds]:data.targetIds,...(data.changeId?{changeId:String(data.changeId)}:{})});
+ p.items.push({id,title:nonempty(data.title,"Work title"),state:"todo",stageId:data.stageId||null,priority:"normal",assignee:String(data.assignee||""),dueDate:data.dueDate||null,resourceId:data.resourceId||null,allocationPct:data.allocationPct??100,executor:null,sourceId:null,estimateDays:1,...(data.notBeforeDate!=null&&data.notBeforeDate!==""?{notBeforeDate:data.notBeforeDate}:{}),targetIds:data.targetIds===undefined?[]:Array.isArray(data.targetIds)?[...data.targetIds]:data.targetIds,...(data.changeId?{changeId:String(data.changeId)}:{})});
 })}}
 export function editItem(s,pid,id,patch){return change(s,x=>{const item=project(x,pid).items.find(t=>t.id===id);if(!item)throw Error("Unknown item");
+ if("notBeforeDate" in patch){
+  const value=patch.notBeforeDate===""?null:patch.notBeforeDate;
+  if((item.notBeforeDate??null)!==(value??null)){
+   if(!isUnstartedWork(item))throw Error("Ограничение начала уже начатой работы не меняется");
+   validateWorkStartLimit(value,project(x,pid).startDate);
+   if(value==null)delete item.notBeforeDate;else item.notBeforeDate=value;
+  }
+ }
  if("title" in patch)item.title=nonempty(patch.title,"Work title");
  if("stageId" in patch)item.stageId=patch.stageId||null;
  if("state" in patch){if(!workStates.has(patch.state))throw Error("Invalid work state");item.state=patch.state;}

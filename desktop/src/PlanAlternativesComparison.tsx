@@ -11,7 +11,7 @@ function workLine(w:any){
  if(!w)return "Работа отсутствует";
  return date(w.start)+" → "+date(w.finish)+
   "; резерв: "+number(w.floatDays)+" дн.; контроль: "+control(w.dueDate)+
-  "; отклонение: "+number(w.slipDays)+" дн.";
+  "; отклонение: "+number(w.slipDays)+" дн."+(w.notBeforeDate?"; начало не ранее: "+w.notBeforeDate:"");
 }
 
 /** The full existing amendment preview, with bounded detail lists. */
@@ -173,7 +173,8 @@ function revisionWorkText(w:any,calendars:Record<string,string>){
  const sequence=predecessors.length?"; после: "+predecessors.slice(0,4).join(", ")+
   (predecessors.length>4?" и ещё "+(predecessors.length-4):""):"; без предшественников";
  const planned=date(w.start)+" → "+date(w.finish)+"; "+duration+calendar+
-  "; срок: "+control(w.deadline)+"; резерв: "+shift(w.floatDays)+(w.critical===true?"; критическая":"")+sequence;
+  "; срок: "+control(w.deadline)+"; резерв: "+shift(w.floatDays)+(w.critical===true?"; критическая":"")+sequence+
+  (w.notBeforeDate?"; начало не ранее: "+w.notBeforeDate:"");
  const assignment=w.assignment;
  return planned+(assignment?"; "+(assignment.resourceLabel??"без ресурса")+
   ", "+assignment.allocationPct+"%; "+(assignment.assignee||"без ответственного"):"; назначения не записаны");

@@ -255,7 +255,8 @@ export function editorSpec(project,action,snapshot=null){
     const shown=previous?.after||item;
     return [item.id,{estimateDays:String(shown.estimateDays??1),
      assignee:shown.assignee||"",resourceId:shown.resourceId||"",
-     allocationPct:String(shown.allocationPct??100),dueDate:shown.dueDate||""}];
+     allocationPct:String(shown.allocationPct??100),dueDate:shown.dueDate||"",
+     notBeforeDate:(Object.hasOwn(shown,"notBeforeDate")?shown.notBeforeDate:item.notBeforeDate)||""}];
    }));
    const first=project.items[0],shown=presets[first.id];
    return {title:"Изменить работу: "+change.title,
@@ -266,7 +267,8 @@ export function editorSpec(project,action,snapshot=null){
     field("assignee","Ответственный (имя или роль)","text",shown.assignee,false),
     choice("resourceId","Плановый ресурс",resourceChoiceOptions(snapshot),shown.resourceId,false),
     field("allocationPct","Доля ресурса на этой работе, %","number",shown.allocationPct),
-    field("dueDate","Срок работы","date",shown.dueDate,false)
+    field("dueDate","Срок работы","date",shown.dueDate,false),
+    ...(project.startDate?[field("notBeforeDate","Начало не ранее","date",shown.notBeforeDate,false)]:[])
    ]};
   }
   return {title:"Предложить новую работу: "+change.title,hint:context,fields:[
@@ -457,9 +459,11 @@ export function editorSpec(project,action,snapshot=null){
   if(item.sourceId)hints.push("Сейчас привязана к "+(source?.locator||"источнику")+
    (item.sourcePath?" / "+item.sourcePath:"")+
    ". Если убрать привязку, сама работа, сроки, этап и зависимости сохранятся.");
+  if(item.notBeforeDate&&(!["todo","blocked"].includes(item.state)||item.actualStartDate||item.actualFinishDate))
+   hints.push("Зафиксированное ограничение начала: "+item.notBeforeDate+". Начатая работа не переносится этой корректировкой.");
   return {title:"Работа: "+item.title,
    ...(hints.length?{hint:hints.join(" ")}:{}),
-   fields:[field("title","Название работы","text",item.title),choice("stageId","Этап",stageOptions(project),item.stageId||"",false),field("dueDate","Срок работы","date",item.dueDate||"",false),choice("state","Состояние",workOptions,item.state),choice("priority","Приоритет",[option("low","Низкий"),option("normal","Обычный"),option("high","Высокий"),option("critical","Критический")],item.priority),field("assignee","Ответственный","text",item.assignee,false),field("estimateDays","Плановая длительность, дней","number",String(item.estimateDays??1)),...workDurationFields(snapshot,item),field("actualStartDate","Фактическое начало (введено пользователем)","date",item.actualStartDate||"",false),field("actualFinishDate","Фактическое завершение (введено пользователем)","date",item.actualFinishDate||"",false),choice("resourceId","Плановый ресурс",resourceChoiceOptions(snapshot),item.resourceId||"",false),field("allocationPct","Доля ресурса, %","number",String(item.allocationPct??100)),choice("targetId",additional.length?"Основное ожидаемое требование":"Связать с ожидаемым результатом",optionalTargets(project),item.targetIds?.[0]||"",false),
+   fields:[field("title","Название работы","text",item.title),choice("stageId","Этап",stageOptions(project),item.stageId||"",false),field("dueDate","Срок работы","date",item.dueDate||"",false),choice("state","Состояние",workOptions,item.state),choice("priority","Приоритет",[option("low","Низкий"),option("normal","Обычный"),option("high","Высокий"),option("critical","Критический")],item.priority),field("assignee","Ответственный","text",item.assignee,false),field("estimateDays","Плановая длительность, дней","number",String(item.estimateDays??1)),...workDurationFields(snapshot,item),...(project.startDate&&["todo","blocked"].includes(item.state)&&!item.actualStartDate&&!item.actualFinishDate?[field("notBeforeDate","Начало не ранее","date",item.notBeforeDate||"",false)]:[]),field("actualStartDate","Фактическое начало (введено пользователем)","date",item.actualStartDate||"",false),field("actualFinishDate","Фактическое завершение (введено пользователем)","date",item.actualFinishDate||"",false),choice("resourceId","Плановый ресурс",resourceChoiceOptions(snapshot),item.resourceId||"",false),field("allocationPct","Доля ресурса, %","number",String(item.allocationPct??100)),choice("targetId",additional.length?"Основное ожидаемое требование":"Связать с ожидаемым результатом",optionalTargets(project),item.targetIds?.[0]||"",false),
    ...(item.sourceId?[choice("sourceLink","Связь с источником",[
     option("keep","Оставить привязку"),option("remove","Убрать привязку")],"keep")]:[])]};
  }
@@ -579,7 +583,8 @@ export function applyEditor(snapshot,projectId,action,input){
  if(action.startsWith("amend-dates:"))return {state:setPlanDates(snapshot,projectId,action.slice(12),{
   startDate:get("startDate"),dueDate:get("dueDate")}).state};
  if(action.startsWith("amend-work:"))return {state:setPlanWork(snapshot,projectId,action.slice(11),{
-  itemId:get("itemId"),estimateDays:integer("estimateDays"),assignee:get("assignee"),dueDate:get("dueDate"),resourceId:get("resourceId"),allocationPct:percentage("allocationPct")}).state};
+  itemId:get("itemId"),estimateDays:integer("estimateDays"),assignee:get("assignee"),dueDate:get("dueDate"),resourceId:get("resourceId"),allocationPct:percentage("allocationPct"),
+  ...(input.get("notBeforeDate")!=null?{notBeforeDate:get("notBeforeDate")||null}:{})}).state};
  if(action.startsWith("amend-new:"))return {state:addPlanWork(snapshot,projectId,action.slice(10),{
   title:get("title"),stageId:get("stageId"),targetId:get("targetId"),estimateDays:integer("estimateDays"),
   assignee:get("assignee"),dueDate:get("dueDate"),resourceId:get("resourceId"),allocationPct:percentage("allocationPct")}).state};
@@ -705,6 +710,7 @@ export function applyEditor(snapshot,projectId,action,input){
   const selected=get("targetId"),rest=(item.targetIds||[]).slice(1);
   const targetIds=[...(selected?[selected]:[]),...rest.filter(link=>link!==selected)];
   return {state:editItem(snapshot,projectId,id,{title:get("title"),stageId:get("stageId")||null,dueDate:get("dueDate")||null,state:get("state"),priority:get("priority"),assignee:get("assignee"),estimateDays:integer("estimateDays"),...workDurationPatch(get,item),
+   ...(input.get("notBeforeDate")!=null?{notBeforeDate:get("notBeforeDate")||null}:{}),
    ...(get("actualStartDate")||(item.actualStartDate??null)!==null?{actualStartDate:get("actualStartDate")||null}:{}),
    ...(get("actualFinishDate")||(item.actualFinishDate??null)!==null?{actualFinishDate:get("actualFinishDate")||null}:{}),
    resourceId:get("resourceId"),allocationPct:percentage("allocationPct"),targetIds,

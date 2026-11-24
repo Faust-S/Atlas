@@ -44,7 +44,7 @@ export function PlanRecoveryComparison({snapshot,projectId,onDraft}:{
  useLayoutEffect(()=>{
   if(!focusWork)return;
   const input=workInputs.current.get(focusWork);
-  if(input){input.focus({preventScroll:true});input.scrollIntoView({block:"nearest"});}
+  if(input){input.focus({preventScroll:true});input.scrollIntoView({block:"center"});}
   setFocusWork(null);
  },[focusWork]);
  useLayoutEffect(()=>{
@@ -93,6 +93,9 @@ export function PlanRecoveryComparison({snapshot,projectId,onDraft}:{
       </select></label>
       <button type="button" className="action-button" onClick={add} disabled={!chosen}>Добавить работу для расчёта</button>
      </div>}
+     <button type="button" className="action-button primary" disabled={(!variants.length&&!edges.length)||
+      variants.some(v=>!candidates.some(w=>w.id===v.itemId))}
+      onClick={calculate}>Рассчитать восстановление срока</button>
      <div className="atlas-amendment-rows">{variants.map((v,i)=>{
       const w=candidates.find(w=>w.id===v.itemId);
       return <div className="atlas-amendment-row" key={v.itemId}>
@@ -137,9 +140,7 @@ export function PlanRecoveryComparison({snapshot,projectId,onDraft}:{
       <button type="button" className="action-button" aria-label={"Убрать связь из расчёта "+(i+1)}
        onClick={()=>{setEdges(list=>list.filter(x=>x!==e));invalidate()}}>Убрать связь из расчёта</button>
      </div>)}</div>}
-     <button type="button" className="action-button primary" disabled={(!variants.length&&!edges.length)||
-      variants.some(v=>!candidates.some(w=>w.id===v.itemId))}
-      onClick={calculate}>Рассчитать восстановление срока</button>
+
      {error&&<p role="alert">{error}</p>}
      {stale&&<p role="alert">План изменился. Рассчитайте варианты заново.</p>}
      {current&&<>

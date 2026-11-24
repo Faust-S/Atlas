@@ -43,6 +43,12 @@ export function previewWorkScheduleEdit(project,workId,draft,beforePlan=null,cum
  if(!validDate(dueDate))
   return {kind:"invalid",reason:"Проверьте календарную дату контрольного срока."};
  const oldEstimate=work.estimateDays??1,oldDueDate=work.dueDate??null;
+ const oldLimit=work.notBeforeDate??null,notBeforeDate=draft?.notBeforeDate===undefined?oldLimit:
+  String(draft.notBeforeDate??"").trim()||null;
+ if(!validDate(notBeforeDate)||notBeforeDate&&!project.startDate)
+  return {kind:"invalid",reason:"Проверьте ограничение даты начала и дату начала проекта."};
+ if(oldLimit!==notBeforeDate&&(!["todo","blocked"].includes(work.state)||work.actualStartDate||work.actualFinishDate))
+  return {kind:"invalid",reason:"Ограничение начала уже начатой работы не меняется."};
  const oldUnit=work.durationUnit??"elapsed_days",newUnit=draft?.durationUnit??oldUnit;
  const oldBasis=work.calendarBasis??null;
  let nextBasis=oldBasis;
@@ -59,7 +65,7 @@ export function previewWorkScheduleEdit(project,workId,draft,beforePlan=null,cum
  if(newUnit==="elapsed_days")nextBasis=null;
  if(newUnit==="working_days"&&!nextBasis)
   return {kind:"invalid",reason:"Для рабочих дней требуется действительная редакция календаря."};
- if(estimateDays===oldEstimate&&dueDate===oldDueDate&&
+ if(estimateDays===oldEstimate&&dueDate===oldDueDate&&oldLimit===notBeforeDate&&
     newUnit===oldUnit&&JSON.stringify(nextBasis)===JSON.stringify(oldBasis))
   return {kind:"unchanged",cumulative:cumulativeResult(
    cumulativeBaseline,beforePlan??(cumulativeBaseline?
@@ -67,7 +73,7 @@ export function previewWorkScheduleEdit(project,workId,draft,beforePlan=null,cum
  // Only the changed work gets a new object, all other project data are shared
  // as read-only inputs to the existing scheduler.
  const projected={...project,items:project.items.map(item=>item.id===workId?
-  {...item,estimateDays,dueDate,durationUnit:newUnit,
+  {...item,estimateDays,dueDate,durationUnit:newUnit,notBeforeDate,
    ...(nextBasis?{calendarBasis:nextBasis}:{calendarBasis:undefined})}:item)};
  let before,after,effect;
  try{

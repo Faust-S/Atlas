@@ -1,6 +1,6 @@
 // Concrete, human-approved plan amendments stored on existing Atlas change records.
 // Preview reuses the single CPM / portfolio dependency projection; no task execution.
-import {validate,planAmendmentKey as key} from "./core.mjs";
+import {validate,planAmendmentKey as key,isUnstartedWork as pendingWork} from "./core.mjs";
 import {planChange} from "./trace.mjs";
 import {portfolioSchedule} from "./portfolio-schedule.mjs";
 import {portfolioResources,planningResourceTotals,comparePlanningResourceScopes,comparePlanningResourceGroups} from "./portfolio-resources.mjs";
@@ -16,7 +16,8 @@ const text = (x,name,max=500) => {
 };
 const amendableWorkFields = item => ({estimateDays:item.estimateDays??1,
  assignee:item.assignee||"",dueDate:item.dueDate||null,
- resourceId:item.resourceId||null,allocationPct:item.allocationPct??100});
+ resourceId:item.resourceId||null,allocationPct:item.allocationPct??100,
+ ...(item.notBeforeDate!=null?{notBeforeDate:item.notBeforeDate}:{})});
 // Pin the meaning of a planned duration in the proposed decision. An
 // authorized Work edit may change its calendar, so checking only numeric
 // estimateDays before approval would silently change the proposal's meaning.
@@ -75,7 +76,7 @@ export function setPlanDates(snapshot,projectId,changeId,{startDate,dueDate,leve
   upsert(change,{kind:"dates",before,after,...(guard!==undefined?{levelingGuard:structuredClone(guard)}:{})});
  });
 }
-export function setPlanWork(snapshot,projectId,changeId,{itemId,estimateDays,assignee,dueDate,resourceId,allocationPct}) {
+export function setPlanWork(snapshot,projectId,changeId,{itemId,estimateDays,assignee,dueDate,resourceId,allocationPct,notBeforeDate}) {
  return mutableDraft(snapshot,projectId,changeId,(project,change)=>{
   const item=project.items.find(x=>x.id===itemId);
   if(!item)throw Error("Работа для изменения не найдена");
@@ -84,7 +85,17 @@ export function setPlanWork(snapshot,projectId,changeId,{itemId,estimateDays,ass
    dueDate:dueDate===undefined?item.dueDate??null:dueDate||null,
    resourceId:resourceId===undefined?item.resourceId??null:resourceId||null,
    allocationPct:allocationPct??item.allocationPct??100};
-  if(same(amendableWorkFields(item),after))throw Error("Укажите изменение срока, длительности, ответственного или планового ресурса");
+  const startLimit=notBeforeDate===undefined?item.notBeforeDate??null:notBeforeDate||null;
+  if(startLimit!==(item.notBeforeDate??null)){
+   if(!pendingWork(item))throw Error("Ограничение начала уже начатой работы не меняется");
+   if(!project.startDate&&startLimit)throw Error("Установите дату начала проекта");
+  }
+  const priorFields=amendableWorkFields(item);
+  if(startLimit!==null||item.notBeforeDate!=null){
+   before.notBeforeDate=item.notBeforeDate??null;priorFields.notBeforeDate=before.notBeforeDate;
+   after.notBeforeDate=startLimit;
+  }
+  if(same(priorFields,after))throw Error("Укажите изменение срока, длительности, ответственного или планового ресурса либо ограничения начала");
   assertExistingActionCurrent(project,change,"work:"+itemId);
   upsert(change,{kind:"work",itemId,before,after});
   change.targetIds=[...new Set([...(change.targetIds||[]),...(item.targetIds||[])])];
@@ -127,7 +138,6 @@ export function addResourcePlanChoice(snapshot,projectId,workId,{changeId=null,t
  return {state:result.state,changeId};
 }
 const edgePresent=(project,from,to)=>project.dependencies.some(e=>e.from===from&&e.to===to);
-const pendingWork=w=>w&&["todo","blocked"].includes(w.state)&&!w.actualStartDate&&!w.actualFinishDate;
 export const canShiftUnstartedProject=p=>Boolean(p&&["planned","active"].includes(p.status)&&p.startDate&&p.items.length&&p.items.every(pendingWork));
 function dependencyEndpoints(project,from,to){
  if(!project||["completed","cancelled"].includes(project.status)||!from||!to||from===to)
@@ -199,8 +209,10 @@ function assertPlanActionCurrent(project,action){
   throw Error("Даты проекта изменились после подготовки заявки: требуется пересмотр");
  if(action.kind==="work"){
   const item=project.items.find(w=>w.id===action.itemId);
-  if(!item||!Object.entries(action.before).every(([k,v])=>same(workFields(item)[k],v)))
+  if(!item||!Object.entries(action.before).every(([k,v])=>same(k==="notBeforeDate"?item.notBeforeDate??null:workFields(item)[k],v)))
    throw Error("Исходная работа изменилась после подготовки заявки: требуется пересмотр");
+  if(Object.hasOwn(action.after,"notBeforeDate")&&(item.notBeforeDate??null)!==(action.after.notBeforeDate??null)&&!pendingWork(item))
+   throw Error("Ограничение начала уже начатой работы не меняется");
  }
  if(action.kind==="dependency"){
   dependencyEndpoints(project,action.from,action.to);
@@ -216,7 +228,7 @@ function assertExistingActionCurrent(project,change,actionKey){
 }
 const REVIEW_LABELS={startDate:"Плановое начало",dueDate:"Контрольный срок",
  estimateDays:"Длительность",assignee:"Ответственный",resourceId:"Плановый ресурс",
- allocationPct:"Доля ресурса",durationUnit:"Единица длительности",calendarBasis:"Редакция календаря"};
+ allocationPct:"Доля ресурса",notBeforeDate:"Начало не ранее",durationUnit:"Единица длительности",calendarBasis:"Редакция календаря"};
 const REVIEW_WORK_FIELDS=["estimateDays","assignee","dueDate","resourceId","allocationPct"];
 const REVIEW_DATE_FIELDS=["startDate","dueDate"];
 function reviewValueLabel(snapshot,name,value,context={}){
@@ -257,13 +269,19 @@ function inspectAction(snapshot,project,action){
  if(action.levelingGuard)return {...row,reason:reason+". Исключите устаревшую корректировку и выполните новый ресурсный расчёт."};
  if(action.kind==="dates"||action.kind==="work"&&item){
   const current=action.kind==="dates"?dateFields(project):workFields(item);
-  const known=action.kind==="dates"?REVIEW_DATE_FIELDS:[...REVIEW_WORK_FIELDS,"durationUnit","calendarBasis"];
-  if(Object.keys(action.before).some(k=>!known.includes(k))||Object.keys(action.after).some(k=>!(action.kind==="dates"?REVIEW_DATE_FIELDS:REVIEW_WORK_FIELDS).includes(k)))
+  const hasLimit=action.kind==="work"&&Object.hasOwn(action.after,"notBeforeDate");
+  const fieldsForReview=action.kind==="dates"?REVIEW_DATE_FIELDS:[...REVIEW_WORK_FIELDS,...(hasLimit?["notBeforeDate"]:[])];
+  if(hasLimit){
+   current.notBeforeDate=item.notBeforeDate??null;
+   if(!pendingWork(item))return row;
+  }
+  const known=action.kind==="dates"?REVIEW_DATE_FIELDS:[...fieldsForReview,"durationUnit","calendarBasis"];
+  if(Object.keys(action.before).some(k=>!known.includes(k))||Object.keys(action.after).some(k=>!fieldsForReview.includes(k)))
    return {...row,reason:"В заявке есть неподдерживаемые поля. Исключите эту корректировку и создайте её заново."};
   const oldContext={durationUnit:action.before.durationUnit??current.durationUnit,
    calendarBasis:Object.hasOwn(action.before,"calendarBasis")?action.before.calendarBasis:current.calendarBasis};
   const contextChanged=action.kind==="work"&&(!same(oldContext.durationUnit,current.durationUnit)||!same(oldContext.calendarBasis,current.calendarBasis));
-  const fields=(action.kind==="dates"?REVIEW_DATE_FIELDS:REVIEW_WORK_FIELDS).map(name=>reviewField(snapshot,name,action.before[name],current[name],action.after[name],{
+  const fields=fieldsForReview.map(name=>reviewField(snapshot,name,action.before[name],current[name],action.after[name],{
    oldContext,currentContext:current,contextChanged})).filter(Boolean);
   if(contextChanged)for(const name of ["durationUnit","calendarBasis"]){
    if(same(oldContext[name],current[name]))continue;
@@ -326,7 +344,10 @@ export function reviewPlanAmendmentAction(snapshot,projectId,request,choices){
   const old=change.planAmendments[position];
   if(old.kind==="dependency"&&row.alreadySatisfied){change.planAmendments.splice(position,1);removed=true;return;}
   const current=old.kind==="dates"?dateFields(project):workFields(project.items.find(w=>w.id===old.itemId));
-  const after=old.kind==="dates"?{...current}:Object.fromEntries(REVIEW_WORK_FIELDS.map(name=>[name,current[name]]));
+  const hasLimit=old.kind==="work"&&Object.hasOwn(old.after,"notBeforeDate");
+  if(hasLimit)current.notBeforeDate??=null;
+  else if(old.kind==="work")delete current.notBeforeDate;
+  const after=old.kind==="dates"?{...current}:Object.fromEntries([...REVIEW_WORK_FIELDS,...(hasLimit?["notBeforeDate"]:[])].map(name=>[name,current[name]]));
   for(const f of row.fields.filter(f=>f.selectable)){
    const selected=choices[f.name]??f.defaultChoice;
    if(!["current","proposed"].includes(selected))throw Error("Выберите значение: "+f.label);
@@ -361,7 +382,11 @@ export function checkPlanAmendment(snapshot,projectId,changeId) {
 function applyToProject(project,change,actions) {
  for(const action of actions){
   if(action.kind==="dates")Object.assign(project,action.after);
-  else if(action.kind==="work")Object.assign(project.items.find(w=>w.id===action.itemId),action.after);
+  else if(action.kind==="work"){
+   const work=project.items.find(w=>w.id===action.itemId);
+   Object.assign(work,action.after);
+   if(Object.hasOwn(action.after,"notBeforeDate")&&work.notBeforeDate==null)delete work.notBeforeDate;
+  }
   else if(action.kind==="new_work")project.items.push({
    id:action.id,title:action.title,state:"todo",priority:"normal",stageId:action.stageId,
    assignee:action.assignee,dueDate:action.dueDate,estimateDays:action.estimateDays,
@@ -452,6 +477,7 @@ function workProjection(item,row){
  return {start:row?.startDate??null,finish:row?.finishDate??null,
   critical:row?.critical??null,floatDays:row?.floatDays??null,
   estimateDays:item.estimateDays??1,durationUnit:item.durationUnit??"elapsed_days",
+  ...(item.notBeforeDate!=null?{notBeforeDate:item.notBeforeDate}:{}),
   dueDate:item.dueDate??null,slipDays:slip(item.dueDate,row?.finishDate),
   assignee:item.assignee||"",resourceId:item.resourceId??null,allocationPct:item.allocationPct??100};
 }
@@ -865,6 +891,7 @@ const revisionPredecessors=ids=>[...ids].sort();
 function historicalWork(work,titles){
  return {title:work.title,start:work.startDate,finish:work.finishDate,deadline:work.dueDate,
   estimateDays:work.estimateDays,durationUnit:work.durationUnit,calendarBasis:revisionCalendar(work.calendarBasis),
+  ...(work.notBeforeDate!=null?{notBeforeDate:work.notBeforeDate}:{}),
   predecessors:revisionPredecessors(work.predecessors),
   predecessorTitles:revisionPredecessors(work.predecessors).map(id=>titles.get(id)??id),
   critical:work.critical,floatDays:work.floatDays??null,assignment:work.assignment?{...work.assignment}:null};
@@ -883,6 +910,7 @@ function liveRevisionWorks(snapshot,project,forecast){
   const row=plan.get(w.id),p=workProjection(w,row),predecessors=revisionPredecessors(incoming.get(w.id));
   return [w.id,{title:w.title,start:p.start,finish:p.finish,deadline:p.dueDate,
    estimateDays:p.estimateDays,durationUnit:p.durationUnit,calendarBasis:revisionCalendar(w.calendarBasis),
+   ...(w.notBeforeDate!=null?{notBeforeDate:w.notBeforeDate}:{}),
    predecessors,predecessorTitles:predecessors.map(id=>titles.get(id)??id),critical:p.critical,floatDays:p.floatDays,
    assignment:recordedWorkAssignment(w,resources)}];
  }));
@@ -905,6 +933,7 @@ function revisionWorkChanges(before,after){
  if(before.estimateDays!==after.estimateDays)reasons.push("Изменена длительность");
  if(before.durationUnit!==after.durationUnit)reasons.push("Изменена единица длительности");
  if(!same(before.calendarBasis,after.calendarBasis))reasons.push("Изменён рабочий календарь");
+ if((before.notBeforeDate??null)!==(after.notBeforeDate??null))reasons.push("Изменено ограничение начала работы");
  if(!same(before.predecessors,after.predecessors))reasons.push("Изменены зависимости");
  if(before.deadline!==after.deadline)reasons.push("Изменён контрольный срок");
  reasons.push(...recordedAssignmentChanges(before.assignment,after.assignment));
@@ -1048,7 +1077,8 @@ function describe(project,action) {
    (action.before.assignee||"без ответственного")+" → "+(action.after.assignee||"без ответственного")+
    "; срок "+shownDate(action.before.dueDate)+" → "+shownDate(action.after.dueDate)+
    "; плановый ресурс "+(action.before.resourceId||"не назначен")+" → "+(action.after.resourceId||"не назначен")+
-   "; загрузка "+(action.before.allocationPct??100)+"% → "+(action.after.allocationPct??100)+"%";
+   "; загрузка "+(action.before.allocationPct??100)+"% → "+(action.after.allocationPct??100)+"%"+
+   (Object.hasOwn(action.after,"notBeforeDate")?"; начало не ранее "+shownDate(action.before.notBeforeDate)+" → "+shownDate(action.after.notBeforeDate):"");
  }
  return "Новая работа «"+action.title+"»: "+action.estimateDays+" дн.; "+
   (action.assignee||"ответственный не назначен")+"; срок "+shownDate(action.dueDate)+"; плановая загрузка "+(action.allocationPct??100)+"%";

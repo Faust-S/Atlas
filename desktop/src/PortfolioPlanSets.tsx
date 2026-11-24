@@ -16,7 +16,7 @@ function PlanSetPicker({name,choices,selection,onChange,onOpen}:{
  const proposals=choices.filter(c=>c.projectId===pid);
  const selected=proposals.find(c=>c.changeId===changeId)??proposals[0];
  return <div className="atlas-amendment-row atlas-plan-set-picker">
-  <strong>{name} · {selection.length} из 4 проектов</strong>
+  <h3 className="atlas-plan-set-count" tabIndex={-1}>{name} · {selection.length} из 4 проектов</h3>
   {selection.map((ref,i)=>{
    const proposal=choices.find(c=>match(c,ref));
    return <div className="atlas-plan-set-member" key={JSON.stringify([ref.projectId,ref.changeId])}>
@@ -71,7 +71,7 @@ export function PortfolioPlanSets({snapshot,onOpen,onApply,selection,onSelection
     {expanded?"Скрыть согласованное планирование":"Сравнить планы портфеля"}</button></div>
   {expanded&&<>
    {!choices.length?<p className="minor">Подготовьте хотя бы одну заявку с конкретными корректировками в разделе «Изменения и решения» проекта.</p>:<>
-    <p className="minor">В каждом варианте до четырёх разных проектов и по одной заявке на проект. Вариант Б можно оставить пустым для сравнения только с действующим планом. Расчёт не меняет заявки.</p>
+    <p className="minor">До четырёх проектов и одной заявки на проект. Вариант Б необязателен. Расчёт не меняет заявки.</p>
     <div className="atlas-plan-comparison-cards">
      <PlanSetPicker name="Вариант А" choices={choices} selection={first} onChange={refs=>{onSelection({...selection,first:refs});invalidate()}} onOpen={onOpen}/>
      <PlanSetPicker name="Вариант Б" choices={choices} selection={second} onChange={refs=>{onSelection({...selection,second:refs});invalidate()}} onOpen={onOpen}/>
