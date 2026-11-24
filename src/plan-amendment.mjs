@@ -1,6 +1,7 @@
 // Concrete, human-approved plan amendments stored on existing Atlas change records.
 // Preview reuses the single CPM / portfolio dependency projection; no task execution.
 import {validate} from "./core.mjs";
+import {planChange} from "./trace.mjs";
 import {portfolioSchedule} from "./portfolio-schedule.mjs";
 import {portfolioResources,planningResourceTotals,comparePlanningResourceGroups} from "./portfolio-resources.mjs";
 import {scheduleProject} from "./planning.mjs";
@@ -80,6 +81,42 @@ export function setPlanWork(snapshot,projectId,changeId,{itemId,estimateDays,ass
   upsert(change,{kind:"work",itemId,before,after});
   change.targetIds=[...new Set([...(change.targetIds||[]),...(item.targetIds||[])])];
  });
+}
+/**
+ * Transfer a chosen resource into an ordinary unapplied amendment.
+ * A new proposal is an existing planChange; an existing proposal keeps its
+ * previously entered duration, assignee, control date and other actions.
+ * The current Work, baseline and Store never change at this stage.
+ * @param {any} snapshot
+ * @param {string} projectId
+ * @param {string} workId
+ * @param {{changeId?:string|null,title?:string,description?:string,resourceId:string}} choice
+ */
+export function addResourcePlanChoice(snapshot,projectId,workId,{changeId=null,title="",description="",resourceId}){
+ validate(snapshot);
+ const project=snapshot.projects.find(p=>p.id===projectId);
+ const work=project?.items?.find(w=>w.id===workId);
+ if(!work||project.status==="cancelled"||work.state==="done")
+  throw Error("Работа недоступна для ресурсной корректировки");
+ if(!resourceId||resourceId===(work.resourceId??null)||!(snapshot.resources??[]).some(r=>r.id===resourceId))
+  throw Error("Выберите другой действующий плановый ресурс");
+ let next=snapshot,previous=null;
+ if(changeId){
+  const {change}=find(snapshot,projectId,changeId);
+  if(!eligible(change))throw Error("Заявку нельзя уточнить после утверждения");
+  pinnedSource(snapshot,project,change);
+  // Do not silently rebase a pending duration or other stale Work change.
+  if(change.planAmendments?.length)checkPlanAmendment(snapshot,projectId,changeId);
+  previous=(change.planAmendments??[]).find(a=>a.kind==="work"&&a.itemId===workId)??null;
+  if(previous?.after.resourceId===resourceId)throw Error("Этот ресурс уже указан в заявке");
+ }else{
+  const result=planChange(snapshot,projectId,{title:text(title,"название заявки"),
+   description:String(description??"").trim(),targetIds:[...(work.targetIds??[])]});
+  next=result.state;changeId=result.id;
+ }
+ const fields=previous?.after??amendableWorkFields(work);
+ const result=setPlanWork(next,projectId,changeId,{itemId:workId,...fields,resourceId});
+ return {state:result.state,changeId};
 }
 export function addPlanWork(snapshot,projectId,changeId,{title,estimateDays,assignee="",dueDate=null,stageId=null,targetId=null,resourceId=null,allocationPct=100}) {
  const id=crypto.randomUUID();

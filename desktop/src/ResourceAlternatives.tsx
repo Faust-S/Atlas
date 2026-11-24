@@ -5,7 +5,8 @@ import {compareResourceSequenceAlternatives} from '../../src/resource-sequence-a
 
 type Props={snapshot:any;forecast:any;resources:any;resourceId:string|null;
  onClose:()=>void;onOpenWork:(projectId:string,workId:string,comparison:any)=>void;
- onOpenSequence:(projectId:string,option:any)=>void};
+ onOpenSequence:(projectId:string,option:any)=>void;
+ onOpenAmendment:(projectId:string,workId:string,comparison:any)=>void};
 const key=(w:any)=>JSON.stringify([w.projectId,w.id]);
 const change=(value:number)=>value>0?'+'+value:String(value);
 function deadlineLine(label:string,deadline:{forecastFinish:string|null;controlDate:string|null;slipDays:number|null}){
@@ -223,7 +224,7 @@ function ResourceConflictDetails({resources,resourceId,preview,onOpenWork,snapsh
 }
 
 /** Planning choices only. The existing Work editor owns any actual change. */
-export function ResourceAlternatives({snapshot,forecast,resources,resourceId,onClose,onOpenWork,onOpenSequence}:Props){
+export function ResourceAlternatives({snapshot,forecast,resources,resourceId,onClose,onOpenWork,onOpenSequence,onOpenAmendment}:Props){
  const assigned=resources.work.filter((w:any)=>w.resourceId===resourceId&&w.state!=='done');
  const alternatives=resources.people.filter((r:any)=>r.id!==resourceId);
  const [chosenWork,setChosenWork]=useState('');
@@ -312,6 +313,9 @@ export function ResourceAlternatives({snapshot,forecast,resources,resourceId,onC
      onClick={()=>onOpenWork(preview.projectId,preview.workId,preview)}>
       Открыть Work с выбранным ресурсом
     </button>
+    <button type="button" className="atlas-resource-options-toggle"
+     aria-label={'Добавить ресурсный вариант в заявку '+preview.workTitle}
+     onClick={()=>onOpenAmendment(preview.projectId,preview.workId,preview)}>В заявку</button>
     <button type="button" className="atlas-resource-options-toggle"
      aria-expanded={showAll} onClick={()=>setShowAll(value=>!value)}>
       {showAll?'Скрыть все варианты':'Показать все варианты ('+alternatives.length+')'}

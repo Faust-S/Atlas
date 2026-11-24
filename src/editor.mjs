@@ -6,7 +6,7 @@ import {projectImpact} from "./impact.mjs";
 import {parseRecheckAction,recheckCandidate} from "./revision-review.mjs";
 import {addPortfolioLink} from "./portfolio.mjs";
 import {parsePlanReviewAction,parsePlanProposalAction,planReviewContext,decidePlanReview,planProposalContext} from "./plan-review.mjs";
-import {setPlanDates,setPlanWork,addPlanWork,checkPlanAmendment} from "./plan-amendment.mjs";
+import {setPlanDates,setPlanWork,addPlanWork,checkPlanAmendment,addResourcePlanChoice} from "./plan-amendment.mjs";
 import {addPlanningResource,editPlanningResource,resourceChoiceOptions} from "./resource-planning.mjs";
 import {repoName,ownerName,branchName} from "./github-public.mjs";
 import {selectedSourceFolder} from "./project-organization.mjs";
@@ -176,6 +176,23 @@ export function editorSpec(project,action,snapshot=null){
    fields:[
     field("title","Что изменить в плане?","text","Пересмотреть план: "+ctx.row.targetTitle),
     field("description","Предлагаемое изменение и причины","textarea",ctx.decision.text,true)
+   ]};
+ }
+ if(action.startsWith("resource-amendment:")){
+  if(!project||!snapshot)throw Error("Для заявки требуется проект");
+  const workId=decodeURIComponent(action.slice("resource-amendment:".length));
+  const work=project.items.find(w=>w.id===workId);
+  if(!work||work.state==="done"||project.status==="cancelled")throw Error("Работа недоступна для заявки");
+  const targets=resourceChoiceOptions(snapshot).filter(r=>r.value&&r.value!==(work.resourceId??""));
+  if(!targets.length)throw Error("Нет другого планового ресурса");
+  const existing=(project.changes??[]).filter(c=>["proposed","deferred"].includes(c.status)&&!c.planAppliedAt);
+  return {title:"Ресурс в заявке: "+work.title,
+   hint:"Выберите новую или существующую неутверждённую заявку. Название и основание используются только для новой заявки. Текущая Work не меняется; после добавления пересчитайте всю заявку.",
+   fields:[
+    choice("changeId","Заявка",[option("","Новая заявка"),...existing.map(c=>option(c.id,c.title))],"",false),
+    field("title","Название новой заявки","text","Переназначение: "+work.title,false),
+    field("description","Основание новой заявки","textarea","Сравнение плановых ресурсных назначений.",false),
+    choice("resourceId","Плановый ресурс",targets,targets[0].value)
    ]};
  }
  if(action.startsWith("amend-dates:")||action.startsWith("amend-work:")||action.startsWith("amend-new:")){
@@ -489,6 +506,9 @@ export function applyEditor(snapshot,projectId,action,input){
  }
  if(action==="resource-new")return {state:addPlanningResource(snapshot,{label:get("label"),capacityPct:integer("capacityPct"),availableFrom:get("availableFrom"),availableUntil:get("availableUntil")}).state};
  if(action.startsWith("resource-edit:"))return {state:editPlanningResource(snapshot,action.slice("resource-edit:".length),{label:get("label"),capacityPct:integer("capacityPct"),availableFrom:get("availableFrom"),availableUntil:get("availableUntil")}).state};
+ if(action.startsWith("resource-amendment:"))return addResourcePlanChoice(snapshot,projectId,
+  decodeURIComponent(action.slice("resource-amendment:".length)),{changeId:get("changeId")||null,
+   title:get("title"),description:get("description"),resourceId:get("resourceId")});
  if(action.startsWith("amend-dates:"))return {state:setPlanDates(snapshot,projectId,action.slice(12),{
   startDate:get("startDate"),dueDate:get("dueDate")}).state};
  if(action.startsWith("amend-work:"))return {state:setPlanWork(snapshot,projectId,action.slice(11),{

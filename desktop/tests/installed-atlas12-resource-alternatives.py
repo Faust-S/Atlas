@@ -217,6 +217,40 @@ def qualify():
     assert d.head()==saved,'Opening Work editor wrote to Native Store'
     v.capture('atlas12-resource-alternatives-work-editor-820')
     print('ATLAS12_NATIVE_RESOURCE_TO_WORK_EDITOR_PASS',flush=True)
+    # The same selected resource can be put into an ordinary unapplied change
+    # rather than modifying Work. Save that proposal and keep the plan intact.
+    d.stop()
+    d.launch()
+    win32gui.MoveWindow(d.handle,0,0,820,650,True)
+    d.activate()
+    d.wait_text('Настроить дашборд',45)
+    assert d.head()==saved
+    native.click_named('Ресурсы','Button')
+    d.wait_text('Плановые ресурсы',35)
+    click_scrollable_button('Сравнить варианты ресурса Кран')
+    click_scrollable_button('Добавить ресурсный вариант в заявку '+first_work)
+    d.window_title_contains('Форма:',15)
+    d.wait_text('Ресурс в заявке: '+first_work,35)
+    d.wait_text('Назначение войдёт в заявку.',35)
+    assert d.head()==saved
+    v.capture('atlas12-resource-to-amendment-form-820')
+    v.find_control('Применить к черновику',types={'Button'},scroll=True).click_input()
+    v.await_no_form()
+    d.wait_text('Ресурсный вариант добавлен в заявку.',35)
+    d.wait_text('Последствия относительно текущего плана',35)
+    assert d.head()==saved,'Resource proposal bypassed explicit Save'
+    native.click_named('Сохранить','Button')
+    saved=v.await_saved(saved)
+    pending=d.saved_project(saved)
+    assert pending['items']==original['projects'][0]['items']
+    assert len(pending['changes'])==1 and pending['changes'][0]['status']=='proposed'
+    actions=pending['changes'][0]['planAmendments']
+    assert len(actions)==1 and actions[0]['itemId']==original['projects'][0]['items'][0]['id']
+    lift=next(r for r in original['resources'] if r['label']=='Подъёмник')
+    assert actions[0]['after']['resourceId']==lift['id']
+    assert not pending['changes'][0].get('planAppliedAt')
+    v.capture('atlas12-resource-amendment-saved-820')
+    print('ATLAS12_NATIVE_RESOURCE_TO_AMENDMENT_PASS',flush=True)
     # Verify a full real sequence edit, from comparison to the same native
     # dependency form, explicit draft application, Save and cold restore.
     d.stop()

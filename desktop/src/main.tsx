@@ -219,6 +219,9 @@ function EditorPanel({editor,onSubmit,onCancel,onDirtyChange,busy,project,plan,c
      "Назначение изменено в форме. Прежнее сравнение относится только к ресурсу "+
      editor.resourceProposal.targetLabel+"."}
    </p>}
+   {editor.action.startsWith("resource-amendment:")&&<p className="minor" role="status">
+    Назначение войдёт в заявку. Текущая Work останется неизменной до утверждения и применения плана.
+   </p>}
    {editor.sequenceProposal&&<p className="atlas-resource-editor-proposal" role="status"
     aria-label={'Предложенный порядок: '+editor.sequenceProposal.fromTitle+' → '+editor.sequenceProposal.toTitle+'.'}>
     Предложенный порядок: {editor.sequenceProposal.fromTitle} → {editor.sequenceProposal.toTitle}.
@@ -1457,12 +1460,13 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    if(sequenceProposal&&(action!=="dep-to:"+encodeURIComponent(sequenceProposal.to)||
       projectId!==sequenceProposal.projectId))
     throw Error("Предложенный порядок относится к другой зависимости");
-   if(resourceProposal&&(action!=="work:"+resourceProposal.workId||
+   if(resourceProposal&&((action!=="work:"+resourceProposal.workId&&
+      action!=="resource-amendment:"+encodeURIComponent(resourceProposal.workId))||
       projectId!==resourceProposal.projectId))
     throw Error("Ресурсный вариант относится к другой работе");
    resetWorkspaceScroll();
    setActive(projectId);setHomeOpen(false);setSettingsOpen(false);
-   setTab(action.startsWith("plan-")?"changes":"reality");
+   setTab(action.startsWith("plan-")||action.startsWith("resource-amendment:")?"changes":"reality");
    inspectorEditorReturnRef.current=false;
    setEditor({action,spec:editorSpec(p,action,data),resourceProposal,sequenceProposal});setInspector(true);
    if(!embedded&&window.innerWidth<1150)setNavPanelOpen(false);
@@ -1494,6 +1498,11 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    // the source Work and revision have not changed since the comparison.
    if(editor.resourceProposal)assertResourceEditorChoiceCurrent(data,editor.resourceProposal);
    const form=new FormData(event.currentTarget);
+   if(editor.action.startsWith("resource-amendment:")&&editor.resourceProposal&&
+      (form.get("resourceId")!==editor.resourceProposal.targetResourceId||
+       active!==editor.resourceProposal.projectId||
+       editor.action!=="resource-amendment:"+encodeURIComponent(editor.resourceProposal.workId)))
+    throw Error("Назначение изменилось. Повторите сравнение перед добавлением в заявку.");
    if(editor.sequenceProposal){
     assertResourceSequenceChoiceCurrent(data,editor.sequenceProposal);
     if(form.get("from")!==editor.sequenceProposal.from||
@@ -1507,6 +1516,11 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    const result=applyEditor(data,formProject,editor.action,form);
    mutate(result.state,"Изменение внесено в черновик. Для записи на диск нажмите «Сохранить».");
    if(result.projectId)selectProject(result.projectId,true);
+   if(editor.action.startsWith("resource-amendment:")&&result.changeId&&formProject){
+    setTab("changes");setForecastId(result.changeId);
+    setChangeJump({projectId:formProject,changeId:result.changeId});
+    setMessage("Ресурсный вариант добавлен в заявку. Текущая Work не изменена. Проверьте общий сценарий и сохраните заявку.");
+   }
    if(result.workId){
     const updatedProject=result.state.projects.find((p:any)=>p.id===formProject);
     setRecentPlanBefore(plannedPlan&&updatedProject?startWorkCorrection({
@@ -2467,7 +2481,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
         <ResourceAlternatives key={r.id} snapshot={data} forecast={dates} resources={resources}
          resourceId={r.id} onClose={()=>setResourceComparisonId(null)}
          onOpenWork={(pid,wid,comparison)=>openEditorFor(pid,"work:"+wid,comparison)}
-         onOpenSequence={(pid,option)=>openEditorFor(pid,"dep-to:"+encodeURIComponent(option.to),option)}/>
+         onOpenSequence={(pid,option)=>openEditorFor(pid,"dep-to:"+encodeURIComponent(option.to),option)}
+         onOpenAmendment={(pid,wid,comparison)=>openEditorFor(pid,"resource-amendment:"+encodeURIComponent(wid),comparison)}/>
        </td></tr>}
       </React.Fragment>)}</tbody></table></div>:
       <Fallback message="Плановые ресурсы пока не добавлены. Назначения ответственных в текстовых полях не считаются подтверждёнными ресурсами."/>}
@@ -2484,7 +2499,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       key="unlinked" snapshot={data} forecast={dates} resources={resources} resourceId={null}
       onClose={()=>setResourceComparisonId(null)}
       onOpenWork={(pid,wid,comparison)=>openEditorFor(pid,"work:"+wid,comparison)}
-         onOpenSequence={(pid,option)=>openEditorFor(pid,"dep-to:"+encodeURIComponent(option.to),option)}/>}
+         onOpenSequence={(pid,option)=>openEditorFor(pid,"dep-to:"+encodeURIComponent(option.to),option)}
+         onOpenAmendment={(pid,wid,comparison)=>openEditorFor(pid,"resource-amendment:"+encodeURIComponent(wid),comparison)}/>}
 
     </section>
     <section id="atlas-portfolio-ecosystem" tabIndex={-1} className="surface atlas-ecosystem-overview" aria-label="Карта разработки по проектам и GitHub">
