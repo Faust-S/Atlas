@@ -16,7 +16,7 @@ test("Unified decision route on the 120-project portfolio preserves one full bas
  }
  const raw=serialize(s),clock=performance.now();
  const comparison=compareResourceConflictResolution(s,r.id,{focus:refs[0],companion:refs[1],
-  targetResourceId:free.id,workDelayDays:3,projectDelayDays:3,allowSequence:true});
+  targetResourceIds:[free.id],workDelayDays:3,projectDelayDays:3,allowSequence:true});
  const ms=performance.now()-clock;
  const options=comparison.options.filter(o=>o.valid);
  assert.ok(options.some(o=>o.kind==="assignment"&&o.source.after.overloadDays===0));

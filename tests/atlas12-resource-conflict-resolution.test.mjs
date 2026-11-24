@@ -65,7 +65,7 @@ test("The chosen assignment alone becomes a normal proposal; full plan and basel
  assert.deepEqual(deserialize(serialize(applied)),applied);
 });
 test("A transferred conflict is a compromise even if the source is cleared and the aggregate number of conflict days is unchanged",()=>{
- const f=fixture(),r=compare(f,{targetResourceId:f.busy,workDelayDays:0,projectDelayDays:0,allowSequence:false}),o=selected(r,"assignment");
+ const f=fixture(),r=compare(f,{targetResourceIds:[f.busy],workDelayDays:0,projectDelayDays:0,allowSequence:false}),o=selected(r,"assignment");
  assert.equal(o.source.after.overloadDays,0);
  assert.equal(o.focus[0].before.overloadDays,2);assert.equal(o.focus[0].after.overloadDays,2);
  assert.equal(o.focus[0].after.resourceId,f.busy);
@@ -95,7 +95,7 @@ test("Only actual conflicting participants are selectable; unstarted eligibility
  const f=fixture();
  assert.throws(()=>compare(f,{focus:{projectId:f.projectId,workId:f.critical}}),/участвующие в известных/);
  assert.throws(()=>compare(f,{companion:{projectId:f.projectId,workId:f.a}}),/разные работы/);
- assert.throws(()=>compare(f,{targetResourceId:f.resourceId}),/другой существующий/);
+ assert.throws(()=>compare(f,{targetResourceIds:[f.resourceId]}),/другой существующий/);
  assert.throws(()=>compare(f,{workDelayDays:8}),/от 0 до 7/);
  const started={...f,snapshot:editItem(f.snapshot,f.projectId,f.a,{state:"in_progress",actualStartDate:"2026-11-23"})};
  const r=compare(started);
@@ -113,7 +113,7 @@ test("Only actual conflicting participants are selectable; unstarted eligibility
 test("Cross-project conflict can use project shifts but cannot invent a Work dependency",()=>{
  const f=fixture(),s=editItem(f.snapshot,f.otherProject,f.otherWork,{resourceId:f.resourceId,allocationPct:60});
  const next={...f,snapshot:s};
- const r=compare(next,{targetResourceId:null,workDelayDays:0,projectDelayDays:3,
+ const r=compare(next,{targetResourceIds:[],workDelayDays:0,projectDelayDays:3,
   focus:{projectId:f.otherProject,workId:f.otherWork},companion:{projectId:f.projectId,workId:f.a}});
  assert.equal(selected(r,"sequence-none").valid,false);
  assert.match(selected(r,"sequence-none").reason,/Межпроектная связь/);

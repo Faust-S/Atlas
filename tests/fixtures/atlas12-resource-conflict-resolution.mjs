@@ -17,7 +17,7 @@ export function fixture(){
 }
 export function choice(f,overrides={}){
  return {focus:{projectId:f.projectId,workId:f.a},companion:{projectId:f.projectId,workId:f.b},
-  targetResourceId:f.free,workDelayDays:3,projectDelayDays:3,allowSequence:true,...overrides};
+  targetResourceIds:[f.free],workDelayDays:3,projectDelayDays:3,allowSequence:true,...overrides};
 }
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  const output=process.argv[2];

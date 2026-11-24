@@ -97,14 +97,16 @@ function normalize(c,input){
   if(!Number.isSafeInteger(value)||value<0||value>7)throw Error("Укажите от 0 до 7 дней: "+name);
   return value;
  };
- const targetResourceId=input.targetResourceId??null;
- if(targetResourceId!==null&&!c.alternatives.some(r=>r.id===targetResourceId))
+ const targetResourceIds=input.targetResourceIds;
+ if(!Array.isArray(targetResourceIds)||targetResourceIds.length>3||new Set(targetResourceIds).size!==targetResourceIds.length)
+  throw Error("Выберите до трёх разных альтернативных ресурсов");
+ if(targetResourceIds.some(id=>!c.alternatives.some(r=>r.id===id)))
   throw Error("Выберите другой существующий ресурс");
  if(typeof input.allowSequence!=="boolean")throw Error("Укажите, сравнивать ли технологический порядок");
  const workDelayDays=days(input.workDelayDays,"перенос работ"),projectDelayDays=days(input.projectDelayDays,"перенос проектов");
- if(!targetResourceId&&!workDelayDays&&!projectDelayDays&&!input.allowSequence)
+ if(!targetResourceIds.length&&!workDelayDays&&!projectDelayDays&&!input.allowSequence)
   throw Error("Разрешите хотя бы один способ устранения конфликта");
- return {focus:ref(primary),companion:other?ref(other):null,targetResourceId,
+ return {focus:ref(primary),companion:other?ref(other):null,targetResourceIds:[...targetResourceIds],
   workDelayDays,projectDelayDays,allowSequence:input.allowSequence};
 }
 function chosenWorks(c,selection){
@@ -174,9 +176,10 @@ function derive(c,selection,onlyId=null){
  const snapshot=c.snapshot,works=chosenWorks(c,selection),primary=works[0],other=works[1];
  const specs=[],options=[];
  const add=spec=>{specs.push(spec);options.push(optionFrom(c,selection,spec))};
- if(selection.targetResourceId&&(!onlyId||onlyId==="assignment")){
-  const kind="assignment",id="assignment";
-  const resource=c.alternatives.find(r=>r.id===selection.targetResourceId);
+ for(const [index,targetResourceId] of selection.targetResourceIds.entries()){
+  const kind="assignment",id=index===0?"assignment":"assignment-"+(index+1);
+  if(onlyId&&onlyId!==id)continue;
+  const resource=c.alternatives.find(r=>r.id===targetResourceId);
   const changes={...ref(primary),workTitle:primary.title,resourceId:resource.id,resourceLabel:resource.label};
   const title=titleFor(kind,changes);
   if(!primary.canReassign)options.push(unavailable(id,kind,title,"Назначение уже начатой или недоступной работы не меняется в этом маршруте."));

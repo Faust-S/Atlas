@@ -18,7 +18,7 @@ export function ResourceConflictResolution({snapshot,resourceId,initialFocus=nul
  snapshot:any;resourceId:string;initialFocus?:{projectId:string;workId:string}|null;onClose:()=>void;disabled?:boolean;
  onDraft:(comparison:any,optionId:string,choice:{rationale:string;confirmTradeoff:boolean;confirmTechnology:boolean})=>boolean}){
  const [focusId,setFocusId]=useState(()=>initialFocus?JSON.stringify([initialFocus.projectId,initialFocus.workId]):""),[companionId,setCompanionId]=useState("");
- const [target,setTarget]=useState(""),[workDelay,setWorkDelay]=useState(7),[projectDelay,setProjectDelay]=useState(0);
+ const [targetIds,setTargetIds]=useState<string[]>([""]),[workDelay,setWorkDelay]=useState(7),[projectDelay,setProjectDelay]=useState(0);
  const [allowSequence,setAllowSequence]=useState(false);
  const [conditionsOpen,setConditionsOpen]=useState(true);
  const [calculation,setCalculation]=useState<{snapshot:any;value:any}|null>(null);
@@ -33,7 +33,9 @@ export function ResourceConflictResolution({snapshot,resourceId,initialFocus=nul
  const participants:any[]=model?.participants??[];
  const focus=focusId?participants.find(w=>w.id===focusId):participants[0];
  const companion=participants.find(w=>w.id===companionId&&w.id!==focus?.id);
- const targetResource=focus?.canReassign?model?.alternatives.find((r:any)=>r.id===target):null;
+ const targetResources:any[]=focus?.canReassign?targetIds.flatMap(id=>{
+  const resource=model?.alternatives.find((r:any)=>r.id===id);return resource?[resource]:[];
+ }):[];
  const result=calculation&&calculation.snapshot===snapshot?calculation.value:null;
  const chosen=result?.options.find((o:any)=>o.id===choice);
  const invalidate=()=>{setCalculation(null);setChoice("");setError("");setConfirmTradeoff(false);setConfirmTechnology(false);setConditionsOpen(true)};
@@ -53,13 +55,13 @@ export function ResourceConflictResolution({snapshot,resourceId,initialFocus=nul
   try{
    setError("");setChoice("");setConfirmTradeoff(false);setConfirmTechnology(false);
    const value=compareResourceConflictResolution(snapshot,resourceId,{
-    focus:ref(focus),companion:companion?ref(companion):null,targetResourceId:targetResource?.id??null,
+    focus:ref(focus),companion:companion?ref(companion):null,targetResourceIds:targetResources.map(r=>r.id),
     workDelayDays:workDelay,projectDelayDays:projectDelay,allowSequence:allowSequence&&Boolean(companion&&focus.projectId===companion.projectId)
    });
    setCalculation({snapshot,value});setConditionsOpen(false);
   }catch(e){setCalculation(null);setError(e instanceof Error?e.message:"Расчёт недоступен")}
  };
- const canCalculate=Boolean(focus&&(targetResource||workDelay||projectDelay||allowSequence&&companion&&focus.projectId===companion.projectId));
+ const canCalculate=Boolean(focus&&(targetResources.length||workDelay||projectDelay||allowSequence&&companion&&focus.projectId===companion.projectId));
  return <section ref={sectionRef} tabIndex={-1} data-atlas-conflict-panel="true" className="atlas-resource-alternatives atlas-conflict-resolution" aria-label="Устранение ресурсного конфликта">
   <div className="atlas-resource-alternatives-header">
    <strong>{"Устранение конфликта: "+(model?.resourceLabel??"ресурс")}</strong>
@@ -69,7 +71,7 @@ export function ResourceConflictResolution({snapshot,resourceId,initialFocus=nul
   {model&&!focus&&participants.length>0&&<>
    <p role="alert">Выбранная ранее работа больше не участвует в конфликте. Выберите другую работу для нового расчёта.</p>
    <label className="atlas-plan-choice-fields">Работа с конфликтом<select aria-label="Работа для устранения конфликта" value=""
-    onChange={e=>{setFocusId(e.target.value);setCompanionId("");setTarget("");setAllowSequence(false);invalidate()}}>
+    onChange={e=>{setFocusId(e.target.value);setCompanionId("");setTargetIds([""]);setAllowSequence(false);invalidate()}}>
     <option value="">Выберите работу</option>{participants.map(w=><option key={w.id} value={w.id}>{name(w)}</option>)}
    </select></label>
   </>}
@@ -80,7 +82,7 @@ export function ResourceConflictResolution({snapshot,resourceId,initialFocus=nul
    {(!result||conditionsOpen)?<>
    <div className="atlas-plan-choice-fields">
     <label>Работа с конфликтом<select aria-label="Работа для устранения конфликта" value={focus.id}
-     onChange={e=>{setFocusId(e.target.value);setTarget("");if(e.target.value===companionId)setCompanionId("");setAllowSequence(false);invalidate()}}>
+     onChange={e=>{setFocusId(e.target.value);setTargetIds([""]);if(e.target.value===companionId)setCompanionId("");setAllowSequence(false);invalidate()}}>
      {participants.map(w=><option key={w.id} value={w.id}>{name(w)}</option>)}
     </select></label>
     <label>Вторая работа (необязательно)<select aria-label="Вторая конфликтующая работа" value={companion?.id??""}
@@ -98,11 +100,16 @@ export function ResourceConflictResolution({snapshot,resourceId,initialFocus=nul
    </div>
    <strong>Какие изменения допустимы</strong>
    <div className="atlas-plan-choice-fields">
-    <label>Другое назначение выбранной работы<select aria-label="Ресурс для устранения конфликта" value={targetResource?.id??""}
-     disabled={!focus.canReassign||!model.alternatives.length} onChange={e=>{setTarget(e.target.value);invalidate()}}>
-     <option value="">Не менять назначение</option>
-     {model.alternatives.map((r:any)=><option key={r.id} value={r.id}>{r.label+" ("+r.capacityPct+"%)"}</option>)}
-    </select></label>
+    {targetIds.map((id,index)=><label key={index}>{index===0?"Другое назначение выбранной работы":"Дополнительный ресурс "+(index+1)}
+     <select aria-label={index===0?"Ресурс для устранения конфликта":"Дополнительный ресурс для сравнения "+(index+1)}
+      value={focus.canReassign&&model.alternatives.some((r:any)=>r.id===id)?id:""}
+      disabled={!focus.canReassign||!model.alternatives.length} onChange={e=>{setTargetIds(old=>old.map((v,i)=>i===index?e.target.value:v));invalidate()}}>
+      <option value="">{index===0?"Не менять назначение":"Не сравнивать"}</option>
+      {model.alternatives.filter((r:any)=>!targetIds.some((v,i)=>i!==index&&v===r.id)).map((r:any)=>
+       <option key={r.id} value={r.id}>{r.label+" ("+r.capacityPct+"%)"}</option>)}
+     </select></label>)}
+    {focus.canReassign&&targetIds.length<Math.min(3,model.alternatives.length)&&targetResources.length===targetIds.length&&
+     <button type="button" className="action-button" onClick={()=>{setTargetIds(old=>[...old,""]);invalidate()}}>Сравнить ещё ресурс</button>}
     <label>Предел переноса работ<select aria-label="Предел переноса конфликтующих работ" value={workDelay}
      onChange={e=>{setWorkDelay(Number(e.target.value));invalidate()}}>{delayOptions(7)}</select></label>
     <label>Предел переноса проектов<select aria-label="Предел переноса конфликтующих проектов" value={projectDelay}
@@ -120,7 +127,7 @@ export function ResourceConflictResolution({snapshot,resourceId,initialFocus=nul
    </>:<div className="atlas-conflict-conditions">
     <div><strong>{name(focus)}{companion?"; "+name(companion):""}</strong>
      <small>{[
-      targetResource?"Ресурс: "+targetResource.label:null,
+      targetResources.length?"Назначения: "+targetResources.map(r=>r.label).join(", "):null,
       workDelay?"Перенос работ до "+workDelay+" дн.":null,
       allowSequence?"Оба направления зависимости":null,
       projectDelay?"Перенос проектов до "+projectDelay+" дн.":null
