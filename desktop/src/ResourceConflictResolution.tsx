@@ -21,6 +21,7 @@ export function ResourceConflictResolution({snapshot,resourceId,resourceGroup,in
  const [focusId,setFocusId]=useState(()=>initialFocus?JSON.stringify([initialFocus.projectId,initialFocus.workId]):""),[companionId,setCompanionId]=useState("");
  const [targetIds,setTargetIds]=useState<string[]>([""]),[workDelay,setWorkDelay]=useState(7),[projectDelay,setProjectDelay]=useState(0);
  const [companionTargetIds,setCompanionTargetIds]=useState<string[]>([]);
+ const [extraIds,setExtraIds]=useState<string[]>([]);
  const [allowSequence,setAllowSequence]=useState(false);
  const [conditionsOpen,setConditionsOpen]=useState(true);
  const [showPeriods,setShowPeriods]=useState(false);
@@ -36,12 +37,19 @@ export function ResourceConflictResolution({snapshot,resourceId,resourceGroup,in
  const participants:any[]=model?.participants??[];
  const focus=focusId?participants.find(w=>w.id===focusId):participants[0];
  const companion=participants.find(w=>w.id===companionId&&w.id!==focus?.id);
+ const extraWorks=extraIds.flatMap(id=>{
+  const w=participants.find(w=>w.id===id&&w.id!==focus?.id&&w.id!==companion?.id);
+  return w?[w]:[];
+ });
+ const extraCandidates=participants.filter(w=>w.id!==focus?.id&&w.id!==companion?.id);
  const availableTargets=(ids:string[])=>ids.flatMap(id=>{
   const resource=model?.alternatives.find((r:any)=>r.id===id);return resource?[resource]:[];
  });
  const targetResources:any[]=focus?.canReassign?availableTargets(targetIds):[];
  const companionTargetResources:any[]=companion?.canReassign?availableTargets(companionTargetIds):[];
  const staleSelection=Boolean(companionId&&!companion||
+  extraIds.some(id=>id&&!extraWorks.some(w=>w.id===id))||
+  extraWorks.length&&!companion||new Set(extraWorks.map(w=>w.id)).size!==extraWorks.length||
   targetIds.some(id=>id&&!targetResources.some(r=>r.id===id))||
   companionTargetIds.some(id=>id&&!companionTargetResources.some(r=>r.id===id)));
  const result=calculation&&calculation.snapshot===snapshot?calculation.value:null;
@@ -63,7 +71,7 @@ export function ResourceConflictResolution({snapshot,resourceId,resourceGroup,in
   try{
    setError("");setChoice("");setConfirmTradeoff(false);setConfirmTechnology(false);
    const value=compareResourceConflictResolution(snapshot,resourceId,{
-    focus:ref(focus),companion:companion?ref(companion):null,targetResourceIds:targetResources.map(r=>r.id),
+    focus:ref(focus),companion:companion?ref(companion):null,additionalWorks:extraWorks.map(ref),targetResourceIds:targetResources.map(r=>r.id),
     companionTargetResourceIds:companionTargetResources.map(r=>r.id),
     workDelayDays:workDelay,projectDelayDays:projectDelay,allowSequence:allowSequence&&Boolean(companion&&focus.projectId===companion.projectId)
    });
@@ -80,7 +88,7 @@ export function ResourceConflictResolution({snapshot,resourceId,resourceGroup,in
   {model&&!focus&&participants.length>0&&<>
    <p role="alert">Выбранная ранее работа больше не участвует в конфликте. Выберите другую работу для нового расчёта.</p>
    <label className="atlas-plan-choice-fields">Работа с конфликтом<select aria-label="Работа для устранения конфликта" value=""
-    onChange={e=>{setFocusId(e.target.value);setCompanionId("");setTargetIds([""]);setCompanionTargetIds([]);setAllowSequence(false);invalidate()}}>
+    onChange={e=>{setFocusId(e.target.value);setCompanionId("");setTargetIds([""]);setCompanionTargetIds([]);setExtraIds([]);setAllowSequence(false);invalidate()}}>
     <option value="">Выберите работу</option>{participants.map(w=><option key={w.id} value={w.id}>{name(w)}</option>)}
    </select></label>
   </>}
@@ -91,11 +99,11 @@ export function ResourceConflictResolution({snapshot,resourceId,resourceGroup,in
    {(!result||conditionsOpen)?<>
    <div className="atlas-plan-choice-fields">
     <label>Работа с конфликтом<select aria-label="Работа для устранения конфликта" value={focus.id}
-     onChange={e=>{setFocusId(e.target.value);setTargetIds([""]);setCompanionTargetIds([]);if(e.target.value===companionId)setCompanionId("");setAllowSequence(false);invalidate()}}>
+     onChange={e=>{setFocusId(e.target.value);setTargetIds([""]);setCompanionTargetIds([]);setExtraIds([]);if(e.target.value===companionId)setCompanionId("");setAllowSequence(false);invalidate()}}>
      {participants.map(w=><option key={w.id} value={w.id}>{name(w)}</option>)}
     </select></label>
     <label>Вторая работа (необязательно)<select aria-label="Вторая конфликтующая работа" value={companion?.id??""}
-     onChange={e=>{setCompanionId(e.target.value);setCompanionTargetIds([]);setAllowSequence(false);invalidate()}}>
+     onChange={e=>{setCompanionId(e.target.value);setCompanionTargetIds([]);setExtraIds([]);setAllowSequence(false);invalidate()}}>
      <option value="">Не выбрана</option>
      {participants.filter(w=>w.id!==focus.id).map(w=><option key={w.id} value={w.id}>{name(w)}</option>)}
     </select></label>
@@ -110,7 +118,23 @@ export function ResourceConflictResolution({snapshot,resourceId,resourceGroup,in
    <button type="button" className="atlas-resource-options-toggle" aria-expanded={showPeriods}
     onClick={()=>setShowPeriods(v=>!v)}>{showPeriods?"Скрыть периоды конфликта работы":"Показать периоды конфликта работы"}</button>
    {showPeriods&&<ConflictPeriodPage key={JSON.stringify([snapshot.revision,focus.id])} group={resourceGroup} focus={ref(focus)}
-    onSelectCompanion={w=>{setCompanionId(JSON.stringify([w.projectId,w.workId]));setCompanionTargetIds([]);setAllowSequence(false);setShowPeriods(false);invalidate()}}/>}
+    onSelectCompanion={w=>{setCompanionId(JSON.stringify([w.projectId,w.workId]));setCompanionTargetIds([]);setExtraIds([]);setAllowSequence(false);setShowPeriods(false);invalidate()}}/>}
+   {companion&&extraCandidates.length>0&&<div className="atlas-amendment-row">
+    <small role="status">{"Участников сравнения: "+(2+extraWorks.length)+" из "+model.maxParticipants+"."}</small>
+    {extraIds.length>0&&<div className="atlas-plan-choice-fields">
+     {extraIds.map((id,index)=><label key={index}>{"Работа "+(index+3)+" для переносов"}
+      <select aria-label={"Работа "+(index+3)+" для поиска переносов"} value={extraWorks.some(w=>w.id===id)?id:""}
+       onChange={e=>{setExtraIds(old=>old.map((v,i)=>i===index?e.target.value:v));invalidate()}}>
+       <option value="">Не выбрана</option>
+       {extraCandidates.filter(w=>!extraIds.some((v,i)=>i!==index&&v===w.id)).map(w=><option key={w.id} value={w.id}>
+        {name(w)+" · резерв "+days(w.reserveDays)}</option>)}
+      </select></label>)}
+     <small>Дополнительные работы входят в сравнение переносов и их последствий. Назначения и порядок работ сравниваются для первых двух.</small>
+    </div>}
+    {extraIds.length<Math.min(model.maxParticipants-2,extraCandidates.length)&&extraWorks.length===extraIds.length&&
+     <button type="button" className="action-button" onClick={()=>{setExtraIds(old=>[...old,""]);invalidate()}}>Добавить работу для поиска переносов</button>}
+    {extraIds.length>0&&<button type="button" className="action-button" onClick={()=>{setExtraIds([]);invalidate()}}>Исключить дополнительные работы</button>}
+   </div>}
    <strong>Какие изменения допустимы</strong>
    <div className="atlas-plan-choice-fields">
     {targetIds.map((id,index)=><label key={index}>{index===0?"Другое назначение выбранной работы":"Дополнительный ресурс "+(index+1)}
@@ -147,7 +171,7 @@ export function ResourceConflictResolution({snapshot,resourceId,resourceGroup,in
    </>}
    {staleSelection&&<div role="alert" className="atlas-amendment-row">
     <small>Ранее выбранная работа или назначение больше недоступны. Уточните условия, прежде чем рассчитывать решения.</small>
-    <button type="button" className="action-button" onClick={()=>{if(!companion)setCompanionId("");setTargetIds([""]);setCompanionTargetIds([]);setAllowSequence(false);invalidate()}}>Сбросить выбранные назначения</button>
+    <button type="button" className="action-button" onClick={()=>{if(!companion)setCompanionId("");setTargetIds([""]);setCompanionTargetIds([]);setExtraIds([]);setAllowSequence(false);invalidate()}}>Сбросить выбранные назначения</button>
    </div>}
    <small>{focus.maxWorkDelay?"Допустимый резерв выбранной работы: до "+focus.maxWorkDelay+" дн.":focus.workReason}
     {companion&&(" Вторая работа: "+(companion.maxWorkDelay?"до "+companion.maxWorkDelay+" дн.":companion.workReason))}</small>
@@ -161,6 +185,7 @@ export function ResourceConflictResolution({snapshot,resourceId,resourceGroup,in
    </>:<div className="atlas-conflict-conditions">
     <div><strong>{name(focus)}{companion?"; "+name(companion):""}</strong>
      <small>{[
+      extraWorks.length?"Дополнительные работы: "+extraWorks.map(name).join(", "):null,
       targetResources.length?"Назначения выбранной работы: "+targetResources.map(r=>r.label).join(", "):null,
       companionTargetResources.length?"Назначения второй работы: "+companionTargetResources.map(r=>r.label).join(", "):null,
       workDelay?"Перенос работ до "+workDelay+" дн.":null,
@@ -178,7 +203,8 @@ export function ResourceConflictResolution({snapshot,resourceId,resourceGroup,in
      <strong>Текущий план</strong>
      <small>{"Ресурс: "+result.baseline.current.overloadDays+" / "+result.baseline.current.unavailableDays+
       " дн.; выбранная работа: "+focus.overloadDays+" / "+focus.unavailableDays+" дн."+
-      (companion?"; вторая: "+companion.overloadDays+" / "+companion.unavailableDays+" дн.":"")}</small>
+      (companion?"; вторая: "+companion.overloadDays+" / "+companion.unavailableDays+" дн.":"")+
+      extraWorks.map((w,i)=>"; "+(i+3)+"-я: "+w.overloadDays+" / "+w.unavailableDays+" дн.").join("")}</small>
      <small>{"Портфель: "+result.baseline.portfolio.overloadDays+" / "+result.baseline.portfolio.unavailableDays+
       " ресурс-дн.; превышение мощности "+result.baseline.portfolio.overloadPctDays+" п. п.·дн."+
       (result.options.find((o:any)=>o.valid)?"; работ в конфликтах "+result.options.find((o:any)=>o.valid).assessment.conflictedWorkBefore:"")}</small>
@@ -191,6 +217,7 @@ export function ResourceConflictResolution({snapshot,resourceId,resourceGroup,in
       {o.valid?<><span>{classification[o.classification]??"Расчёт"}</span>
        <small>{"Ресурс: "+o.source.after.overloadDays+" / "+o.source.after.unavailableDays+"; работа: "+shown(o.focus[0]?.after)+
         (o.focus[1]?"; вторая: "+shown(o.focus[1].after):"")+
+        o.focus.slice(2).map((w:any,i:number)=>"; "+(i+3)+"-я: "+shown(w.after)).join("")+
         "; работ портфеля в конфликтах: "+o.assessment.conflictedWorkAfter}</small>
        <small>{"Портфель: "+o.preview.resourceAfter.overloadDays+" / "+o.preview.resourceAfter.unavailableDays+
         " ресурс-дн.; превышение "+o.preview.resourceAfter.overloadPctDays+" п. п.·дн."}</small>

@@ -7,7 +7,7 @@ import {portfolioSchedule} from "../src/portfolio-schedule.mjs";
 import {decideChange} from "../src/trace.mjs";
 import {applyPlanAmendment,comparePortfolioPlanSets} from "../src/plan-amendment.mjs";
 import {resourceConflictEntry,resourceConflictPage,inspectResourceConflictResolution,compareResourceConflictResolution,createResourceConflictProposals} from "../src/resource-conflict-resolution.mjs";
-import {fixture,choice} from "./fixtures/atlas12-resource-conflict-resolution.mjs";
+import {fixture,choice,fourFixture,fourChoice} from "./fixtures/atlas12-resource-conflict-resolution.mjs";
 const rationale="Допустимый способ снижения нагрузки выбранного участка.";
 const compare=(f,overrides={})=>compareResourceConflictResolution(f.snapshot,f.resourceId,choice(f,overrides));
 const selected=(r,id)=>r.options.find(o=>o.id===id);
@@ -178,3 +178,42 @@ test("Direct resource navigation preserves bounded paging even for a resource be
  assert.deepEqual(resourceConflictPage(rows,80,"71"),rows);
  assert.deepEqual(resourceConflictPage(rows,40,"missing"),rows.slice(0,40));
 });
+
+test("Four explicitly chosen conflicting Works share one bounded reserve search and exact full-selection preview",()=>{
+ const f=fourFixture(),s=f.snapshot,raw=serialize(s),p=s.projects.find(p=>p.id===f.projectId);
+ const r=compareResourceConflictResolution(s,f.resourceId,fourChoice(f));
+ assert.equal(r.baseline.maxParticipants,4);assert.equal(r.baseline.participants.length,4);
+ const best=r.options.find(o=>o.id==="work-shift-capacity");
+ assert.ok(best?.valid&&best.canDraft);assert.equal(best.source.after.overloadDays,0);
+ assert.deepEqual(best.focus.map(w=>w.workId),[f.a,f.b,...f.extra]);
+ assert.ok(best.focus.every(w=>w.before.overloadDays===2&&w.after.known&&w.after.overloadDays===0));
+ assert.equal(best.additionalEffects.length,2);assert.ok(best.additionalEffects.every(e=>e.improved&&!e.worsened));
+ assert.equal(best.preview.changed,0);assert.equal(best.changes.shifts.length,3);
+ assert.equal(best.changes.search.exact,false);assert.ok(best.changes.search.evaluated<256);
+ const d=createResourceConflictProposals(s,r,best.id,{rationale});
+ assert.equal(d.refs.length,1);const dp=d.state.projects.find(x=>x.id===f.projectId);
+ assert.deepEqual(dp.items,p.items);assert.deepEqual(dp.planBaselines,p.planBaselines);
+ const c=dp.changes.at(-1);
+ assert.equal(c.planAmendments.length,3);
+ assert.ok(c.planAmendments.every(a=>a.kind==="work"&&a.levelingGuard&&a.levelingGuard.preserveDeadlines));
+ const approved=decideChange(d.state,f.projectId,c.id,{status:"approved",rationale}).state;
+ const applied=applyPlanAmendment(approved,f.projectId,c.id).state;
+ assert.equal(portfolioResources(applied).byId.get(f.resourceId).overloadDays,0);
+ assert.equal(portfolioSchedule(applied).byId.get(f.projectId).projectedFinish,portfolioSchedule(s).byId.get(f.projectId).projectedFinish);
+ assert.deepEqual(applied.projects[0].planBaselines,p.planBaselines);
+ assert.equal(serialize(s),raw);
+});
+test("Additional Work selection is explicit, unique, bounded and limited to known participants",()=>{
+ const f=fourFixture(),s=f.snapshot,input=fourChoice(f);
+ const compare=input=>compareResourceConflictResolution(s,f.resourceId,input);
+ assert.throws(()=>compare({...input,companion:null}),/до четырёх/);
+ assert.throws(()=>compare({...input,additionalWorks:[...input.additionalWorks,input.focus]}),/до четырёх/);
+ assert.throws(()=>compare({...input,additionalWorks:[input.focus]}),/разные работы/);
+ assert.throws(()=>compare({...input,additionalWorks:[input.additionalWorks[0],input.additionalWorks[0]]}),/разные работы/);
+ assert.throws(()=>compare({...input,additionalWorks:[{projectId:f.projectId,workId:f.critical}]}),/известных конфликтах/);
+ const r=compare(input),best=r.options.find(o=>o.id==="work-shift-capacity");
+ const tampered=structuredClone(r);
+ tampered.options.find(o=>o.id===best.id).focus[2].after.overloadDays=1;
+ assert.throws(()=>createResourceConflictProposals(s,tampered,best.id,{rationale}),/Последствия варианта изменились/);
+});
+

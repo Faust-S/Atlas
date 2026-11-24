@@ -54,7 +54,7 @@ function contextView(c){
  return {resourceId:c.resourceId,resourceLabel:c.group.label,
   current:groupMetrics(c.group),portfolio:planningResourceTotals(c.resources),
   undatedWork:c.group.undatedWork,participants:c.participants,alternatives:c.alternatives,
-  maxDelay:7};
+  maxDelay:7,maxParticipants:4};
 }
 export function inspectResourceConflictResolution(snapshot,resourceId){
  return contextView(buildContext(snapshot,resourceId));
@@ -93,6 +93,12 @@ function normalize(c,input){
  const primary=participant(input?.focus),other=input?.companion==null?null:participant(input.companion);
  if(!primary||input?.companion!=null&&(!other||primary.id===other.id))
   throw Error("Выберите разные работы, участвующие в известных конфликтах ресурса");
+ const additional=input.additionalWorks===undefined?[]:input.additionalWorks;
+ if(!Array.isArray(additional)||additional.length>2||additional.length&&!other)
+  throw Error("Выберите до четырёх работ, включая основную и вторую");
+ const extra=additional.map(participant),selected=[primary,...(other?[other]:[]),...extra];
+ if(extra.some(w=>!w)||new Set(selected.map(w=>w?.id)).size!==selected.length)
+  throw Error("Выберите разные работы, участвующие в известных конфликтах ресурса");
  const days=(value,name)=>{
   if(!Number.isSafeInteger(value)||value<0||value>7)throw Error("Укажите от 0 до 7 дней: "+name);
   return value;
@@ -111,13 +117,13 @@ function normalize(c,input){
  const workDelayDays=days(input.workDelayDays,"перенос работ"),projectDelayDays=days(input.projectDelayDays,"перенос проектов");
  if(!targetResourceIds.length&&!companionTargetResourceIds.length&&!workDelayDays&&!projectDelayDays&&!input.allowSequence)
   throw Error("Разрешите хотя бы один способ устранения конфликта");
- return {focus:ref(primary),companion:other?ref(other):null,targetResourceIds,companionTargetResourceIds,
-  workDelayDays,projectDelayDays,allowSequence:input.allowSequence};
+ return {focus:ref(primary),companion:other?ref(other):null,additionalWorks:extra.map(ref),
+  targetResourceIds,companionTargetResourceIds,workDelayDays,projectDelayDays,allowSequence:input.allowSequence};
 }
 function chosenWorks(c,selection){
- return [selection.focus,selection.companion].filter(Boolean).map(w=>c.participants.find(p=>p.id===key(w.projectId,w.workId)));
+ return focusRefs(selection).map(w=>c.participants.find(p=>p.id===key(w.projectId,w.workId)));
 }
-function focusRefs(selection){return [selection.focus,selection.companion].filter(Boolean)}
+function focusRefs(selection){return [selection.focus,selection.companion,...(selection.additionalWorks??[])].filter(Boolean)}
 function selectedMetrics(c,preview){
  const old=groupMetrics(c.group),row=preview.resourceRows.find(r=>r.id===c.resourceId);
  return {before:old,after:row?{overloadDays:row.overloadAfter,unavailableDays:row.availabilityAfter,
@@ -135,24 +141,24 @@ function focusChange(w){
 function assess(c,selection,option){
  const {preview,assessment}=option;
  const source=selectedMetrics(c,preview),focus=preview.resourceScope.workChanges.focus;
- const sourceChange=compareMetrics(source.before,source.after),focusEffect=focusChange(focus[0]);
- const companionEffect=focus[1]?focusChange(focus[1]):null;
+ const sourceChange=compareMetrics(source.before,source.after),effects=focus.map(focusChange);
+ const focusEffect=effects[0],companionEffect=effects[1]??null,additionalEffects=effects.slice(2);
  const movedBegun=preview.workRows.filter(r=>{
   const w=c.items.get(key(r.projectId,r.workId)),p=c.projects.get(r.projectId);
   return w&&(!isUnstartedWork(w)||!active(p))&&
    (r.before?.start!==r.after?.start||r.before?.finish!==r.after?.finish);
  }).map(r=>({projectId:r.projectId,workId:r.workId,title:r.title}));
  const w=assessment.warnings;
- const tradeoff=sourceChange.worsened||focusEffect.worsened||Boolean(companionEffect?.worsened)||Boolean(w.newLate||w.worseLate||
+ const tradeoff=sourceChange.worsened||effects.some(e=>e.worsened)||Boolean(w.newLate||w.worseLate||
   w.newLateWork||w.worseLateWork||w.newConflictWork||w.worseConflictWork||w.movedConflictResource||
   w.newConflictDates||w.changedConflictKind||w.worseResources);
  const lost=preview.rows.some(r=>r.beforeFinish&&!r.afterFinish)||preview.workSummary.newlyUndated||
   w.undatedIncrease||w.unknownDates||focus.some(x=>x.before?.known&&!x.after?.known);
- const relief=sourceChange.improved||focusEffect.improved||Boolean(companionEffect?.improved);
+ const relief=sourceChange.improved||effects.some(e=>e.improved);
  const blocker=preview.applicationBlocker??(lost?"Теряются известные даты или ресурсный расчёт.":
   movedBegun.length?"Изменяются даты уже начатых или недоступных работ.":
   !relief?"Не уменьшает известный конфликт выбранного ресурса или работы.":null);
- return {source,focus,sourceChange,focusEffect,companionEffect,tradeoff,
+ return {source,focus,sourceChange,focusEffect,companionEffect,additionalEffects,tradeoff,
   classification:blocker?"BLOCKED":tradeoff?"TRADEOFF":focus[0]?.after?.known&&
    !focus[0].after.overloadDays&&!focus[0].after.unavailableDays?"FOCUS_CLEARED":"RELIEVED",
   canDraft:!blocker,blocker,movedBegun};
