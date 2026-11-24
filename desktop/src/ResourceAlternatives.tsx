@@ -148,19 +148,23 @@ function ResourceSequencePanel({snapshot,forecast,resources,period,onOpenSequenc
 }
 
 /** On-demand interval explanation; the ordinary editor still owns changes. */
-function ConflictPeriodPage({group,onOpenWork,snapshot,forecast,resources,allowSequence,onOpenSequence}:{
- group:any;onOpenWork:Props['onOpenWork'];snapshot:any;forecast:any;resources:any;
- allowSequence:boolean;onOpenSequence:Props['onOpenSequence']}){
+export function ConflictPeriodPage({group,onOpenWork,snapshot,forecast,resources,allowSequence=false,onOpenSequence,focus=null,onSelectCompanion}:{
+ group:any;onOpenWork?:Props['onOpenWork'];snapshot?:any;forecast?:any;resources?:any;
+ allowSequence?:boolean;onOpenSequence?:Props['onOpenSequence'];
+ focus?:{projectId:string,workId:string}|null;onSelectCompanion?:(w:{projectId:string,workId:string})=>void}){
  const [offset,setOffset]=useState(0),[workOffset,setWorkOffset]=useState(0);
- const view=useMemo(()=>resourceConflictPeriods(group,{offset,workOffset,workLimit:6}),
-  [group,offset,workOffset]);
+ const view=useMemo(()=>resourceConflictPeriods(group,{offset,workOffset,workLimit:6,focus}),
+  [group,offset,workOffset,focus?.projectId,focus?.workId]);
  const p=view.period;
  const periodLabel=p?(p.kind==='overload'?'Перегрузка':'Вне периода доступности')+
   ': '+p.startDate+' по '+p.endDate+'. Нагрузка '+p.loadPct+'%, мощность '+p.capacityPct+'%.':'';
  return <div className="atlas-resource-conflict-page">
   <p>{'Выше мощности: '+view.overloadDays+' дн. Вне доступности: '+view.unavailableDays+
    ' дн. Работ без даты: '+view.undatedWork+'.'}</p>
-  {!p?<p>По известным датам конфликтов нет.</p>:<>
+  {focus&&view.focusConflict&&<p>{view.focusConflict.known?
+   'Выбранная работа: перегрузка '+view.focusConflict.overloadDays+' дн.; вне доступности '+view.focusConflict.unavailableDays+' дн.':
+   'Даты выбранной работы не определены.'}</p>}
+  {!p?<p>{focus?'Нет известных конфликтных интервалов выбранной работы.':'По известным датам конфликтов нет.'}</p>:<>
    <div className="atlas-resource-conflict-period">
     <strong role="status" aria-label={periodLabel}>{periodLabel}</strong>
     <small>{'Период '+(offset+1)+' из '+view.periodCount+'. Дней: '+p.days+
@@ -171,10 +175,13 @@ function ConflictPeriodPage({group,onOpenWork,snapshot,forecast,resources,allowS
     </div>
     {p.works.map((w:any)=><div className="atlas-resource-conflict-work" key={key({projectId:w.projectId,id:w.workId})}>
      <div><strong>{w.title}</strong><small>{w.projectName} · {w.allocationPct}%</small></div>
-     <button type="button" aria-label={'Открыть работу конфликта '+w.projectName+': '+w.title}
-      onClick={()=>onOpenWork(w.projectId,w.workId,null)}>Открыть Work</button>
+     {onOpenWork&&<button type="button" aria-label={'Открыть работу конфликта '+w.projectName+': '+w.title}
+      onClick={()=>onOpenWork(w.projectId,w.workId,null)}>Открыть Work</button>}
+     {onSelectCompanion&&!(focus?.projectId===w.projectId&&focus?.workId===w.workId)&&
+      <button type="button" aria-label={'Выбрать второй работой '+w.projectName+': '+w.title}
+       onClick={()=>onSelectCompanion({projectId:w.projectId,workId:w.workId})}>Выбрать второй</button>}
     </div>)}
-    {allowSequence&&p.kind==='overload'&&p.workCount>=2&&
+    {allowSequence&&onOpenSequence&&p.kind==='overload'&&p.workCount>=2&&
      <ResourceSequencePanel key={offset} snapshot={snapshot} forecast={forecast} resources={resources}
       period={p} onOpenSequence={onOpenSequence}/>}
     {p.workCount>p.workLimit&&<div className="atlas-resource-period-nav">

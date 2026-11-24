@@ -74,20 +74,24 @@ const dayEvents=(group,onConflict=null,withParticipants=Boolean(onConflict))=>{
  * Unknown dates and zero-day work do not create fabricated intervals.
  *
  * @param {any} group Resource group from portfolioResources or its projection.
- * @param {{offset?:number,workOffset?:number,workLimit?:number}} [options]
+ * @param {{offset?:number,workOffset?:number,workLimit?:number,focus?:{projectId:string,workId:string}|null}} [options]
  * @returns {{resourceId:string,resourceLabel:string,offset:number,periodCount:number,
  * period: {kind:string,startDate:string,endDate:string,days:number,loadPct:number,
  * capacityPct:number,workCount:number,projectCount:number,workOffset:number,
  * workLimit:number,works:Array<{projectId:string,projectName:string,workId:string,
  * title:string,allocationPct:number}>}|null,overloadDays:number,unavailableDays:number,
- * undatedWork:number}}
+ * undatedWork:number,focusConflict?:{known:boolean,overloadDays:number|null,unavailableDays:number|null}}}
  */
-export function resourceConflictPeriods(group,{offset=0,workOffset=0,workLimit=8}={}){
+export function resourceConflictPeriods(group,{offset=0,workOffset=0,workLimit=8,focus=null}={}){
  if(!group||!Array.isArray(group.work)||
     !Number.isSafeInteger(offset)||offset<0||
     !Number.isSafeInteger(workOffset)||workOffset<0||
     !Number.isSafeInteger(workLimit)||workLimit<1||workLimit>30)
   throw Error("Некорректный запрос периодов ресурсного конфликта");
+ const selected=focus===null?null:group.work.find(w=>w.projectId===focus.projectId&&w.id===focus.workId);
+ if(focus!==null&&!selected)throw Error("Выбранная работа не относится к ресурсу");
+ const focusKey=selected?JSON.stringify([selected.projectId,selected.id]):null;
+ let focusOverload=0,focusUnavailable=0;
  /** @type {{kind:string,startDate:string,endDate:string,days:number,
   * loadPct:number,capacityPct:number,workCount:number,projectCount:number,
   * workOffset:number,workLimit:number,works:Array<{projectId:string,
@@ -95,6 +99,11 @@ export function resourceConflictPeriods(group,{offset=0,workOffset=0,workLimit=8
  let period=null;
  let periodCount=0;
  const aggregate=dayEvents(group,(segment,active)=>{
+  if(focusKey!==null){
+   if(!active.has(focusKey))return;
+   if(segment.kind==="overload")focusOverload+=segment.until-segment.from;
+   else focusUnavailable+=segment.until-segment.from;
+  }
   if(periodCount++!==offset)return;
   const all=[...active.values()].map(x=>x.work).sort((a,b)=>
    a.projectName.localeCompare(b.projectName,"ru")||a.title.localeCompare(b.title,"ru")||
@@ -110,7 +119,10 @@ export function resourceConflictPeriods(group,{offset=0,workOffset=0,workLimit=8
  });
  return {resourceId:group.id,resourceLabel:group.label,offset,periodCount,period,
   overloadDays:aggregate.overloadDays,unavailableDays:aggregate.unavailableDays,
-  undatedWork:group.undatedWork??group.work.filter(w=>w.startDay===null).length};
+  undatedWork:group.undatedWork??group.work.filter(w=>w.startDay===null).length,
+  ...(selected?{focusConflict:{known:selected.startDay!=null,
+   overloadDays:selected.startDay!=null?focusOverload:null,
+   unavailableDays:selected.startDay!=null?focusUnavailable:null}}:{})};
 }
 
 

@@ -2533,7 +2533,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
         <Action onClick={()=>openEditor("resource-edit:"+r.id)}>Настроить</Action>
        </td></tr>
        {resourceResolutionId===r.id&&<tr className="atlas-resource-comparison-row"><td colSpan={6}>
-        <ResourceConflictResolution key={JSON.stringify([r.id,resourceResolutionFocus])} snapshot={data} resourceId={r.id}
+        <ResourceConflictResolution key={JSON.stringify([r.id,resourceResolutionFocus])} snapshot={data} resourceId={r.id} resourceGroup={r}
          initialFocus={resourceResolutionFocus} disabled={busy||!!editor}
          onClose={()=>{setResourceResolutionId(null);setResourceResolutionFocus(null)}}
          onDraft={(comparison,optionId,choice)=>{

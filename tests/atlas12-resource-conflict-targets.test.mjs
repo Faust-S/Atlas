@@ -31,7 +31,7 @@ test("Compare three independent candidate resources on the same portfolio withou
   assert.equal(c.planAmendments[0].after.resourceId,target);
   assert.equal(c.planAmendments[0].itemId,f.a);
   assert.deepEqual(p.items,s.projects.find(x=>x.id===p.id).items);
-  assert.equal(d.state.projects.flatMap(p=>p.changes).length,s.projects.flatMap(p=>p.changes).length+1);
+  assert.equal(d.state.projects.flatMap(p=>p.changes??[]).length,s.projects.flatMap(p=>p.changes??[]).length+1);
  }
  assert.equal(serialize(s),before);
 });

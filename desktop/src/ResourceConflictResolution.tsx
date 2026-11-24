@@ -1,6 +1,7 @@
 import React,{useLayoutEffect,useMemo,useRef,useState} from "react";
 import {inspectResourceConflictResolution,compareResourceConflictResolution} from "../../src/resource-conflict-resolution.mjs";
 import {AmendmentAnalysis} from "./PlanAlternativesComparison";
+import {ConflictPeriodPage} from "./ResourceAlternatives";
 
 const labels:Record<string,string>={assignment:"Переназначение",work_shift:"Резерв работ",sequence:"Порядок",project_shift:"Старт проектов"};
 const classification:Record<string,string>={FOCUS_CLEARED:"Конфликт выбранной работы устранён",RELIEVED:"Ограничение сокращено",
@@ -14,13 +15,14 @@ const optionTitle=(o:any)=>(labels[o.kind]??o.kind)+": "+o.title;
 const delayOptions=(max:number)=>Array.from({length:max+1},(_,i)=><option key={i} value={i}>{i?i+" дн.":"Не переносить"}</option>);
 
 /** Same selected conflict, one current portfolio, ordinary plan proposals. */
-export function ResourceConflictResolution({snapshot,resourceId,initialFocus=null,onClose,onDraft,disabled=false}:{
- snapshot:any;resourceId:string;initialFocus?:{projectId:string;workId:string}|null;onClose:()=>void;disabled?:boolean;
+export function ResourceConflictResolution({snapshot,resourceId,resourceGroup,initialFocus=null,onClose,onDraft,disabled=false}:{
+ snapshot:any;resourceId:string;resourceGroup:any;initialFocus?:{projectId:string;workId:string}|null;onClose:()=>void;disabled?:boolean;
  onDraft:(comparison:any,optionId:string,choice:{rationale:string;confirmTradeoff:boolean;confirmTechnology:boolean})=>boolean}){
  const [focusId,setFocusId]=useState(()=>initialFocus?JSON.stringify([initialFocus.projectId,initialFocus.workId]):""),[companionId,setCompanionId]=useState("");
  const [targetIds,setTargetIds]=useState<string[]>([""]),[workDelay,setWorkDelay]=useState(7),[projectDelay,setProjectDelay]=useState(0);
  const [allowSequence,setAllowSequence]=useState(false);
  const [conditionsOpen,setConditionsOpen]=useState(true);
+ const [showPeriods,setShowPeriods]=useState(false);
  const [calculation,setCalculation]=useState<{snapshot:any;value:any}|null>(null);
  const [choice,setChoice]=useState(""),[error,setError]=useState(""),[rationale,setRationale]=useState("");
  const [confirmTradeoff,setConfirmTradeoff]=useState(false),[confirmTechnology,setConfirmTechnology]=useState(false);
@@ -98,6 +100,10 @@ export function ResourceConflictResolution({snapshot,resourceId,initialFocus=nul
     {!focus.unstarted&&<small>Работа уже начата. Можно искать перенос другой выбранной работы, не меняя её даты.</small>}
     {companion&&<small>{name(companion)+": резерв "+days(companion.reserveDays)+"; конфликт "+companion.overloadDays+" / "+companion.unavailableDays+" дн."}</small>}
    </div>
+   <button type="button" className="atlas-resource-options-toggle" aria-expanded={showPeriods}
+    onClick={()=>setShowPeriods(v=>!v)}>{showPeriods?"Скрыть периоды конфликта работы":"Показать периоды конфликта работы"}</button>
+   {showPeriods&&<ConflictPeriodPage key={JSON.stringify([snapshot.revision,focus.id])} group={resourceGroup} focus={ref(focus)}
+    onSelectCompanion={w=>{setCompanionId(JSON.stringify([w.projectId,w.workId]));setAllowSequence(false);setShowPeriods(false);invalidate()}}/>}
    <strong>Какие изменения допустимы</strong>
    <div className="atlas-plan-choice-fields">
     {targetIds.map((id,index)=><label key={index}>{index===0?"Другое назначение выбранной работы":"Дополнительный ресурс "+(index+1)}
