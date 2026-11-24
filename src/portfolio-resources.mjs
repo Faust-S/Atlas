@@ -11,9 +11,9 @@ const date = value => new Date(value*DAY).toISOString().slice(0,10);
 const show = value => value||"—";
 const names = value => value.trim().replace(/\s+/g," ");
 // One sweep for the aggregate and (only on request) its exact conflict periods.
-const dayEvents=(group,onConflict=null)=>{
+const dayEvents=(group,onConflict=null,withParticipants=Boolean(onConflict))=>{
  const events=new Map();
- const active=onConflict?new Map():null;
+ const active=withParticipants?new Map():null;
  const append=(day,load,count,work=null)=>{
   const e=events.get(day)||{load:0,count:0};
   e.load+=load;e.count+=count;
@@ -34,6 +34,7 @@ const dayEvents=(group,onConflict=null)=>{
  const boundaries=[...events.keys()].sort((a,b)=>a-b);
  let load=0,concurrent=0,maxLoadPct=0,maxConcurrent=0;
  let overloadDays=0,unavailableDays=0,overlapDays=0;
+ let overloadPctDays=0,unavailablePctDays=0,peakExcessPct=0;
  for(let i=0;i<boundaries.length;i++){
   const event=events.get(boundaries[i]);
   load+=event.load;concurrent+=event.count;
@@ -51,14 +52,19 @@ const dayEvents=(group,onConflict=null)=>{
   if(length<=0||load<=0)continue;
   if(concurrent>1)overlapDays+=length;
   const outOfWindow=from!==null&&boundaries[i]<from||until!==null&&boundaries[i]>until;
-  if(outOfWindow)unavailableDays+=length;
-  else if(load>group.capacityPct)overloadDays+=length;
+  if(outOfWindow){unavailableDays+=length;unavailablePctDays+=load*length;}
+  else if(load>group.capacityPct){
+   const excess=load-group.capacityPct;
+   overloadDays+=length;overloadPctDays+=excess*length;
+   peakExcessPct=Math.max(peakExcessPct,excess);
+  }
   if(onConflict&&(outOfWindow||load>group.capacityPct))
    onConflict({from:boundaries[i],until:boundaries[i+1],
     kind:outOfWindow?"availability":"overload",loadPct:load,
     capacityPct:group.capacityPct,concurrent},active);
  }
- return {overlapDays,maxConcurrent,maxLoadPct,overloadDays,unavailableDays};
+ return {overlapDays,maxConcurrent,maxLoadPct,overloadDays,unavailableDays,
+  overloadPctDays,unavailablePctDays,peakExcessPct};
 };
 
 /**
@@ -136,6 +142,64 @@ export function resourceOverloadContainsPair(group,projectId,firstWorkId,secondW
   if(segment.kind==="overload"&&active.has(first)&&active.has(second))found=true;
  });
  return found;
+}
+
+/**
+ * Compare actual conflict intervals, not merely their total lengths. Uses
+ * the same sweep and civil dates as resourceConflictPeriods. Only the
+ * requested page is retained; no expansion into individual days.
+ * @param {any} before
+ * @param {any} after
+ * @param {{offset?:number,limit?:number}} [options]
+ * @returns {{resourceId:string,resourceLabel:string,offset:number,limit:number,count:number,
+ * totals:Record<string,number>,rows:Array<{kind:string,startDate:string,endDate:string,
+ * days:number,beforeKind:string|null,afterKind:string|null,beforeLoadPct:number|null,
+ * afterLoadPct:number|null,beforeExcessPct:number,afterExcessPct:number}>}}
+ */
+export function resourceConflictDifference(before,after,{offset=0,limit=4}={}){
+ if(!before||!after||before.id!==after.id||!Array.isArray(before.work)||!Array.isArray(after.work)||
+    !Number.isSafeInteger(offset)||offset<0||!Number.isSafeInteger(limit)||limit<1||limit>12)
+  throw Error('Invalid resource conflict difference');
+ const intervals=group=>{
+  const out=[];
+  dayEvents(group,segment=>out.push(segment),false);
+  return out;
+ };
+ const a=intervals(before),b=intervals(after);
+ const boundaries=[...new Set([...a,...b].flatMap(x=>[x.from,x.until]))].sort((x,y)=>x-y);
+ const totals={NEW:0,CLEARED:0,WORSENED:0,RELIEVED:0,CHANGED_KIND:0};
+ const rows=[];
+ let i=0,j=0,count=0,pending=null;
+ const flush=()=>{
+  if(!pending)return;
+  totals[pending.kind]+=pending.until-pending.from;
+  if(count>=offset&&rows.length<limit)rows.push({kind:pending.kind,startDate:date(pending.from),
+   endDate:date(pending.until-1),days:pending.until-pending.from,beforeKind:pending.beforeKind,
+   afterKind:pending.afterKind,beforeLoadPct:pending.beforeLoadPct,afterLoadPct:pending.afterLoadPct,
+   beforeExcessPct:pending.beforeExcessPct,afterExcessPct:pending.afterExcessPct});
+  count++;pending=null;
+ };
+ for(let k=0;k+1<boundaries.length;k++){
+  const from=boundaries[k],until=boundaries[k+1];
+  while(i<a.length&&a[i].until<=from)i++;
+  while(j<b.length&&b[j].until<=from)j++;
+  const old=i<a.length&&a[i].from<=from?a[i]:null;
+  const next=j<b.length&&b[j].from<=from?b[j]:null;
+  const excess=x=>x?(x.kind==='overload'?x.loadPct-x.capacityPct:x.loadPct):0;
+  const beforeExcessPct=excess(old),afterExcessPct=excess(next);
+  const kind=!old&&next?'NEW':old&&!next?'CLEARED':old&&next&&old.kind!==next.kind?'CHANGED_KIND':
+   afterExcessPct>beforeExcessPct?'WORSENED':afterExcessPct<beforeExcessPct?'RELIEVED':null;
+  if(!kind){flush();continue;}
+  const row={kind,from,until,beforeKind:old?.kind??null,afterKind:next?.kind??null,
+   beforeLoadPct:old?.loadPct??null,afterLoadPct:next?.loadPct??null,beforeExcessPct,afterExcessPct};
+  if(pending&&pending.until===from&&pending.kind===kind&&pending.beforeKind===row.beforeKind&&
+     pending.afterKind===row.afterKind&&pending.beforeLoadPct===row.beforeLoadPct&&
+     pending.afterLoadPct===row.afterLoadPct&&pending.beforeExcessPct===beforeExcessPct&&
+     pending.afterExcessPct===afterExcessPct){pending.until=until;continue;}
+  flush();pending=row;
+ }
+ flush();
+ return {resourceId:before.id,resourceLabel:before.label,offset,limit,count,totals,rows};
 }
 
 // The single capacity summarizer is also used for a hypothetical reassignment.

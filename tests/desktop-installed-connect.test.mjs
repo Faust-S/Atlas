@@ -603,11 +603,11 @@ test("Atlas 0.11 development keeps the accepted 0.6 release gate and checks its 
  const tauri=JSON.parse(read("../desktop/src-tauri/tauri.conf.json"));
  const manifest=JSON.parse(read("../desktop/package.json"));
  const lock=JSON.parse(read("../desktop/package-lock.json"));
- assert.equal(product.version,"0.11.0-dev.1");
- assert.equal(tauri.version,"0.11.0-dev.1");
- assert.equal(manifest.version,"0.11.0-dev.1");
- assert.equal(lock.version,"0.11.0-dev.1");
- assert.equal(lock.packages[""].version,"0.11.0-dev.1");
+ assert.equal(product.version,"0.12.0-dev.1");
+ assert.equal(tauri.version,"0.12.0-dev.1");
+ assert.equal(manifest.version,"0.12.0-dev.1");
+ assert.equal(lock.version,"0.12.0-dev.1");
+ assert.equal(lock.packages[""].version,"0.12.0-dev.1");
  assert.match(workflow,/release\/0\.6/);
  assert.match(workflow,/Require successful live GitHub first-use on Atlas 0\.6/);
  assert.match(workflow,/Qualify large Atlas 0\.6 map in installed Windows GUI/);
@@ -636,7 +636,7 @@ test("Atlas 0.11 development inherits the qualified original Setup Core route",(
  const setup=read("../desktop/installer/build-setup-core.ps1");
  assert.match(workflow,/work\/2026-11-12-atlas-0-7/);
  assert.match(workflow,/Qualify ordinary project without GitHub on installed Atlas 0\.6/);
- assert.match(setup,/IWXA-Atlas-0\.11\.0-dev\.1-Setup\.exe/);
+ assert.match(setup,/IWXA-Atlas-0\.12\.0-dev\.1-Setup\.exe/);
  assert.match(workflow,/gh release create v0\.6\.0/);
 });
 

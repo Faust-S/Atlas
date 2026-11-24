@@ -168,6 +168,11 @@ def qualify():
     assert d.head()==saved,'Conflict explanation wrote to Native Store'
     v.capture('atlas12-resource-conflict-period-820')
     print('ATLAS12_NATIVE_RESOURCE_CONFLICT_PERIOD_PASS',flush=True)
+    click_scrollable_button('Изменения: Кран')
+    find_resource_control('Новые дни конфликта: 0. Устранены: 3. Усилены: 0. Ослаблены: 0. Изменён вид: 0.',contains=True)
+    assert d.head()==saved,'Conflict difference wrote to Native Store'
+    v.capture('atlas12-resource-conflict-change-820')
+    print('ATLAS12_NATIVE_CONFLICT_DIFFERENCE_PASS',flush=True)
     click_scrollable_button('Скрыть периоды конфликтов')
     click_scrollable_button('Показать все варианты (3)')
     find_resource_control('Новый конфликт: Резервный кран, перегрузка 3 дн.',contains=True)

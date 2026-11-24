@@ -10,6 +10,8 @@ function totals(view){
   unavailableResources:view.people.filter(p=>p.unavailableDays>0).length,
   overloadResourceDays:view.people.reduce((n,p)=>n+p.overloadDays,0),
   unavailableResourceDays:view.people.reduce((n,p)=>n+p.unavailableDays,0),
+  overloadPctDays:view.people.reduce((n,p)=>n+p.overloadPctDays,0),
+  unavailablePctDays:view.people.reduce((n,p)=>n+p.unavailablePctDays,0),
   undatedWork:view.totals.undated,
   unlinkedWork:view.totals.unlinked
  };
@@ -23,7 +25,7 @@ function totals(view){
  */
 function explainShift(sourceBefore,sourceAfter,targetBefore,targetAfter,remaining){
  const assignmentAdded=sourceBefore.id===null;
- const relieved=[],introduced=[],worsened=[];
+ const relieved=[],introduced=[],worsened=[],severity=[];
  for(const [prior,next] of [[sourceBefore,sourceAfter],[targetBefore,targetAfter]]){
   if(prior.id===null)continue; // unlinked Work is not a virtual resource
   for(const [metric,kind] of [['overloadDays','overload'],['unavailableDays','availability']]){
@@ -37,11 +39,15 @@ function explainShift(sourceBefore,sourceAfter,targetBefore,targetAfter,remainin
     else worsened.push(record);
    }
   }
+  for(const [metric,kind] of [['overloadPctDays','overload'],['unavailablePctDays','availability']]){
+   if(prior[metric]!==next[metric])severity.push({resourceId:prior.id,resourceLabel:prior.label,
+    kind,before:prior[metric],after:next[metric],delta:next[metric]-prior[metric]});
+  }
  }
- return {relieved,introduced,worsened,remaining,assignmentAdded,
-  classification:introduced.length||worsened.length?
-   (relieved.length||assignmentAdded)?'TRADEOFF':'WORSENED':
-   (relieved.length||assignmentAdded)?'IMPROVED':'UNCHANGED',
+ const improved=Boolean(relieved.length||assignmentAdded||severity.some(s=>s.delta<0));
+ const degraded=Boolean(introduced.length||worsened.length||severity.some(s=>s.delta>0));
+ return {relieved,introduced,worsened,severity,remaining,assignmentAdded,
+  classification:degraded?(improved?'TRADEOFF':'WORSENED'):(improved?'IMPROVED':'UNCHANGED'),
   // Even a fully clean *planning* result is not an assertion that a real
   // person, machine, or delivery slot has been committed.
   outlook:remaining.overloadResourceDays>0||remaining.unavailableResourceDays>0?
@@ -74,7 +80,8 @@ function resourceAssignmentControlDates(project,work,projection,current){
 
 function unlinkedStatus(count){
  return {id:null,label:'Без привязки к ресурсу',capacityPct:null,maxLoadPct:null,
-  overloadDays:0,unavailableDays:0,undatedWork:null,itemCount:count};
+  overloadDays:0,unavailableDays:0,overloadPctDays:0,unavailablePctDays:0,
+  peakExcessPct:0,undatedWork:null,itemCount:count};
 }
 function adjustedTotals(before,sourceBefore,sourceAfter,targetBefore,targetAfter){
  return {...before,
@@ -88,13 +95,18 @@ function adjustedTotals(before,sourceBefore,sourceAfter,targetBefore,targetAfter
    sourceBefore.overloadDays+targetAfter.overloadDays-targetBefore.overloadDays,
   unavailableResourceDays:before.unavailableResourceDays+sourceAfter.unavailableDays-
    sourceBefore.unavailableDays+targetAfter.unavailableDays-targetBefore.unavailableDays,
+  overloadPctDays:before.overloadPctDays+sourceAfter.overloadPctDays-sourceBefore.overloadPctDays+
+   targetAfter.overloadPctDays-targetBefore.overloadPctDays,
+  unavailablePctDays:before.unavailablePctDays+sourceAfter.unavailablePctDays-sourceBefore.unavailablePctDays+
+   targetAfter.unavailablePctDays-targetBefore.unavailablePctDays,
   unlinkedWork:before.unlinkedWork-(sourceBefore.id===null?1:0)};
 }
 function resourceStatus(group){
  if(!group)throw Error('Плановый ресурс не найден');
  return {id:group.id,label:group.label,capacityPct:group.capacityPct,
   maxLoadPct:group.maxLoadPct,overloadDays:group.overloadDays,
-  unavailableDays:group.unavailableDays,undatedWork:group.undatedWork,
+  unavailableDays:group.unavailableDays,overloadPctDays:group.overloadPctDays,
+  unavailablePctDays:group.unavailablePctDays,peakExcessPct:group.peakExcessPct,undatedWork:group.undatedWork,
   itemCount:group.itemCount};
 }
 /**
@@ -146,6 +158,8 @@ export function previewWorkResourceReassignment(snapshot,{projectId,workId,targe
   constraints:explainShift(sourceBefore,sourceAfter,targetBefore,targetAfter,after),
   overloadDaysDelta:after.overloadResourceDays-before.overloadResourceDays,
   unavailableDaysDelta:after.unavailableResourceDays-before.unavailableResourceDays,
+  overloadPctDaysDelta:after.overloadPctDays-before.overloadPctDays,
+  unavailablePctDaysDelta:after.unavailablePctDays-before.unavailablePctDays,
   startDate:current.startDate,finishDate:current.finishDate,
   datesUnchanged:current.startDate===alternative.startDate&&
    current.finishDate===alternative.finishDate,

@@ -1,6 +1,6 @@
 import React,{useMemo,useState} from 'react';
 import {previewWorkResourceReassignment,compareWorkResourceAlternatives} from '../../src/resource-alternatives.mjs';
-import {projectResourceReassignment,resourceConflictPeriods} from '../../src/portfolio-resources.mjs';
+import {projectResourceReassignment,resourceConflictPeriods,resourceConflictDifference} from '../../src/portfolio-resources.mjs';
 import {compareResourceSequenceAlternatives} from '../../src/resource-sequence-alternatives.mjs';
 
 type Props={snapshot:any;forecast:any;resources:any;resourceId:string|null;
@@ -17,6 +17,38 @@ function deadlineLine(label:string,deadline:{forecastFinish:string|null;controlD
 }
 
 
+
+
+const intervalState=(kind:string|null,load:number|null,excess:number)=>kind==='overload'?
+ 'перегрузка '+excess+' п. п. (нагрузка '+load+'%)':
+ kind==='availability'?'вне доступности: '+load+'% нагрузки':'конфликта нет';
+const differenceLabel=(kind:string)=>({NEW:'Новый конфликт',CLEARED:'Конфликт устранён',
+ WORSENED:'Конфликт усилен',RELIEVED:'Конфликт ослаблен',CHANGED_KIND:'Изменён вид ограничения'} as Record<string,string>)[kind]||kind;
+const differenceSummary=(totals:Record<string,number>)=>'Новые дни конфликта: '+totals.NEW+
+ '. Устранены: '+totals.CLEARED+'. Усилены: '+totals.WORSENED+
+ '. Ослаблены: '+totals.RELIEVED+'. Изменён вид: '+totals.CHANGED_KIND+'.';
+function ConflictChangePage({before,after}:{before:any;after:any}){
+ const [offset,setOffset]=useState(0);
+ const view=useMemo(()=>resourceConflictDifference(before,after,{offset,limit:4}),[before,after,offset]);
+ const summary=differenceSummary(view.totals);
+ return <div className="atlas-resource-conflict-page">
+  <p role="status" aria-label={summary}>{summary}</p>
+  <small>{'Превышение мощности: '+before.overloadPctDays+' → '+after.overloadPctDays+
+   ' п. п.·дн.; нагрузка вне доступности: '+before.unavailablePctDays+' → '+after.unavailablePctDays+' %·дн.'}</small>
+  {!view.count?<p>Изменённых известных периодов конфликтов нет.</p>:<>
+   {view.rows.map(row=><div className="atlas-resource-conflict-period" key={row.kind+':'+row.startDate}>
+    <strong>{differenceLabel(row.kind)+': '+row.startDate+' по '+row.endDate+' ('+row.days+' дн.)'}</strong>
+    <small>{'Было: '+intervalState(row.beforeKind,row.beforeLoadPct,row.beforeExcessPct)+
+     '. Стало: '+intervalState(row.afterKind,row.afterLoadPct,row.afterExcessPct)+'.'}</small>
+   </div>)}
+   <div className="atlas-resource-period-nav">
+    <button type="button" disabled={offset===0} onClick={()=>setOffset(n=>Math.max(0,n-4))}>Предыдущие изменения</button>
+    <small>{'Периоды '+(offset+1)+'-'+(offset+view.rows.length)+' из '+view.count}</small>
+    <button type="button" disabled={offset+view.rows.length>=view.count} onClick={()=>setOffset(n=>n+4)}>Следующие изменения</button>
+   </div>
+  </>}
+ </div>;
+}
 
 /** Compare two selected participants of the current, not hypothetical, overload. */
 function ResourceSequencePanel({snapshot,forecast,resources,period,onOpenSequence}:{
@@ -67,6 +99,7 @@ function ResourceSequencePanel({snapshot,forecast,resources,period,onOpenSequenc
     return <div className="atlas-resource-option" key={option.from}>
      <div><strong>{title}</strong><small role="status" aria-label={summary}>{summary}</small>
       <small>{'Вне доступности по портфелю: '+option.before.unavailableDays+' → '+option.after.unavailableDays+' дн.'}</small>
+      <small>{'Превышение мощности: '+option.before.overloadPctDays+' → '+option.after.overloadPctDays+' п. п.·дн.; нагрузка вне доступности: '+option.before.unavailablePctDays+' → '+option.after.unavailablePctDays+' %·дн.'}</small>
       <small>{option.source.label+': перегрузка '+option.source.overloadBefore+' → '+option.source.overloadAfter+' дн.'}</small>
       <small>{'Критический путь: изменено работ '+option.affected.criticalChangedTotal+
        '; новых нарушений сроков работ '+option.affected.deadlineNewMissedTotal+'.'}</small>
@@ -78,9 +111,20 @@ function ResourceSequencePanel({snapshot,forecast,resources,period,onOpenSequenc
        {r.name+': '+(r.previousFinish||'не определён')+' → '+(r.projectedFinish||'не определён')}</small>)}
       {option.portfolio.affectedTotal>3&&<small>{'Ещё связанных проектов: '+(option.portfolio.affectedTotal-3)}</small>}
       <small>{'Ресурсов с ухудшением: '+option.worsenedResources+'; с улучшением: '+option.improvedResources+'.'}</small>
-      {option.resourceExamples.map((r:any)=><small key={r.id}>
-       {r.label+': перегрузка '+r.overloadBefore+' → '+r.overloadAfter+
-        ' дн.; вне доступности '+r.availabilityBefore+' → '+r.availabilityAfter+' дн.'}</small>)}
+      {option.resourceExamples.map((r:any)=><React.Fragment key={r.id}>
+       <small>{r.label+': перегрузка '+r.overloadBefore+' → '+r.overloadAfter+
+        ' дн.; вне доступности '+r.availabilityBefore+' → '+r.availabilityAfter+' дн.'}</small>
+       <small>{'Превышение: '+r.overloadDepthBefore+' → '+r.overloadDepthAfter+' п. п.·дн.; нагрузка вне доступности: '+r.availabilityDepthBefore+' → '+r.availabilityDepthAfter+' %·дн.'}</small>
+       {r.periodChanges?.count>0&&<>
+        <small>{differenceSummary(r.periodChanges.totals)}</small>
+        <details>
+         <summary>Изменённые интервалы: {r.periodChanges.count}</summary>
+         {r.periodChanges.rows.map((p:any)=><small key={p.kind+':'+p.startDate}>
+          {differenceLabel(p.kind)+': '+p.startDate+' по '+p.endDate+'. '+intervalState(p.beforeKind,p.beforeLoadPct,p.beforeExcessPct)+' → '+intervalState(p.afterKind,p.afterLoadPct,p.afterExcessPct)}</small>)}
+         {r.periodChanges.count>r.periodChanges.rows.length&&<small>{'Ещё изменённых периодов: '+(r.periodChanges.count-r.periodChanges.rows.length)}</small>}
+        </details>
+       </>}
+      </React.Fragment>)}
       {option.resourcesChanged>option.resourceExamples.length&&<small>{'Ещё изменённых ресурсов: '+(option.resourcesChanged-option.resourceExamples.length)}</small>}
       {option.unknown&&<small>Часть расчётных дат отсутствует.</small>}
       <small>{option.note}</small>
@@ -139,7 +183,7 @@ function ResourceConflictDetails({resources,resourceId,preview,onOpenWork,snapsh
  const [show,setShow]=useState(false),[selected,setSelected]=useState('source-now');
  const groups=useMemo(()=>{
   if(!show)return [];
-  const out:{key:string;label:string;group:any}[]=[];
+  const out:{key:string;label:string;group:any;before?:any;after?:any}[]=[];
   const source=resources.byId.get(resourceId);
   if(source)out.push({key:'source-now',label:'Сейчас: '+source.label,group:source});
   if(preview){
@@ -148,6 +192,10 @@ function ResourceConflictDetails({resources,resourceId,preview,onOpenWork,snapsh
    out.push({key:'target-now',label:'Сейчас: '+v.target.label,group:v.target});
    if(v.sourceAfter)out.push({key:'source-after',label:'После: '+v.sourceAfter.label,group:v.sourceAfter});
    out.push({key:'target-after',label:'После: '+v.targetAfter.label,group:v.targetAfter});
+   if(v.source&&v.sourceAfter)out.push({key:'source-change',label:'Изменения: '+v.source.label,
+    group:v.sourceAfter,before:v.source,after:v.sourceAfter});
+   out.push({key:'target-change',label:'Изменения: '+v.target.label,
+    group:v.targetAfter,before:v.target,after:v.targetAfter});
   }
   return out;
  },[resources,resourceId,preview,show]);
@@ -162,9 +210,13 @@ function ResourceConflictDetails({resources,resourceId,preview,onOpenWork,snapsh
     {groups.map(g=><button type="button" key={g.key} aria-pressed={choice.key===g.key}
      onClick={()=>setSelected(g.key)}>{g.label}</button>)}
    </div>
-   <ConflictPeriodPage key={choice.key+':'+choice.group.id+':'+(preview?.workId??'')+':'+(preview?.target.id??'')}
-    group={choice.group} onOpenWork={onOpenWork} snapshot={snapshot} forecast={forecast} resources={resources}
-    allowSequence={choice.key==='source-now'||choice.key==='target-now'} onOpenSequence={onOpenSequence}/>
+   {choice.before&&choice.after?
+    <ConflictChangePage key={choice.key+':'+choice.group.id+':'+(preview?.workId??'')+':'+(preview?.target.id??'')}
+     before={choice.before} after={choice.after}/>:
+    <ConflictPeriodPage key={choice.key+':'+choice.group.id+':'+(preview?.workId??'')+':'+(preview?.target.id??'')}
+     group={choice.group} onOpenWork={onOpenWork} snapshot={snapshot} forecast={forecast} resources={resources}
+     allowSequence={choice.key==='source-now'||choice.key==='target-now'} onOpenSequence={onOpenSequence}/>}
+
   </>}
  </section>;
 }
@@ -274,6 +326,11 @@ export function ResourceAlternatives({snapshot,forecast,resources,resourceId,onC
       {preview.controlDates.baseline.forecastFinish||'не определён'}.</p>}
      <small>{preview.controlDates.note}</small>
     </section>
+    <p role="status" className="atlas-resource-alternatives-note">
+     {'Превышение мощности по портфелю: '+preview.original.overloadPctDays+' → '+preview.alternative.overloadPctDays+
+      ' п. п.·дн. Нагрузка вне доступности: '+preview.original.unavailablePctDays+' → '+preview.alternative.unavailablePctDays+' %·дн.'}
+    </p>
+    <small>Превышение мощности учитывает превышение в каждый занятый день; нагрузка вне доступности учитывается отдельно.</small>
     <p className="atlas-resource-alternatives-note">{preview.note}</p>
 
    </>}
@@ -307,6 +364,9 @@ export function ResourceAlternatives({snapshot,forecast,resources,resourceId,onC
         {c.relieved.map((x:any)=><small key={x.resourceId+x.kind}>
          Снижение: {x.resourceLabel}, {x.days} дн.
          {x.fullyCleared?' (ограничение снято)':''}</small>)}
+        {c.severity.map((x:any)=><small key={'severity:'+x.resourceId+':'+x.kind}>
+         {x.resourceLabel+': '+(x.kind==='overload'?'превышение мощности':'нагрузка вне доступности')+
+          ' '+x.before+' → '+x.after+(x.kind==='overload'?' п. п.·дн.':' %·дн.')}</small>)}
         <small>{c.outlook==='KNOWN_RESOURCE_CONFLICTS'?
          'В портфеле остаются известные ресурсные конфликты.':
          c.outlook==='DATES_INCOMPLETE'?'Сроки части работ неизвестны.':

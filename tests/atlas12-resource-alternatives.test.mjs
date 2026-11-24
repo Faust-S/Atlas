@@ -368,7 +368,7 @@ test('Fast resource projection matches canonical portfolio calculations for 120 
  const optimizedMs=performance.now()-start;
  assert.equal(page.options.length,12);
  const keys=['itemCount','projectCount','scheduledDays','occupiedCalendarDays','datedWork','undatedWork',
-  'maxLoadPct','maxConcurrent','overlapDays','overloadDays','unavailableDays'];
+  'maxLoadPct','maxConcurrent','overlapDays','overloadDays','unavailableDays','overloadPctDays','unavailablePctDays','peakExcessPct'];
  let canonicalMs=0;
  for(const option of page.options){
   const projected=projectResourceReassignment(resources,{projectId,workId,targetResourceId:option.target.id});
@@ -382,6 +382,8 @@ test('Fast resource projection matches canonical portfolio calculations for 120 
   }
   assert.equal(option.alternative.overloadResourceDays,expected.people.reduce((n,r)=>n+r.overloadDays,0));
   assert.equal(option.alternative.unavailableResourceDays,expected.people.reduce((n,r)=>n+r.unavailableDays,0));
+  assert.equal(option.alternative.overloadPctDays,expected.people.reduce((n,r)=>n+r.overloadPctDays,0));
+  assert.equal(option.alternative.unavailablePctDays,expected.people.reduce((n,r)=>n+r.unavailablePctDays,0));
   assert.equal(option.alternative.overloadedResources,expected.totals.potentialConflicts);
   assert.equal(option.alternative.unavailableResources,expected.totals.outsideAvailability);
   assert.equal(option.alternative.unlinkedWork,expected.totals.unlinked);
