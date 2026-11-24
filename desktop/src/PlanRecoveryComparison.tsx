@@ -22,6 +22,7 @@ export function PlanRecoveryComparison({snapshot,projectId,onDraft}:{
  const [error,setError]=useState("");
  const [rationale,setRationale]=useState("");
  const [focusWork,setFocusWork]=useState<string|null>(null);
+ const [editingWork,setEditingWork]=useState<string|null>(null);
  const workInputs=useRef(new Map<string,HTMLInputElement>());
  const resultsHeading=useRef<HTMLParagraphElement|null>(null);
  const context=useMemo(()=>{
@@ -44,7 +45,7 @@ export function PlanRecoveryComparison({snapshot,projectId,onDraft}:{
  useLayoutEffect(()=>{
   if(!focusWork)return;
   const input=workInputs.current.get(focusWork);
-  if(input){input.focus({preventScroll:true});input.scrollIntoView({block:"center"});}
+  if(input){input.focus({preventScroll:true});input.scrollIntoView({block:"nearest"});}
   setFocusWork(null);
  },[focusWork]);
  useLayoutEffect(()=>{
@@ -54,10 +55,13 @@ export function PlanRecoveryComparison({snapshot,projectId,onDraft}:{
  const patch=(id:string,values:Partial<WorkVariant>)=>{
   setVariants(rows=>rows.map(v=>v.itemId===id?{...v,...values}:v));invalidate();
  };
+ const editVariant=(id:string)=>{setEditingWork(id);setFocusWork(id)};
  const add=()=>{
-  if(!chosen||variants.length>=(info?.maxWorks??4))return;
-  setVariants(rows=>[...rows,{itemId:chosen.id,estimateDays:String(chosen.estimateDays),
-   resourceId:chosen.resourceId??"",allocationPct:String(chosen.allocationPct)}]);setFocusWork(chosen.id);invalidate();
+  if(!chosen||variants.length>=(info?.maxWorks??4)||variants.some(v=>v.itemId===chosen.id))return;
+  setVariants(rows=>rows.length>=(info?.maxWorks??4)||rows.some(v=>v.itemId===chosen.id)?rows:
+   [...rows,{itemId:chosen.id,estimateDays:String(chosen.estimateDays),
+    resourceId:chosen.resourceId??"",allocationPct:String(chosen.allocationPct)}]);
+  editVariant(chosen.id);invalidate();
  };
  const calculate=()=>{
   try{
@@ -86,6 +90,36 @@ export function PlanRecoveryComparison({snapshot,projectId,onDraft}:{
     </div>
     {!info.available?<p>{info.reason}</p>:<>
      <p>Введите реально достижимую длительность и, при необходимости, другой существующий ресурс или долю загрузки. До четырёх ещё не начатых работ и двух изменений связей. Каждая корректировка проверяется отдельно и совместно, без переноса контрольного срока.</p>
+     <p role="status" className="minor">{"Работ включено: "+variants.length+" из "+info.maxWorks+"."}</p>
+     <div className="atlas-amendment-rows">{variants.map((v,i)=>{
+      const w=candidates.find(w=>w.id===v.itemId);
+      return <div className="atlas-amendment-row" key={v.itemId}>
+       <strong>{w?.title??"Работа больше недоступна"}</strong>
+       {w&&<small>{w.estimateDays+" "+unit(w.durationUnit)+" · "+(w.critical?"критическая":"резерв "+w.floatDays+" дн.")+(w.state==="blocked"?" · заблокирована":"")}</small>}
+       {editingWork===v.itemId?<div className="atlas-plan-choice-fields">
+        <label>Длительность ({unit(w?.durationUnit)})<input type="number" min="1" max="36500" step="1"
+         ref={node=>{if(node)workInputs.current.set(v.itemId,node);else workInputs.current.delete(v.itemId)}}
+         aria-label={"Длительность варианта "+(i+1)} value={v.estimateDays} onChange={e=>patch(v.itemId,{estimateDays:e.target.value})}/></label>
+        <label>Плановый ресурс<select aria-label={"Ресурс варианта "+(i+1)} value={v.resourceId} onChange={e=>patch(v.itemId,{resourceId:e.target.value})}>
+         {!w?.resourceId&&<option value="">Не назначен</option>}
+         {resources.map(r=><option key={r.id} value={r.id}>{r.label}</option>)}
+        </select></label>
+        <label>Загрузка, %<input type="number" min="1" max="100" step="1" disabled={!v.resourceId}
+         aria-label={"Загрузка варианта "+(i+1)} value={v.allocationPct} onChange={e=>patch(v.itemId,{allocationPct:e.target.value})}/></label>
+       </div>:<small>{"Вариант: "+(v.estimateDays||"не указано")+" "+unit(w?.durationUnit)+
+        " · "+(resources.find(r=>r.id===v.resourceId)?.label??"Без ресурса")+
+        (v.resourceId?" · "+(v.allocationPct||"не указано")+"%":"")}</small>}
+       <div className="atlas-resource-primary-actions">
+        {editingWork===v.itemId?
+         <button type="button" className="action-button" aria-label={"Свернуть параметры варианта "+(i+1)}
+          onClick={()=>setEditingWork(null)}>Свернуть</button>:
+         <button type="button" className="action-button" aria-label={"Изменить параметры варианта "+(i+1)}
+          onClick={()=>editVariant(v.itemId)}>Изменить параметры</button>}
+        <button type="button" className="action-button" aria-label={"Убрать работу из расчёта "+(i+1)}
+         onClick={()=>{setVariants(rows=>rows.filter(x=>x.itemId!==v.itemId));if(editingWork===v.itemId)setEditingWork(null);invalidate()}}>Убрать из расчёта</button>
+       </div>
+      </div>;
+     })}</div>
      {available.length>0&&variants.length<info.maxWorks&&<div className="atlas-plan-choice-fields">
       <label>Работа для проверки<select aria-label="Работа для восстановления срока" value={chosen?.id??""}
        onChange={e=>setCandidateId(e.target.value)}>
@@ -96,25 +130,6 @@ export function PlanRecoveryComparison({snapshot,projectId,onDraft}:{
      <button type="button" className="action-button primary" disabled={(!variants.length&&!edges.length)||
       variants.some(v=>!candidates.some(w=>w.id===v.itemId))}
       onClick={calculate}>Рассчитать восстановление срока</button>
-     <div className="atlas-amendment-rows">{variants.map((v,i)=>{
-      const w=candidates.find(w=>w.id===v.itemId);
-      return <div className="atlas-amendment-row" key={v.itemId}>
-       <strong>{w?.title??"Работа больше недоступна"}</strong>
-       {w&&<small>{w.estimateDays+" "+unit(w.durationUnit)+" · "+(w.critical?"критическая":"резерв "+w.floatDays+" дн.")+(w.state==="blocked"?" · заблокирована":"")}</small>}
-       <div className="atlas-plan-choice-fields">
-        <label>Длительность ({unit(w?.durationUnit)})<input type="number" min="1" max="36500" step="1"
-         ref={node=>{if(node)workInputs.current.set(v.itemId,node);else workInputs.current.delete(v.itemId)}}
-         aria-label={"Длительность варианта "+(i+1)} value={v.estimateDays} onChange={e=>patch(v.itemId,{estimateDays:e.target.value})}/></label>
-        <label>Плановый ресурс<select aria-label={"Ресурс варианта "+(i+1)} value={v.resourceId} onChange={e=>patch(v.itemId,{resourceId:e.target.value})}>
-         {!w?.resourceId&&<option value="">Не назначен</option>}
-         {resources.map(r=><option key={r.id} value={r.id}>{r.label}</option>)}
-        </select></label>
-        <label>Загрузка, %<input type="number" min="1" max="100" step="1" disabled={!v.resourceId}
-         aria-label={"Загрузка варианта "+(i+1)} value={v.allocationPct} onChange={e=>patch(v.itemId,{allocationPct:e.target.value})}/></label>
-       </div>
-       <button type="button" className="action-button" onClick={()=>{setVariants(rows=>rows.filter(x=>x.itemId!==v.itemId));invalidate()}}>Убрать из расчёта</button>
-      </div>;
-     })}</div>
      {sequenceWorks.length>=2&&<button type="button" className="action-button" aria-expanded={sequenceOpen}
       onClick={()=>setSequenceOpen(v=>!v)}>{sequenceOpen?"Скрыть выбор связей":"Уточнить порядок работ"}</button>}
      {sequenceOpen&&sequenceWorks.length>=2&&<>
@@ -176,7 +191,7 @@ export function PlanRecoveryComparison({snapshot,projectId,onDraft}:{
         </small>)}
         <details><summary>Последствия варианта</summary><AmendmentAnalysis result={o.preview} compact/></details>
         <button type="button" className="action-button" disabled={rationale.trim().length<8}
-         aria-label={"Подготовить заявку: "+o.title} onClick={()=>{if(onDraft(current,o.id,rationale)){setExpanded(false);setVariants([]);setEdges([]);setRationale("");invalidate()}}}>Подготовить заявку</button>
+         aria-label={"Подготовить заявку: "+o.title} onClick={()=>{if(onDraft(current,o.id,rationale)){setExpanded(false);setVariants([]);setEditingWork(null);setFocusWork(null);setEdges([]);setRationale("");invalidate()}}}>Подготовить заявку</button>
        </>}
       </div>)}</div>
       <p className="minor">Варианты отражают введённые предположения, а не подтверждённую производительность или ресурсное выравнивание. Заявка требует отдельного решения и сохранения.</p>

@@ -82,7 +82,18 @@ def qualify():
     # first available entry uses real controls, not fixture IDs or DOM hooks.
     for i in range(1,4):
         click('Добавить работу для расчёта')
+        d.wait_text('Работ включено: '+str(i)+' из 4.',35)
         fill('Длительность варианта '+str(i),'2')
+    # Reopen the first compact row and verify that its entered estimate
+    # survived editing the later rows; then leave it folded for comparison.
+    click('Изменить параметры варианта 1')
+    first=find('Длительность варианта 1')
+    try:
+        entered=first.iface_range_value.CurrentValue
+    except Exception:
+        entered=first.iface_value.CurrentValue
+    assert float(entered)==2
+    click('Свернуть параметры варианта 1')
     click('Рассчитать восстановление срока')
     find('Рассчитано вариантов: 4 из 4',contains=True)
     find('Контрольный срок достигнут по расчёту',contains=True)

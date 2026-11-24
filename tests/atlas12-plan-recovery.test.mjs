@@ -189,3 +189,14 @@ test('Bounded four-Work recovery retains exact preview/application parity on 120
  assert.equal(serialize(s),original);
  console.log('ATLAS12_RECOVERY_SCALE projects=120 works=1200 options=5 ms='+ms.toFixed(2));
 });
+
+test('Compact recovery editor keeps all variants in one list while opening exactly one Work parameter row',()=>{
+ const ui=readFileSync(new URL('../desktop/src/PlanRecoveryComparison.tsx',import.meta.url),'utf8');
+ assert.match(ui,/editingWork===v\.itemId\?<div className="atlas-plan-choice-fields">/);
+ assert.match(ui,/setVariants\(rows=>rows\.map\(v=>v\.itemId===id\?/);
+ assert.match(ui,/rows\.some\(v=>v\.itemId===chosen\.id\)\?rows:/);
+ assert.match(ui,/Работ включено: /);
+ assert.ok(ui.indexOf('Работ включено: ')<ui.indexOf('Добавить работу для расчёта'));
+ assert.match(ui,/Изменить параметры варианта /);
+ assert.match(ui,/variants\.map\(v=>\(\{itemId:v\.itemId,/);
+});
