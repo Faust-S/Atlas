@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {empty,createProject,createItem,editItem,editProject,serialize} from '../src/core.mjs';
+import {empty,createProject,createItem,editItem,editProject,serialize,createWorkCalendar} from '../src/core.mjs';
 import {addPlanningResource} from '../src/resource-planning.mjs';
 import {portfolioSchedule} from '../src/portfolio-schedule.mjs';
 import {portfolioResources,projectResourceReassignment} from '../src/portfolio-resources.mjs';
@@ -369,11 +369,13 @@ test('Fast resource projection matches canonical portfolio calculations for 120 
  assert.equal(page.options.length,12);
  const keys=['itemCount','projectCount','scheduledDays','occupiedCalendarDays','datedWork','undatedWork',
   'maxLoadPct','maxConcurrent','overlapDays','overloadDays','unavailableDays'];
- const canonicalStart=performance.now();
+ let canonicalMs=0;
  for(const option of page.options){
   const projected=projectResourceReassignment(resources,{projectId,workId,targetResourceId:option.target.id});
   const candidate=editItem(snapshot,projectId,workId,{resourceId:option.target.id});
+  const canonicalStart=performance.now();
   const expected=portfolioResources(candidate,{schedule});
+  canonicalMs+=performance.now()-canonicalStart;
   for(const [observed,id] of [[projected.sourceAfter,option.source.id],[projected.targetAfter,option.target.id]]){
    const group=expected.byId.get(id);
    for(const k of keys)assert.equal(observed[k],group[k],id+' '+k);
@@ -385,7 +387,7 @@ test('Fast resource projection matches canonical portfolio calculations for 120 
   assert.equal(option.alternative.unlinkedWork,expected.totals.unlinked);
   assert.equal(option.datesUnchanged,true);
  }
- const canonicalMs=performance.now()-canonicalStart;
+
  console.log('ATLAS12_RESOURCE_SCALE_PARITY options=12 projects=120 works=1200 fast_ms='+optimizedMs.toFixed(2)+
   ' canonical_ms='+canonicalMs.toFixed(2));
  assert.equal(serialize(snapshot),saved);
@@ -402,4 +404,29 @@ test('Unlinked resource coverage has its own accessible entry in the existing re
  assert.match(ui,/Первое назначение/);
  assert.match(ui,/role="region" aria-label="Контрольные сроки и ресурсные ограничения"/);
  assert.doesNotMatch(ui,/commitWithReadback\(|applyEditor\(|save\(\)/);
+});
+
+test('First assignment preserves exact working-day occupancy including weekends and excluded dates',()=>{
+ const f=fixture();
+ f.snapshot=editProject(f.snapshot,f.pid,{startDate:'2026-11-20'});
+ const cal=createWorkCalendar(f.snapshot,{name:'График работы',weekdays:[1,2,3,4,5],
+  excludedDates:['2026-11-23'],additionalWorkingDates:[],source:{kind:'entered_by_user',reference:null}});
+ const loose=createItem(cal.state,f.pid,{title:'Работа по графику',allocationPct:60});
+ f.snapshot=editItem(loose.state,f.pid,loose.id,{estimateDays:2,durationUnit:'working_days',
+  calendarBasis:{id:cal.id,version:cal.version}});
+ const schedule=portfolioSchedule(f.snapshot),resources=portfolioResources(f.snapshot,{schedule});
+ const original=resources.work.find(w=>w.id===loose.id);
+ assert.equal(original.resourceId,null);
+ assert.equal(original.startDate,'2026-11-20');
+ assert.equal(original.finishDate,'2026-11-25');
+ assert.equal(original.activeRanges.length,2);
+ const selection={projectId:f.pid,workId:loose.id,targetResourceId:f.lift};
+ const preview=previewWorkResourceReassignment(f.snapshot,selection,{schedule,resources});
+ const candidate=editItem(f.snapshot,f.pid,loose.id,{resourceId:f.lift});
+ const expected=portfolioResources(candidate,{schedule}).byId.get(f.lift);
+ assert.equal(preview.proposedTarget.maxLoadPct,60);
+ assert.equal(preview.proposedTarget.overloadDays,0);
+ assert.equal(preview.proposedTarget.maxLoadPct,expected.maxLoadPct);
+ assert.equal(preview.finishDate,original.finishDate);
+ assert.equal(resources.byId.get(f.lift).itemCount,0);
 });

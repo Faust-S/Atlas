@@ -106,7 +106,10 @@ export function scheduleProject(p,{calendarLibrary=[],startDate=undefined,includ
     // never a parallel planner. Compact ranges skip nonworking dates and cost
     // nothing for ordinary Gantt/table scheduling calls.
     let activeRanges=null;
-    const forResource=includeResourceOccupancy===true&&Boolean(item.resourceId);
+    // Unassigned work also needs exact occupancy for first-assignment what-if.
+    // Resource grouping still counts only an explicit resourceId; this does
+    // not reserve capacity for unlinked work or alter the CPM.
+    const forResource=includeResourceOccupancy===true;
     if(duration>0&&unit==='elapsed_days'){
       ef=ready+duration;
       if(forResource)activeRanges=[[es,ef]];
