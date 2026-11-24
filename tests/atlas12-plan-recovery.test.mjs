@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {createProject,empty,editProject,editItem,serialize,deserialize} from '../src/core.mjs';
+import {createProject,empty,editProject,editItem,createItem,createWorkCalendar,serialize,deserialize} from '../src/core.mjs';
 import {inspectDeadlineRecovery,compareDeadlineRecovery,createDeadlineRecoveryProposal} from '../src/plan-recovery.mjs';
 import {portfolioSchedule} from '../src/portfolio-schedule.mjs';
 import {portfolioResources,planningResourceTotals} from '../src/portfolio-resources.mjs';
@@ -108,4 +108,19 @@ test('Desktop transfers the chosen result only through existing Atlas draft and 
  assert.match(ui,/compareDeadlineRecovery\(snapshot,projectId,/);
  assert.match(main,/createDeadlineRecoveryProposal\(latestSnapshot.current,comparison,optionId,\{rationale\}\)/);
  assert.doesNotMatch(ui,/applyPlanAmendment\(|commitWithReadback\(|createTask\(/);
+});
+
+test('Calendar-aware recovery measures elapsed date gains, not the numeric duration difference',()=>{
+ const p=createProject(empty(),{name:'Монтаж по рабочим дням',type:'engineering'});
+ let s=editProject(p.state,p.id,{startDate:'2026-11-20',dueDate:'2026-11-24'});
+ const c=createWorkCalendar(s,{name:'Рабочая неделя',weekdays:[1,2,3,4,5],
+  excludedDates:['2026-11-23'],additionalWorkingDates:[],source:{kind:'entered_by_user',reference:null}});
+ const w=createItem(c.state,p.id,{title:'Монтаж'});
+ s=editItem(w.state,p.id,w.id,{estimateDays:2,durationUnit:'working_days',calendarBasis:{id:c.id,version:c.version}});
+ const r=compareDeadlineRecovery(s,p.id,[{itemId:w.id,estimateDays:1}]),o=r.options[0];
+ assert.equal(o.valid,true);assert.equal(o.effect.beforeFinish,'2026-11-25');assert.equal(o.effect.afterFinish,'2026-11-21');
+ assert.equal(o.effect.advanceDays,4);assert.equal(o.effect.recoveredDays,1);assert.equal(o.effect.remainingSlip,0);
+ const d=createDeadlineRecoveryProposal(s,r,o.id,reason),a=d.state.projects[0].changes[0].planAmendments[0];
+ assert.equal(a.before.durationUnit,'working_days');assert.deepEqual(a.before.calendarBasis,{id:c.id,version:c.version});
+ assert.equal(a.after.estimateDays,1);assert.equal('calendarBasis' in a.after,false);
 });

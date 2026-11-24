@@ -25,7 +25,7 @@ export function PlanRecoveryComparison({snapshot,projectId,onDraft}:{
  const available=candidates.filter(w=>!variants.some(v=>v.itemId===w.id));
  const chosen=available.find(w=>w.id===candidateId)??available[0];
  const resources=(snapshot.resources??[]) as any[];
- const current=calculation?.snapshot===snapshot?calculation.value:null;
+ const current=calculation&&calculation.snapshot===snapshot?calculation.value:null;
  const stale=!!calculation&&!current;
  const invalidate=()=>{setCalculation(null);setError("")};
  const patch=(id:string,values:Partial<WorkVariant>)=>{
@@ -105,7 +105,7 @@ export function PlanRecoveryComparison({snapshot,projectId,onDraft}:{
         {o.effect.tradeoff&&<small>Есть ухудшения сроков или ресурсных ограничений. Проверьте последствия.</small>}
         {o.effect.unknownDates&&<small>Не все даты или ресурсные периоды определены.</small>}
         {o.effect.unlinked>0&&<small>{"Работ без плановой привязки в портфеле: "+o.effect.unlinked}</small>}
-        <AmendmentAnalysis result={o.preview} compact/>
+        <details><summary>Последствия варианта</summary><AmendmentAnalysis result={o.preview} compact/></details>
         <button type="button" className="action-button" disabled={rationale.trim().length<8}
          aria-label={"Подготовить заявку: "+o.title} onClick={()=>onDraft(current,o.id,rationale)}>Подготовить заявку</button>
        </>}

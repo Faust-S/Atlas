@@ -48,7 +48,7 @@ concurrency:
 jobs:
   installed-native-ui:
     runs-on: windows-latest
-    timeout-minutes: 65
+    timeout-minutes: 80
     steps:
       - name: Checkout exact Atlas 0.12 source revision
         uses: actions/checkout@v4
@@ -174,7 +174,7 @@ jobs:
           $ErrorActionPreference = 'Stop'
           python -m pip install pywinauto==0.6.9 pillow==11.3.0
           if ($LASTEXITCODE -ne 0) { throw 'ATLAS11_NATIVE_UIA_MISSING' }
-          python -m py_compile desktop/tests/installed-atlas11-v6-design.py desktop/tests/installed-atlas11-portfolio-impact.py desktop/tests/installed-atlas12-resource-alternatives.py desktop/tests/installed-atlas12-plan-alternatives.py desktop/tests/installed-atlas-plan-amendment-review.py
+          python -m py_compile desktop/tests/installed-atlas11-v6-design.py desktop/tests/installed-atlas11-portfolio-impact.py desktop/tests/installed-atlas12-resource-alternatives.py desktop/tests/installed-atlas12-plan-alternatives.py desktop/tests/installed-atlas-plan-amendment-review.py desktop/tests/installed-atlas12-plan-recovery.py
           if ($LASTEXITCODE -ne 0) { throw 'ATLAS11_NATIVE_SCRIPT_SYNTAX' }
           python desktop/tests/installed-atlas11-v6-design.py
           if ($LASTEXITCODE -ne 0) { throw 'ATLAS11_NATIVE_V6_USER_ROUTE_FAIL' }
@@ -214,18 +214,30 @@ jobs:
           python desktop/tests/installed-atlas-plan-amendment-review.py
           if ($LASTEXITCODE -ne 0) { throw 'ATLAS_NATIVE_PLAN_REVIEW_FAIL' }
 
-      - name: Require both resource and compound native qualifications
+      - name: Qualify recovery alternatives and ordinary proposal application
+        id: recovery_qualification
+        continue-on-error: true
+        shell: pwsh
+        timeout-minutes: 12
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python desktop/tests/installed-atlas12-plan-recovery.py
+          if ($LASTEXITCODE -ne 0) { throw 'ATLAS12_NATIVE_PLAN_RECOVERY_FAIL' }
+
+      - name: Require all independent native qualifications
         shell: pwsh
         env:
           RESOURCE_OUTCOME: ${{ steps.resource_qualification.outcome }}
           COMPOUND_OUTCOME: ${{ steps.compound_qualification.outcome }}
           REVIEW_OUTCOME: ${{ steps.review_qualification.outcome }}
+          RECOVERY_OUTCOME: ${{ steps.recovery_qualification.outcome }}
         run: |
-          if ($env:RESOURCE_OUTCOME -ne 'success' -or $env:COMPOUND_OUTCOME -ne 'success' -or $env:REVIEW_OUTCOME -ne 'success') {
-            throw "ATLAS12_NATIVE_HOLD resource=$env:RESOURCE_OUTCOME compound=$env:COMPOUND_OUTCOME review=$env:REVIEW_OUTCOME"
+          if ($env:RESOURCE_OUTCOME -ne 'success' -or $env:COMPOUND_OUTCOME -ne 'success' -or $env:REVIEW_OUTCOME -ne 'success' -or $env:RECOVERY_OUTCOME -ne 'success') {
+            throw "ATLAS12_NATIVE_HOLD resource=$env:RESOURCE_OUTCOME compound=$env:COMPOUND_OUTCOME review=$env:REVIEW_OUTCOME recovery=$env:RECOVERY_OUTCOME"
           }
           Write-Host 'ATLAS12_NATIVE_RESOURCE_AND_COMPOUND_PASS'
           Write-Host 'ATLAS_NATIVE_PLAN_REVIEW_PASS'
+          Write-Host 'ATLAS12_NATIVE_PLAN_RECOVERY_PASS'
 
       - name: Preserve accepted development installer and SHA-256
         if: success()
