@@ -7,7 +7,7 @@ test("Atlas 0.12 final package preserves the accepted product identity and exact
  const desktop=JSON.parse(read("desktop/package.json"));
  const tauri=JSON.parse(read("desktop/src-tauri/tauri.conf.json"));
  const setup=JSON.parse(read("desktop/installer/atlas.json"));
- assert.equal(desktop.version,"0.12.0");
+ assert.equal(desktop.version,"0.12.1-dev.1");
  assert.equal(tauri.version,desktop.version);
  assert.equal(setup.version,desktop.version);
  assert.equal(tauri.identifier,"ru.iwxa.atlas");
@@ -18,7 +18,7 @@ test("Atlas 0.12 final package preserves the accepted product identity and exact
  assert.equal(setup.entrypoint,"iwxa-atlas-desktop.exe");
  assert.equal(tauri.bundle.active,false);
  assert.doesNotMatch(read("desktop/installer/build-setup-core.ps1"),/0\.12\.0-dev/);
- assert.match(read("desktop/tests/installed-atlas11-v6-design.py"),/d\.wait_text\("0\.12\.0",20\)/);
+ assert.match(read("desktop/tests/installed-atlas11-v6-design.py"),/d\.wait_text\("0\.12\.1-dev\.1",20\)/);
 });
 test("Stable publication depends on complete source, original integration and native jobs in the same run",()=>{
  const release=read(".github/workflows/atlas-0-12-release.yml");
@@ -43,10 +43,13 @@ test("Accepted native installer cannot be uploaded before both scenarios, and Ru
  assert.match(win,/cargo test --release --locked --manifest-path desktop\/src-tauri\/Cargo.toml --lib/);
  assert.match(win,/steps\.resource_qualification\.outcome/);
  assert.match(win,/steps\.compound_qualification\.outcome/);
+ assert.match(win,/steps\.review_qualification\.outcome/);
+ assert.match(win,/\$env:REVIEW_OUTCOME -ne 'success'/);
+ assert.match(win,/python desktop\/tests\/installed-atlas-plan-amendment-review\.py/);
  const gate=win.indexOf("Require both resource and compound native qualifications");
- const accepted=win.indexOf("Preserve accepted release installer");
+ const accepted=win.indexOf("Preserve accepted development installer");
  assert.ok(gate>0&&accepted>gate);
- assert.match(win,/name: IWXA-Atlas-0\.12\.0-Setup\n/);
+ assert.match(win,/name: IWXA-Atlas-0\.12\.1-dev\.1-Setup\n/);
  assert.match(integration,/tests\/atlas-t3-original-d6-qualification.mjs/);
  assert.match(integration,/tests\/atlas09-original-t3-sender-contract.mjs/);
  assert.match(integration,/node tests\/atlas-center-interop.mjs/);

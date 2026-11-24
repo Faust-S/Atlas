@@ -64,6 +64,7 @@ export function setPlanDates(snapshot,projectId,changeId,{startDate,dueDate}) {
  return mutableDraft(snapshot,projectId,changeId,(project,change)=>{
   const before=dateFields(project),after={startDate:startDate||null,dueDate:dueDate||null};
   if(same(before,after))throw Error("Укажите даты, которые действительно изменятся");
+  assertExistingActionCurrent(project,change,"dates");
   upsert(change,{kind:"dates",before,after});
  });
 }
@@ -77,6 +78,7 @@ export function setPlanWork(snapshot,projectId,changeId,{itemId,estimateDays,ass
    resourceId:resourceId===undefined?item.resourceId??null:resourceId||null,
    allocationPct:allocationPct??item.allocationPct??100};
   if(same(amendableWorkFields(item),after))throw Error("Укажите изменение срока, длительности, ответственного или планового ресурса");
+  assertExistingActionCurrent(project,change,"work:"+itemId);
   upsert(change,{kind:"work",itemId,before,after});
   change.targetIds=[...new Set([...(change.targetIds||[]),...(item.targetIds||[])])];
  });
@@ -181,6 +183,153 @@ export function removePlanAmendment(snapshot,projectId,changeId,actionKey) {
   if(before===change.planAmendments.length)throw Error("Корректировка не найдена");
  });
 }
+// The same source checks drive both application and the review screen.
+function assertPlanActionCurrent(project,action){
+ if(action.kind==="dates"&&!same(dateFields(project),action.before))
+  throw Error("Даты проекта изменились после подготовки заявки: требуется пересмотр");
+ if(action.kind==="work"){
+  const item=project.items.find(w=>w.id===action.itemId);
+  if(!item||!Object.entries(action.before).every(([k,v])=>same(workFields(item)[k],v)))
+   throw Error("Исходная работа изменилась после подготовки заявки: требуется пересмотр");
+ }
+ if(action.kind==="dependency"){
+  dependencyEndpoints(project,action.from,action.to);
+  if(edgePresent(project,action.from,action.to)!==action.before)
+   throw Error("Исходная зависимость изменилась после подготовки заявки: требуется пересмотр");
+ }
+ if(action.kind==="new_work"&&project.items.some(w=>w.id===action.id))
+  throw Error("Предлагаемая работа уже существует: применение остановлено");
+}
+function assertExistingActionCurrent(project,change,actionKey){
+ const existing=(change.planAmendments??[]).find(a=>key(a)===actionKey);
+ if(existing)assertPlanActionCurrent(project,existing);
+}
+const REVIEW_LABELS={startDate:"Плановое начало",dueDate:"Контрольный срок",
+ estimateDays:"Длительность",assignee:"Ответственный",resourceId:"Плановый ресурс",
+ allocationPct:"Доля ресурса",durationUnit:"Единица длительности",calendarBasis:"Редакция календаря"};
+const REVIEW_WORK_FIELDS=["estimateDays","assignee","dueDate","resourceId","allocationPct"];
+const REVIEW_DATE_FIELDS=["startDate","dueDate"];
+function reviewValueLabel(snapshot,name,value,context={}){
+ if(name==="resourceId")return value?snapshot.resources?.find(r=>r.id===value)?.label??"Ресурс недоступен":"Не назначен";
+ if(name==="durationUnit")return value==="working_days"?"Рабочие дни":"Календарные дни";
+ if(name==="calendarBasis"){
+  if(!value)return "Без рабочего календаря";
+  const c=snapshot.calendarLibrary?.find(r=>r.id===value.id&&r.version===value.version);
+  return (c?.name??"Недоступный календарь")+" · редакция "+value.version;
+ }
+ if(name==="estimateDays")return value+(context.durationUnit==="working_days"?" раб. дн.":" кал. дн.");
+ if(name==="allocationPct")return value+"%";
+ return value==null||value===""?"Не задано":String(value);
+}
+function reviewField(snapshot,name,before,current,proposed,{oldContext={},currentContext={},contextChanged=false}={}){
+ const changedNow=!same(before,current),changedProposal=!same(before,proposed);
+ const interpretation=name==="estimateDays"&&contextChanged&&changedProposal;
+ const state=interpretation?"CONFLICT":!changedProposal?"CURRENT_ONLY":
+  same(current,proposed)?"CONVERGED":changedNow?"CONFLICT":"PROPOSED_ONLY";
+ if(!changedNow&&!changedProposal&&!interpretation)return null;
+ const selectable=state==="CONFLICT"||state==="PROPOSED_ONLY";
+ return {name,label:REVIEW_LABELS[name],before,current,proposed,state,selectable,
+  required:state==="CONFLICT",defaultChoice:state==="CONFLICT"?"":selectable?"proposed":"current",
+  beforeLabel:reviewValueLabel(snapshot,name,before,oldContext),
+  currentLabel:reviewValueLabel(snapshot,name,current,currentContext),
+  proposedLabel:reviewValueLabel(snapshot,name,proposed,oldContext),
+  proposedInCurrentLabel:reviewValueLabel(snapshot,name,proposed,currentContext),interpretation};
+}
+function inspectAction(snapshot,project,action){
+ let reason=null;
+ try{assertPlanActionCurrent(project,action)}catch(error){reason=error instanceof Error?error.message:String(error)}
+ if(!reason)return null;
+ const item=action.kind==="work"?project.items.find(w=>w.id===action.itemId):null;
+ const title=action.kind==="dates"?"Даты проекта":action.kind==="work"?item?.title??"Работа недоступна":
+  action.kind==="dependency"?(project.items.find(w=>w.id===action.from)?.title??"Работа")+" → "+
+   (project.items.find(w=>w.id===action.to)?.title??"Работа"):action.title;
+ const row={key:key(action),kind:action.kind,title,reason,fields:[],canReview:false,alreadySatisfied:false};
+ if(action.kind==="dates"||action.kind==="work"&&item){
+  const current=action.kind==="dates"?dateFields(project):workFields(item);
+  const known=action.kind==="dates"?REVIEW_DATE_FIELDS:[...REVIEW_WORK_FIELDS,"durationUnit","calendarBasis"];
+  if(Object.keys(action.before).some(k=>!known.includes(k))||Object.keys(action.after).some(k=>!(action.kind==="dates"?REVIEW_DATE_FIELDS:REVIEW_WORK_FIELDS).includes(k)))
+   return {...row,reason:"В заявке есть неподдерживаемые поля. Исключите эту корректировку и создайте её заново."};
+  const oldContext={durationUnit:action.before.durationUnit??current.durationUnit,
+   calendarBasis:Object.hasOwn(action.before,"calendarBasis")?action.before.calendarBasis:current.calendarBasis};
+  const contextChanged=action.kind==="work"&&(!same(oldContext.durationUnit,current.durationUnit)||!same(oldContext.calendarBasis,current.calendarBasis));
+  const fields=(action.kind==="dates"?REVIEW_DATE_FIELDS:REVIEW_WORK_FIELDS).map(name=>reviewField(snapshot,name,action.before[name],current[name],action.after[name],{
+   oldContext,currentContext:current,contextChanged})).filter(Boolean);
+  if(contextChanged)for(const name of ["durationUnit","calendarBasis"]){
+   if(same(oldContext[name],current[name]))continue;
+   fields.push({name,label:REVIEW_LABELS[name],state:"CONTEXT_CHANGED",selectable:false,
+    beforeLabel:reviewValueLabel(snapshot,name,oldContext[name]),currentLabel:reviewValueLabel(snapshot,name,current[name]),
+    proposedLabel:reviewValueLabel(snapshot,name,oldContext[name])});
+  }
+  return {...row,fields,canReview:true};
+ }
+ if(action.kind==="dependency"){
+  const current=edgePresent(project,action.from,action.to);
+  const present=value=>value?"Связь есть":"Связи нет";
+  const alreadySatisfied=current===action.after;
+  return {...row,alreadySatisfied,canReview:alreadySatisfied,
+   fields:[{name:"presence",label:"Зависимость",state:alreadySatisfied?"CONVERGED":"BLOCKED",selectable:false,
+    beforeLabel:present(action.before),currentLabel:present(current),proposedLabel:present(action.after)}]};
+ }
+ return row;
+}
+/** Read-only explanation of stale actions; no forecast, rebase or writes. */
+export function inspectPlanAmendment(snapshot,projectId,changeId){
+ validate(snapshot);
+ const {project,change}=find(snapshot,projectId,changeId);
+ let sourceIssue=null;
+ try{pinnedSource(snapshot,project,change)}catch(error){sourceIssue=error instanceof Error?error.message:String(error)}
+ const editable=eligible(change)&&!sourceIssue;
+ const rows=change.planAppliedAt?[]:(change.planAmendments??[]).map(a=>inspectAction(snapshot,project,a)).filter(Boolean);
+ return {projectId,changeId,revision:snapshot.revision,status:change.status,editable,sourceIssue,
+  needsDeferral:!change.planAppliedAt&&["approved","in_progress"].includes(change.status),rows};
+}
+export function planAmendmentReviewAction(changeId,actionKey,revision){
+ return "amend-review:"+encodeURIComponent(changeId)+":"+encodeURIComponent(actionKey)+":"+revision;
+}
+export function parsePlanAmendmentReviewAction(action){
+ const parts=action.slice("amend-review:".length).split(":");
+ if(!action.startsWith("amend-review:")||parts.length!==3||!parts[0]||!parts[1]||!/^\d+$/.test(parts[2])||!Number.isSafeInteger(Number(parts[2])))
+  throw Error("Неверная ссылка на пересмотр заявки");
+ return {changeId:decodeURIComponent(parts[0]),actionKey:decodeURIComponent(parts[1]),revision:Number(parts[2])};
+}
+export function planAmendmentReviewContext(snapshot,projectId,request){
+ if(snapshot.revision!==request.revision)throw Error("План изменился после открытия пересмотра. Откройте его заново.");
+ const view=inspectPlanAmendment(snapshot,projectId,request.changeId);
+ if(!view.editable)throw Error(view.sourceIssue??"Уточнять корректировку можно только до утверждения");
+ const row=view.rows.find(r=>r.key===request.actionKey);
+ if(!row?.canReview)throw Error("Корректировка не требует такого пересмотра или должна быть исключена вручную");
+ return row;
+}
+/** Explicit three-way review of ONE existing action in the ordinary draft.
+ * Independent current edits survive, conflicting values require a choice.
+ * Other actions, approval history, actual Work and Store are untouched.
+ */
+export function reviewPlanAmendmentAction(snapshot,projectId,request,choices){
+ const row=planAmendmentReviewContext(snapshot,projectId,request);
+ const allowed=new Set(row.fields.filter(f=>f.selectable).map(f=>f.name));
+ if(!choices||typeof choices!=="object"||Array.isArray(choices)||Object.keys(choices).some(k=>!allowed.has(k)))
+  throw Error("Недопустимые поля пересмотра");
+ let removed=false;
+ const result=mutableDraft(snapshot,projectId,request.changeId,(project,change)=>{
+  const position=change.planAmendments.findIndex(a=>key(a)===request.actionKey);
+  const old=change.planAmendments[position];
+  if(old.kind==="dependency"&&row.alreadySatisfied){change.planAmendments.splice(position,1);removed=true;return;}
+  const current=old.kind==="dates"?dateFields(project):workFields(project.items.find(w=>w.id===old.itemId));
+  const after=old.kind==="dates"?{...current}:Object.fromEntries(REVIEW_WORK_FIELDS.map(name=>[name,current[name]]));
+  for(const f of row.fields.filter(f=>f.selectable)){
+   const selected=choices[f.name]??f.defaultChoice;
+   if(!["current","proposed"].includes(selected))throw Error("Выберите значение: "+f.label);
+   if(selected==="proposed")after[f.name]=f.proposed;
+  }
+  const unchanged=Object.entries(after).every(([name,value])=>same(current[name],value));
+  if(unchanged){change.planAmendments.splice(position,1);removed=true;}
+  else change.planAmendments[position]={...old,before:current,after};
+ });
+ // Full graph/calendar/portfolio validation remains in the normal forecast
+ // and approval route. Other stale actions can be reviewed independently.
+ return {...result,changeId:request.changeId,removed};
+}
+
 export function checkPlanAmendment(snapshot,projectId,changeId) {
  validate(snapshot);
  const {project,change}=find(snapshot,projectId,changeId);
@@ -188,22 +337,7 @@ export function checkPlanAmendment(snapshot,projectId,changeId) {
  if(!actions.length)throw Error("В заявке не указаны конкретные корректировки плана");
  if(change.planAppliedAt)throw Error("Корректировка уже применена");
  pinnedSource(snapshot,project,change);
- for(const action of actions){
-  if(action.kind==="dates"&&!same(dateFields(project),action.before))
-   throw Error("Даты проекта изменились после подготовки заявки: требуется пересмотр");
-  if(action.kind==="work"){
-   const item=project.items.find(w=>w.id===action.itemId);
-   if(!item||!Object.entries(action.before).every(([k,v])=>same(workFields(item)[k],v)))
-    throw Error("Исходная работа изменилась после подготовки заявки: требуется пересмотр");
-  }
-  if(action.kind==="dependency"){
-   dependencyEndpoints(project,action.from,action.to);
-   if(edgePresent(project,action.from,action.to)!==action.before)
-    throw Error("Исходная зависимость изменилась после подготовки заявки: требуется пересмотр");
-  }
-  if(action.kind==="new_work"&&project.items.some(w=>w.id===action.id))
-   throw Error("Предлагаемая работа уже существует: применение остановлено");
- }
+ for(const action of actions)assertPlanActionCurrent(project,action);
  // Check the whole candidate with the existing validator. Separate
  // proposals may each be possible yet become cyclic in combination.
  if(actions.some(a=>a.kind==="dependency"))amendmentCandidate(snapshot,projectId,changeId,actions);
@@ -435,6 +569,16 @@ function describe(project,action) {
  return "Новая работа «"+action.title+"»: "+action.estimateDays+" дн.; "+
   (action.assignee||"ответственный не назначен")+"; срок "+shownDate(action.dueDate)+"; плановая загрузка "+(action.allocationPct??100)+"%";
 }
+function renderPlanAmendmentReview(snapshot,projectId,changeId,escape){
+ const view=inspectPlanAmendment(snapshot,projectId,changeId);
+ if(!view.rows.length&&!view.sourceIssue)return "";
+ return '<div class="atlas-plan-review"><h4>Исходные данные заявки изменились</h4>'+
+  (view.sourceIssue?'<p>'+escape(view.sourceIssue)+'</p>':"")+
+  (view.needsDeferral?'<p>Для пересмотра утверждённой заявки сначала отложите её через решение.</p><button data-action="change:'+escape(changeId)+'">Открыть решение</button>':"")+
+  view.rows.map(r=>'<article><strong>'+escape(r.title)+'</strong><p>'+escape(r.reason)+'</p><ul>'+r.fields.map(f=>
+   '<li>'+escape(f.label)+': было '+escape(f.beforeLabel)+'; сейчас '+escape(f.currentLabel)+'; предлагалось '+escape(f.proposedLabel)+'</li>').join("")+'</ul>'+
+   (view.editable&&r.canReview?'<button data-action="'+escape(planAmendmentReviewAction(changeId,r.key,view.revision))+'">Пересмотреть корректировку</button>':"")+'</article>').join("")+'</div>';
+}
 export function renderProjectPlanAmendments(snapshot,projectId,{previewId=null,escape=esc}={}) {
  const project=snapshot.projects.find(p=>p.id===projectId);
  if(!project)return "";
@@ -482,7 +626,9 @@ export function renderProjectPlanAmendments(snapshot,projectId,{previewId=null,e
      (view.rows.length>20?'<p class="muted">Показаны первые 20 проектов из '+view.rows.length+'.</p>':"")+capacity+
      (["approved","in_progress"].includes(change.status)?
        '<button class="primary" data-action="apply-amendment:'+escape(change.id)+'">Применить утверждённую корректировку</button>':"");
-   }catch(e){preview='<p class="atlas-source-error">Применение приостановлено: '+escape(e.message||String(e))+'</p>'}
+   }catch(e){preview='<p class="atlas-source-error">Применение приостановлено: '+escape(e.message||String(e))+'</p>';
+    try{preview+=renderPlanAmendmentReview(snapshot,projectId,change.id,escape)}catch(_error){/* preserve the actual forecast failure */}}
+
   }
   return '<article class="atlas-response-plan" id="atlas-amendment-'+escape(encodeURIComponent(change.id))+'" tabindex="-1"><h3>'+escape(change.title)+'</h3>'+
    '<p class="muted">Статус: '+escape(change.status)+(change.planAppliedAt?" · план изменён "+escape(change.planAppliedAt):"")+'</p>'+

@@ -1,10 +1,11 @@
-name: Atlas 0.12 baseline source and desktop qualification
+name: Atlas 0.12.1-dev.1 plan revision source qualification
 
 on:
   push:
     branches:
       - work/2026-11-22-atlas-0-11-baseline
       - work/2026-11-23-atlas-0-12-plan-readiness
+      - work/2026-11-24-atlas-plan-revision
   workflow_dispatch:
   workflow_call:
 

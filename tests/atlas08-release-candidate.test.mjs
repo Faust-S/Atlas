@@ -7,7 +7,7 @@ test("Atlas 0.12 stable candidate packaging leaves historical 0.8 and 0.9 releas
  const pkg=JSON.parse(read("../desktop/package.json"));
  const manifest=JSON.parse(read("../desktop/installer/atlas.json"));
  const tauri=JSON.parse(read("../desktop/src-tauri/tauri.conf.json"));
- assert.equal(pkg.version,"0.12.0");
+ assert.equal(pkg.version,"0.12.1-dev.1");
  assert.equal(manifest.version,pkg.version);
  assert.equal(tauri.version,pkg.version);
  assert.equal(manifest.entrypoint,"iwxa-atlas-desktop.exe");

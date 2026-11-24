@@ -66,7 +66,7 @@ const pkg=JSON.parse(readFileSync(
  fileURLToPath(new URL("../desktop/package.json",import.meta.url)),"utf8"));
 assert.equal(tauri.version,pkg.version,
  "ATLAS11_TAURI_PACKAGE_VERSION_MISMATCH");
-assert.equal(tauri.version,"0.12.0",
+assert.equal(tauri.version,"0.12.1-dev.1",
  "ATLAS12_RELEASE_VERSION_MISMATCH");
 console.log("ATLAS09_ONE_DIST_SIGNED_HOST_PASS",JSON.stringify({
  installedHost:entry.file,bytes:statSync(file).size,

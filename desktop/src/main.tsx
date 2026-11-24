@@ -20,10 +20,10 @@ import {portfolioSchedule,projectedFinishLabel} from "../../src/portfolio-schedu
 import {capturePlanBaseline,comparePlanBaseline} from "../../src/plan-baseline.mjs";
 import {projectScreenSchedule} from "../../src/project-schedule-view.mjs";
 import {portfolioResources,resourceWorkConflicts} from "../../src/portfolio-resources.mjs";
-import {PlanAlternativesComparison,AmendmentAnalysis} from "./PlanAlternativesComparison";
+import {PlanAlternativesComparison,AmendmentAnalysis,AmendmentReview} from "./PlanAlternativesComparison";
 import {planReviewQueue,planReviewAction,planProposalAction} from "../../src/plan-review.mjs";
 import {revisionReview,recheckAction} from "../../src/revision-review.mjs";
-import {previewPlanAmendment,applyPlanAmendment,removePlanAmendment} from "../../src/plan-amendment.mjs";
+import {previewPlanAmendment,applyPlanAmendment,removePlanAmendment,inspectPlanAmendment} from "../../src/plan-amendment.mjs";
 import {planPublicRefresh,reconcilePublicSources,publicSourceQueue} from "../../src/public-refresh.mjs";
 import {sourceReview,sourceFreshnessLabel} from "../../src/source-review.mjs";
 import {githubPortfolioCatalog,createProjectFromGitHubCatalog,githubPortfolioOverview,
@@ -1531,6 +1531,12 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     setMessage(editor.action.startsWith("resource-amendment:")?
      "Ресурсный вариант добавлен в заявку. Текущая Work не изменена. Проверьте общий сценарий и сохраните заявку.":
      "Порядок добавлен в заявку. Текущий граф не изменён. Проверьте общий сценарий и сохраните заявку.");
+   }
+   if(editor.action.startsWith("amend-review:")&&result.changeId&&formProject){
+    setTab("changes");setForecastId(result.changeId);
+    setChangeJump({projectId:formProject,changeId:result.changeId});
+    setMessage(result.removed?"Лишняя корректировка исключена из заявки. Текущий план не изменён. Сохраните черновик.":
+     "Корректировка пересмотрена. Текущий план не изменён. Проверьте общий сценарий и сохраните черновик.");
    }
    if(result.workId){
     const updatedProject=result.state.projects.find((p:any)=>p.id===formProject);
@@ -3433,7 +3439,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       </div>
       {!!c.planAmendments?.length&&<div className="minor">Корректировок: {c.planAmendments.length} · {c.planAppliedAt?"Применено "+c.planAppliedAt:"Пока не применено"}</div>}
       {forecastId===c.id&&!!c.planAmendments?.length&&!c.planAppliedAt&&<AmendmentForecast state={data} projectId={project.id} changeId={c.id} onApply={()=>applyAmendment(c.id)}
-       canApply={["approved","in_progress"].includes(c.status)} onError={issue}/>}
+       canApply={["approved","in_progress"].includes(c.status)} onError={issue} onOpenEditor={openEditor}/>}
       {!!c.planAmendments?.length&&<div className="table-scroll"><table>
        <thead><tr><th>Корректировка</th><th>Было</th><th>Предлагается</th><th>Действие</th></tr></thead>
        <tbody>{c.planAmendments.map((a:any,i:number)=>{
@@ -3956,14 +3962,19 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   </div>
  </div>;
 }
-function AmendmentForecast({state,projectId,changeId,onApply,canApply,onError}:{
- state:Atlas;projectId:string;changeId:string;onApply:()=>void;canApply:boolean;onError:(e:unknown)=>void
+function AmendmentForecast({state,projectId,changeId,onApply,canApply,onError,onOpenEditor}:{
+ state:Atlas;projectId:string;changeId:string;onApply:()=>void;canApply:boolean;onError:(e:unknown)=>void;onOpenEditor:(action:string)=>void
 }){
  const calculation=useMemo(()=>{
   try{return {result:previewPlanAmendment(state,projectId,changeId)}}
-  catch(error){return {error:deepFreezeError(error)}}
+  catch(error){
+   const message=deepFreezeError(error);
+   try{return {error:message,review:inspectPlanAmendment(state,projectId,changeId)}}
+   catch{return {error:message,review:null}}
+  }
  },[state,projectId,changeId]);
- if("error" in calculation)return <p className="error" role="alert">Сценарий не может быть применён: {calculation.error}</p>;
+ if("error" in calculation)return <div className="forecast"><p className="error" role="alert">Сценарий не может быть применён: {calculation.error}</p>
+  <AmendmentReview view={calculation.review} onOpenEditor={onOpenEditor}/></div>;
  return <div className="forecast">
   <AmendmentAnalysis key={changeId} result={calculation.result}/>
   {canApply&&<Action onClick={onApply} primary>Применить утверждённый план</Action>}

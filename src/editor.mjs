@@ -6,7 +6,7 @@ import {projectImpact} from "./impact.mjs";
 import {parseRecheckAction,recheckCandidate} from "./revision-review.mjs";
 import {addPortfolioLink} from "./portfolio.mjs";
 import {parsePlanReviewAction,parsePlanProposalAction,planReviewContext,decidePlanReview,planProposalContext} from "./plan-review.mjs";
-import {setPlanDates,setPlanWork,addPlanWork,checkPlanAmendment,addResourcePlanChoice,setPlanDependency,addSequencePlanChoice} from "./plan-amendment.mjs";
+import {setPlanDates,setPlanWork,addPlanWork,checkPlanAmendment,addResourcePlanChoice,setPlanDependency,addSequencePlanChoice,parsePlanAmendmentReviewAction,planAmendmentReviewContext,reviewPlanAmendmentAction} from "./plan-amendment.mjs";
 import {addPlanningResource,editPlanningResource,resourceChoiceOptions} from "./resource-planning.mjs";
 import {repoName,ownerName,branchName} from "./github-public.mjs";
 import {selectedSourceFolder} from "./project-organization.mjs";
@@ -177,6 +177,23 @@ export function editorSpec(project,action,snapshot=null){
     field("title","Что изменить в плане?","text","Пересмотреть план: "+ctx.row.targetTitle),
     field("description","Предлагаемое изменение и причины","textarea",ctx.decision.text,true)
    ]};
+ }
+ if(action.startsWith("amend-review:")){
+  if(!snapshot||!project)throw Error("Для пересмотра требуется снимок проекта");
+  const row=planAmendmentReviewContext(snapshot,project.id,parsePlanAmendmentReviewAction(action));
+  const summary=row.fields.map(f=>f.label+": было "+f.beforeLabel+"; сейчас "+f.currentLabel+"; предлагалось "+f.proposedLabel+".").join(" ");
+  const hint=summary+" Изменения текущего плана, которых заявка не касалась, сохранятся. "+
+   (row.alreadySatisfied?"Связь уже соответствует предложению; подтверждение исключит лишнюю корректировку. ":"")+
+   "Если выбранные значения уже совпадают с текущим планом, корректировка будет исключена. Сам план не изменится.";
+  return {title:"Пересмотр корректировки: "+row.title,hint,fields:[
+   ...row.fields.filter(f=>f.selectable).map(f=>choice("review_"+f.name,
+    f.label+(f.interpretation?" (уточните значение в текущей единице)":""),[
+     ...(f.required?[option("","Выберите явно")]:[]),option("current","Сохранить текущее: "+f.currentLabel),
+     option("proposed","Предложить: "+(f.interpretation?f.proposedInCurrentLabel:f.proposedLabel))
+    ],f.defaultChoice)),
+   choice("confirmReview","Подтвердить пересмотр",[option("","Выберите решение"),
+    option("review","Обновить только заявку")],"")
+  ]};
  }
  if(action.startsWith("sequence-amendment:")){
   if(!project||!snapshot)throw Error("Для заявки требуется проект");
@@ -514,6 +531,12 @@ export function applyEditor(snapshot,projectId,action,input){
  const get=k=>String(input.get(k)??"").trim();
  const integer=k=>{const raw=get(k);if(!/^\d+$/.test(raw))throw Error("Введите неотрицательное целое число");return Number(raw)};
  const percentage=k=>get(k)===""?100:integer(k);
+ if(action.startsWith("amend-review:")){
+  if(get("confirmReview")!=="review")throw Error("Подтвердите пересмотр заявки");
+  const request=parsePlanAmendmentReviewAction(action),row=planAmendmentReviewContext(snapshot,projectId,request);
+  const choices=Object.fromEntries(row.fields.filter(f=>f.selectable).map(f=>[f.name,get("review_"+f.name)]));
+  return reviewPlanAmendmentAction(snapshot,projectId,request,choices);
+ }
  if(action.startsWith("plan-review:")){
   const request=parsePlanReviewAction(action);
   if(request.projectId!==projectId)throw Error("Неверный проект решения");

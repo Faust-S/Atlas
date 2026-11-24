@@ -1,10 +1,11 @@
-name: IWXA Atlas 0.12.0 exact Windows release qualification
+name: IWXA Atlas 0.12.1-dev.1 Windows development qualification
 
 on:
   push:
     branches:
       - work/2026-11-22-atlas-0-11-baseline
       - work/2026-11-23-atlas-0-12-plan-readiness
+      - work/2026-11-24-atlas-plan-revision
     paths:
       - '.github/workflows/atlas-0-11-v6-windows.yml'
       - 'desktop/tests/installed-atlas11-v6-design.py'
@@ -25,6 +26,8 @@ on:
       - 'desktop/src-tauri/**'
       - 'desktop/tests/installed-atlas11-*.py'
       - 'desktop/tests/installed-atlas12-*.py'
+      - 'desktop/tests/installed-atlas-plan-amendment-review.py'
+      - 'tests/atlas-plan-amendment-review.test.mjs'
       - 'tests/fixtures/**'
       - 'tests/verify-atlas09-host-dist.mjs'
       - 'tests/atlas11-*.test.mjs'
@@ -103,8 +106,8 @@ jobs:
         with:
           name: Atlas-0.12-unqualified-candidate-${{ github.sha }}
           path: |
-            artifacts/IWXA-Atlas-0.12.0-Setup.exe
-            artifacts/IWXA-Atlas-0.12.0-Setup.exe.sha256
+            artifacts/IWXA-Atlas-0.12.1-dev.1-Setup.exe
+            artifacts/IWXA-Atlas-0.12.1-dev.1-Setup.exe.sha256
           if-no-files-found: error
           retention-days: 7
 
@@ -152,6 +155,17 @@ jobs:
           }
           "ATLAS12_PLAN_ALTERNATIVES_IWXA=$archive" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
+      - name: Prepare independently imported stale proposal IWXA
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $archive = Join-Path $env:RUNNER_TEMP 'atlas-plan-amendment-review.iwxa'
+          node tests/fixtures/atlas-plan-amendment-review.mjs $archive
+          if ($LASTEXITCODE -ne 0 -or !(Test-Path -LiteralPath $archive)) {
+            throw 'ATLAS_PLAN_REVIEW_FIXTURE_FAILED'
+          }
+          "ATLAS_PLAN_REVIEW_IWXA=$archive" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
       - name: Qualify installed native UI with Windows accessibility API
         shell: pwsh
         timeout-minutes: 25
@@ -159,7 +173,7 @@ jobs:
           $ErrorActionPreference = 'Stop'
           python -m pip install pywinauto==0.6.9 pillow==11.3.0
           if ($LASTEXITCODE -ne 0) { throw 'ATLAS11_NATIVE_UIA_MISSING' }
-          python -m py_compile desktop/tests/installed-atlas11-v6-design.py desktop/tests/installed-atlas11-portfolio-impact.py desktop/tests/installed-atlas12-resource-alternatives.py desktop/tests/installed-atlas12-plan-alternatives.py
+          python -m py_compile desktop/tests/installed-atlas11-v6-design.py desktop/tests/installed-atlas11-portfolio-impact.py desktop/tests/installed-atlas12-resource-alternatives.py desktop/tests/installed-atlas12-plan-alternatives.py desktop/tests/installed-atlas-plan-amendment-review.py
           if ($LASTEXITCODE -ne 0) { throw 'ATLAS11_NATIVE_SCRIPT_SYNTAX' }
           python desktop/tests/installed-atlas11-v6-design.py
           if ($LASTEXITCODE -ne 0) { throw 'ATLAS11_NATIVE_V6_USER_ROUTE_FAIL' }
@@ -189,25 +203,37 @@ jobs:
           python desktop/tests/installed-atlas12-plan-alternatives.py
           if ($LASTEXITCODE -ne 0) { throw 'ATLAS12_NATIVE_PLAN_ALTERNATIVES_FAIL' }
 
+      - name: Qualify stale proposal review and explicit application
+        id: review_qualification
+        continue-on-error: true
+        shell: pwsh
+        timeout-minutes: 12
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python desktop/tests/installed-atlas-plan-amendment-review.py
+          if ($LASTEXITCODE -ne 0) { throw 'ATLAS_NATIVE_PLAN_REVIEW_FAIL' }
+
       - name: Require both resource and compound native qualifications
         shell: pwsh
         env:
           RESOURCE_OUTCOME: ${{ steps.resource_qualification.outcome }}
           COMPOUND_OUTCOME: ${{ steps.compound_qualification.outcome }}
+          REVIEW_OUTCOME: ${{ steps.review_qualification.outcome }}
         run: |
-          if ($env:RESOURCE_OUTCOME -ne 'success' -or $env:COMPOUND_OUTCOME -ne 'success') {
-            throw "ATLAS12_NATIVE_HOLD resource=$env:RESOURCE_OUTCOME compound=$env:COMPOUND_OUTCOME"
+          if ($env:RESOURCE_OUTCOME -ne 'success' -or $env:COMPOUND_OUTCOME -ne 'success' -or $env:REVIEW_OUTCOME -ne 'success') {
+            throw "ATLAS12_NATIVE_HOLD resource=$env:RESOURCE_OUTCOME compound=$env:COMPOUND_OUTCOME review=$env:REVIEW_OUTCOME"
           }
           Write-Host 'ATLAS12_NATIVE_RESOURCE_AND_COMPOUND_PASS'
+          Write-Host 'ATLAS_NATIVE_PLAN_REVIEW_PASS'
 
-      - name: Preserve accepted release installer and SHA-256
+      - name: Preserve accepted development installer and SHA-256
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: IWXA-Atlas-0.12.0-Setup
+          name: IWXA-Atlas-0.12.1-dev.1-Setup
           path: |
-            artifacts/IWXA-Atlas-0.12.0-Setup.exe
-            artifacts/IWXA-Atlas-0.12.0-Setup.exe.sha256
+            artifacts/IWXA-Atlas-0.12.1-dev.1-Setup.exe
+            artifacts/IWXA-Atlas-0.12.1-dev.1-Setup.exe.sha256
           if-no-files-found: error
           retention-days: 30
 

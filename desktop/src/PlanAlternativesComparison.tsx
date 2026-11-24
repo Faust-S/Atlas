@@ -1,5 +1,5 @@
 import React,{useMemo,useState} from "react";
-import {comparePlanAmendments} from "../../src/plan-amendment.mjs";
+import {comparePlanAmendments,planAmendmentReviewAction} from "../../src/plan-amendment.mjs";
 
 const date=(value:any)=>value??"не определён";
 const shift=(value:any)=>value==null?"не определён":(value>0?"+":"")+value+" дн.";
@@ -107,6 +107,32 @@ export function AmendmentAnalysis({result,compact=false}:{result:any;compact?:bo
    </details>
   </>}
   <p className="minor">Расчёт плана, не фактическая доступность ресурсов или разрешение на исполнение.</p>
+ </div>;
+}
+
+/** Explain the exact stale source fields before opening the ordinary editor. */
+export function AmendmentReview({view,onOpenEditor}:{view:any;onOpenEditor:(action:string)=>void}){
+ if(!view||(!view.rows.length&&!view.sourceIssue))return null;
+ const labels:Record<string,string>={CURRENT_ONLY:"Сохранится текущее значение",PROPOSED_ONLY:"Предложение можно сохранить или исключить",
+  CONVERGED:"Уже соответствует предложению",CONFLICT:"Требуется выбор",CONTEXT_CHANGED:"Единицы или календарь изменились",BLOCKED:"Нельзя изменить порядок"};
+ return <div className="atlas-amendment-review">
+  <h4>Исходные данные заявки изменились</h4>
+  {view.sourceIssue&&<p role="alert">{view.sourceIssue}</p>}
+  {view.needsDeferral&&<><p>Сначала отложите утверждённую заявку через существующее решение. Предыдущее утверждение останется в истории.</p>
+   <button type="button" className="action-button" onClick={()=>onOpenEditor("change:"+view.changeId)}>Открыть решение</button></>}
+  <p role="status">Корректировок к пересмотру: {view.rows.length}. Сам план не изменяется.</p>
+  {view.rows.map((r:any)=><div className="atlas-amendment-row" key={r.key}>
+   <strong>{r.title}</strong><small>{r.reason}</small>
+   {view.editable&&r.canReview&&<button type="button" className="action-button" aria-label={"Пересмотреть корректировку "+r.title}
+    onClick={()=>onOpenEditor(planAmendmentReviewAction(view.changeId,r.key,view.revision))}>Пересмотреть</button>}
+   {view.editable&&!r.canReview&&<small>Уберите эту корректировку из заявки, если она больше недопустима.</small>}
+   {r.fields.map((f:any)=><div key={f.name} className="atlas-amendment-review-field">
+    <strong>{f.label+": "+(labels[f.state]??f.state)}</strong>
+    <small>{"Было: "+f.beforeLabel}</small><small>{"Сейчас: "+f.currentLabel}</small>
+    <small>{"Предлагалось: "+f.proposedLabel}</small>
+    {f.interpretation&&<small>Нельзя автоматически переносить длительность между календарями. Выберите значение в текущей единице явно.</small>}
+   </div>)}
+  </div>)}
  </div>;
 }
 

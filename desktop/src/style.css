@@ -1800,3 +1800,10 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .atlas-sequence-details{margin:6px 0 0}
 .atlas-sequence-details summary{cursor:pointer;font-size:11px;color:#245480;font-weight:600}
 .atlas-sequence-details>small{display:block;margin:4px 0}
+
+/* Stale proposal diagnosis uses the existing compact change card layout. */
+.atlas-amendment-review{display:grid;gap:8px;min-width:0}
+.atlas-amendment-review h4{margin:0;font-size:13px;color:#245480}
+.atlas-amendment-review p{margin:2px 0;font-size:11px;line-height:1.45}
+.atlas-amendment-review-field{border-top:1px solid #d5e3ef;margin-top:7px;padding-top:5px;overflow-wrap:anywhere}
+.atlas-amendment-review .action-button{margin:5px 0}

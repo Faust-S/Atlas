@@ -148,7 +148,7 @@ def qualify():
     d.wait_text("Настройки",20)
     click_named("О приложении","Button")
     d.wait_text("Установленная версия",20)
-    d.wait_text("0.12.0",20) # Settings show the exact packaged release version.
+    d.wait_text("0.12.1-dev.1",20) # Settings show the exact packaged release version.
     click_named("Вернуться","Button")
     print("ATLAS11_NATIVE_MENU_PROFILE_VERSION_PASS",flush=True)
 

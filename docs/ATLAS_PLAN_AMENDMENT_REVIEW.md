@@ -1,0 +1,13 @@
+# Atlas 0.12.1-dev.1: stale proposal review
+
+Development branch from the combined 0.12.0 release candidate; no stable tag or publication is implied. The existing Work, Change, decision history, CPM, T3 Host and Native Store remain authoritative. The 0.12.0 release branch is not modified.
+
+## User route
+
+Open a proposal and its before/after scenario. If recorded inputs differ from the current plan, Atlas shows the exact action and original/current/proposed field values. Open the ordinary review form. Independent current edits are preserved, coincident values are converged, proposal-only fields may be retained or dropped, and conflicting values require an explicit selection. A changed calendar or duration unit is not silently converted. A dependency already satisfied by the current plan can be removed from the proposal; an invalid dependency remains blocked until removed. Unsupported changes are not guessed.
+
+A reviewed action uses the current recorded input, retains only selected proposed changes and is checked against the exact snapshot revision. If all intended changes are already satisfied, the action is removed. An approved or in-progress proposal must first be deferred by an ordinary decision. Prior decisions remain unchanged. Review modifies only the draft proposal; Save, approval, application and final Save are separate operations. The existing scheduler calculates the revised scenario.
+
+## Qualification
+
+Seven regression tests cover independent edits, conflicting values, stale review forms, calendar semantics, impossible date intervals, satisfied dependencies and decision history. The native route imports an independent IWXA with linked projects, a stale duration proposal and changed resource/assignee/load/deadline. It checks values 3/7/5, selects 5 days, saves the reviewed proposal, cold restores, approves, applies and saves again; reads back the original plan, baseline and unchanged dependent project at each boundary. Native success requires the new review route plus both earlier resource and compound routes.
