@@ -132,7 +132,7 @@ def qualify():
     # In the 820px window, bring the first Gantt row above the lower edge.
     # Choose its full-size text control rather than the narrow calendar bar.
     v.mouse.scroll(coords=(260,520),wheel_dist=-4)
-    native.click_named("\u0412\u044b\u0431\u0440\u0430\u0442\u044c \u0440\u0430\u0431\u043e\u0442\u0443 "+TARGET_WORK,"Button")
+    native.click_named_after_scroll("\u0412\u044b\u0431\u0440\u0430\u0442\u044c \u0440\u0430\u0431\u043e\u0442\u0443 "+TARGET_WORK,"Button")
     d.wait_text("\u0418\u0437\u043c\u0435\u043d\u0438\u0442\u044c \u0440\u0430\u0431\u043e\u0442\u0443",25)
     native.click_named("\u0418\u0437\u043c\u0435\u043d\u0438\u0442\u044c \u0440\u0430\u0431\u043e\u0442\u0443","Button")
     d.wait_text("Изменение данных",25)

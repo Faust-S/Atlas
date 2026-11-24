@@ -10,7 +10,8 @@ import time
 from pathlib import Path
 
 import win32gui
-from pywinauto import keyboard
+from comtypes import COMError
+from pywinauto import Desktop, keyboard, mouse
 
 sys.stdout.reconfigure(encoding="utf-8",errors="replace")
 path=Path(__file__).with_name("installed-atlas06-visual-scale.py")
@@ -46,6 +47,69 @@ def click_named(name,role=None):
     d.activate()
     physical[0].click_input()
     time.sleep(.35)
+
+def physical_button_point(control):
+    """Return an actual uncovered point of this UIA button, never a point
+    in a sticky navigation overlay or a stale accessibility rectangle."""
+    rect=control.rectangle()
+    wanted=control.element_info
+    x=(rect.left+rect.right)//2
+    for y in ((rect.top+rect.bottom)//2,rect.top+rect.height()//4,rect.bottom-rect.height()//4):
+        try:
+            hit=Desktop(backend='uia').from_point(x,y).element_info
+            for _ in range(12):
+                if hit is None:break
+                if hit==wanted:return (x,y)
+                hit=hit.parent
+        except (KeyError,COMError):
+            # A transient native accessibility repaint is not a hit.
+            continue
+    return None
+
+
+def click_named_after_scroll(name,role="Button"):
+    """Wait for the actual scrolled element, not its previous UIA geometry.
+
+    The caller performs the user scroll. Require exactly one complete,
+    enabled, visible control, two consecutive equal geometries and a real
+    native hit-test. Never click a second time to compensate for a failed
+    route. The caller must still verify the actual editor and its result.
+    """
+    d.activate()
+    until=time.monotonic()+12
+    previous=None
+    candidates=[]
+    while time.monotonic()<until:
+        try:
+            bounds=win32gui.GetWindowRect(d.handle)
+            controls=d.window().descendants(control_type=role)
+            named=[e for e in controls if str(e.window_text() or "")==name and e.is_visible() and e.is_enabled()]
+            physical=[]
+            candidates=[]
+            for e in named:
+                rect=e.rectangle()
+                geometry=(rect.left,rect.top,rect.right,rect.bottom)
+                candidates.append(geometry)
+                if (rect.left>=bounds[0]+4 and rect.right<=bounds[2]-4 and
+                    rect.top>=bounds[1]+4 and rect.bottom<=bounds[3]-4 and
+                    rect.width()>0 and rect.height()>0):
+                    point=physical_button_point(e)
+                    if point is not None:physical.append((geometry,point))
+            # An ambiguous name is never a valid click, even if only one
+            # of its matching controls currently happens to be on screen.
+            if len(named)==1 and len(physical)==1:
+                current=physical[0]
+                if current==previous:
+                    mouse.click(coords=current[1])
+                    time.sleep(.35)
+                    return
+                previous=current
+            else:previous=None
+        except (KeyError,COMError):
+            previous=None
+        time.sleep(.20)
+    v.capture("atlas11-scroll-control-not-reachable")
+    raise AssertionError("Native control did not settle after user scroll: "+name+" / "+repr(candidates))
 
 def qualify():
     original=v.imported_snapshot()

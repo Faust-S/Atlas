@@ -13,7 +13,7 @@ from pathlib import Path
 
 import win32gui
 from comtypes import COMError
-from pywinauto import Desktop, mouse
+from pywinauto import mouse
 
 sys.stdout.reconfigure(encoding='utf-8',errors='replace')
 source=Path(__file__).with_name('installed-atlas11-v6-design.py')
@@ -36,23 +36,7 @@ def check_archive():
     return snapshot
 
 
-def physical_button_point(control):
-    """Return an actual uncovered point of this UIA button, never a point
-    in a sticky navigation overlay or a stale accessibility rectangle."""
-    rect=control.rectangle()
-    wanted=control.element_info
-    x=(rect.left+rect.right)//2
-    for y in ((rect.top+rect.bottom)//2,rect.top+rect.height()//4,rect.bottom-rect.height()//4):
-        try:
-            hit=Desktop(backend='uia').from_point(x,y).element_info
-            for _ in range(12):
-                if hit is None:break
-                if hit==wanted:return (x,y)
-                hit=hit.parent
-        except (KeyError,COMError):
-            # A transient native accessibility repaint is not a hit.
-            continue
-    return None
+physical_button_point=native.physical_button_point
 
 
 def find_resource_control(name,role=None,contains=False,require_hit=False):

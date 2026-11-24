@@ -113,7 +113,14 @@ test('Native v6 project tabs use the actual workspace top and selected plan appe
  const forecast=card.indexOf('forecastId===c.id&&!!c.planAmendments?.length&&!c.planAppliedAt&&<AmendmentForecast');
  const table=card.indexOf('!!c.planAmendments?.length&&<div className="table-scroll"><table>');
  assert.ok(forecast>=0&&table>forecast);
- assert.match(driver,/\.from_point\(x,y\)\.element_info/);
+ const native=readFileSync(new URL('../desktop/tests/installed-atlas11-v6-design.py',import.meta.url),'utf8');
+ const impact=readFileSync(new URL('../desktop/tests/installed-atlas11-portfolio-impact.py',import.meta.url),'utf8');
+ assert.match(native,/\.from_point\(x,y\)\.element_info/);
+ assert.match(driver,/physical_button_point=native\.physical_button_point/);
+ assert.match(native,/def click_named_after_scroll\(name,role="Button"\)/);
+ assert.match(native,/len\(named\)==1 and len\(physical\)==1/);
+ assert.match(native,/if current==previous:/);
+ assert.match(impact,/native\.click_named_after_scroll\(/);
  assert.match(driver,/find_resource_control\(name,'Button',require_hit=True\)/);
  assert.match(driver,/point=physical_button_point\(control\)/);
  assert.match(driver,/mouse\.click\(coords=point\)/);

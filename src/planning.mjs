@@ -84,15 +84,28 @@ export function scheduleProject(p,{calendarLibrary=[],startDate=undefined,includ
       throw Error('Неверный календарь рабочих дней');
     const allowed=new Set(def.weekdays),excluded=new Set(def.excludedDates||[]);
     const included=new Set(def.additionalWorkingDates||[]);
-    const days=[];
-    for(let offset=0;offset<MAX_DAYS;offset++){
-      const date=daysFrom(start,offset);
-      if(!date)break;
-      const weekday=new Date(startMs+offset*DAY).getUTCDay();
-      if(!excluded.has(date)&&(allowed.has(weekday)||included.has(date)))days.push(offset);
-    }
-    calendars.set(key,days);
-    return days;
+    // A calendar belongs to this calculation only. Generate its working
+    // offsets lazily, instead of eagerly materializing the entire 100-year
+    // horizon for every project and alternative. Keep the exact same dates
+    // and half-open occupancy ranges; no global cache or second planner.
+    const calendar={days:[],nextOffset:0,allowed,excluded,included};
+    calendars.set(key,calendar);
+    return calendar;
+  };
+  const scanCalendarDay=calendar=>{
+    if(calendar.nextOffset>=MAX_DAYS)return false;
+    const offset=calendar.nextOffset++;
+    const date=daysFrom(start,offset);
+    if(!date){calendar.nextOffset=MAX_DAYS;return false;}
+    const weekday=(start.getUTCDay()+offset)%7;
+    if(!calendar.excluded.has(date)&&(calendar.allowed.has(weekday)||calendar.included.has(date)))
+      calendar.days.push(offset);
+    return true;
+  };
+  const calendarThrough=(calendar,until)=>{
+    // Include all valid working days strictly BEFORE the civil boundary.
+    while(calendar.nextOffset<until&&scanCalendarDay(calendar)){}
+    return calendar.days;
   };
   const times=new Map();
   let durationDays=0;
@@ -115,9 +128,11 @@ export function scheduleProject(p,{calendarLibrary=[],startDate=undefined,includ
       if(forResource)activeRanges=[[es,ef]];
     }
     if(unit==='working_days'){
-      const dates=calendarFor(item);
+      const calendar=calendarFor(item);
       if(duration>0){
+        const dates=calendarThrough(calendar,ready);
         const first=lowerBound(dates,ready),last=first+duration-1;
+        while(dates.length<=last&&scanCalendarDay(calendar)){}
         if(last>=dates.length)throw Error('Project schedule exceeds supported calendar horizon');
         es=dates[first];ef=dates[last]+1;
         if(forResource){
@@ -148,7 +163,10 @@ export function scheduleProject(p,{calendarLibrary=[],startDate=undefined,includ
       Math.min(...successors.map(child=>times.get(child).lateStart)):durationDays;
     let ls=lf-row.durationDays;
     if(row.durationUnit==='working_days'&&row.durationDays>0){
-      const dates=calendarFor(byId.get(id));
+      // Other calendar branches can make this Work's late boundary later
+      // than the last day needed by its forward pass. Extend to that exact
+      // boundary before searching backwards for the latest valid start.
+      const dates=calendarThrough(calendarFor(byId.get(id)),lf);
       const last=lowerBound(dates,lf)-1;
       const first=last-row.durationDays+1;
       if(first<0)throw Error('Working-day latest start outside project calendar');
