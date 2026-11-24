@@ -1760,3 +1760,12 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .atlas-resource-conflict-work>div{flex:1 1 160px;min-width:0}
 .atlas-resource-conflict-work strong,.atlas-resource-conflict-work small{display:block;overflow-wrap:anywhere;font-size:11px;line-height:1.4}
 .atlas-resource-conflict-work small{font-size:10px;color:#526c84}
+
+/* Existing resource analysis: explicit, bounded sequencing alternatives. */
+.atlas-resource-sequence{border:1px solid #c5d9ec;background:#f4f8fd;border-radius:7px;padding:8px;margin:8px 0;min-width:0}
+.atlas-resource-sequence>strong{font-size:12px;color:#245480}
+.atlas-resource-sequence>p{font-size:11px;line-height:1.45;margin:5px 0}
+.atlas-resource-sequence>small{display:block;font-size:10px;overflow-wrap:anywhere;color:#526c84}
+.atlas-resource-sequence .atlas-resource-period-nav button{max-width:100%;white-space:normal;overflow-wrap:anywhere;text-align:left}
+.atlas-resource-sequence .atlas-resource-option{background:#fff}
+.atlas-resource-sequence .atlas-resource-options-toggle:disabled{opacity:.55;cursor:default}

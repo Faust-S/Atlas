@@ -158,8 +158,8 @@ def qualify():
     assert d.head()==saved,'Comparison modified Native Store without explicit Save'
     v.capture('atlas12-resource-alternatives-820')
     print('ATLAS12_NATIVE_RESOURCE_OPTIONS_READ_ONLY_PASS',flush=True)
-    find_resource_control('Контрольные сроки и ресурсные ограничения',contains=True)
-    d.wait_text('Work: расчётный финиш 2026-11-26; контрольная дата 2026-11-24.',35)
+    find_resource_control('Work: расчётный финиш 2026-11-26; контрольная дата 2026-11-24. Превышение: 2 дн.',contains=True)
+    find_resource_control('Проект: расчётный финиш 2026-11-26; контрольная дата 2026-11-25. Превышение: 1 дн.',contains=True)
     v.capture('atlas12-resource-control-dates-820')
     click_scrollable_button('Показать периоды конфликтов')
     find_resource_control('Перегрузка: 2026-11-23 по 2026-11-25. Нагрузка 130%, мощность 100%.',contains=True)
@@ -170,7 +170,7 @@ def qualify():
     print('ATLAS12_NATIVE_RESOURCE_CONFLICT_PERIOD_PASS',flush=True)
     click_scrollable_button('Скрыть периоды конфликтов')
     click_scrollable_button('Показать все варианты (3)')
-    reveal_resource_text('Новый конфликт: Резервный кран','Рассмотреть ресурс Резервный кран')
+    find_resource_control('Новый конфликт: Резервный кран, перегрузка 3 дн.',contains=True)
     assert d.head()==saved,'Showing several comparisons wrote to Native Store'
     click_scrollable_button('Рассмотреть ресурс Резервный кран')
     reveal_resource_text('Изменение дней перегрузки: 0. Вне доступности: 0. Сроки Work по CPM не изменятся.',work_action)
@@ -199,6 +199,55 @@ def qualify():
     assert d.head()==saved,'Opening Work editor wrote to Native Store'
     v.capture('atlas12-resource-alternatives-work-editor-820')
     print('ATLAS12_NATIVE_RESOURCE_TO_WORK_EDITOR_PASS',flush=True)
+    # Verify a full real sequence edit, from comparison to the same native
+    # dependency form, explicit draft application, Save and cold restore.
+    d.stop()
+    d.launch()
+    win32gui.MoveWindow(d.handle,0,0,820,650,True)
+    d.activate()
+    d.wait_text('Настроить дашборд',45)
+    assert d.head()==saved
+    native.click_named('Ресурсы','Button')
+    d.wait_text('Плановые ресурсы',35)
+    click_scrollable_button('Сравнить варианты ресурса Кран')
+    click_scrollable_button('Показать периоды конфликтов')
+    project_name=original['projects'][0]['name']
+    second_work=original['projects'][0]['items'][1]['title']
+    click_scrollable_button('Выбрать для порядка '+project_name+': '+first_work)
+    click_scrollable_button('Выбрать для порядка '+project_name+': '+second_work)
+    click_scrollable_button('Сравнить порядок двух работ')
+    first_order=first_work+' → '+second_work
+    second_order=second_work+' → '+first_work
+    expected='. Перегрузка портфеля: 3 → 0 дн. Финиш проекта: 2026-11-26 → 2026-11-29.'
+    find_resource_control('Порядок: '+first_order+expected,contains=True)
+    find_resource_control('Порядок: '+second_order+expected,contains=True)
+    assert d.head()==saved,'Sequence comparison wrote to Native Store'
+    v.capture('atlas12-resource-sequence-options-820')
+    print('ATLAS12_NATIVE_SEQUENCE_ALTERNATIVES_PASS',flush=True)
+    click_scrollable_button('Открыть порядок '+first_order)
+    d.wait_text('Предшествующая работа для: '+second_work,35)
+    d.wait_text('Предложенный порядок: '+first_order+'.',35)
+    assert d.head()==saved,'Opening dependency form wrote to Native Store'
+    v.capture('atlas12-resource-sequence-form-820')
+    v.find_control('Применить к черновику',types={'Button'},scroll=True).click_input()
+    v.await_no_form()
+    assert d.head()==saved,'Applying a dependency draft bypassed Save'
+    native.click_named('Сохранить','Button')
+    committed=v.await_saved(saved)
+    persisted=d.saved_project(committed)
+    first_id=original['projects'][0]['items'][0]['id']
+    second_id=original['projects'][0]['items'][1]['id']
+    assert persisted['dependencies']==[{'from':first_id,'to':second_id}]
+    assert persisted['items']==original['projects'][0]['items'],'Sequence edit changed Work data'
+    assert committed['root']['resources']==saved['root']['resources']
+    d.stop()
+    d.launch()
+    win32gui.MoveWindow(d.handle,0,0,820,650,True)
+    d.activate()
+    d.wait_text('Настроить дашборд',45)
+    assert d.head()==committed,'Selected dependency was lost after restart'
+    assert d.saved_project(committed)['dependencies']==[{'from':first_id,'to':second_id}]
+    print('ATLAS12_NATIVE_SEQUENCE_SAVE_COLD_RESTORE_PASS',flush=True)
 
 if __name__=='__main__':
     try:

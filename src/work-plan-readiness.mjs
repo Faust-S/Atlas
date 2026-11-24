@@ -3,7 +3,7 @@
 // assigns people, or creates a second schedule/Store.
 import {portfolioSchedule} from './portfolio-schedule.mjs';
 import {scheduleProject} from './planning.mjs';
-import {portfolioResources} from './portfolio-resources.mjs';
+import {portfolioResources,resourceWorkConflicts} from './portfolio-resources.mjs';
 
 const inactive=new Set(['paused','cancelled']);
 const priorityWeight={critical:0,high:1,normal:2,low:3};
@@ -44,6 +44,14 @@ export function projectWorkPlanReadiness(snapshot,projectId,{portfolio=null,reso
  const planned=new Map(workPlan.rows.map(row=>[row.id,row]));
  const resourceWork=new Map((resourceView?.work??[])
   .filter(row=>row.projectId===projectId).map(row=>[row.id,row]));
+ // Explain only conflicts that actually touch this project's Work, rather
+ // than attributing every conflict of a resource to every linked Work.
+ const conflictByWork=new Map();
+ for(const id of new Set(project.items.map(w=>w.resourceId).filter(Boolean))){
+  const group=resourceView?.byId?.get(id);
+  if(group&&(group.overloadDays>0||group.unavailableDays>0))
+   for(const [workId,detail] of resourceWorkConflicts(group,projectId))conflictByWork.set(workId,detail);
+ }
  const byProject=new Map(snapshot.projects.map(p=>[p.id,p]));
  const waitingProjects=(snapshot.portfolioLinks??[])
   .filter(link=>link.to===projectId)
@@ -60,13 +68,12 @@ export function projectWorkPlanReadiness(snapshot,projectId,{portfolio=null,reso
    .map(p=>({id:p.id,title:p.title,state:p.state}));
   const resource=item.resourceId?resourceView?.byId?.get(item.resourceId):null;
   const allocation=resourceWork.get(item.id);
-  const outsideResource=Boolean(resource&&allocation&&allocation.startDate&&(
-   resource.availableFrom&&allocation.startDate<resource.availableFrom||
-   resource.availableUntil&&allocation.finishDate>resource.availableUntil));
-  // Resource group conflicts are warnings for review, not a claim that this
-  // particular Work caused the overload or that an employee is unavailable.
-  const resourceReview=Boolean(resource&&(
-   outsideResource||resource.overloadDays>0||resource.unavailableDays>0));
+  const conflict=conflictByWork.get(item.id)??{overloadDays:0,unavailableDays:0};
+  const resourceReview=Boolean(resource&&(conflict.overloadDays>0||conflict.unavailableDays>0));
+  const resourceLinked=Boolean(item.resourceId&&resource);
+  // A Work without a resource is not automatically a violation; the model
+  // has no mandatory-resource flag. Coverage is reported independently.
+  const resourceUnlinked=item.state!=='done'&&!item.resourceId;
   let status;
   if(item.state==='done')status='reported_done';
   else if(item.state==='in_progress')status='started';
@@ -86,19 +93,23 @@ export function projectWorkPlanReadiness(snapshot,projectId,{portfolio=null,reso
   if(projectedUnavailable.length&&!waitingProjects.length)
    reasons.push('Недоступен расчёт по связанному проекту');
   if(status==='no_dates')reasons.push('Не определена расчётная дата начала');
-  if(resourceReview)reasons.push('Проверить общую загрузку планового ресурса'+
-   (resource?.label?': '+resource.label:''));
+  if(resourceReview)reasons.push('Проверить загрузку планового ресурса'+
+   (resource?.label?': '+resource.label:'')+'. Перегрузка этой работы: '+conflict.overloadDays+
+   ' дн.; вне доступности: '+conflict.unavailableDays+' дн.');
+  if(resourceUnlinked)reasons.push('Нет плановой привязки к ресурсу');
+  if(resourceLinked&&allocation&&!allocation.startDate)reasons.push('Даты ресурсной занятости не определены');
   return {id:item.id,title:item.title,priority:item.priority??'normal',
    status,label:states[status],predecessorWorks,waitingProjects,
    startDate:current.projectedStart?row?.startDate??null:null,
    finishDate:current.projectedStart?row?.finishDate??null:null,
-   resourceReview,reasons};
+   resourceReview,resourceLinked,resourceUnlinked,resourceConflict:conflict,reasons};
  });
  const totals={
   all:rows.length,
   ready:rows.filter(row=>row.status==='ready').length,
   waiting:rows.filter(row=>row.status==='waiting').length,
   review:rows.filter(row=>row.status==='review').length,
+  unlinked:rows.filter(row=>row.resourceUnlinked).length,
   no_dates:rows.filter(row=>row.status==='no_dates').length,
   blocked:rows.filter(row=>row.status==='blocked').length,
   started:rows.filter(row=>row.status==='started').length,

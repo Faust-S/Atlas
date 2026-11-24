@@ -107,6 +107,37 @@ export function resourceConflictPeriods(group,{offset=0,workOffset=0,workLimit=8
   undatedWork:group.undatedWork??group.work.filter(w=>w.startDay===null).length};
 }
 
+
+/**
+ * Exact per-Work conflict participation, using the same occupied intervals
+ * and availability precedence as the resource totals. Project-scoped keys
+ * prevent identical Work IDs in different projects from being conflated.
+ */
+export function resourceWorkConflicts(group,projectId){
+ const result=new Map();
+ if(!group||!projectId)return result;
+ dayEvents(group,(segment,active)=>{
+  for(const {work} of active.values()){
+   if(work.projectId!==projectId)continue;
+   const row=result.get(work.id)??{overloadDays:0,unavailableDays:0};
+   row[segment.kind==="overload"?"overloadDays":"unavailableDays"]+=segment.until-segment.from;
+   result.set(work.id,row);
+  }
+ });
+ return result;
+}
+
+/** Both selected Works must participate in an actual overload interval. */
+export function resourceOverloadContainsPair(group,projectId,firstWorkId,secondWorkId){
+ if(!group||!projectId||!firstWorkId||!secondWorkId||firstWorkId===secondWorkId)return false;
+ const first=JSON.stringify([projectId,firstWorkId]),second=JSON.stringify([projectId,secondWorkId]);
+ let found=false;
+ dayEvents(group,(segment,active)=>{
+  if(segment.kind==="overload"&&active.has(first)&&active.has(second))found=true;
+ });
+ return found;
+}
+
 // The single capacity summarizer is also used for a hypothetical reassignment.
 // It consumes the canonical occupied intervals, never recalculates the CPM.
 function summarizeResourceGroup(r){

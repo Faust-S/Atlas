@@ -182,7 +182,7 @@ test('The ordinary Work editor preselects the suggestion but never applies it au
  assert.match(main,/if\(editor\.resourceProposal\)onDirtyChange\(true\)/);
  assert.match(main,/else onDirtyChange\(false\)/);
  assert.match(main,/Ресурс выбран в форме, но ещё не применён к черновику/);
- assert.match(main,/resourceProposal\}\);setInspector\(true\)/);
+ assert.match(main,/resourceProposal,sequenceProposal\}\);setInspector\(true\)/);
  assert.match(css,/\.atlas-resource-editor-proposal\{/);
  assert.doesNotMatch(ui,/applyEditor\(|commitWithReadback\(|save\(\)/);
 });

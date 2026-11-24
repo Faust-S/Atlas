@@ -38,6 +38,7 @@ import {ProjectConnect} from "./ProjectConnect";
 import {ProjectOrganizationGuide} from "./ProjectOrganizationGuide";
 import {ResourceAlternatives} from "./ResourceAlternatives";
 import {prepareResourceEditorChoice,assertResourceEditorChoiceCurrent} from "../../src/resource-alternatives.mjs";
+import {prepareResourceSequenceChoice,assertResourceSequenceChoiceCurrent} from "../../src/resource-sequence-alternatives.mjs";
 import {projectSourcePlanWorkContext,projectWorkTableSearch} from "../../src/project-organization.mjs";
 import {repoName} from "../../src/github-public.mjs";
 import {applyPublicProjectPreview} from "../../src/project-onboarding.mjs";
@@ -66,7 +67,8 @@ type ImportPreview = {snapshot:Atlas;originalRevision:number;expectedGeneration:
 type OpenResult = {generation:string;snapshot:Atlas;restoredFromBackup:boolean;needsConfirmation:boolean};
 type Field = {name:string;label:string;value?:string;required?:boolean;type:string;searchable?:boolean;options?:{value:string;label:string}[]};
 type Editor = {action:string;spec:{title:string;hint?:string;fields:Field[]};
- resourceProposal?:ReturnType<typeof prepareResourceEditorChoice>};
+ resourceProposal?:ReturnType<typeof prepareResourceEditorChoice>;
+ sequenceProposal?:ReturnType<typeof prepareResourceSequenceChoice>};
 type SavedRefPreview = {label:string;json:string;revision:string;generation:string};
 type Tab = "overview"|"work"|"board"|"timeline"|"graph"|"reality"|"changes"|"resources"|"history"|"sources";
 const tabs:{key:Tab;title:string}[]=[
@@ -186,12 +188,14 @@ function EditorPanel({editor,onSubmit,onCancel,onDirtyChange,busy,project,plan,c
   // The proposal is preselected ONLY in this local form. It remains unapplied
   // until the user confirms the ordinary Work editor, and is never saved here.
   const selected=editor.resourceProposal?
-   {...defaults,resourceId:editor.resourceProposal.targetResourceId}:defaults;
+   {...defaults,resourceId:editor.resourceProposal.targetResourceId}:
+   editor.sequenceProposal?{...defaults,from:editor.sequenceProposal.from}:defaults;
   setFields(selected);
   setWorkQuery("");
   if(editor.resourceProposal)onDirtyChange(true);
+  else if(editor.sequenceProposal)onDirtyChange(true);
   else onDirtyChange(false);
- },[editor.action,editor.spec,editor.resourceProposal]);
+ },[editor.action,editor.spec,editor.resourceProposal,editor.sequenceProposal]);
  const updateFields=(next:Record<string,string>)=>{
   onDirtyChange(editor.spec.fields.some(f=>String(f.value??"")!==(next[f.name]??"")));
   setFields(next);
@@ -213,6 +217,13 @@ function EditorPanel({editor,onSubmit,onCancel,onDirtyChange,busy,project,plan,c
      ". Ресурс выбран в форме, но ещё не применён к черновику.":
      "Назначение изменено в форме. Прежнее сравнение относится только к ресурсу "+
      editor.resourceProposal.targetLabel+"."}
+   </p>}
+   {editor.sequenceProposal&&<p className="atlas-resource-editor-proposal" role="status"
+    aria-label={'Предложенный порядок: '+editor.sequenceProposal.fromTitle+' → '+editor.sequenceProposal.toTitle+'.'}>
+    Предложенный порядок: {editor.sequenceProposal.fromTitle} → {editor.sequenceProposal.toTitle}.
+    {fields.from===editor.sequenceProposal.from?
+     " Подтвердите только технологически допустимую связь. Она ещё не внесена в черновик.":
+     " Предшественник изменён. Вернитесь к проверенному варианту или откройте обычный редактор зависимости."}
    </p>}
    <div className="atlas-editor-fields" role="region" aria-label="Поля редактора" tabIndex={0}>
    {editor.spec.fields.map((f,index)=>f.searchable?
@@ -1430,7 +1441,12 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   try{
    const p=data.projects.find((x:any)=>x.id===projectId);
    if(!p)throw Error("Проект для решения не найден");
-   const resourceProposal=comparison?prepareResourceEditorChoice(data,comparison):undefined;
+   const sequenceProposal=comparison?.kind==="RESOURCE_SEQUENCE_OPTION"?
+    prepareResourceSequenceChoice(data,comparison):undefined;
+   const resourceProposal=comparison&&!sequenceProposal?prepareResourceEditorChoice(data,comparison):undefined;
+   if(sequenceProposal&&(action!=="dep-to:"+encodeURIComponent(sequenceProposal.to)||
+      projectId!==sequenceProposal.projectId))
+    throw Error("Предложенный порядок относится к другой зависимости");
    if(resourceProposal&&(action!=="work:"+resourceProposal.workId||
       projectId!==resourceProposal.projectId))
     throw Error("Ресурсный вариант относится к другой работе");
@@ -1438,7 +1454,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    setActive(projectId);setHomeOpen(false);setSettingsOpen(false);
    setTab(action.startsWith("plan-")?"changes":"reality");
    inspectorEditorReturnRef.current=false;
-   setEditor({action,spec:editorSpec(p,action,data),resourceProposal});setInspector(true);
+   setEditor({action,spec:editorSpec(p,action,data),resourceProposal,sequenceProposal});setInspector(true);
    if(!embedded&&window.innerWidth<1150)setNavPanelOpen(false);
    setError("");
   }catch(e){issue(e)}
@@ -1468,6 +1484,13 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    // the source Work and revision have not changed since the comparison.
    if(editor.resourceProposal)assertResourceEditorChoiceCurrent(data,editor.resourceProposal);
    const form=new FormData(event.currentTarget);
+   if(editor.sequenceProposal){
+    assertResourceSequenceChoiceCurrent(data,editor.sequenceProposal);
+    if(form.get("from")!==editor.sequenceProposal.from||
+       active!==editor.sequenceProposal.projectId||
+       editor.action!=="dep-to:"+encodeURIComponent(editor.sequenceProposal.to))
+     throw Error("Выбран другой порядок. Повторите сравнение перед применением.");
+   }
    const formProject=editor.action.startsWith("plan-review:")?
    decodeURIComponent(editor.action.split(":")[3]||""):editor.action.startsWith("plan-proposal:")?
    decodeURIComponent(editor.action.split(":")[1]||""):active;
@@ -2433,7 +2456,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
        {resourceComparisonId===r.id&&<tr className="atlas-resource-comparison-row"><td colSpan={6}>
         <ResourceAlternatives key={r.id} snapshot={data} forecast={dates} resources={resources}
          resourceId={r.id} onClose={()=>setResourceComparisonId(null)}
-         onOpenWork={(pid,wid,comparison)=>openEditorFor(pid,"work:"+wid,comparison)}/>
+         onOpenWork={(pid,wid,comparison)=>openEditorFor(pid,"work:"+wid,comparison)}
+         onOpenSequence={(pid,option)=>openEditorFor(pid,"dep-to:"+encodeURIComponent(option.to),option)}/>
        </td></tr>}
       </React.Fragment>)}</tbody></table></div>:
       <Fallback message="Плановые ресурсы пока не добавлены. Назначения ответственных в текстовых полях не считаются подтверждёнными ресурсами."/>}
@@ -2449,7 +2473,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      {resources.totals.unlinked>0&&resourceComparisonId===""&&<ResourceAlternatives
       key="unlinked" snapshot={data} forecast={dates} resources={resources} resourceId={null}
       onClose={()=>setResourceComparisonId(null)}
-      onOpenWork={(pid,wid,comparison)=>openEditorFor(pid,"work:"+wid,comparison)}/>}
+      onOpenWork={(pid,wid,comparison)=>openEditorFor(pid,"work:"+wid,comparison)}
+         onOpenSequence={(pid,option)=>openEditorFor(pid,"dep-to:"+encodeURIComponent(option.to),option)}/>}
 
     </section>
     <section id="atlas-portfolio-ecosystem" tabIndex={-1} className="surface atlas-ecosystem-overview" aria-label="Карта разработки по проектам и GitHub">

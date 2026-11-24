@@ -68,6 +68,7 @@ export function ProjectOrganizationGuide({snapshot,projectId,portfolioForecast,r
      {readiness.totals.waiting>0?" Ждут предшественников: "+readiness.totals.waiting+".":""}
      {readiness.totals.blocked>0?" Заблокированы: "+readiness.totals.blocked+".":""}
      {readiness.totals.review>0?" Проверить ресурсы: "+readiness.totals.review+".":""}
+     {readiness.totals.unlinked>0?" Без привязки к ресурсу: "+readiness.totals.unlinked+".":""}
      {readiness.totals.no_dates>0?" Уточнить даты: "+readiness.totals.no_dates+".":""}</span>
    </div>
    <details className="atlas-work-plan-readiness-details">

@@ -114,3 +114,33 @@ test('UI and source enforce planning-only responsibility, no additional Task or 
  assert.match(source,/portfolioSchedule\(snapshot\)/);
  assert.match(source,/portfolioResources\(snapshot,\{schedule:forecast\}\)/);
 });
+
+test('An unrelated later Work using the same resource is not blamed for an earlier overload',()=>{
+ const a=project(),pid=projectId(a);
+ const resource=addPlanningResource(a,{label:'Кран',capacityPct:100});
+ const one=createItem(resource.state,pid,{title:'Первая',resourceId:resource.id,allocationPct:70});
+ const two=createItem(one.state,pid,{title:'Вторая',resourceId:resource.id,allocationPct:60});
+ const later=createItem(two.state,pid,{title:'Поздняя',resourceId:resource.id,allocationPct:100});
+ let s=editItem(later.state,pid,one.id,{estimateDays:3});
+ s=editItem(s,pid,two.id,{estimateDays:3});
+ s=connect(s,pid,one.id,later.id);
+ s=connect(s,pid,two.id,later.id);
+ const view=projectWorkPlanReadiness(s,pid);
+ assert.equal(view.rows.find(w=>w.id===one.id).resourceConflict.overloadDays,3);
+ assert.equal(view.rows.find(w=>w.id===two.id).resourceConflict.overloadDays,3);
+ const late=view.rows.find(w=>w.id===later.id);
+ assert.equal(late.resourceReview,false);
+ assert.equal(late.resourceConflict.overloadDays,0);
+ assert.equal(late.status,'waiting');
+});
+test('The exclusive CPM finish does not exceed the inclusive last available day',()=>{
+ const a=project(),pid=projectId(a);
+ const r=addPlanningResource(a,{label:'Ресурс',capacityPct:100,availableUntil:'2026-11-23'});
+ const w=createItem(r.state,pid,{title:'Один день',resourceId:r.id,allocationPct:100});
+ const loose=createItem(w.state,pid,{title:'Без привязки'});
+ const view=projectWorkPlanReadiness(loose.state,pid);
+ assert.equal(view.rows.find(x=>x.id===w.id).finishDate,'2026-11-24');
+ assert.equal(view.rows.find(x=>x.id===w.id).resourceReview,false);
+ assert.equal(view.totals.unlinked,1);
+ assert.equal(view.rows.find(x=>x.id===loose.id).resourceUnlinked,true);
+});

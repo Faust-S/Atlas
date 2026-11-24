@@ -1,9 +1,11 @@
 import React,{useMemo,useState} from 'react';
 import {previewWorkResourceReassignment,compareWorkResourceAlternatives} from '../../src/resource-alternatives.mjs';
 import {projectResourceReassignment,resourceConflictPeriods} from '../../src/portfolio-resources.mjs';
+import {compareResourceSequenceAlternatives} from '../../src/resource-sequence-alternatives.mjs';
 
 type Props={snapshot:any;forecast:any;resources:any;resourceId:string|null;
- onClose:()=>void;onOpenWork:(projectId:string,workId:string,comparison:any)=>void};
+ onClose:()=>void;onOpenWork:(projectId:string,workId:string,comparison:any)=>void;
+ onOpenSequence:(projectId:string,option:any)=>void};
 const key=(w:any)=>JSON.stringify([w.projectId,w.id]);
 const change=(value:number)=>value>0?'+'+value:String(value);
 function deadlineLine(label:string,deadline:{forecastFinish:string|null;controlDate:string|null;slipDays:number|null}){
@@ -15,8 +17,86 @@ function deadlineLine(label:string,deadline:{forecastFinish:string|null;controlD
 }
 
 
+
+/** Compare two selected participants of the current, not hypothetical, overload. */
+function ResourceSequencePanel({snapshot,forecast,resources,period,onOpenSequence}:{
+ snapshot:any;forecast:any;resources:any;period:any;
+ onOpenSequence:Props['onOpenSequence']}){
+ const [selected,setSelected]=useState<any[]>([]);
+ const [show,setShow]=useState(false);
+ const toggle=(w:any)=>{
+  setShow(false);
+  setSelected(old=>{
+   const exists=old.some(x=>x.projectId===w.projectId&&x.workId===w.workId);
+   return exists?old.filter(x=>x.projectId!==w.projectId||x.workId!==w.workId):
+    [...old.slice(-1),w];
+  });
+ };
+ const sameProject=selected.length===2&&selected[0].projectId===selected[1].projectId;
+ const result=useMemo(()=>{
+  if(!show||!sameProject)return null;
+  try{return {value:compareResourceSequenceAlternatives(snapshot,{
+   projectId:selected[0].projectId,firstWorkId:selected[0].workId,secondWorkId:selected[1].workId
+  },{schedule:forecast,resources})};}
+  catch(error){return {error:error instanceof Error?error.message:'Расчёт порядка недоступен'};}
+ },[snapshot,forecast,resources,selected,show,sameProject]);
+ return <section className="atlas-resource-sequence" aria-label="Варианты порядка конфликтующих работ">
+  <strong>Изменить порядок работ</strong>
+  <p>Выберите две работы одного проекта. Сравнение добавляет только предлагаемую связь в расчёт. Технологическую допустимость определяет пользователь.</p>
+  <div className="atlas-resource-period-nav">
+   {period.works.map((w:any)=>{
+    const active=selected.some(x=>x.projectId===w.projectId&&x.workId===w.workId);
+    return <button type="button" key={key({projectId:w.projectId,id:w.workId})}
+     aria-pressed={active} aria-label={'Выбрать для порядка '+w.projectName+': '+w.title}
+     onClick={()=>toggle(w)}>{w.title}{active?' (выбрана)':''}</button>;
+   })}
+  </div>
+  <small>{selected.length?'Выбрано: '+selected.map(x=>x.projectName+': '+x.title).join('; '):'Выбрано 0 из 2.'}</small>
+  {selected.length===2&&!sameProject&&<p role="status">Работы относятся к разным проектам. Atlas не создаёт искусственную связь между проектами.</p>}
+  <button type="button" className="atlas-resource-options-toggle" disabled={!sameProject}
+   onClick={()=>setShow(true)}>Сравнить порядок двух работ</button>
+  {result&&'error' in result&&<p role="status">{result.error}</p>}
+  {result&&'value' in result&&result.value&&<div className="atlas-resource-options-list">
+   {result.value.alternatives.map((option:any)=>{
+    const title=option.fromTitle+' → '+option.toTitle;
+    if(!option.valid)return <div className="atlas-resource-option" key={option.from}>
+     <strong>{title}</strong><small>{option.reason}</small></div>;
+    const summary='Порядок: '+title+'. Перегрузка портфеля: '+option.before.overloadDays+
+     ' → '+option.after.overloadDays+' дн. Финиш проекта: '+
+     (option.project.beforeFinish||'не определён')+' → '+(option.project.afterFinish||'не определён')+'.';
+    return <div className="atlas-resource-option" key={option.from}>
+     <div><strong>{title}</strong><small role="status" aria-label={summary}>{summary}</small>
+      <small>{'Вне доступности по портфелю: '+option.before.unavailableDays+' → '+option.after.unavailableDays+' дн.'}</small>
+      <small>{option.source.label+': перегрузка '+option.source.overloadBefore+' → '+option.source.overloadAfter+' дн.'}</small>
+      <small>{'Критический путь: изменено работ '+option.affected.criticalChangedTotal+
+       '; новых нарушений сроков работ '+option.affected.deadlineNewMissedTotal+'.'}</small>
+      <small>{'Контроль проекта: '+(option.project.dueDate||'не задан')+
+       '. Отклонение: '+(option.project.beforeSlip??'не определено')+' → '+(option.project.afterSlip??'не определено')+' дн.'}</small>
+      <small>{'Затронуто связанных проектов: '+option.portfolio.affectedTotal+
+       '; новых рисков срока: '+option.portfolio.newDeadlineRisks+'.'}</small>
+      {option.portfolio.rows.slice(0,3).map((r:any)=><small key={r.id}>
+       {r.name+': '+(r.previousFinish||'не определён')+' → '+(r.projectedFinish||'не определён')}</small>)}
+      {option.portfolio.affectedTotal>3&&<small>{'Ещё связанных проектов: '+(option.portfolio.affectedTotal-3)}</small>}
+      <small>{'Ресурсов с ухудшением: '+option.worsenedResources+'; с улучшением: '+option.improvedResources+'.'}</small>
+      {option.resourceExamples.map((r:any)=><small key={r.id}>
+       {r.label+': перегрузка '+r.overloadBefore+' → '+r.overloadAfter+
+        ' дн.; вне доступности '+r.availabilityBefore+' → '+r.availabilityAfter+' дн.'}</small>)}
+      {option.resourcesChanged>option.resourceExamples.length&&<small>{'Ещё изменённых ресурсов: '+(option.resourcesChanged-option.resourceExamples.length)}</small>}
+      {option.unknown&&<small>Часть расчётных дат отсутствует.</small>}
+      <small>{option.note}</small>
+     </div>
+     <button type="button" aria-label={'Открыть порядок '+title}
+      onClick={()=>onOpenSequence(option.projectId,option)}>Открыть зависимость</button>
+    </div>;
+   })}
+  </div>}
+ </section>;
+}
+
 /** On-demand interval explanation; the ordinary editor still owns changes. */
-function ConflictPeriodPage({group,onOpenWork}:{group:any;onOpenWork:Props['onOpenWork']}){
+function ConflictPeriodPage({group,onOpenWork,snapshot,forecast,resources,allowSequence,onOpenSequence}:{
+ group:any;onOpenWork:Props['onOpenWork'];snapshot:any;forecast:any;resources:any;
+ allowSequence:boolean;onOpenSequence:Props['onOpenSequence']}){
  const [offset,setOffset]=useState(0),[workOffset,setWorkOffset]=useState(0);
  const view=useMemo(()=>resourceConflictPeriods(group,{offset,workOffset,workLimit:6}),
   [group,offset,workOffset]);
@@ -40,6 +120,9 @@ function ConflictPeriodPage({group,onOpenWork}:{group:any;onOpenWork:Props['onOp
      <button type="button" aria-label={'Открыть работу конфликта '+w.projectName+': '+w.title}
       onClick={()=>onOpenWork(w.projectId,w.workId,null)}>Открыть Work</button>
     </div>)}
+    {allowSequence&&p.kind==='overload'&&p.workCount>=2&&
+     <ResourceSequencePanel key={offset} snapshot={snapshot} forecast={forecast} resources={resources}
+      period={p} onOpenSequence={onOpenSequence}/>}
     {p.workCount>p.workLimit&&<div className="atlas-resource-period-nav">
      <button type="button" disabled={p.workOffset===0} onClick={()=>setWorkOffset(n=>Math.max(0,n-6))}>Предыдущие работы</button>
      <small>{'Работы '+(p.workOffset+1)+'-'+(p.workOffset+p.works.length)+' из '+p.workCount}</small>
@@ -50,8 +133,9 @@ function ConflictPeriodPage({group,onOpenWork}:{group:any;onOpenWork:Props['onOp
   </>}
  </div>;
 }
-function ResourceConflictDetails({resources,resourceId,preview,onOpenWork}:{
- resources:any;resourceId:string|null;preview:any;onOpenWork:Props['onOpenWork']}){
+function ResourceConflictDetails({resources,resourceId,preview,onOpenWork,snapshot,forecast,onOpenSequence}:{
+ resources:any;resourceId:string|null;preview:any;onOpenWork:Props['onOpenWork'];
+ snapshot:any;forecast:any;onOpenSequence:Props['onOpenSequence']}){
  const [show,setShow]=useState(false),[selected,setSelected]=useState('source-now');
  const groups=useMemo(()=>{
   if(!show)return [];
@@ -79,13 +163,14 @@ function ResourceConflictDetails({resources,resourceId,preview,onOpenWork}:{
      onClick={()=>setSelected(g.key)}>{g.label}</button>)}
    </div>
    <ConflictPeriodPage key={choice.key+':'+choice.group.id+':'+(preview?.workId??'')+':'+(preview?.target.id??'')}
-    group={choice.group} onOpenWork={onOpenWork}/>
+    group={choice.group} onOpenWork={onOpenWork} snapshot={snapshot} forecast={forecast} resources={resources}
+    allowSequence={choice.key==='source-now'||choice.key==='target-now'} onOpenSequence={onOpenSequence}/>
   </>}
  </section>;
 }
 
 /** Planning choices only. The existing Work editor owns any actual change. */
-export function ResourceAlternatives({snapshot,forecast,resources,resourceId,onClose,onOpenWork}:Props){
+export function ResourceAlternatives({snapshot,forecast,resources,resourceId,onClose,onOpenWork,onOpenSequence}:Props){
  const assigned=resources.work.filter((w:any)=>w.resourceId===resourceId&&w.state!=='done');
  const alternatives=resources.people.filter((r:any)=>r.id!==resourceId);
  const [chosenWork,setChosenWork]=useState('');
@@ -131,7 +216,7 @@ export function ResourceAlternatives({snapshot,forecast,resources,resourceId,onC
    Прогноз не изменяет проект или сохранённые данные.</p>
   {assigned.length===0?<p>{resourceId===null?'Нет работ без ресурсного назначения.':'К этому ресурсу нет незавершённых работ.'}</p>:
   alternatives.length===0?<><p>Нет доступных для сравнения плановых ресурсов. Добавьте ресурс.</p>
-   <ResourceConflictDetails resources={resources} resourceId={resourceId} preview={null} onOpenWork={onOpenWork}/></>:
+   <ResourceConflictDetails resources={resources} resourceId={resourceId} preview={null} onOpenWork={onOpenWork} snapshot={snapshot} forecast={forecast} onOpenSequence={onOpenSequence}/></>:
   <>
    <div className="atlas-resource-alternatives-controls">
     <label>Работа
@@ -182,8 +267,8 @@ export function ResourceAlternatives({snapshot,forecast,resources,resourceId,onC
 
     <section className="atlas-resource-deadlines" role="region" aria-label="Контрольные сроки и ресурсные ограничения">
      <strong>Контрольные сроки и ресурсные ограничения</strong>
-     <p>{deadlineLine('Work',preview.controlDates.work)}</p>
-     <p>{deadlineLine('Проект',preview.controlDates.project)}</p>
+     <p role="status" aria-label={deadlineLine('Work',preview.controlDates.work)}>{deadlineLine('Work',preview.controlDates.work)}</p>
+     <p role="status" aria-label={deadlineLine('Проект',preview.controlDates.project)}>{deadlineLine('Проект',preview.controlDates.project)}</p>
      {preview.controlDates.baseline&&<p>Контрольный план:
       {preview.controlDates.baseline.name}, финиш
       {preview.controlDates.baseline.forecastFinish||'не определён'}.</p>}
@@ -192,7 +277,7 @@ export function ResourceAlternatives({snapshot,forecast,resources,resourceId,onC
     <p className="atlas-resource-alternatives-note">{preview.note}</p>
 
    </>}
-   <ResourceConflictDetails resources={resources} resourceId={resourceId} preview={preview} onOpenWork={onOpenWork}/>
+   <ResourceConflictDetails resources={resources} resourceId={resourceId} preview={preview} onOpenWork={onOpenWork} snapshot={snapshot} forecast={forecast} onOpenSequence={onOpenSequence}/>
    {showAll&&comparisonError&&<p role="status">{comparisonError}</p>}
    {showAll&&pageData&&<section className="atlas-resource-options" aria-label="Сравнение нескольких ресурсных альтернатив">
     <strong>Все варианты назначения</strong>
@@ -212,9 +297,11 @@ export function ResourceAlternatives({snapshot,forecast,resources,resourceId,onC
         <small>Устранено или сокращено: {c.relieved.length};
          новых конфликтов: {c.introduced.length};
          усилено существующих: {c.worsened.length}.</small>
-        {c.introduced.map((x:any)=><small key={x.resourceId+x.kind}>
-         {'Новый конфликт: '+x.resourceLabel+', '+
-         (x.kind==='overload'?'перегрузка':'вне периода доступности')+' '+x.days+' дн.'}</small>)}
+        {c.introduced.map((x:any)=>{
+         const label='Новый конфликт: '+x.resourceLabel+', '+
+          (x.kind==='overload'?'перегрузка':'вне периода доступности')+' '+x.days+' дн.';
+         return <small key={x.resourceId+x.kind} role="status" aria-label={label}>{label}</small>;
+        })}
         {c.worsened.map((x:any)=><small key={x.resourceId+x.kind}>
          Усиление: {x.resourceLabel}, {x.days} дн.</small>)}
         {c.relieved.map((x:any)=><small key={x.resourceId+x.kind}>
