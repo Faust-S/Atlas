@@ -40,6 +40,7 @@ import {ProjectOrganizationGuide} from "./ProjectOrganizationGuide";
 import {ResourceAlternatives} from "./ResourceAlternatives";
 import {prepareResourceEditorChoice,assertResourceEditorChoiceCurrent} from "../../src/resource-alternatives.mjs";
 import {prepareResourceSequenceChoice,assertResourceSequenceChoiceCurrent} from "../../src/resource-sequence-alternatives.mjs";
+import {planAmendmentKey} from "../../src/core.mjs";
 import {projectSourcePlanWorkContext,projectWorkTableSearch} from "../../src/project-organization.mjs";
 import {repoName} from "../../src/github-public.mjs";
 import {applyPublicProjectPreview} from "../../src/project-onboarding.mjs";
@@ -225,7 +226,9 @@ function EditorPanel({editor,onSubmit,onCancel,onDirtyChange,busy,project,plan,c
    {editor.sequenceProposal&&<p className="atlas-resource-editor-proposal" role="status"
     aria-label={'Предложенный порядок: '+editor.sequenceProposal.fromTitle+' → '+editor.sequenceProposal.toTitle+'.'}>
     Предложенный порядок: {editor.sequenceProposal.fromTitle} → {editor.sequenceProposal.toTitle}.
-    {fields.from===editor.sequenceProposal.from?
+    {editor.action.startsWith("sequence-amendment:")?
+     " Связь войдёт только в заявку. Текущий граф работ не меняется.":
+     fields.from===editor.sequenceProposal.from?
      " Подтвердите только технологически допустимую связь. Она ещё не внесена в черновик.":
      " Предшественник изменён. Вернитесь к проверенному варианту или откройте обычный редактор зависимости."}
    </p>}
@@ -1457,7 +1460,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    const sequenceProposal=comparison?.kind==="RESOURCE_SEQUENCE_OPTION"?
     prepareResourceSequenceChoice(data,comparison):undefined;
    const resourceProposal=comparison&&!sequenceProposal?prepareResourceEditorChoice(data,comparison):undefined;
-   if(sequenceProposal&&(action!=="dep-to:"+encodeURIComponent(sequenceProposal.to)||
+   if(sequenceProposal&&((action!=="dep-to:"+encodeURIComponent(sequenceProposal.to)&&
+      action!=="sequence-amendment:"+encodeURIComponent(sequenceProposal.from)+":"+encodeURIComponent(sequenceProposal.to))||
       projectId!==sequenceProposal.projectId))
     throw Error("Предложенный порядок относится к другой зависимости");
    if(resourceProposal&&((action!=="work:"+resourceProposal.workId&&
@@ -1466,7 +1470,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     throw Error("Ресурсный вариант относится к другой работе");
    resetWorkspaceScroll();
    setActive(projectId);setHomeOpen(false);setSettingsOpen(false);
-   setTab(action.startsWith("plan-")||action.startsWith("resource-amendment:")?"changes":"reality");
+   setTab(action.startsWith("plan-")||action.startsWith("resource-amendment:")||
+    action.startsWith("sequence-amendment:")?"changes":"reality");
    inspectorEditorReturnRef.current=false;
    setEditor({action,spec:editorSpec(p,action,data),resourceProposal,sequenceProposal});setInspector(true);
    if(!embedded&&window.innerWidth<1150)setNavPanelOpen(false);
@@ -1505,9 +1510,10 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     throw Error("Назначение изменилось. Повторите сравнение перед добавлением в заявку.");
    if(editor.sequenceProposal){
     assertResourceSequenceChoiceCurrent(data,editor.sequenceProposal);
-    if(form.get("from")!==editor.sequenceProposal.from||
-       active!==editor.sequenceProposal.projectId||
-       editor.action!=="dep-to:"+encodeURIComponent(editor.sequenceProposal.to))
+    const proposedAction="sequence-amendment:"+encodeURIComponent(editor.sequenceProposal.from)+":"+encodeURIComponent(editor.sequenceProposal.to);
+    const directAction="dep-to:"+encodeURIComponent(editor.sequenceProposal.to);
+    if(active!==editor.sequenceProposal.projectId||
+       (editor.action!==proposedAction&&(editor.action!==directAction||form.get("from")!==editor.sequenceProposal.from)))
      throw Error("Выбран другой порядок. Повторите сравнение перед применением.");
    }
    const formProject=editor.action.startsWith("plan-review:")?
@@ -1516,10 +1522,12 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    const result=applyEditor(data,formProject,editor.action,form);
    mutate(result.state,"Изменение внесено в черновик. Для записи на диск нажмите «Сохранить».");
    if(result.projectId)selectProject(result.projectId,true);
-   if(editor.action.startsWith("resource-amendment:")&&result.changeId&&formProject){
+   if((editor.action.startsWith("resource-amendment:")||editor.action.startsWith("sequence-amendment:"))&&result.changeId&&formProject){
     setTab("changes");setForecastId(result.changeId);
     setChangeJump({projectId:formProject,changeId:result.changeId});
-    setMessage("Ресурсный вариант добавлен в заявку. Текущая Work не изменена. Проверьте общий сценарий и сохраните заявку.");
+    setMessage(editor.action.startsWith("resource-amendment:")?
+     "Ресурсный вариант добавлен в заявку. Текущая Work не изменена. Проверьте общий сценарий и сохраните заявку.":
+     "Порядок добавлен в заявку. Текущий граф не изменён. Проверьте общий сценарий и сохраните заявку.");
    }
    if(result.workId){
     const updatedProject=result.state.projects.find((p:any)=>p.id===formProject);
@@ -2481,7 +2489,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
         <ResourceAlternatives key={r.id} snapshot={data} forecast={dates} resources={resources}
          resourceId={r.id} onClose={()=>setResourceComparisonId(null)}
          onOpenWork={(pid,wid,comparison)=>openEditorFor(pid,"work:"+wid,comparison)}
-         onOpenSequence={(pid,option)=>openEditorFor(pid,"dep-to:"+encodeURIComponent(option.to),option)}
+         onOpenSequence={(pid,option,asProposal)=>asProposal?
+          openEditorFor(pid,"sequence-amendment:"+encodeURIComponent(option.from)+":"+encodeURIComponent(option.to),option):
+          openEditorFor(pid,"dep-to:"+encodeURIComponent(option.to),option)}
          onOpenAmendment={(pid,wid,comparison)=>openEditorFor(pid,"resource-amendment:"+encodeURIComponent(wid),comparison)}/>
        </td></tr>}
       </React.Fragment>)}</tbody></table></div>:
@@ -2499,7 +2509,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       key="unlinked" snapshot={data} forecast={dates} resources={resources} resourceId={null}
       onClose={()=>setResourceComparisonId(null)}
       onOpenWork={(pid,wid,comparison)=>openEditorFor(pid,"work:"+wid,comparison)}
-         onOpenSequence={(pid,option)=>openEditorFor(pid,"dep-to:"+encodeURIComponent(option.to),option)}
+         onOpenSequence={(pid,option,asProposal)=>asProposal?
+          openEditorFor(pid,"sequence-amendment:"+encodeURIComponent(option.from)+":"+encodeURIComponent(option.to),option):
+          openEditorFor(pid,"dep-to:"+encodeURIComponent(option.to),option)}
          onOpenAmendment={(pid,wid,comparison)=>openEditorFor(pid,"resource-amendment:"+encodeURIComponent(wid),comparison)}/>}
 
     </section>
@@ -3405,6 +3417,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
        {["proposed","deferred"].includes(c.status)&&<>
         <Action onClick={()=>openEditor("amend-dates:"+c.id)}>Даты</Action>
         {project.items.length>0&&<Action onClick={()=>openEditor("amend-work:"+c.id)}>Изменить работу</Action>}
+        {project.items.filter((w:any)=>["todo","blocked"].includes(w.state)&&!w.actualStartDate&&!w.actualFinishDate).length>1&&
+         <Action onClick={()=>openEditor("amend-dependency:"+c.id)}>Изменить связь</Action>}
         <Action onClick={()=>openEditor("amend-new:"+c.id)}>Добавить работу</Action></>}
        {["approved","in_progress"].includes(c.status)&&<Action onClick={()=>openEditor("work-change:"+c.id)}>
         {project.items.some((w:any)=>w.changeId===c.id)?"＋ Ещё связанная работа":"＋ Создать связанную работу"}</Action>}
@@ -3416,7 +3430,10 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       {!!c.planAmendments?.length&&<div className="table-scroll"><table>
        <thead><tr><th>Корректировка</th><th>Было</th><th>Предлагается</th><th>Действие</th></tr></thead>
        <tbody>{c.planAmendments.map((a:any,i:number)=>{
-        const key=a.kind==="dates"?"dates":a.kind==="work"?"work:"+a.itemId:"new_work:"+a.id;
+        const key=planAmendmentKey(a);
+        const dependencyTitle=a.kind==="dependency"?
+         (project.items.find((w:any)=>w.id===a.from)?.title||"Работа")+" → "+
+         (project.items.find((w:any)=>w.id===a.to)?.title||"Работа"):null;
         const item=a.kind==="work"?project.items.find((w:any)=>w.id===a.itemId):null;
         const assignment=(w:any)=>" · ресурс: "+(resources.byId.get(w.resourceId)?.label||"не назначен")+
          " · доля: "+(w.allocationPct??100)+"%";
@@ -3425,15 +3442,16 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
          a.kind==="work"?
          (a.before.estimateDays??1)+(a.before.durationUnit==="working_days"?" раб. дн.":" кал. дн.")+
           " · срок: "+readable(a.before.dueDate)+assignment(a.before):
-         "Работа отсутствует";
+         a.kind==="dependency"?(a.before?"Связь есть":"Связи нет"):"Работа отсутствует";
         const after=a.kind==="dates"?
          "Начало: "+readable(a.after.startDate)+" · срок: "+readable(a.after.dueDate):
          a.kind==="work"?
          (a.after.estimateDays??1)+(a.before.durationUnit==="working_days"?" раб. дн.":" кал. дн.")+
           " · срок: "+readable(a.after.dueDate)+assignment(a.after):
+         a.kind==="dependency"?(a.after?"Добавить связь":"Удалить связь"):
          (a.estimateDays??1)+" кал. дн. · срок: "+readable(a.dueDate)+assignment(a);
         return <tr key={key+"-"+i}>
-         <td>{a.kind==="dates"?"Даты проекта":a.kind==="work"?"Работа: "+(item?.title||"Не найдена"):"Новая работа: "+a.title}</td>
+         <td>{a.kind==="dates"?"Даты проекта":a.kind==="work"?"Работа: "+(item?.title||"Не найдена"):a.kind==="dependency"?"Порядок: "+dependencyTitle:"Новая работа: "+a.title}</td>
          <td>{before}</td><td>{after}</td>
          <td>{["proposed","deferred"].includes(c.status)&&!c.planAppliedAt?
           <Action onClick={()=>removeAmendment(c.id,key)}>Убрать</Action>:"—"}</td>

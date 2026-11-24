@@ -60,6 +60,14 @@ export function AmendmentAnalysis({result,compact=false}:{result:any;compact?:bo
     {result.rows.length>projects&&<button type="button" className="action-button" onClick={()=>setProjects(n=>n+8)}>
      Ещё проекты ({result.rows.length-projects})</button>}
    </details>
+   {result.dependencyRows?.length>0&&<details open={!compact}>
+    <summary>Изменения порядка работ ({result.dependencyRows.length})</summary>
+    <div className="atlas-amendment-rows">{result.dependencyRows.map((r:any)=>
+     <div className="atlas-amendment-row" key={JSON.stringify([r.from,r.to])}>
+      <strong>{r.fromTitle+" → "+r.toTitle}</strong>
+      <small>{r.after?"Добавить зависимость":"Удалить зависимость"}</small>
+     </div>)}</div>
+   </details>}
    <details>
     <summary>Затронутые работы и резервы ({result.workRows.length})</summary>
     <div className="atlas-amendment-rows">{result.workRows.slice(0,works).map((w:any)=>

@@ -41,7 +41,11 @@ def qualify():
     child=next(p for p in original['projects'] if p['id']!=project['id'])
     proposals={c['title']:c for c in project['changes']}
     assert proposals[A]['status']=='approved' and proposals[B]['status']=='proposed'
-    assert len(proposals[A]['planAmendments'])==len(proposals[B]['planAmendments'])==2
+    assert len(proposals[A]['planAmendments'])==3
+    assert len(proposals[B]['planAmendments'])==2
+    edge=next(a for a in proposals[A]['planAmendments'] if a['kind']=='dependency')
+    assert edge['before'] is False and edge['after'] is True
+    assert project['dependencies']==[]
     previous=d.head()
     v.ARCHIVE=ARCHIVE
     d.launch()
@@ -80,7 +84,7 @@ def qualify():
     d.wait_text('Предложения и утверждённые изменения',35)
     click('Сравнить варианты плана')
     click('Рассчитать два сценария')
-    find('Финиш проекта: 2026-11-26 → 2026-11-26.',contains=True)
+    find('Финиш проекта: 2026-11-26 → 2026-11-29.',contains=True)
     find('Финиш проекта: 2026-11-26 → 2026-11-28.',contains=True)
     assert d.head()==saved,'Comparing two proposals wrote to Native Store'
     v.capture('atlas12-multi-work-alternatives-820')
@@ -100,11 +104,12 @@ def qualify():
     result=stored_project(committed,project['id'])
     expected=json.loads(json.dumps(project['items']))
     for action in proposals[A]['planAmendments']:
-        work=next(w for w in expected if w['id']==action['itemId'])
-        work.update(action['after'])
+        if action['kind']=='work':
+            work=next(w for w in expected if w['id']==action['itemId'])
+            work.update(action['after'])
     assert result['items']==expected
     assert result['planBaselines']==project['planBaselines']
-    assert result['dependencies']==project['dependencies']
+    assert result['dependencies']==[{'from':edge['from'],'to':edge['to']}]
     assert next(c for c in result['changes'] if c['id']==proposals[A]['id'])['planAppliedAt']
     assert next(c for c in result['changes'] if c['id']==proposals[B]['id'])==proposals[B]
     assert any(x.get('kind')=='plan_application' and x.get('changeId')==proposals[A]['id'] for x in result['decisions'])
@@ -118,6 +123,8 @@ def qualify():
     d.wait_text('Настроить дашборд',45)
     assert d.head()==committed
     assert stored_project(committed,project['id'])==result
+    assert stored_project(committed,project['id'])['dependencies']==[{'from':edge['from'],'to':edge['to']}]
+    print('ATLAS12_NATIVE_COMPOUND_PLAN_DEPENDENCY_SAVE_COLD_RESTORE_PASS',flush=True)
     print('ATLAS12_NATIVE_COMPOUND_PLAN_SAVE_COLD_RESTORE_PASS',flush=True)
 
 if __name__=='__main__':

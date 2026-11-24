@@ -6,7 +6,7 @@ import {projectImpact} from "./impact.mjs";
 import {parseRecheckAction,recheckCandidate} from "./revision-review.mjs";
 import {addPortfolioLink} from "./portfolio.mjs";
 import {parsePlanReviewAction,parsePlanProposalAction,planReviewContext,decidePlanReview,planProposalContext} from "./plan-review.mjs";
-import {setPlanDates,setPlanWork,addPlanWork,checkPlanAmendment,addResourcePlanChoice} from "./plan-amendment.mjs";
+import {setPlanDates,setPlanWork,addPlanWork,checkPlanAmendment,addResourcePlanChoice,setPlanDependency,addSequencePlanChoice} from "./plan-amendment.mjs";
 import {addPlanningResource,editPlanningResource,resourceChoiceOptions} from "./resource-planning.mjs";
 import {repoName,ownerName,branchName} from "./github-public.mjs";
 import {selectedSourceFolder} from "./project-organization.mjs";
@@ -178,6 +178,21 @@ export function editorSpec(project,action,snapshot=null){
     field("description","Предлагаемое изменение и причины","textarea",ctx.decision.text,true)
    ]};
  }
+ if(action.startsWith("sequence-amendment:")){
+  if(!project||!snapshot)throw Error("Для заявки требуется проект");
+  const parts=action.slice("sequence-amendment:".length).split(":").map(decodeURIComponent);
+  if(parts.length!==2||parts[0]===parts[1])throw Error("Неверная зависимость");
+  const from=project.items.find(w=>w.id===parts[0]),to=project.items.find(w=>w.id===parts[1]);
+  if(!from||!to)throw Error("Работы зависимости не найдены");
+  const existing=(project.changes??[]).filter(c=>["proposed","deferred"].includes(c.status)&&!c.planAppliedAt);
+  return {title:"Порядок в заявке: "+from.title+" → "+to.title,
+   hint:"Связь войдёт в неутверждённую заявку, а не в текущий граф. Проверьте технологическую допустимость и затем общий прогноз.",
+   fields:[
+    choice("changeId","Заявка",[option("","Новая заявка"),...existing.map(c=>option(c.id,c.title))],"",false),
+    field("title","Название новой заявки","text","Порядок: "+from.title+" → "+to.title,false),
+    field("description","Основание новой заявки","textarea","Сравнение порядка конфликтующих работ.",false)
+   ]};
+ }
  if(action.startsWith("resource-amendment:")){
   if(!project||!snapshot)throw Error("Для заявки требуется проект");
   const workId=decodeURIComponent(action.slice("resource-amendment:".length));
@@ -195,7 +210,7 @@ export function editorSpec(project,action,snapshot=null){
     choice("resourceId","Плановый ресурс",targets,targets[0].value)
    ]};
  }
- if(action.startsWith("amend-dates:")||action.startsWith("amend-work:")||action.startsWith("amend-new:")){
+ if(action.startsWith("amend-dates:")||action.startsWith("amend-work:")||action.startsWith("amend-new:")||action.startsWith("amend-dependency:")){
   if(!snapshot||!project)throw Error("Для корректировки требуется снимок проекта");
   const kind=action.split(":")[0],id=action.slice(kind.length+1);
   const change=(project.changes||[]).find(x=>x.id===id);
@@ -207,6 +222,15 @@ export function editorSpec(project,action,snapshot=null){
    field("startDate","Плановое начало","date",dateAction?(dateAction.after.startDate??""):(project.startDate??""),false),
    field("dueDate","Контрольный срок","date",dateAction?(dateAction.after.dueDate??""):(project.dueDate??""),false)
   ]};
+  if(kind==="amend-dependency"){
+   const available=project.items.filter(w=>["todo","blocked"].includes(w.state)&&!w.actualStartDate&&!w.actualFinishDate);
+   if(available.length<2)throw Error("Нужны две ещё не начатые работы");
+   const options=available.map(w=>option(w.id,w.title));
+   return {title:"Изменить связь: "+change.title,hint:context+" Выберите две разные работы и добавление или удаление зависимости.",
+    fields:[choice("from","Предшественник",options,available[0].id),
+     choice("to","Последующая работа",options,available[1].id),
+     choice("presence","Действие",[option("add","Добавить зависимость"),option("remove","Удалить зависимость")],"add")]};
+  }
   if(kind==="amend-work"){
    if(!project.items.length)throw Error("В проекте пока нет работ");
    const presets=Object.fromEntries(project.items.map(item=>{
@@ -388,7 +412,9 @@ export function editorSpec(project,action,snapshot=null){
  if(action.startsWith("change:")){
   const c=(project.changes||[]).find(x=>x.id===action.slice(7));if(!c)throw Error("Изменение не найдено");
   const choices={proposed:["approved","rejected","deferred"],deferred:["approved","rejected"],approved:["in_progress","deferred"],in_progress:["implemented","deferred"]};
-  const allowed=choices[c.status]||[];
+  const allowed=(choices[c.status]||[]).filter(status=>
+   !(c.planAppliedAt&&status==="deferred")&&
+   !(c.planAmendments?.length&&!c.planAppliedAt&&status==="implemented"));
   if(!allowed.length)throw Error("Изменение завершено или отклонено");
   return {title:"Решение: "+c.title,hint:"Решение и обоснование останутся в истории. Если заявка содержит конкретную корректировку, утверждение не применяет её автоматически.",fields:[
    choice("status","Новый статус",changeOptions.filter(o=>allowed.includes(o.value)),allowed[0]),
@@ -506,6 +532,18 @@ export function applyEditor(snapshot,projectId,action,input){
  }
  if(action==="resource-new")return {state:addPlanningResource(snapshot,{label:get("label"),capacityPct:integer("capacityPct"),availableFrom:get("availableFrom"),availableUntil:get("availableUntil")}).state};
  if(action.startsWith("resource-edit:"))return {state:editPlanningResource(snapshot,action.slice("resource-edit:".length),{label:get("label"),capacityPct:integer("capacityPct"),availableFrom:get("availableFrom"),availableUntil:get("availableUntil")}).state};
+ if(action.startsWith("sequence-amendment:")){
+  const parts=action.slice("sequence-amendment:".length).split(":").map(decodeURIComponent);
+  if(parts.length!==2)throw Error("Неверная зависимость");
+  return addSequencePlanChoice(snapshot,projectId,{from:parts[0],to:parts[1],changeId:get("changeId")||null,
+   title:get("title"),description:get("description")});
+ }
+ if(action.startsWith("amend-dependency:")){
+  const presence=get("presence");
+  if(!["add","remove"].includes(presence))throw Error("Выберите действие с зависимостью");
+  return {state:setPlanDependency(snapshot,projectId,action.slice("amend-dependency:".length),
+   {from:get("from"),to:get("to"),present:presence==="add"}).state};
+ }
  if(action.startsWith("resource-amendment:"))return addResourcePlanChoice(snapshot,projectId,
   decodeURIComponent(action.slice("resource-amendment:".length)),{changeId:get("changeId")||null,
    title:get("title"),description:get("description"),resourceId:get("resourceId")});
@@ -618,7 +656,7 @@ export function applyEditor(snapshot,projectId,action,input){
  if(action.startsWith("change:")){
   const id=action.slice(7),status=get("status");
   const current=p.changes?.find(c=>c.id===id);
-  if(["approved","in_progress"].includes(status)&&current?.planAmendments?.length)
+  if(["approved","in_progress"].includes(status)&&current?.planAmendments?.length&&!current.planAppliedAt)
    checkPlanAmendment(snapshot,projectId,id);
   return {state:decideChange(snapshot,projectId,id,{status,rationale:get("rationale")}).state};
  }

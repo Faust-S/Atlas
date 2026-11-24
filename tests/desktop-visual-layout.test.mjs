@@ -144,7 +144,7 @@ test("R3 impact preview exposes all affected projects, works and resources",()=>
 test("R4 plan amendments show concrete before/after changes and allow removal before approval",()=>{
  const ui=readFileSync(new URL("../desktop/src/main.tsx",import.meta.url),"utf8");
  assert.match(ui,/c\.planAmendments\.map\(\(a:any,i:number\)=>/);
- assert.match(ui,/a\.kind==="work"\?"work:"\+a\.itemId:"new_work:"\+a\.id/);
+ assert.match(ui,/const key=planAmendmentKey\(a\)/);
  assert.match(ui,/removeAmendment\(c\.id,key\)/);
  assert.match(ui,/\["proposed","deferred"\]\.includes\(c\.status\)&&!c\.planAppliedAt/);
  assert.match(ui,/if\(!confirmAction\("Убрать выбранную корректировку/);

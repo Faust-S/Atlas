@@ -276,6 +276,40 @@ def qualify():
     assert d.head()==saved,'Sequence comparison wrote to Native Store'
     v.capture('atlas12-resource-sequence-options-820')
     print('ATLAS12_NATIVE_SEQUENCE_ALTERNATIVES_PASS',flush=True)
+    # The same order can enter an unapplied proposal before touching the graph.
+    click_scrollable_button('Добавить порядок в заявку '+first_order)
+    d.window_title_contains('Форма: Порядок в заявке:',20)
+    d.wait_text('Предложенный порядок: '+first_order+'.',35)
+    assert d.head()==saved,'Opening sequence proposal changed the saved graph'
+    v.capture('atlas12-sequence-to-amendment-820')
+    v.find_control('Применить к черновику',types={'Button'},scroll=True).click_input()
+    v.await_no_form()
+    d.wait_text('Порядок добавлен в заявку.',35)
+    assert d.head()==saved
+    native.click_named('Сохранить','Button')
+    saved=v.await_saved(saved)
+    pending=d.saved_project(saved)
+    assert pending['items']==original['projects'][0]['items']
+    assert pending['dependencies']==[]
+    assert len(pending['changes'])==2
+    edge=next(a for c in pending['changes'] for a in c['planAmendments'] if a['kind']=='dependency')
+    assert edge=={'kind':'dependency','from':original['projects'][0]['items'][0]['id'],
+                  'to':original['projects'][0]['items'][1]['id'],'before':False,'after':True}
+    print('ATLAS12_NATIVE_SEQUENCE_TO_AMENDMENT_PASS',flush=True)
+    # Ordinary direct dependency edit remains available and does not apply the
+    # now independent proposal. Restart and compare the same current plan.
+    d.stop()
+    d.launch()
+    win32gui.MoveWindow(d.handle,0,0,820,650,True)
+    d.activate()
+    d.wait_text('Настроить дашборд',45)
+    assert d.head()==saved
+    native.click_named('Ресурсы','Button')
+    click_scrollable_button('Сравнить варианты ресурса Кран')
+    click_scrollable_button('Показать периоды конфликтов')
+    click_scrollable_button('Выбрать для порядка '+project_name+': '+first_work)
+    click_scrollable_button('Выбрать для порядка '+project_name+': '+second_work)
+    click_scrollable_button('Сравнить порядок двух работ')
     click_scrollable_button('Открыть порядок '+first_order)
     # Check the real native window route, not only the presence of text in
     # the prior resource panel. Fail on a product error instead of hiding it.

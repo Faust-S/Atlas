@@ -3,6 +3,10 @@ import {validatePortfolioLinks} from "./portfolio.mjs";
 import {validCauseKey} from "./response.mjs";
 import toposort from "./vendor/toposort.mjs";
 export const SCHEMA="atlas.project/1";
+// One identity for an action in an existing change record. The directed
+// dependency is identified by both local Work IDs, not its display title.
+export const planAmendmentKey=a=>a.kind==="dates"?"dates":a.kind==="work"?"work:"+a.itemId:
+ a.kind==="dependency"?"dependency:"+JSON.stringify([a.from,a.to]):"new_work:"+a.id;
 const types=new Set(["personal","team","business","engineering","research","care","other"]);
 const statuses=new Set(["planned","active","paused","completed","cancelled"]);
 const workStates=new Set(["todo","in_progress","blocked","done"]);
@@ -304,8 +308,8 @@ export function validate(s){
     throw Error("Invalid plan application");
    const amendmentKeys=new Set(),newIds=new Set();
    for(const a of c.planAmendments){
-    if(!a||!["dates","work","new_work"].includes(a.kind))throw Error("Invalid plan amendment");
-    const key=a.kind==="dates"?"dates":a.kind==="work"?"work:"+a.itemId:"new_work:"+a.id;
+    if(!a||!["dates","work","new_work","dependency"].includes(a.kind))throw Error("Invalid plan amendment");
+    const key=planAmendmentKey(a);
     if(amendmentKeys.has(key))throw Error("Duplicate plan amendment");
     amendmentKeys.add(key);
     if(a.kind==="dates"){
@@ -316,6 +320,11 @@ export function validate(s){
      if(!itemIds.has(a.itemId)||!a.before||!a.after)throw Error("Invalid amendment work");
      for(const v of [a.before,a.after])if(!Number.isSafeInteger(v.estimateDays)||v.estimateDays<0||v.estimateDays>36500||
       typeof v.assignee!=="string"||!validDate(v.dueDate)||!validResource(v.resourceId)||!validAllocation(v.allocationPct))throw Error("Invalid amendment work fields");
+    } else if(a.kind==="dependency"){
+     if(typeof a.from!=="string"||typeof a.to!=="string"||a.from===a.to||
+        !itemIds.has(a.from)||!itemIds.has(a.to)||typeof a.before!=="boolean"||
+        typeof a.after!=="boolean"||a.before===a.after)
+      throw Error("Invalid amendment dependency");
     } else {
      if(typeof a.id!=="string"||!a.id||newIds.has(a.id)||typeof a.title!=="string"||!a.title.trim()||
        !Number.isSafeInteger(a.estimateDays)||a.estimateDays<0||a.estimateDays>36500||
@@ -583,7 +592,8 @@ export function removeItem(s,pid,id){return change(s,x=>{
  if(p.dependencies.some(d=>d.from===id||d.to===id))throw Error("Работа связана зависимостями. Сначала удалите связи.");
  if((p.findings||[]).some(f=>f.workId===id))
   throw Error("Работа связана с сохранённым наблюдением. История фактов должна сохранять источник.");
- if((p.changes||[]).some(c=>(c.planAmendments||[]).some(a=>a.kind==="work"&&a.itemId===id||a.kind==="new_work"&&a.id===id)))
+ if((p.changes||[]).some(c=>(c.planAmendments||[]).some(a=>a.kind==="work"&&a.itemId===id||a.kind==="new_work"&&a.id===id||
+  a.kind==="dependency"&&(a.from===id||a.to===id))))
   throw Error("Работа связана с предложением изменения.");
  p.items=p.items.filter(w=>w.id!==id);
  // A deliberate work deletion also removes the scenario-only override.

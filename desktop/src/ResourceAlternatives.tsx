@@ -5,7 +5,7 @@ import {compareResourceSequenceAlternatives} from '../../src/resource-sequence-a
 
 type Props={snapshot:any;forecast:any;resources:any;resourceId:string|null;
  onClose:()=>void;onOpenWork:(projectId:string,workId:string,comparison:any)=>void;
- onOpenSequence:(projectId:string,option:any)=>void;
+ onOpenSequence:(projectId:string,option:any,asProposal?:boolean)=>void;
  onOpenAmendment:(projectId:string,workId:string,comparison:any)=>void};
 const key=(w:any)=>JSON.stringify([w.projectId,w.id]);
 const change=(value:number)=>value>0?'+'+value:String(value);
@@ -99,16 +99,23 @@ function ResourceSequencePanel({snapshot,forecast,resources,period,onOpenSequenc
      (option.project.beforeFinish||'не определён')+' → '+(option.project.afterFinish||'не определён')+'.';
     return <div className="atlas-resource-option" key={option.from}>
      <div><strong>{title}</strong>
-      <button type="button" className="action-button atlas-sequence-open"
-       aria-label={'Открыть порядок '+title} onClick={()=>onOpenSequence(option.projectId,option)}>Открыть зависимость</button>
       <small role="status" aria-label={summary}>{summary}</small>
+      <div className="atlas-resource-primary-actions">
+       <button type="button" className="action-button atlas-sequence-open"
+        aria-label={'Открыть порядок '+title} onClick={()=>onOpenSequence(option.projectId,option)}>Открыть зависимость</button>
+       <button type="button" className="action-button atlas-sequence-open"
+        aria-label={'Добавить порядок в заявку '+title} onClick={()=>onOpenSequence(option.projectId,option,true)}>В заявку</button>
+      </div>
+      <small>{'Контроль проекта: '+(option.project.dueDate||'не задан')+
+       '. Отклонение: '+(option.project.beforeSlip??'не определено')+' → '+(option.project.afterSlip??'не определено')+' дн.'}</small>
+      <details className="atlas-sequence-details">
+      <summary>Подробнее о последствиях</summary>
       <small>{'Вне доступности по портфелю: '+option.before.unavailableDays+' → '+option.after.unavailableDays+' дн.'}</small>
       <small>{'Превышение мощности: '+option.before.overloadPctDays+' → '+option.after.overloadPctDays+' п. п.·дн.; нагрузка вне доступности: '+option.before.unavailablePctDays+' → '+option.after.unavailablePctDays+' %·дн.'}</small>
       <small>{option.source.label+': перегрузка '+option.source.overloadBefore+' → '+option.source.overloadAfter+' дн.'}</small>
       <small>{'Критический путь: изменено работ '+option.affected.criticalChangedTotal+
        '; новых нарушений сроков работ '+option.affected.deadlineNewMissedTotal+'.'}</small>
-      <small>{'Контроль проекта: '+(option.project.dueDate||'не задан')+
-       '. Отклонение: '+(option.project.beforeSlip??'не определено')+' → '+(option.project.afterSlip??'не определено')+' дн.'}</small>
+
       <small>{'Затронуто связанных проектов: '+option.portfolio.affectedTotal+
        '; новых рисков срока: '+option.portfolio.newDeadlineRisks+'.'}</small>
       {option.portfolio.rows.slice(0,3).map((r:any)=><small key={r.id}>
@@ -132,6 +139,7 @@ function ResourceSequencePanel({snapshot,forecast,resources,period,onOpenSequenc
       {option.resourcesChanged>option.resourceExamples.length&&<small>{'Ещё изменённых ресурсов: '+(option.resourcesChanged-option.resourceExamples.length)}</small>}
       {option.unknown&&<small>Часть расчётных дат отсутствует.</small>}
       <small>{option.note}</small>
+      </details>
      </div>
     </div>;
    })}

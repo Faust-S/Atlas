@@ -1,6 +1,6 @@
 // Concrete, human-approved plan amendments stored on existing Atlas change records.
 // Preview reuses the single CPM / portfolio dependency projection; no task execution.
-import {validate} from "./core.mjs";
+import {validate,planAmendmentKey as key} from "./core.mjs";
 import {planChange} from "./trace.mjs";
 import {portfolioSchedule} from "./portfolio-schedule.mjs";
 import {portfolioResources,planningResourceTotals,comparePlanningResourceGroups} from "./portfolio-resources.mjs";
@@ -25,7 +25,6 @@ const workFields = item => ({
  calendarBasis:item.calendarBasis??null
 });
 const dateFields = project => ({startDate:project.startDate||null,dueDate:project.dueDate||null});
-const key = action => action.kind==="dates"?"dates":action.kind==="work"?"work:"+action.itemId:"new_work:"+action.id;
 const eligible = c => c && ["proposed","deferred"].includes(c.status) && !c.planAppliedAt;
 
 function pinnedSource(snapshot,project,change) {
@@ -118,6 +117,50 @@ export function addResourcePlanChoice(snapshot,projectId,workId,{changeId=null,t
  const result=setPlanWork(next,projectId,changeId,{itemId:workId,...fields,resourceId});
  return {state:result.state,changeId};
 }
+const edgePresent=(project,from,to)=>project.dependencies.some(e=>e.from===from&&e.to===to);
+const pendingWork=w=>w&&["todo","blocked"].includes(w.state)&&!w.actualStartDate&&!w.actualFinishDate;
+function dependencyEndpoints(project,from,to){
+ if(!project||["completed","cancelled"].includes(project.status)||!from||!to||from===to)
+  throw Error("Выберите две разные работы действующего проекта");
+ const a=project.items.find(w=>w.id===from),b=project.items.find(w=>w.id===to);
+ if(!a||!b)throw Error("Работы зависимости должны принадлежать одному проекту");
+ if(!pendingWork(a)||!pendingWork(b))
+  throw Error("Порядок можно изменить в заявке только для ещё не начатых работ");
+ return {a,b};
+}
+/** One explicit addition or removal of an ordinary dependency in a proposal.
+ * The existing DAG validator checks the complete combined scenario.
+ */
+export function setPlanDependency(snapshot,projectId,changeId,{from,to,present}){
+ const original=find(snapshot,projectId,changeId);
+ if(original.change.planAmendments?.length)checkPlanAmendment(snapshot,projectId,changeId);
+ const result=mutableDraft(snapshot,projectId,changeId,(project,change)=>{
+  const {a,b}=dependencyEndpoints(project,from,to);
+  const before=edgePresent(project,from,to);
+  if(typeof present!=="boolean"||before===present)
+   throw Error("Укажите действительное добавление или удаление зависимости");
+  const action={kind:"dependency",from,to,before,after:present};
+  if((change.planAmendments??[]).some(x=>key(x)===key(action)))
+   throw Error("Эта зависимость уже указана в заявке");
+  upsert(change,action);
+  change.targetIds=[...new Set([...(change.targetIds??[]),...(a.targetIds??[]),...(b.targetIds??[])])];
+ });
+ checkPlanAmendment(result.state,projectId,changeId);
+ return result;
+}
+/** Transfer the selected order to a new or existing unapplied proposal. */
+export function addSequencePlanChoice(snapshot,projectId,{from,to,changeId=null,title="",description=""}){
+ validate(snapshot);
+ const project=snapshot.projects.find(p=>p.id===projectId);
+ dependencyEndpoints(project,from,to);
+ let next=snapshot;
+ if(!changeId){
+  const created=planChange(snapshot,projectId,{title:text(title,"название заявки"),description:String(description??"").trim()});
+  next=created.state;changeId=created.id;
+ }
+ const result=setPlanDependency(next,projectId,changeId,{from,to,present:true});
+ return {state:result.state,changeId};
+}
 export function addPlanWork(snapshot,projectId,changeId,{title,estimateDays,assignee="",dueDate=null,stageId=null,targetId=null,resourceId=null,allocationPct=100}) {
  const id=crypto.randomUUID();
  return mutableDraft(snapshot,projectId,changeId,(project,change)=>{
@@ -153,9 +196,17 @@ export function checkPlanAmendment(snapshot,projectId,changeId) {
    if(!item||!Object.entries(action.before).every(([k,v])=>same(workFields(item)[k],v)))
     throw Error("Исходная работа изменилась после подготовки заявки: требуется пересмотр");
   }
+  if(action.kind==="dependency"){
+   dependencyEndpoints(project,action.from,action.to);
+   if(edgePresent(project,action.from,action.to)!==action.before)
+    throw Error("Исходная зависимость изменилась после подготовки заявки: требуется пересмотр");
+  }
   if(action.kind==="new_work"&&project.items.some(w=>w.id===action.id))
    throw Error("Предлагаемая работа уже существует: применение остановлено");
  }
+ // Check the whole candidate with the existing validator. Separate
+ // proposals may each be possible yet become cyclic in combination.
+ if(actions.some(a=>a.kind==="dependency"))amendmentCandidate(snapshot,projectId,changeId,actions);
  return {project,change,actions};
 }
 function applyToProject(project,change,actions) {
@@ -169,6 +220,22 @@ function applyToProject(project,change,actions) {
    targetIds:[...action.targetIds],sourceId:null,executor:null,changeId:change.id
   });
  }
+ // Remove explicitly proposed old edges before adding the new edges.
+ // Only the final combined DAG is validated, not an artificial order of
+ // individual mutations. No Work or cross-project relation is invented.
+ const changes=actions.filter(a=>a.kind==="dependency");
+ if(changes.length){
+  const removed=new Set(changes.filter(a=>!a.after).map(a=>JSON.stringify([a.from,a.to])));
+  project.dependencies=project.dependencies.filter(e=>!removed.has(JSON.stringify([e.from,e.to])));
+  for(const a of changes)if(a.after)project.dependencies.push({from:a.from,to:a.to});
+ }
+}
+function amendmentCandidate(snapshot,projectId,changeId,actions){
+ const candidate=structuredClone(snapshot),{project,change}=find(candidate,projectId,changeId);
+ applyToProject(project,change,actions);
+ change.planAmendments=[];
+ validate(candidate);
+ return candidate;
 }
 const dateDelta=(before,after)=>before&&after?
  (Date.parse(after+"T00:00:00Z")-Date.parse(before+"T00:00:00Z"))/86400000:null;
@@ -257,13 +324,8 @@ function amendmentWorkComparison(snapshot,candidate,ids,before,after){
 function forecastAmendment(snapshot,projectId,changeId,context){
  const {actions}=checkPlanAmendment(snapshot,projectId,changeId);
  const {forecast:before,resources:beforeResources}=context;
- const candidate=structuredClone(snapshot);
- const {project,change}=find(candidate,projectId,changeId);
- applyToProject(project,change,actions);
- // Only the ephemeral candidate is modified; all proposed amendments remain
- // independently recorded on the original change and original snapshot.
- change.planAmendments=[];
- validate(candidate);
+ // Preview and actual application share the same plan operations.
+ const candidate=amendmentCandidate(snapshot,projectId,changeId,actions);
  const after=portfolioSchedule(candidate),afterResources=portfolioResources(candidate,{schedule:after});
  const affected=new Set([projectId]),links=snapshot.portfolioLinks||[];
  const outgoing=new Map(snapshot.projects.map(p=>[p.id,[]]));
@@ -295,6 +357,10 @@ function forecastAmendment(snapshot,projectId,changeId,context){
   beforeMaxLoad:r.peakBefore,afterMaxLoad:r.peakAfter}));
  const resourceBefore=planningResourceTotals(beforeResources),resourceAfter=planningResourceTotals(afterResources);
  const work=amendmentWorkComparison(snapshot,candidate,affected,before,after);
+ const dependencyRows=actions.filter(a=>a.kind==="dependency").map(a=>{
+  const p=projects.get(projectId);
+  return {...a,fromTitle:p.items.find(w=>w.id===a.from).title,toTitle:p.items.find(w=>w.id===a.to).title};
+ });
  const projectSummary={
   newlyLate:rows.filter(r=>r.beforeDeadline===r.afterDeadline&&r.beforeSlip===0&&r.afterSlip>0).length,
   worsenedLate:rows.filter(r=>r.beforeDeadline===r.afterDeadline&&r.beforeSlip>0&&r.afterSlip>r.beforeSlip).length,
@@ -302,7 +368,7 @@ function forecastAmendment(snapshot,projectId,changeId,context){
   controlChanged:rows.filter(r=>r.beforeDeadline!==r.afterDeadline).length,
   unknown:rows.filter(r=>!r.afterFinish).length
  };
- return {rows,resourceRows,resourceBefore,resourceAfter,projectSummary,...work,
+ return {rows,resourceRows,resourceBefore,resourceAfter,projectSummary,dependencyRows,...work,
   changed:rows.filter(r=>r.changed).length,affected:rows.length,actions:actions.length};
 }
 export function previewPlanAmendment(snapshot,projectId,changeId) {
@@ -352,6 +418,11 @@ const shownDate = value => value||"не задана";
 function describe(project,action) {
  if(action.kind==="dates")return "Сроки проекта: начало "+shownDate(action.before.startDate)+" → "+shownDate(action.after.startDate)+
   "; контрольный срок "+shownDate(action.before.dueDate)+" → "+shownDate(action.after.dueDate);
+ if(action.kind==="dependency"){
+  const from=project.items.find(w=>w.id===action.from)?.title??"Работа";
+  const to=project.items.find(w=>w.id===action.to)?.title??"Работа";
+  return (action.after?"Добавить связь: ":"Удалить связь: ")+from+" → "+to;
+ }
  if(action.kind==="work"){
   const name=project.items.find(x=>x.id===action.itemId)?.title||"Работа";
   return "Работа «"+name+"»: "+action.before.estimateDays+" → "+action.after.estimateDays+
@@ -376,6 +447,7 @@ export function renderProjectPlanAmendments(snapshot,projectId,{previewId=null,e
   if(canEdit){
    buttons='<button data-action="amend-dates:'+escape(change.id)+'">Даты проекта</button> '+
     (project.items.length?'<button data-action="amend-work:'+escape(change.id)+'">Изменить работу</button> ':"")+
+    (project.items.length>1?'<button data-action="amend-dependency:'+escape(change.id)+'">Изменить связь</button> ':"")+
     '<button data-action="amend-new:'+escape(change.id)+'">Добавить работу в план</button> ';
   }
   if(actions.length&&!change.planAppliedAt)buttons+='<button data-action="preview-amendment:'+escape(change.id)+'">'+

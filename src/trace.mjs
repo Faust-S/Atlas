@@ -74,11 +74,19 @@ export function planChange(snapshot,projectId,{title,description="",targetIds=[]
   p.changes.push(c);return c.id;
  });
 }
+function checkPlanChangeStatus(change,status){
+ if(change.planAppliedAt&&!["approved","in_progress","implemented"].includes(status))
+  throw Error("Применённый план нельзя отложить или отменить сменой статуса. Подготовьте новую корректировку.");
+ if(status==="implemented"&&change.planAmendments?.length&&!change.planAppliedAt)
+  throw Error("Сначала примените утверждённые корректировки плана");
+}
+
 export function updateChange(snapshot,projectId,changeId,status) {
  if(!CHANGE_STATUS.has(status))throw Error("Invalid change status");
  return mutate(snapshot,projectId,p=>{
   const change=p.changes.find(x=>x.id===changeId);
   if(!change)throw Error("Unknown change");
+  checkPlanChangeStatus(change,status);
   change.status=status;return changeId;
  });
 }
@@ -96,6 +104,7 @@ export function decideChange(snapshot,projectId,changeId,{status,rationale}){
    in_progress:["implemented","deferred"]
   };
   if(!allowed[change.status]?.includes(status))throw Error("Invalid change status transition");
+  checkPlanChangeStatus(change,status);
   const previous=change.status;
   change.status=status;
   p.decisions.push({id:id(),changeId,status,text:reason,previousStatus:previous,at:new Date().toISOString()});

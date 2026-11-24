@@ -1788,3 +1788,10 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 .atlas-plan-comparison-cards{display:grid;gap:8px;grid-template-columns:minmax(0,1fr);margin-top:8px}
 .atlas-plan-comparison-cards>.atlas-amendment-row>button{margin:6px 0}
 @media(max-width:900px){.atlas-plan-choice-fields{grid-template-columns:minmax(0,1fr)}}
+
+/* Keep both sequencing decisions and their main cost visible before detail. */
+.atlas-resource-sequence .atlas-resource-primary-actions{margin:6px 0;gap:6px}
+.atlas-resource-sequence .atlas-sequence-open{margin:0;min-height:32px}
+.atlas-sequence-details{margin:6px 0 0}
+.atlas-sequence-details summary{cursor:pointer;font-size:11px;color:#245480;font-weight:600}
+.atlas-sequence-details>small{display:block;margin:4px 0}
