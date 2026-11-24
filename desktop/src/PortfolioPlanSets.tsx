@@ -72,11 +72,11 @@ export function PortfolioPlanSets({snapshot,onOpen,onApply,selection,onSelection
   {expanded&&<>
    {!choices.length?<p className="minor">Подготовьте хотя бы одну заявку с конкретными корректировками в разделе «Изменения и решения» проекта.</p>:<>
     <p className="minor">До четырёх проектов и одной заявки на проект. Вариант Б необязателен. Расчёт не меняет заявки.</p>
+    <button type="button" className="action-button primary" disabled={disabled||!first.length} onClick={calculate}>Рассчитать планы портфеля</button>
     <div className="atlas-plan-comparison-cards">
      <PlanSetPicker name="Вариант А" choices={choices} selection={first} onChange={refs=>{onSelection({...selection,first:refs});invalidate()}} onOpen={onOpen}/>
      <PlanSetPicker name="Вариант Б" choices={choices} selection={second} onChange={refs=>{onSelection({...selection,second:refs});invalidate()}} onOpen={onOpen}/>
     </div>
-    <button type="button" className="action-button primary" disabled={disabled||!first.length} onClick={calculate}>Рассчитать планы портфеля</button>
    </>}
    {error&&<p role="alert">{error}</p>}
    {comparison&&!result&&first.length>0&&<p role="alert">Портфель изменился. Рассчитайте варианты заново.</p>}

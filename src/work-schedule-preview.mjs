@@ -112,6 +112,9 @@ export function previewWorkScheduleEdit(project,workId,draft,beforePlan=null,cum
  return {
   kind:"changed",workId,portfolioImpact,portfolioCumulative,portfolioIssue,
   oldEstimate,estimateDays,oldDueDate,dueDate,
+  ...(oldLimit!==notBeforeDate?{oldNotBeforeDate:oldLimit,notBeforeDate,
+   oldStart:was.startDate??null,newStart:will.startDate??null,
+   oldReserve:was.floatDays,newReserve:will.floatDays}:{}),
   beforeDays:before.durationDays,afterDays:after.durationDays,
   oldFinish:was.finishDate??null,newFinish:will.finishDate??null,
   oldFinishOffset:was.earlyFinish,newFinishOffset:will.earlyFinish,

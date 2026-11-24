@@ -286,6 +286,7 @@ export function AtlasInspectorPreview({project,snapshot,plan,forecast,comparison
       </section>}
       {workSection==="schedule"&&<section className="atlas-v6-preview-card"><strong>Календарь работы</strong>
       <p>Длительность: {work.estimateDays??1} {work.durationUnit==="working_days"?"рабочих":"календарных"} дн.</p>
+      {work.notBeforeDate&&<p>Начало не ранее: {format(work.notBeforeDate)}.</p>}
       <p>Расчётное начало: {format(workPlan?.startDate)}</p>
       <p>Расчётный финиш: {format(workPlan?.finishDate)}</p>
       <p>Контрольный срок: {format(work.dueDate)}</p>
@@ -328,6 +329,7 @@ export function AtlasInspectorPreview({project,snapshot,plan,forecast,comparison
      {facts?.deadline&&<section className="atlas-v6-preview-card" aria-label="Факторы расчётной просрочки">
       <strong>Факторы расчётной просрочки</strong>
       <p>Плановый финиш позже контрольного срока на {facts.deadline.daysLate} дн.</p>
+      {facts.deadline.constraintWaitDays>0&&<p>Ожидание допустимого начала: {facts.deadline.constraintWaitDays} дн.</p>}
       {facts.deadline.calendarWaitDays>0&&<p>Ожидание рабочих дат по календарю: {facts.deadline.calendarWaitDays} дн.</p>}
       {(facts.deadline.drivers??[]).map((driver:any)=><button type="button"
        className="atlas-v6-preview-link" key={driver.id} onClick={()=>open("work",driver.id)}>

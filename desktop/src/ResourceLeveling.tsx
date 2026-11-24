@@ -5,7 +5,7 @@ import {AmendmentAnalysis} from "./PlanAlternativesComparison";
 
 type Choice={id:string;projectId:string;workId?:string;maxDelay:string};
 export function ResourceLeveling({snapshot,resources,onDraft,disabled=false}:{
- snapshot:any;resources:any;onDraft:(comparison:any,optionId:string,rationale:string)=>void;disabled?:boolean}){
+ snapshot:any;resources:any;onDraft:(comparison:any,optionId:string,rationale:string)=>boolean;disabled?:boolean}){
  const [expanded,setExpanded]=useState(false),[resourceId,setResourceId]=useState("");
  const [mode,setMode]=useState<"project"|"work">("project");
  const workMode=mode==="work";
@@ -136,6 +136,8 @@ export function ResourceLeveling({snapshot,resources,onDraft,disabled=false}:{
       <small>{"Превышение мощности: "+result.before.overloadPctDays+" → "+o.target.overloadPctDays+" п. п.·дн."}</small>
       <small>{"Дополнительное отставание по известным срокам: проекты "+o.projectIncrease+" дн., работы "+o.workIncrease+" дн."}</small>
       <small>{"Конфликтующих работ портфеля: "+o.assessment.conflictedWorkBefore+" → "+o.assessment.conflictedWorkAfter}</small>
+      <small>{"Новых конфликтующих работ: "+o.assessment.newlyConflicted+"; освобождено работ: "+o.assessment.clearedConflict}</small>
+      {(o.assessment.newlyConflicted>0||o.assessment.newConflictDateWorks>0)&&<p>Часть конфликтов может перейти на другие работы или даты. Сравните полный состав последствий до утверждения.</p>}
       {o.assessment.hasTradeoff&&<small>Есть изменившиеся ограничения, сроки или резервы. Изучите подробности.</small>}
       {o.assessment.resourceState==="INCOMPLETE"&&<small>Ресурсный расчёт неполон.</small>}
       {o.assessment.resourceState==="CONFLICTS"&&<small>Остаются ресурсные ограничения портфеля.</small>}
@@ -148,7 +150,7 @@ export function ResourceLeveling({snapshot,resources,onDraft,disabled=false}:{
       </div></div>)}
       <details><summary>Последствия для работ и всего портфеля</summary><AmendmentAnalysis compact result={o.preview}/></details>
       <button type="button" className="action-button" disabled={disabled||rationale.trim().length<8}
-       aria-label={"Подготовить заявки: "+o.title} onClick={()=>onDraft(result,o.id,rationale)}>Подготовить заявки</button>
+       aria-label={"Подготовить заявки: "+o.title} onClick={()=>{if(onDraft(result,o.id,rationale)){setExpanded(false);changeChoice([]);setRationale("")}}}>Подготовить заявки</button>
      </div>)}</div>
      <p className="minor">{workMode?"Будут подготовлены обычные неутверждённые заявки на ограничения начала отдельных работ. По одной заявке на проект. Даты проектов, длительности, назначения и контрольные сроки сохраняются.":"Будут подготовлены обычные неутверждённые заявки на перенос начала, без изменения контрольных сроков, длительностей или назначений."} Согласование, применение и сохранение выполняются отдельно.</p>
     </>}

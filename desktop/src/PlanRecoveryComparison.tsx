@@ -10,7 +10,7 @@ const date=(x:any)=>x??"не определена";
 const unit=(x:any)=>x==="working_days"?"раб. дн.":"кал. дн.";
 const days=(x:any)=>x==null?"не определено":x+" дн.";
 export function PlanRecoveryComparison({snapshot,projectId,onDraft}:{
- snapshot:any;projectId:string;onDraft:(comparison:any,optionId:string,rationale:string)=>void}){
+ snapshot:any;projectId:string;onDraft:(comparison:any,optionId:string,rationale:string)=>boolean}){
  const [expanded,setExpanded]=useState(false);
  const [candidateId,setCandidateId]=useState("");
  const [variants,setVariants]=useState<WorkVariant[]>([]);
@@ -176,7 +176,7 @@ export function PlanRecoveryComparison({snapshot,projectId,onDraft}:{
         </small>)}
         <details><summary>Последствия варианта</summary><AmendmentAnalysis result={o.preview} compact/></details>
         <button type="button" className="action-button" disabled={rationale.trim().length<8}
-         aria-label={"Подготовить заявку: "+o.title} onClick={()=>onDraft(current,o.id,rationale)}>Подготовить заявку</button>
+         aria-label={"Подготовить заявку: "+o.title} onClick={()=>{if(onDraft(current,o.id,rationale)){setExpanded(false);setVariants([]);setEdges([]);setRationale("");invalidate()}}}>Подготовить заявку</button>
        </>}
       </div>)}</div>
       <p className="minor">Варианты отражают введённые предположения, а не подтверждённую производительность или ресурсное выравнивание. Заявка требует отдельного решения и сохранения.</p>

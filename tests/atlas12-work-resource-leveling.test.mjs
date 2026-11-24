@@ -163,3 +163,34 @@ test("A guarded proposal cannot be silently edited or mixed with other kinds of 
  const state=setPlanWork(change.state,f.projectId,ref.changeId,{itemId:f.a,estimateDays:1}).state;
  assert.match(previewPlanAmendment(state,f.projectId,ref.changeId).applicationBlocker,/отдельного состава/);
 });
+
+
+test("Bounded Work-level search scales to 120 projects and 1200 works without moving a project",async()=>{
+ const {desktopLoadPortfolio}=await import("./fixtures/desktop-portfolio-120.mjs");
+ let s=desktopLoadPortfolio();
+ const resource=addPlanningResource(s,{label:"Общий монтажный участок",capacityPct:100});
+ s=resource.state;
+ const selection=[];
+ for(const p of s.projects.slice(50,54)){
+  const work=p.items[5],long=p.items[9];
+  s=editItem(s,p.id,long.id,{estimateDays:10});
+  s=editItem(s,p.id,work.id,{estimateDays:2,resourceId:resource.id,allocationPct:60});
+  selection.push({projectId:p.id,workId:work.id,maxDelay:7});
+ }
+ const raw=serialize(s),clock=performance.now();
+ const comparison=compareWorkResourceLeveling(s,resource.id,selection);
+ const ms=performance.now()-clock;
+ assert.equal(comparison.search.space,4096);assert.equal(comparison.search.exact,false);
+ assert.ok(comparison.search.evaluated<256);
+ const best=comparison.options[0];
+ assert.ok(best);assert.equal(best.target.overloadDays,0);assert.equal(best.vector[0],0);
+ assert.equal(best.preview.rows.length,120);assert.equal(best.preview.changed,0);
+ assert.equal(best.preview.applicationBlocker,null);
+ assert.equal(serialize(s),raw);
+ assert.ok(comparison.search.memo.hits>comparison.search.memo.misses);
+ const draft=createWorkResourceLevelingProposals(s,comparison,best.id,{rationale});
+ assert.deepEqual(comparePortfolioPlanSets(draft.state,draft.refs).options[0].preview,best.preview);
+ console.log("ATLAS12_WORK_LEVELING_SCALE projects=120 works=1200 combinations="+comparison.search.evaluated+
+  " ms="+ms.toFixed(2)+" memo_hits="+comparison.search.memo.hits+" misses="+comparison.search.memo.misses+
+  " shifts="+JSON.stringify(best.vector));
+});

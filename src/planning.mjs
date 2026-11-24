@@ -329,8 +329,8 @@ export function scheduleDeadlineExplanations(plan,{limit=2}={}){
   // A predecessor with the latest physical finish constrains the ready date.
   // A calendar-critical predecessor may also bind the successor despite a
   // nonworking gap (and despite another predecessor finishing later).
-  const limiting=predecessors.filter(prior=>prior.earlyFinish===ready||
-   prior.critical&&row.critical&&prior.lateFinish===row.lateStart)
+  const limiting=predecessors.filter(prior=>!constraintWaitDays&&(prior.earlyFinish===ready||
+   prior.critical&&row.critical&&prior.lateFinish===row.lateStart))
    .sort((a,b)=>Number(b.critical)-Number(a.critical)||
     b.earlyFinish-a.earlyFinish||String(a.id).localeCompare(String(b.id)));
   details.set(row.id,{

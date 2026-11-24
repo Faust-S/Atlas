@@ -332,6 +332,10 @@ function EditorPanel({editor,onSubmit,onCancel,onDirtyChange,busy,project,plan,c
        " Сдвиг "+(workDraftPreview.afterDays>workDraftPreview.beforeDays?"+":"")+
         (workDraftPreview.afterDays-workDraftPreview.beforeDays)+" дн.":""}
      </p>
+     {"notBeforeDate" in workDraftPreview&&<>
+      <p>Начало не ранее: {workDraftPreview.oldNotBeforeDate||"не задано"} → {workDraftPreview.notBeforeDate||"не задано"}.</p>
+      <p>Расчётное начало: {workDraftPreview.oldStart||"без даты"} → {workDraftPreview.newStart||"без даты"}. Резерв: {workDraftPreview.oldReserve} → {workDraftPreview.newReserve} дн.</p>
+     </>}
      <p>Финиш выбранной работы: было {workDraftPreview.oldFinish||
        "через "+workDraftPreview.oldFinishOffset+" дн. от начала"},
       станет {workDraftPreview.newFinish||
@@ -2539,15 +2543,15 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     </section>
     <ResourceLeveling snapshot={data} resources={resources} disabled={busy||!!editor}
      onDraft={(comparison,optionId,rationale)=>{
-      if(!requireClosedForm()||busyRef.current)return;
+      if(!requireClosedForm()||busyRef.current)return false;
       try{
        const result=comparison.kind==="ATLAS_WORK_RESOURCE_LEVELING"?
         createWorkResourceLevelingProposals(latestSnapshot.current,comparison,optionId,{rationale}):
         createResourceLevelingProposals(latestSnapshot.current,comparison,optionId,{rationale});
        mutate(result.state,"Заявки на выравнивание подготовлены в черновике. Сохраните и рассмотрите их.");
        setPortfolioPlanSelection({first:result.refs,second:[],expanded:true});
-       setPortfolioJump("plan-sets");
-      }catch(e){issue(e)}
+       setPortfolioJump("plan-sets");return true;
+      }catch(e){issue(e);return false}
      }}/>
     <PortfolioPlanSets snapshot={data} disabled={busy||!!editor} selection={portfolioPlanSelection} onSelection={setPortfolioPlanSelection} onOpen={(pid,cid)=>openProjectTab(pid,"changes",cid)}
      onApply={(comparison,optionId,rationale)=>{
@@ -3159,7 +3163,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
            {deadlineRiskDetails.get(w.id)!.hiddenDrivers>0&&
             <small>Ещё {deadlineRiskDetails.get(w.id)!.hiddenDrivers} в схеме зависимостей.</small>}
           </div>:
-          <small>Предшествующих работ нет. Проверьте длительность и контрольный срок.</small>}
+          <small>{(deadlineRiskDetails.get(w.id)!.constraintWaitDays??0)>0?"Заданное ограничение определяет начало работы.":"Предшествующих работ нет. Проверьте длительность и контрольный срок."}</small>}
          <button type="button" className="text-link"
           aria-label={"Исправить план работы "+w.title+". Отставание от контрольного срока: "+
            deadlineRiskDetails.get(w.id)!.daysLate+" дн."}
@@ -3456,12 +3460,12 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       <Action onClick={()=>openEditor("proposal")} primary>＋ Предложение</Action></div></div>
      <PlanRecoveryComparison key={"recovery:"+project.id} snapshot={data} projectId={project.id}
       onDraft={(comparison,optionId,rationale)=>{
-       if(!requireClosedForm()||busyRef.current)return;
+       if(!requireClosedForm()||busyRef.current)return false;
        try{
         const result=createDeadlineRecoveryProposal(latestSnapshot.current,comparison,optionId,{rationale});
         mutate(result.state,"Заявка на пересмотр срока подготовлена в черновике. Сохраните её и примите отдельное решение.");
-        setForecastId(result.changeId);setChangeJump({projectId:project.id,changeId:result.changeId});
-       }catch(e){issue(e)}
+        setForecastId(result.changeId);setChangeJump({projectId:project.id,changeId:result.changeId});return true;
+       }catch(e){issue(e);return false}
       }}/>
      <PlanAlternativesComparison key={project.id} snapshot={data} projectId={project.id}
       onOpenChange={changeId=>{
