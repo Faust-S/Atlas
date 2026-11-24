@@ -1813,3 +1813,5 @@ select,input,textarea{border:1px solid #c9d9ed;border-radius:8px;background:#fbf
 
 .atlas-plan-set-member{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding:7px 0;border-top:1px solid var(--line);min-width:0}.atlas-plan-set-member>div:first-child{min-width:0;flex:1;overflow-wrap:anywhere}.atlas-plan-set-member small{display:block;overflow-wrap:anywhere}.atlas-plan-set-member .button-row{flex-wrap:wrap}.atlas-plan-set-picker{min-width:0}
 @media(max-width:1000px){.atlas-plan-set-member{flex-wrap:wrap}.atlas-plan-set-member>div:first-child{flex-basis:100%}}
+
+.atlas-plan-set-summary{margin:10px 0;min-width:0}.atlas-plan-set-summary th:not(:first-child),.atlas-plan-set-summary td:not(:first-child){text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}.atlas-coordination-history .atlas-amendment-row p{white-space:pre-line;overflow-wrap:anywhere}

@@ -5,7 +5,7 @@ import {readFileSync} from 'node:fs';
 import {editItem,removeProject,serialize,deserialize,createItem} from '../src/core.mjs';
 import {decideChange,planChange} from '../src/trace.mjs';
 import {listPortfolioPlanProposals,comparePortfolioPlanSets,applyPortfolioPlanSet,
- listPortfolioPlanApplications,previewPlanAmendment,setPlanWork,addPlanWork,setPlanDependency} from '../src/plan-amendment.mjs';
+ listPortfolioPlanApplications,previewPlanAmendment,setPlanWork,setPlanDates,addPlanWork,setPlanDependency} from '../src/plan-amendment.mjs';
 import {portfolioSchedule} from '../src/portfolio-schedule.mjs';
 import {portfolioResources,planningResourceTotals,planningResourceScope} from '../src/portfolio-resources.mjs';
 import {coordinatedPortfolio} from './fixtures/atlas12-portfolio-plan-sets.mjs';
@@ -175,4 +175,24 @@ test('Desktop uses the original draft route and retains selection through projec
  assert.match(main,/selection=\{portfolioPlanSelection\} onSelection=\{setPortfolioPlanSelection\}/);
  assert.match(main,/onOpen=\{\(pid,cid\)=>openProjectTab\(pid,"changes",cid\)\}/);
  assert.doesNotMatch(ui,/commitWithReadback\(|createTask\(|decideChange\(/);
+});
+
+test('Comparison uses an identical calendar cohort and flags lost forecasts and changed Work deadlines',()=>{
+ const f=coordinatedPortfolio(),q=planChange(f.snapshot,f.c.projectId,{title:'Убрать дату начала из расчёта'});
+ let s=setPlanDates(q.state,f.c.projectId,q.id,{startDate:null,dueDate:'2026-11-27'}).state;
+ const r=comparePortfolioPlanSets(s,f.first,[...f.first,{projectId:f.c.projectId,changeId:q.id}]);
+ assert.ok(r.options.every(o=>o.valid));
+ assert.equal(r.summary.projectCount,4);assert.equal(r.summary.comparableProjects,3);
+ assert.deepEqual(r.summary.columns.map(c=>c.late),[3,0,0]);
+ assert.deepEqual(r.summary.columns.map(c=>c.slip),[3,0,0]);
+ assert.deepEqual(r.summary.columns.map(c=>c.unknownProjects),[0,0,1]);
+ assert.equal(r.options[1].assessment.deadlines.newlyUnknown,1);
+ assert.equal(r.options[1].assessment.hasTradeoff,true);
+ const work=planChange(f.snapshot,f.a.projectId,{title:'Перенести контроль работы'});
+ s=setPlanWork(work.state,f.a.projectId,work.id,{itemId:f.a.workId,estimateDays:5,dueDate:'2026-11-29'}).state;
+ const o=comparePortfolioPlanSets(s,[{projectId:f.a.projectId,changeId:work.id}]).options[0];
+ assert.equal(o.valid,true);
+ assert.equal(o.preview.workSummary.worsenedLate,1,'The ordinary comparison excludes the changed Work deadline');
+ assert.equal(o.assessment.workDeadlines.worsenedLate,2,'Original Work due date and dependent commissioning both worsen');
+ assert.equal(o.assessment.workDeadlines.changedDeadline,1);
 });

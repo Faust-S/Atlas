@@ -412,7 +412,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  // Standalone v6 chrome; embedded T3 keeps its already-qualified host surface.
  const [homeOpen,setHomeOpen]=useState(()=>!host);
  const [settingsOpen,setSettingsOpen]=useState(false);
- const [portfolioJump,setPortfolioJump]=useState<"resources"|"ecosystem"|"review"|null>(null);
+ const [portfolioJump,setPortfolioJump]=useState<"resources"|"ecosystem"|"review"|"plan-sets"|null>(null);
  useEffect(()=>{
   if(embedded||active!==null||homeOpen||settingsOpen||!portfolioJump)return;
   const destination=rootRef.current?.querySelector<HTMLElement>("#atlas-portfolio-"+portfolioJump);
@@ -1792,8 +1792,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    const checked=deserialize(JSON.stringify(result.snapshot));
    latestSnapshot.current=checked;
    saved.current=snapshotText(checked);
-   setData(checked);setGeneration(result.generation);setSavedVersions(null);
    setPortfolioPlanSelection(emptyPortfolioPlanSelection());
+   setData(checked);setGeneration(result.generation);setSavedVersions(null);
    // React state updates asynchronously. Navigation after an explicitly
    // confirmed restore must not use the prior modal-guard render closure.
    selectProject(null,true);setSelectedHistory(null);
@@ -1963,8 +1963,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   if(!requireClosedForm())return;
   selectProject(null);setHomeOpen(false);setSettingsOpen(false);setPortfolioJump(null);
  };
- const goPortfolioSection=(section:"resources"|"ecosystem"|"review")=>{
+ const goPortfolioSection=(section:"resources"|"ecosystem"|"review"|"plan-sets")=>{
   if(!requireClosedForm())return;
+  if(section==="plan-sets")setPortfolioPlanSelection(old=>({...old,expanded:true}));
   selectProject(null);setHomeOpen(false);setSettingsOpen(false);setPortfolioJump(section);
  };
  const goSettings=()=>{
@@ -2317,6 +2318,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
        openProjectTab(data.projects[0].id,"timeline"):goPortfolio()}
      onReview={()=>reviewRows.length?openProjectTab(reviewRows[0].projectId,"changes"):goPortfolioSection("review")}
      onEcosystem={()=>goPortfolioSection("ecosystem")}
+     onPlanSets={()=>goPortfolioSection("plan-sets")}
      onHistory={id=>openProjectTab(id,"history")}/>:
    <>
     <div className="page-heading"><div><small>Ваше рабочее пространство</small><h1>Портфель проектов</h1>
@@ -3430,7 +3432,10 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      </section>}
     {tab==="changes"&&<section className="surface"><div className="section-heading"><div><h2>Предложения и утверждённые изменения</h2>
      <p>Утверждение - отдельное решение человека. Применение конкретного плана также требует подтверждения.</p></div>
-     <Action onClick={()=>openEditor("proposal")} primary>＋ Предложение</Action></div>
+     <div className="button-row">
+      {!embedded&&[...portfolioPlanSelection.first,...portfolioPlanSelection.second].some(r=>r.projectId===project.id)&&
+       <Action onClick={()=>goPortfolioSection("plan-sets")}>К согласованному плану</Action>}
+      <Action onClick={()=>openEditor("proposal")} primary>＋ Предложение</Action></div></div>
      <PlanRecoveryComparison key={"recovery:"+project.id} snapshot={data} projectId={project.id}
       onDraft={(comparison,optionId,rationale)=>{
        if(!requireClosedForm()||busyRef.current)return;

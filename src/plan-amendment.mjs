@@ -398,7 +398,7 @@ function workProjection(item,row){
   assignee:item.assignee||"",resourceId:item.resourceId??null,allocationPct:item.allocationPct??100};
 }
 function amendmentWorkComparison(snapshot,candidate,ids,before,after){
- const workRows=[],workSummary={affected:0,moved:0,criticalChanged:0,
+ const workRows=[],fixedWorkRows=[],workSummary={affected:0,moved:0,criticalChanged:0,
   reserveReduced:0,newlyLate:0,worsenedLate:0,resolvedLate:0,
   controlChanged:0,newlyUndated:0,added:0,unknown:0};
  const beforeProjects=new Map(snapshot.projects.map(p=>[p.id,p]));
@@ -415,6 +415,7 @@ function amendmentWorkComparison(snapshot,candidate,ids,before,after){
    const prior=previous.get(item.id),historical=reference.get(item.id);
    const a=workProjection(prior,oldPlan.get(item.id));
    const b=workProjection(item,nextPlan.get(item.id));
+   if(a)fixedWorkRows.push({beforeDeadline:a.dueDate,afterDeadline:b.dueDate,beforeFinish:a.finish,afterFinish:b.finish});
    if(!b.finish)workSummary.unknown++;
    if(a&&same(a,b))continue;
    const controlChanged=Boolean(a&&a.dueDate!==b.dueDate);
@@ -453,7 +454,7 @@ function amendmentWorkComparison(snapshot,candidate,ids,before,after){
   Math.abs(b.shiftDays??0)-Math.abs(a.shiftDays??0)||
   a.projectName.localeCompare(b.projectName,"ru")||a.title.localeCompare(b.title,"ru")||
   a.projectId.localeCompare(b.projectId)||a.workId.localeCompare(b.workId));
- return {workRows,workSummary};
+ return {workRows,workSummary,fixedWorkDeadlines:fixedDeadlineTotals(fixedWorkRows)};
 }
 
 // All proposal comparisons use the same validated candidate and scheduler.
@@ -611,7 +612,7 @@ function fixedDeadlineTotals(rows){
  return totals;
 }
 function assessPlanSet(preview,roots,chain){
- const deadlines=fixedDeadlineTotals(preview.rows);
+ const deadlines=fixedDeadlineTotals(preview.rows),workDeadlines=preview.fixedWorkDeadlines;
  const selectedDeadlines=fixedDeadlineTotals(preview.rows.filter(r=>roots.has(r.id)));
  const otherDeadlines=fixedDeadlineTotals(preview.rows.filter(r=>!roots.has(r.id)));
  const scope=preview.resourceScope,conflicts=scope.workChanges.totals;
@@ -627,8 +628,8 @@ function assessPlanSet(preview,roots,chain){
  const outsideChain=resourceProjects.filter(id=>!chain.has(id));
  const warnings={
   newLate:deadlines.newlyLate,worseLate:deadlines.worsenedLate,unknownDates:deadlines.newlyUnknown,
-  changedDeadline:deadlines.changedDeadline,workDeadlineChanges:preview.workSummary.controlChanged,
-  newLateWork:preview.workSummary.newlyLate,worseLateWork:preview.workSummary.worsenedLate,
+  changedDeadline:deadlines.changedDeadline,workDeadlineChanges:workDeadlines.changedDeadline,
+  newLateWork:workDeadlines.newlyLate,worseLateWork:workDeadlines.worsenedLate,
   newlyUndatedWork:preview.workSummary.newlyUndated,reserveReduced:preview.workSummary.reserveReduced,
   newConflictWork:conflicts.newlyConflicted,worseConflictWork:conflicts.worsened,
   movedConflictResource:conflicts.resourceChanged,worseResources,
@@ -637,7 +638,7 @@ function assessPlanSet(preview,roots,chain){
  const hasTradeoff=Object.values(warnings).some(n=>n>0);
  const resourceState=scope.after.totals.conflictedWork?"CONFLICTS":
   scope.after.totals.positiveUnlinked||scope.after.totals.undated?"INCOMPLETE":"NO_KNOWN_CONFLICTS";
- return {deadlines,selectedDeadlines,otherDeadlines,warnings,hasTradeoff,resourceState,
+ return {deadlines,workDeadlines,selectedDeadlines,otherDeadlines,warnings,hasTradeoff,resourceState,
   selectedProjects:roots.size,calendarChainProjects:chain.size,resourceProjects,outsideChain,
   conflictedWorkBefore:scope.before.totals.conflictedWork,conflictedWorkAfter:scope.after.totals.conflictedWork,
   newlyConflicted:conflicts.newlyConflicted,clearedConflict:conflicts.cleared,
@@ -676,6 +677,35 @@ function calculatePlanSet(snapshot,refs,context){
   return {valid:false,members,canApply:false,reason:error instanceof Error?error.message:"Расчёт недоступен"};
  }
 }
+/** One common calendar cohort across every valid alternative.
+ * Never rank an option as faster merely because its forecast became unknown.
+ */
+function summarizePortfolioPlanSets(options){
+ const valid=options.filter(o=>o.valid);
+ if(!valid.length)return null;
+ const base=valid[0].preview,lookups=valid.map(o=>new Map(o.preview.rows.map(r=>[r.id,r])));
+ const common=base.rows.filter(r=>r.beforeDeadline&&r.beforeFinish&&lookups.every(m=>m.get(r.id)?.afterFinish));
+ const currentCalendar=common.reduce((t,r)=>{const n=slip(r.beforeDeadline,r.beforeFinish);
+  t.late+=Number(n>0);t.slip+=n;return t},{late:0,slip:0});
+ const before=base.resourceScope.before.totals;
+ const columns=[{id:"current",late:currentCalendar.late,slip:currentCalendar.slip,
+  unknownProjects:base.rows.filter(r=>!r.beforeFinish).length,overloadDays:base.resourceBefore.overloadDays,
+  unavailableDays:base.resourceBefore.unavailableDays,overloadDepth:base.resourceBefore.overloadPctDays,
+  conflictWorks:before.conflictedWork,unlinked:before.positiveUnlinked,undated:before.undated,
+  changedDeadline:0,newConflicts:0}];
+ for(const [i,o] of valid.entries()){
+  const calendar=common.reduce((t,r)=>{const n=slip(r.beforeDeadline,lookups[i].get(r.id).afterFinish);
+   t.late+=Number(n>0);t.slip+=n;return t},{late:0,slip:0});
+  const resource=o.preview.resourceAfter,scope=o.preview.resourceScope.after.totals;
+  columns.push({id:o.id,late:calendar.late,slip:calendar.slip,
+   unknownProjects:o.preview.projectSummary.unknown,overloadDays:resource.overloadDays,
+   unavailableDays:resource.unavailableDays,overloadDepth:resource.overloadPctDays,
+   conflictWorks:scope.conflictedWork,unlinked:scope.positiveUnlinked,undated:scope.undated,
+   changedDeadline:o.assessment.deadlines.changedDeadline,newConflicts:o.assessment.newlyConflicted});
+ }
+ return {projectCount:base.rows.length,comparableProjects:common.length,columns};
+}
+
 /**
  * Compare one or two independent sets against precisely the same current
  * snapshot. One proposal per project avoids hidden field merges. A single
@@ -691,7 +721,8 @@ export function comparePortfolioPlanSets(snapshot,first,second=null){
  const context=amendmentPlanningContext(snapshot);
  const options=[{id:"A",selection:a,...calculatePlanSet(snapshot,a,context)}];
  if(b)options.push({id:"B",selection:b,...calculatePlanSet(snapshot,b,context)});
- return {kind:"ATLAS_PORTFOLIO_PLAN_SETS",revision:snapshot.revision,sourceStamp:JSON.stringify(snapshot),options};
+ return {kind:"ATLAS_PORTFOLIO_PLAN_SETS",revision:snapshot.revision,sourceStamp:JSON.stringify(snapshot),
+  options,summary:summarizePortfolioPlanSets(options)};
 }
 /**
  * An atomic in-memory edit of the original portfolio. Every chosen proposal
@@ -729,8 +760,10 @@ export function applyPortfolioPlanSet(snapshot,comparison,optionId,{rationale}){
   change.planAppliedAt=now;
   project.decisions.push({id:crypto.randomUUID(),kind:"plan_application",changeId:change.id,
    text:"Совместное применение утверждённых заявок ("+members.length+" проекта). "+rationale.trim()+
-    "\nСостав: "+memberText+"\nРасчёт по исходным срокам: просроченных проектов "+
-    fresh.assessment.deadlines.lateBefore+" → "+fresh.assessment.deadlines.lateAfter+
+    "\nСостав: "+memberText+"\nПо "+fresh.assessment.deadlines.comparable+
+    " сопоставимым срокам, действовавшим до применения: дней отставания "+
+    fresh.assessment.deadlines.comparableSlipBefore+" → "+fresh.assessment.deadlines.comparableSlipAfter+
+    "; неизвестен прогноз по исходным срокам: "+fresh.assessment.deadlines.unknownAfter+
     "; работ в ресурсных конфликтах "+fresh.assessment.conflictedWorkBefore+" → "+fresh.assessment.conflictedWorkAfter+".",
    at:now,coordination:structuredClone(coordination)});
  }

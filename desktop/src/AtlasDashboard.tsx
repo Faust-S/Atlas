@@ -12,7 +12,7 @@ type Props={
  data:any;dates:any;resources:any;reviews:any[];sourceQueue:any;ecosystemRows:any[];
  dirty:boolean;onPortfolio:()=>void;onNewProject:()=>void;onConnect:()=>void;
  onOpenProject:(id:string,page?:Page)=>void;onResources:()=>void;
- onCalendar:()=>void;onReview:()=>void;onEcosystem:()=>void;onHistory:(projectId:string)=>void;
+ onCalendar:()=>void;onReview:()=>void;onEcosystem:()=>void;onPlanSets:()=>void;onHistory:(projectId:string)=>void;
 };
 function initialLayout(){
  try{
@@ -27,7 +27,7 @@ const status:Record<string,string>={
 };
 const count=(value:number)=>value.toLocaleString("ru-RU");
 export function AtlasDashboard({data,dates,resources,reviews,sourceQueue,ecosystemRows,dirty,
- onPortfolio,onNewProject,onConnect,onOpenProject,onResources,onCalendar,onReview,onEcosystem,onHistory}:Props){
+ onPortfolio,onNewProject,onConnect,onOpenProject,onResources,onCalendar,onReview,onEcosystem,onPlanSets,onHistory}:Props){
  const [layout,setLayout]=useState<string[]>(initialLayout);
  const [editing,setEditing]=useState(false);
  const [dragged,setDragged]=useState<string|null>(null);
@@ -65,7 +65,8 @@ export function AtlasDashboard({data,dates,resources,reviews,sourceQueue,ecosyst
        {forecast.deadlineSlipDays>0&&<small className="atlas-dash-warn">+{forecast.deadlineSlipDays} дн. за сроком</small>}
       </div>
      </div>)}
-    <button className="atlas-dash-secondary" onClick={onPortfolio}>Все прогнозы портфеля</button>
+    <div className="button-row"><button className="atlas-dash-secondary" onClick={onPortfolio}>Все прогнозы портфеля</button>
+     {projects.length>1&&<button className="atlas-dash-secondary" onClick={onPlanSets}>Сравнить планы</button>}</div>
    </div>:<div className="atlas-dash-empty">Пока нет проектов с расчётным сроком. Добавьте проект и укажите дату начала и работы.
     <button onClick={onPortfolio}>Портфель</button></div>;
    case "attention":return attention.length?<div className="atlas-dash-rows">
