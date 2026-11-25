@@ -1,10 +1,6 @@
 name: Atlas 0.12 baseline source and desktop qualification
 
 on:
-  push:
-    branches:
-      - work/2026-11-22-atlas-0-11-baseline
-      - work/2026-11-23-atlas-0-12-plan-readiness
   workflow_dispatch:
 
 permissions:
