@@ -1,9 +1,7 @@
 name: IWXA Atlas 0.12.0 stable release from exact qualified source
 
 on:
-  push:
-    branches:
-      - release/0.12
+  workflow_dispatch:
 
 permissions:
   contents: read
