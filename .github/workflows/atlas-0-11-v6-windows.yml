@@ -1,35 +1,6 @@
 name: IWXA Atlas 0.12 original Windows v6 installed UI qualification
 
 on:
-  push:
-    branches:
-      - work/2026-11-22-atlas-0-11-baseline
-      - work/2026-11-23-atlas-0-12-plan-readiness
-    paths:
-      - '.github/workflows/atlas-0-11-v6-windows.yml'
-      - 'desktop/tests/installed-atlas11-v6-design.py'
-      - 'desktop/src/main.tsx'
-      - 'desktop/src/AtlasChrome.tsx'
-      - 'desktop/src/AtlasDashboard.tsx'
-      - 'desktop/src/AtlasSettings.tsx'
-      - 'desktop/src/AtlasInspectorPreview.tsx'
-      - 'desktop/src/ProjectOrganizationGuide.tsx'
-      - 'desktop/src/ResourceAlternatives.tsx'
-      - 'desktop/src/PlanAlternativesComparison.tsx'
-      - 'desktop/src/inspector-work-context.mjs'
-      - 'desktop/src/style.css'
-      - 'desktop/index.html'
-      - 'desktop/package.json'
-      - 'desktop/package-lock.json'
-      - 'desktop/installer/**'
-      - 'desktop/src-tauri/**'
-      - 'desktop/tests/installed-atlas11-*.py'
-      - 'desktop/tests/installed-atlas12-*.py'
-      - 'tests/fixtures/**'
-      - 'tests/verify-atlas09-host-dist.mjs'
-      - 'tests/atlas11-*.test.mjs'
-      - 'tests/atlas12-*.test.mjs'
-      - 'src/**'
   workflow_dispatch:
 
 permissions:
