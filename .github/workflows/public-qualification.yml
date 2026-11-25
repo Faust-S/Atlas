@@ -1,15 +1,6 @@
 name: Atlas public branch qualification (fast push / gated cross-OS browser)
 
 on:
-  push:
-    branches:
-      - work/2026-11-01-atlas-foundation
-    paths:
-      - 'src/**'
-      - 'tests/**'
-      - 'index.html'
-      - 'package.json'
-      - '.github/workflows/public-qualification.yml'
   workflow_dispatch:
 
 permissions:
