@@ -1,17 +1,6 @@
 name: IWXA Atlas 0.8 exact release-candidate Windows acceptance
 
 on:
-  push:
-    branches:
-      - release/0.8
-      - work/2026-11-15-atlas08-t3-project-work-result
-    paths:
-      - '.github/workflows/atlas-0-8-windows.yml'
-      - 'desktop/tests/installed-atlas08-corrections.py'
-      - 'desktop/src/**'
-      - 'desktop/installer/**'
-      - 'src/**'
-      - 'tests/**'
   workflow_dispatch:
 
 permissions:

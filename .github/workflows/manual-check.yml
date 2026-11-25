@@ -3,35 +3,6 @@ name: Atlas tests and desktop build
 on:
   workflow_dispatch:
   workflow_call:
-  push:
-    branches:
-      - work/2026-11-04-atlas-0-3
-      - work/2026-11-08-atlas-0-4
-      - work/2026-11-09-atlas-0-5
-      - work/2026-11-10-atlas-0-6
-      - release/0.6
-      - release/0.7
-      - release/0.8
-      - release/0.10
-      - work/2026-11-12-atlas-0-7
-      - work/2026-11-14-atlas-0-8
-      - work/2026-11-15-atlas08-t3-project-work-result
-      - work/2026-11-16-atlas-0-9-t3
-      - work/2026-11-22-atlas-0-10-calendar-scenario
-      - work/2026-11-24-atlas-plan-revision
-    paths:
-      - 'src/**'
-      - 'tests/**'
-      - 'desktop/src/**'
-      - 'desktop/vite.config.ts'
-      - 'desktop/index.html'
-      - 'desktop/tests/**'
-      - 'desktop/src-tauri/**'
-      - 'desktop/installer/**'
-      - 'desktop/public/**'
-      - 'desktop/package.json'
-      - 'desktop/package-lock.json'
-      - '.github/workflows/manual-check.yml'
 
 permissions:
   contents: read

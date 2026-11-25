@@ -1,11 +1,7 @@
 name: Publish accepted IWXA Atlas 0.8.0 from exact Windows-qualified SHA
 
 on:
-  push:
-    branches:
-      - release/0.8
-    paths:
-      - '.github/workflows/atlas-0-8-publish.yml'
+  workflow_dispatch:
 
 permissions:
   contents: write

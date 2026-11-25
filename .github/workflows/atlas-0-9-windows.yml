@@ -1,21 +1,6 @@
 name: IWXA Atlas 0.9 development Windows qualification
 
 on:
-  push:
-    branches:
-      - work/2026-11-16-atlas-0-9-t3
-    paths:
-      - '.github/workflows/atlas-0-9-windows.yml'
-      - 'desktop/tests/installed-atlas08-corrections.py'
-      - 'desktop/tests/installed-atlas06-connect.py'
-      - 'desktop/tests/installed-atlas06-visual-scale.py'
-      - 'desktop/tests/installed-atlas09-qualification.py'
-      - 'desktop/src/**'
-      - 'desktop/vite.config.ts'
-      - 'desktop/index.html'
-      - 'desktop/installer/**'
-      - 'src/**'
-      - 'tests/**'
   workflow_dispatch:
 
 permissions:

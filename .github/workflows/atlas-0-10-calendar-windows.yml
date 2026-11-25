@@ -1,30 +1,6 @@
 name: IWXA Atlas 0.10.0 exact release candidate Windows acceptance
 
 on:
-  push:
-    branches:
-      - release/0.10
-    paths:
-      - '.github/workflows/atlas-0-10-calendar-windows.yml'
-      - 'desktop/tests/installed-atlas08-corrections.py'
-      - 'desktop/tests/installed-atlas06-connect.py'
-      - 'desktop/tests/installed-atlas06-visual-scale.py'
-      - 'desktop/tests/installed-atlas09-qualification.py'
-      - 'desktop/tests/installed-atlas10-calendar-scenario.py'
-      - 'desktop/tests/installed-atlas10-typed-work.py'
-      - 'desktop/tests/installed-atlas10-portfolio-forecast.py'
-      - 'tests/fixtures/atlas10-portfolio-forecast.mjs'
-      - 'src/project-schedule-view.mjs'
-      - 'desktop/src/**'
-      - 'desktop/vite.config.ts'
-      - 'desktop/index.html'
-      - 'desktop/installer/**'
-      - 'desktop/src-tauri/**'
-      - 'desktop/package.json'
-      - 'desktop/package-lock.json'
-      - 'desktop/tests/**'
-      - 'src/**'
-      - 'tests/**'
   workflow_dispatch:
 
 permissions:
