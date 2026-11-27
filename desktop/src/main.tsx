@@ -3828,10 +3828,10 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       {([["projects","Проекты"],["works","Работы"],["findings","Факты"],["decisions","Решения"],["changes","Предложения"],["sources","Источники"],["links","Связи проектов"]] as const).map(([key,label])=>
        <tr key={key}><td>{label}</td><td>{pendingImport.summary.current[key]}</td><td>{pendingImport.summary.incoming[key]}</td></tr>)}
      </tbody></table></div>
-     <p><strong>Исключено:</strong> {pendingImport.summary.removed} проектов.
+     <p><strong>При замене исключается:</strong> {pendingImport.summary.removed} проектов.
       <strong> Добавлено:</strong> {pendingImport.summary.added}.
       <strong> Найдены в обоих портфелях:</strong> {pendingImport.summary.matchingIds} (их данные будут заменены содержимым копии).</p>
-     {pendingImport.summary.removed>0&&<p className="atlas-schedule-warning">Будут исключены:
+     {pendingImport.summary.removed>0&&<p className="atlas-schedule-warning">При замене будут исключены:
       {pendingImport.summary.removedExamples.join(", ")}
       {pendingImport.summary.removed>pendingImport.summary.removedExamples.length?" и другие.":"."}
      </p>}
