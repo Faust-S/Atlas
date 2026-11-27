@@ -43,6 +43,7 @@ export function createAtlasSavedRef(snapshot,{projectId,workId}={},{
 }
 // Resolve the existing saved WorkRef for navigation only. Never substitute a
 // work with the same title or refresh a stale revision implicitly.
+/** @returns {Readonly<{ref:Readonly<{projectId:string,workId:string,revision:string}>,projectName:string,workTitle:string}>} */
 export function resolveAtlasWorkNavigation(snapshot,raw){
  let value=raw;
  if(typeof raw==="string"){
@@ -54,11 +55,15 @@ export function resolveAtlasWorkNavigation(snapshot,raw){
     !Object.keys(value).every(k=>["projectId","workId","revision"].includes(k))||
     typeof value.revision!=="string")failure("ATLAS_WORK_REFERENCE_INVALID");
  const ref=normalizeRef(value,true);
- const actual=createAtlasSavedRef(snapshot,ref,{persisted:true,dirty:false});
+ const projectId=ref.projectId,workId=stringId(value.workId,"WORK_ID");
+ const actual=createAtlasSavedRef(snapshot,{projectId,workId},{persisted:true,dirty:false});
  if(actual.revision!==ref.revision)failure("ATLAS_SOURCE_REVISION_CHANGED");
- const project=projectFrom(snapshot,actual.projectId);
- const work=project.items.find(item=>item.id===actual.workId);
- return Object.freeze({ref:actual,projectName:project.name,workTitle:work.title});
+ const project=projectFrom(snapshot,projectId);
+ const work=project.items.find(item=>item.id===workId);
+ // createAtlasSavedRef also has a valid project-only return shape. Return
+ // the verified WorkRef explicitly so TypeScript cannot infer that shape.
+ return Object.freeze({ref:Object.freeze({projectId,workId,revision:actual.revision}),
+  projectName:project.name,workTitle:work.title});
 }
 // Authorization is always delegated to the actual host. It is not a grant.
 export function createAtlasProjectReadPort({openSnapshot,authorize}={}){
