@@ -56,7 +56,8 @@ import {atlasT3DecisionSummary,atlasT3RecordedWorkLinks,
  from "../../src/atlas-t3-native-recipient.mjs";
 import {findConfirmedAtlasT3Decision} from "../../src/atlas-t3-confirmed-projection.mjs";
 import {invokeAtlasHost,type AtlasEmbeddedHost,
- type AtlasT3SignedFilePreview} from "./embedded-host";
+ type AtlasT3SignedFilePreview,type AtlasT3SignedFileRoute} from "./embedded-host";
+import {openStandaloneAtlasSignedFileRoute} from "./atlas-t3-standalone-recipient.mjs";
 
 // Show the same product version that was packaged in Tauri, without leaking
 // a previous release's branding into a development installation.
@@ -507,8 +508,10 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const savedVersionsOpenRef=useRef(false);savedVersionsOpenRef.current=savedVersions!==null;
  const pendingImportOpenRef=useRef(false);pendingImportOpenRef.current=pendingImport!==null;
  const signedResultOpenRef=useRef(false);signedResultOpenRef.current=signedResultPreview!==null;
- const signedFileOwnerAvailable=Boolean(host?.t3?.inspectSignedFile&&
-  host?.t3?.receiveSignedFile&&host?.t3?.readbackSignedFile);
+ const [standaloneSignedRoute,setStandaloneSignedRoute]=useState<AtlasT3SignedFileRoute|null>(null);
+ const signedRoute=host?.t3??standaloneSignedRoute;
+ const signedFileOwnerAvailable=Boolean(signedRoute?.inspectSignedFile&&
+  signedRoute?.receiveSignedFile&&signedRoute?.readbackSignedFile);
  const [resourceLimit,setResourceLimit]=useState(40);
  const [resourceComparisonId,setResourceComparisonId]=useState<string|null>(null);
  const [reviewLimit,setReviewLimit]=useState(20);
@@ -560,6 +563,18 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const dataSignature=useMemo(()=>snapshotText(data),[data]);
  const dirty=ready&&dataSignature!==saved.current;
  const persisted=generation!=="none";
+ useEffect(()=>{
+  if(embedded||!isTauri()||!ready||!persisted)return;
+  let mounted=true;
+  void openStandaloneAtlasSignedFileRoute({isActive:()=>mounted}).then(route=>{
+   if(mounted)setStandaloneSignedRoute(route as AtlasT3SignedFileRoute|null);
+  }).catch(error=>{
+   // The normal public product has no T3 component. A missing optional
+   // owner must not prevent Atlas starting or saving its ordinary projects.
+   if(mounted)setStandaloneSignedRoute(null);
+  });
+  return()=>{mounted=false;setStandaloneSignedRoute(null);};
+ },[embedded,ready,persisted]);
  const dirtyRef=useRef(false),busyRef=useRef(false),editorOpenRef=useRef(false);
  const editorDirtyRef=useRef(false);
  const inspectorEditorReturnRef=useRef(false);
@@ -959,7 +974,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  // mounted by the trusted native Atlas composition. No signer or grant in UI.
  const inspectSignedResultFile=async(file:File|null)=>{
   if(!file)return;
-  const inspect=host?.t3?.inspectSignedFile;
+  const inspect=signedRoute?.inspectSignedFile;
   if(!signedFileOwnerAvailable||typeof inspect!=="function"){
    issue(Error("Оригинальный подписанный получатель T3 не подключён."));return;
   }
@@ -1002,7 +1017,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  // Only original Reconciliation and current Atlas authorization can verify
  // a received file. A persisted Decision alone is NEVER the current grant.
  const verifyReceivedSignedResult=async(p:AtlasT3SignedFilePreview)=>{
-  const read=host?.t3?.readbackSignedFile;
+  const read=signedRoute?.readbackSignedFile;
   if(typeof read!=="function")
    throw Error("ATLAS_T3_SIGNED_RECEIPT_OWNER_UNAVAILABLE");
   const receipt=await read(p.operationId);
@@ -1023,7 +1038,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    "Событие Kernel отправителя на этом компьютере не проверялось.");
  };
  const acceptSignedResultFile=async()=>{
-  const p=signedResultPreview,apply=host?.t3?.receiveSignedFile;
+  const p=signedResultPreview,apply=signedRoute?.receiveSignedFile;
   if(!p||typeof apply!=="function"||busyRef.current||
      signedFileDispatchAttemptedRef.current)return;
   if(dirtyRef.current||editorOpenRef.current||pendingImportOpenRef.current){
@@ -3170,7 +3185,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
         {(t3WorkLinks.get(w.id)||[]).slice(-2).map((link:any)=>
          <small key={link.decisionId} className="atlas-work-evidence-note">
           {link.portableSelectedSummary
-           ?<>Agent Result {link.resultId}. Выбранный текст сохранён в Atlas; доступ к источнику проверяется в T3.</>
+           ?<>{link.sourceKind==="ADMIN_APPLIED_RESULT"?"Корпоративный Result":"Agent Result"} {link.resultId}. Выбранный текст сохранён в Atlas; доступ к источнику проверяется в T3.</>
            :<>Agent Result {link.resultId}. Сохранена ссылка; доступ проверяется в T3.</>}
          </small>)}
         {(t3WorkLinks.get(w.id)||[]).length>2&&<small className="atlas-work-evidence-note">

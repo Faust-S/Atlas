@@ -4,7 +4,8 @@
 param(
     [string]$SetupCoreRoot = "setup-core-source",
     [string]$Output = "artifacts/IWXA-Atlas-0.12.0-Setup.exe",
-    [switch]$InstallForQualification
+    [switch]$InstallForQualification,
+    [string]$OriginalT3ConsumerPath = ""
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -24,6 +25,27 @@ $stubBuilder = Join-Path $core 'installer/windows/build-stub.ps1'
 $profile = Join-Path $PSScriptRoot 'atlas.json'
 $icon = Join-Path $atlas 'desktop/src-tauri/icons/icon.ico'
 $exe = Join-Path $atlas 'desktop/src-tauri/target/release/iwxa-atlas-desktop.exe'
+# Optional private release: use the SAME original T3 Consumer executable
+# provided by the trusted release process. Compile its exact digest into
+# Atlas before packaging; public CI without this option stays unchanged.
+$consumer = $null
+if ($OriginalT3ConsumerPath) {
+    $consumer = (Resolve-Path -LiteralPath $OriginalT3ConsumerPath).Path
+    if ([IO.Path]::GetFileName($consumer) -ne 'iwxa-t3-product-consumer.exe' -or
+        !(Test-Path -LiteralPath $consumer -PathType Leaf)) {
+        throw 'ATLAS_ORIGINAL_T3_CONSUMER_REQUIRED'
+    }
+    $oldPin = $env:IWXA_T3_CONSUMER_SHA256
+    $env:IWXA_T3_CONSUMER_SHA256 = (Get-FileHash -LiteralPath $consumer -Algorithm SHA256).Hash.ToLowerInvariant()
+    Push-Location (Join-Path $atlas 'desktop')
+    try {
+        & npm run desktop:build -- --no-bundle
+        if ($LASTEXITCODE -ne 0) { throw 'ATLAS_ORIGINAL_T3_NATIVE_BUILD_FAILED' }
+    } finally {
+        Pop-Location
+        $env:IWXA_T3_CONSUMER_SHA256 = $oldPin
+    }
+}
 foreach ($file in @($build,$stubBuilder,$profile,$icon,$exe)) {
     if (!(Test-Path -LiteralPath $file -PathType Leaf)) {
         throw "ATLAS_SETUP_INPUT_MISSING $file"
@@ -48,6 +70,11 @@ $payload = Join-Path $temporary 'payload'
 New-Item -ItemType Directory -Path $payload -Force | Out-Null
 try {
     Copy-Item -LiteralPath $exe -Destination (Join-Path $payload $product.entrypoint) -Force
+    if ($consumer) {
+        $t3 = Join-Path $payload 't3'
+        New-Item -ItemType Directory -Path $t3 -Force | Out-Null
+        Copy-Item -LiteralPath $consumer -Destination (Join-Path $t3 'iwxa-t3-product-consumer.exe')
+    }
     $stub = Join-Path $temporary 'iwxa-setup-core-stub.exe'
     & $stubBuilder -Output $stub -Icon $icon
     if ($LASTEXITCODE -ne 0 -or !(Test-Path -LiteralPath $stub -PathType Leaf)) {

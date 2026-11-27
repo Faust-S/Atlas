@@ -80,11 +80,14 @@ fn check_file_size(size: usize, label: &str) -> Result<(), String> {
 // The pinned IWXA Setup Core owns the user's selected data folder. Previous
 // NSIS installations have no Setup Core registry key and keep their own store.
 #[cfg(windows)]
-fn setup_core_data_root() -> Result<Option<PathBuf>, String> {
+fn atlas_setup_product_data_root(product:&str) -> Result<Option<PathBuf>, String> {
     use std::{ffi::OsString, os::windows::ffi::OsStringExt};
     use windows_sys::Win32::Foundation::{ERROR_FILE_NOT_FOUND, ERROR_PATH_NOT_FOUND};
     use windows_sys::Win32::System::Registry::{RegGetValueW, HKEY_CURRENT_USER, RRF_RT_REG_SZ};
-    let key: Vec<u16> = "Software\\IWXA\\SetupCore\\Products\\iwxa.atlas\0".encode_utf16().collect();
+    if !matches!(product,"iwxa.atlas"|"iwxa.admin-center"){
+        return Err("ATLAS_SETUP_PRODUCT_NOT_SUPPORTED".into());
+    }
+    let key: Vec<u16> = format!("Software\\IWXA\\SetupCore\\Products\\{product}\0").encode_utf16().collect();
     let value: Vec<u16> = "DataLocation\0".encode_utf16().collect();
     let mut bytes = 0u32;
     let status = unsafe {
@@ -115,6 +118,11 @@ fn setup_core_data_root() -> Result<Option<PathBuf>, String> {
         return Err("Некорректный абсолютный путь данных IWXA Setup Core".into());
     }
     Ok(Some(root))
+}
+
+#[cfg(windows)]
+fn setup_core_data_root() -> Result<Option<PathBuf>, String> {
+    atlas_setup_product_data_root("iwxa.atlas")
 }
 
 fn path_for(app: &AppHandle) -> Result<PathBuf, String> {
@@ -1260,6 +1268,201 @@ mod launch_work_tests {
         }
     }
 }
+// Only the original bundled T3 Consumer validates a signed .iwxa Result.
+// A standard public Atlas installation remains fully functional without it.
+// No access engine, signer or new project storage is implemented in Rust.
+#[cfg(windows)]
+fn atlas_t3_original_consumer(app:&AppHandle)->Result<PathBuf,String>{
+    let expected=option_env!("IWXA_T3_CONSUMER_SHA256")
+        .ok_or("ATLAS_T3_ORIGINAL_COMPONENT_NOT_BUNDLED")?;
+    if expected.len()!=64||!expected.bytes().all(|b|b.is_ascii_digit()||
+        (b'a'..=b'f').contains(&b)){
+        return Err("ATLAS_T3_ORIGINAL_COMPONENT_PIN_INVALID".into());
+    }
+    let file=app.path().resource_dir()
+        .map_err(|_|"ATLAS_T3_RESOURCE_ROOT_UNAVAILABLE")?
+        .join("t3").join("iwxa-t3-product-consumer.exe");
+    let meta=fs::symlink_metadata(&file)
+        .map_err(|_|"ATLAS_T3_ORIGINAL_COMPONENT_NOT_BUNDLED")?;
+    if !meta.is_file()||meta.file_type().is_symlink(){
+        return Err("ATLAS_T3_ORIGINAL_COMPONENT_INVALID".into());
+    }
+    let mut stream=File::open(&file).map_err(|_|"ATLAS_T3_ORIGINAL_COMPONENT_UNREADABLE")?;
+    let mut digest=Sha256::new();
+    let mut buf=[0_u8;64*1024];
+    loop{
+        let size=stream.read(&mut buf).map_err(|_|"ATLAS_T3_ORIGINAL_COMPONENT_UNREADABLE")?;
+        if size==0{break;}
+        digest.update(&buf[..size]);
+    }
+    if format!("{:x}",digest.finalize())!=expected{
+        return Err("ATLAS_T3_ORIGINAL_COMPONENT_MISMATCH".into());
+    }
+    Ok(file)
+}
+
+#[cfg(windows)]
+fn atlas_t3_local_roots(app:&AppHandle)->Result<(PathBuf,PathBuf),String>{
+    let store=path_for(app)?;
+    let recipient=store.parent().ok_or("ATLAS_T3_DATA_ROOT_UNAVAILABLE")?.join("t3-atlas");
+    // Setup Core may place either product's data outside LocalAppData.
+    // Only the installed original product location, never a UI path.
+    let center=if let Some(root)=atlas_setup_product_data_root("iwxa.admin-center")?{
+        root
+    }else{
+        let original=app.path().app_local_data_dir()
+            .map_err(|_|"ATLAS_T3_DATA_ROOT_UNAVAILABLE")?;
+        if original.file_name().and_then(|n|n.to_str())!=Some("ru.iwxa.atlas"){
+            return Err("ATLAS_T3_DATA_SCOPE_INVALID".into());
+        }
+        original.parent().ok_or("ATLAS_T3_DATA_ROOT_UNAVAILABLE")?.join("ru.iwxa.admin-center")
+    };
+    Ok((recipient,center.join("t3-admin").join("organizations")))
+}
+
+#[cfg(windows)]
+fn atlas_t3_consumer_call(app:&AppHandle,action:&str,file:Option<&str>)->Result<Value,String>{
+    use std::{process::{Command,Stdio},os::windows::process::CommandExt,
+        thread,time::{Duration,Instant}};
+    if !matches!(action,"atlas-capabilities"|"atlas-inspect"|"atlas-readback"){
+        return Err("ATLAS_T3_ORIGINAL_OPERATION_UNSUPPORTED".into());
+    }
+    let binary=atlas_t3_original_consumer(app)?;
+    let (root,center)=atlas_t3_local_roots(app)?;
+    let mut command=Command::new(binary);
+    command.arg(action).arg(root).arg(center);
+    if let Some(path)=file{command.arg(path);}
+    let mut child=command.stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped())
+        .creation_flags(0x08000000).spawn().map_err(|_|"ATLAS_T3_ORIGINAL_COMPONENT_START_FAILED")?;
+    let stdout=child.stdout.take().ok_or("ATLAS_T3_ORIGINAL_OUTPUT_UNAVAILABLE")?;
+    let stderr=child.stderr.take().ok_or("ATLAS_T3_ORIGINAL_OUTPUT_UNAVAILABLE")?;
+    let drain=|mut source:Box<dyn Read+Send>|->Result<Vec<u8>,String>{
+        let mut result=Vec::new();let mut buf=[0_u8;8192];let mut overflow=false;
+        loop{
+            let n=source.read(&mut buf).map_err(|_|"ATLAS_T3_ORIGINAL_OUTPUT_INVALID")?;
+            if n==0{break;}
+            if result.len()+n<=512*1024&&!overflow{result.extend_from_slice(&buf[..n]);}
+            else{overflow=true;}
+        }
+        if overflow{return Err("ATLAS_T3_ORIGINAL_OUTPUT_TOO_LARGE".into());}
+        Ok(result)
+    };
+    let out=thread::spawn(move||drain(Box::new(stdout)));
+    let errors=thread::spawn(move||drain(Box::new(stderr)));
+    let start=Instant::now();
+    let status=loop{
+        match child.try_wait(){
+            Ok(Some(status))=>break Ok(status),
+            Ok(None) if start.elapsed()<Duration::from_secs(90)=>thread::sleep(Duration::from_millis(25)),
+            _=>{
+                let _=child.kill();let _=child.wait();
+                break Err("ATLAS_T3_ORIGINAL_COMPONENT_TIMEOUT");
+            }
+        }
+    };
+    let out=out.join().map_err(|_|"ATLAS_T3_ORIGINAL_OUTPUT_INVALID")??;
+    let errors=errors.join().map_err(|_|"ATLAS_T3_ORIGINAL_OUTPUT_INVALID")??;
+    if !status?.success(){
+        let raw=String::from_utf8_lossy(&errors);
+        let code=raw.lines().next().unwrap_or("").trim();
+        if code.starts_with("T3_ATLAS_")&&code.len()<=150&&
+           code.bytes().all(|b|b.is_ascii_uppercase()||b.is_ascii_digit()||b==b'_'){
+            return Err(code.to_owned());
+        }
+        return Err("ATLAS_T3_ORIGINAL_COMPONENT_REFUSED".into());
+    }
+    let value:Value=serde_json::from_slice(&out).map_err(|_|"ATLAS_T3_ORIGINAL_OUTPUT_INVALID")?;
+    if value["schema"]!="IWXA_T3_ATLAS_NATIVE_RECIPIENT/1"||value["recipientId"]!="iwxa.atlas"{
+        return Err("ATLAS_T3_ORIGINAL_RECEIPT_INVALID".into());
+    }
+    if action=="atlas-capabilities"{
+        if value["status"]!="ORIGINAL_COMPONENT_AVAILABLE"||value["sameWindowsAccount"]!=true{
+            return Err("ATLAS_T3_ORIGINAL_CAPABILITY_INVALID".into());
+        }
+        return Ok(value);
+    }
+    let row=&value["result"];
+    if row["status"]!="ORIGINAL_SIGNED_SELECTED_RESULT_VERIFIED"||
+       row["recipientId"]!="iwxa.atlas"||row["sourceKind"]!="ADMIN_APPLIED_RESULT"||
+       row["signatureVerified"]!=true||row["archiveBytesVerified"]!=true||
+       row["originalManifestVerified"]!=true||row["recipientGrantVerified"]!=true||
+       row["originalKernelEventVerified"]!=false{
+        return Err("ATLAS_T3_ORIGINAL_RECEIPT_INVALID".into());
+    }
+    Ok(row.clone())
+}
+
+#[tauri::command]
+async fn atlas_t3_capabilities(app:AppHandle)->Result<Value,String>{
+    #[cfg(windows)]
+    {
+        return tauri::async_runtime::spawn_blocking(move||{
+            if option_env!("IWXA_T3_CONSUMER_SHA256").is_none(){
+                return Ok(serde_json::json!({"available":false}));
+            }
+            let proof=atlas_t3_consumer_call(&app,"atlas-capabilities",None)?;
+            Ok(serde_json::json!({"available":true,"recipientId":"iwxa.atlas",
+                "sameWindowsAccount":proof["sameWindowsAccount"]}))
+        }).await.map_err(|_|"ATLAS_T3_NATIVE_WORKER_FAILED".to_owned())?;
+    }
+    #[cfg(not(windows))]
+    { let _=app;Ok(serde_json::json!({"available":false})) }
+}
+#[tauri::command]
+async fn atlas_t3_inspect(app:AppHandle,archive_base64:String)->Result<Value,String>{
+    #[cfg(windows)]
+    {
+        return tauri::async_runtime::spawn_blocking(move||{
+            if archive_base64.len()>((MAX_IWXA_BYTES+2)/3)*4{
+                return Err("ATLAS_T3_SIGNED_FILE_TOO_LARGE".into());
+            }
+            let bytes=BASE64.decode(&archive_base64).map_err(|_|"ATLAS_T3_SIGNED_FILE_INVALID")?;
+            if bytes.len()<22||bytes.len()>MAX_IWXA_BYTES{
+                return Err("ATLAS_T3_SIGNED_FILE_INVALID".into());
+            }
+            // The native component must read the exact selected bytes. A
+            // fixed app-owned scratch file is removed even on a refusal.
+            let (root,_)=atlas_t3_local_roots(&app)?;
+            let scratch=root.join("temporary");
+            fs::create_dir_all(&scratch).map_err(|_|"ATLAS_T3_TEMPORARY_DIRECTORY_FAILED")?;
+            struct Scratch(PathBuf);
+            impl Drop for Scratch{fn drop(&mut self){let _=fs::remove_file(&self.0);}}
+            let path=Scratch(scratch.join(format!("{}.iwxa",Uuid::new_v4())));
+            let mut file=OpenOptions::new().create_new(true).write(true).open(&path.0)
+                .map_err(|_|"ATLAS_T3_TEMPORARY_FILE_FAILED")?;
+            file.write_all(&bytes).and_then(|_|file.sync_all()).map_err(|_|"ATLAS_T3_TEMPORARY_FILE_FAILED")?;
+            drop(file);
+            let selected=path.0.to_str().ok_or("ATLAS_T3_TEMPORARY_FILE_PATH_INVALID")?;
+            let proof=atlas_t3_consumer_call(&app,"atlas-inspect",Some(selected))?;
+            if proof["archiveSha256"].as_str()!=Some(checksum(&bytes).as_str()){
+                return Err("ATLAS_T3_ORIGINAL_ARCHIVE_MISMATCH".into());
+            }
+            Ok(proof)
+        }).await.map_err(|_|"ATLAS_T3_NATIVE_WORKER_FAILED".to_owned())?;
+    }
+    #[cfg(not(windows))]
+    {let _=(app,archive_base64);Err("ATLAS_T3_NATIVE_WINDOWS_REQUIRED".into())}
+}
+#[tauri::command]
+async fn atlas_t3_readback(app:AppHandle,archive_sha256:String)->Result<Value,String>{
+    if archive_sha256.len()!=64||!archive_sha256.bytes().all(|b|
+        b.is_ascii_digit()||(b'a'..=b'f').contains(&b)){
+        return Err("ATLAS_T3_ORIGINAL_ARCHIVE_HASH_INVALID".into());
+    }
+    #[cfg(windows)]
+    {
+        return tauri::async_runtime::spawn_blocking(move||{
+            let proof=atlas_t3_consumer_call(&app,"atlas-readback",Some(&archive_sha256))?;
+            if proof["archiveSha256"].as_str()!=Some(archive_sha256.as_str()){
+                return Err("ATLAS_T3_ORIGINAL_ARCHIVE_MISMATCH".into());
+            }
+            Ok(proof)
+        }).await.map_err(|_|"ATLAS_T3_NATIVE_WORKER_FAILED".to_owned())?;
+    }
+    #[cfg(not(windows))]
+    {let _=app;Err("ATLAS_T3_NATIVE_WINDOWS_REQUIRED".into())}
+}
+
 pub fn run(){
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -1277,7 +1480,8 @@ pub fn run(){
         .invoke_handler(tauri::generate_handler![
             atlas_open,atlas_commit,atlas_export_json,atlas_select_import,
             atlas_export_iwxa,atlas_select_iwxa,atlas_restore_previous,
-            atlas_list_history,atlas_restore_history,atlas_launch_work_ref,atlas_take_work_ref
+            atlas_list_history,atlas_restore_history,atlas_launch_work_ref,atlas_take_work_ref,
+            atlas_t3_capabilities,atlas_t3_inspect,atlas_t3_readback
         ])
         .run(tauri::generate_context!())
         .expect("IWXA Atlas desktop window could not be started");
