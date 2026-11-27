@@ -142,14 +142,29 @@ const decisionRecord=(d)=>{
 // a saved link, not an original signature, current grant or delivery proof.
 // Compare the signed corporate provenance, not titles or adjacent results.
 export function recordedCorporateAtlasResult(snapshot,source){
- const work=source?.workRef;
+ const work=source?.workRef,workspace=source?.sourceKind==="ADMIN_WORKSPACE_RESULT";
  if(!source||!work||!ID.test(source.organizationId??"")||
     !ID.test(source.workspaceId??"")||!ID.test(source.taskId??"")||
-    !SHA.test(source.taskRevisionId??"")||!SHA.test(source.resultRevisionId??"")||
-    !SHA.test(source.acceptanceId??"")||!ID.test(work.projectId??"")||
-    !ID.test(work.workId??"")||typeof work.revision!=="string"||
+    !SHA.test(source.taskRevisionId??"")||
+    !ID.test(work.projectId??"")||!ID.test(work.workId??"")||typeof work.revision!=="string"||
     !/^(0|[1-9][0-9]*)$/.test(work.revision)||
-    !Number.isSafeInteger(Number(work.revision)))
+    !Number.isSafeInteger(Number(work.revision))||
+    (workspace?(
+      !ID.test(source.resultId??"")||!SHA.test(source.taskPackageSha256??"")||
+      !/^company:work:[a-f0-9]{64}$/.test(source.taskObjectId??"")||
+      !/^company:work:[a-f0-9]{64}$/.test(source.resultObjectId??"")||
+      source.taskObjectId===source.resultObjectId||
+      !ID.test(source.taskEventId??"")||!ID.test(source.resultEventId??"")||
+      source.taskEventId===source.resultEventId||
+      !/^admin:t3:atlas:[a-f0-9]{64}$/.test(source.sourceOperationId??"")||
+      !SHA.test(source.archiveSha256??"")||!SHA.test(source.resultSha256??"")||
+      typeof source.selectedText!=="string"||!source.selectedText.trim()||
+      new TextEncoder().encode(source.selectedText).byteLength>65536||
+      Object.hasOwn(source,"acceptanceId")
+    ):(
+      source.sourceKind!==undefined&&source.sourceKind!=="ADMIN_APPLIED_RESULT"||
+      !SHA.test(source.resultRevisionId??"")||!SHA.test(source.acceptanceId??"")
+    )))
   fail("ATLAS_T3_CORPORATE_RESULT_REFERENCE_INVALID");
  const revision=String(snapshot.revision);
  const project=snapshot.projects.find(p=>p.id===work.projectId);
@@ -158,13 +173,23 @@ export function recordedCorporateAtlasResult(snapshot,source){
  const matches=[];
  for(const decision of project.decisions){
   const row=decisionRecord(decision);
-  if(!row||row.sourceKind!=="ADMIN_APPLIED_RESULT"||row.signedFileMode!==true||
-     row.originalKernelEventVerified!==false||
+  if(!row||row.sourceKind!==(workspace?"ADMIN_WORKSPACE_RESULT":"ADMIN_APPLIED_RESULT")||
+     row.signedFileMode!==true||row.originalKernelEventVerified!==false||
      row.projectId!==work.projectId||row.workId!==work.workId||
      String(row.sourceRevision)!==work.revision||
      row.organizationId!==source.organizationId||row.workspaceId!==source.workspaceId||
-     row.taskId!==source.taskId||row.signedTaskRevisionId!==source.taskRevisionId||
-     row.resultId!==source.resultRevisionId||row.acceptanceId!==source.acceptanceId)continue;
+     row.taskId!==source.taskId||row.signedTaskRevisionId!==source.taskRevisionId)continue;
+  if(workspace){
+   // Correlate the exact published carrier with the actual persisted
+   // Decision. Similar text, an adjacent Result or an earlier grant
+   // must not be reported as receipt of this publication.
+   if(row.resultId!==source.resultId||row.signedTaskPackageSha256!==source.taskPackageSha256||
+      row.taskObjectId!==source.taskObjectId||row.taskEventId!==source.taskEventId||
+      row.resultEventId!==source.resultEventId||row.sourceObjectRef.object_id!==source.resultObjectId||
+      row.sourceOperationId!==source.sourceOperationId||row.archiveSha256!==source.archiveSha256||
+      row.acceptedDigest!==source.resultSha256||row.selectedSummarySha256!==source.resultSha256||
+      row.portableSelectedSummary!==true||row.selectedAcceptedSummary!==source.selectedText)continue;
+  }else if(row.resultId!==source.resultRevisionId||row.acceptanceId!==source.acceptanceId)continue;
   if(!/^atlas:t3:[a-f0-9]{64}$/.test(row.operationId)||
      !ID.test(decision.id??"")||!(snapshot.revision>Number(work.revision)))
    return {status:"AMBIGUOUS",revision};
@@ -173,11 +198,13 @@ export function recordedCorporateAtlasResult(snapshot,source){
  if(matches.length>1)return {status:"AMBIGUOUS",revision};
  if(!matches.length)return {status:"NOT_RECORDED",revision};
  const entry=matches[0];
- // Do not present one apparently valid record when another saved Decision
- // carries its operation ID (even in a different project).
+ // The same operation or exact publication may not appear twice even
+ // across projects. This read-only projection does not attest current rights.
  let count=0;
  for(const p of snapshot.projects)for(const d of p.decisions){
-  if(decisionRecord(d)?.operationId===entry.row.operationId)count++;
+  const other=decisionRecord(d);
+  if(other?.operationId===entry.row.operationId||
+     workspace&&other?.sourceOperationId===source.sourceOperationId)count++;
  }
  if(count!==1)return {status:"AMBIGUOUS",revision};
  return {status:"RECORDED",revision,decisionId:entry.decisionId};
