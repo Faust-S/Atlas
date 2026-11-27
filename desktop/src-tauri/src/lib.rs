@@ -1101,9 +1101,150 @@ fn atlas_launch_work_ref()->Result<Option<Value>,String>{
         .collect::<Result<Vec<_>,_>>()?;
     launch_work_ref(&args)
 }
+// A local Windows navigation request carries ONLY an existing WorkRef.
+// It is not a permission, project write, Exchange carrier or network service.
+// The same original saved-head check is used for CLI, pasted and window links.
+fn parse_window_work_ref(bytes:&[u8])->Result<Value,String>{
+    if bytes.is_empty()||bytes.len()>2048{return Err("ATLAS_WORK_REFERENCE_INVALID".into());}
+    let raw:Value=serde_json::from_slice(bytes).map_err(|_|"ATLAS_WORK_REFERENCE_INVALID")?;
+    let obj=raw.as_object().ok_or("ATLAS_WORK_REFERENCE_INVALID")?;
+    if obj.len()!=3{return Err("ATLAS_WORK_REFERENCE_INVALID".into());}
+    let args=vec!["--iwxa-open-work".to_string(),
+        obj.get("projectId").and_then(Value::as_str).ok_or("ATLAS_WORK_REFERENCE_INVALID")?.into(),
+        obj.get("workId").and_then(Value::as_str).ok_or("ATLAS_WORK_REFERENCE_INVALID")?.into(),
+        obj.get("revision").and_then(Value::as_str).ok_or("ATLAS_WORK_REFERENCE_INVALID")?.into()];
+    launch_work_ref(&args)?.ok_or("ATLAS_WORK_REFERENCE_INVALID".into())
+}
+
+#[cfg(windows)]
+mod work_navigation_windows {
+    use super::{parse_window_work_ref,Value};
+    use std::{ffi::c_void,sync::Mutex};
+    use tauri::{AppHandle,Emitter};
+
+    const WM_COPYDATA:u32=0x004a;
+    const WM_NCDESTROY:u32=0x0082;
+    // Property means this window implements the navigation operation, NOT
+    // that a particular product release is required.
+    const PROPERTY:&str="IWXA.Atlas.NavigateWork";
+    const DATA_KIND:usize=0x49575841;
+    const SUBCLASS:usize=0x41544c53;
+    static PENDING:Mutex<Option<Value>>=Mutex::new(None);
+
+    #[repr(C)]
+    struct CopyData {kind:usize,len:u32,data:*mut c_void}
+    type SubclassProc=unsafe extern "system" fn(isize,u32,usize,isize,usize,usize)->isize;
+    #[link(name="comctl32")]
+    unsafe extern "system" {
+        fn SetWindowSubclass(hwnd:isize,proc:Option<SubclassProc>,id:usize,reference:usize)->i32;
+        fn RemoveWindowSubclass(hwnd:isize,proc:Option<SubclassProc>,id:usize)->i32;
+        fn DefSubclassProc(hwnd:isize,msg:u32,w:usize,l:isize)->isize;
+    }
+    #[link(name="user32")]
+    unsafe extern "system" {
+        fn SetPropW(hwnd:isize,name:*const u16,value:isize)->i32;
+        fn GetPropW(hwnd:isize,name:*const u16)->isize;
+        fn RemovePropW(hwnd:isize,name:*const u16)->isize;
+        fn GetWindowThreadProcessId(hwnd:isize,pid:*mut u32)->u32;
+        fn SendMessageTimeoutW(hwnd:isize,msg:u32,w:usize,l:isize,
+            flags:u32,timeout:u32,result:*mut usize)->isize;
+    }
+    fn property()->Vec<u16>{PROPERTY.encode_utf16().chain(Some(0)).collect()}
+    unsafe extern "system" fn receive(hwnd:isize,msg:u32,w:usize,l:isize,
+        _id:usize,reference:usize)->isize{
+        if msg==WM_COPYDATA&&l!=0{
+            // Windows owns the COPYDATA buffer for the lifetime of this
+            // synchronous message. Never keep its pointer after returning.
+            let data=&*(l as *const CopyData);
+            if data.kind==DATA_KIND {
+                if data.data.is_null()||data.len==0||data.len>2048{return 0;}
+                let bytes=std::slice::from_raw_parts(data.data.cast::<u8>(),data.len as usize);
+                let Ok(work)=parse_window_work_ref(bytes) else{return 0};
+                let Ok(mut pending)=PENDING.lock() else{return 0};
+                if pending.is_some(){return 0;}
+                *pending=Some(work);
+                drop(pending);
+                let app=&*(reference as *const AppHandle);
+                // The React listener only asks native for the queued WorkRef.
+                // A listener not yet mounted also drains it on startup.
+                let _=app.emit("atlas-work-reference-available",());
+                return 1;
+            }
+        }
+        if msg==WM_NCDESTROY {
+            RemovePropW(hwnd,property().as_ptr());
+            RemoveWindowSubclass(hwnd,Some(receive),SUBCLASS);
+            if let Ok(mut pending)=PENDING.lock(){*pending=None;}
+            drop(Box::from_raw(reference as *mut AppHandle));
+        }
+        DefSubclassProc(hwnd,msg,w,l)
+    }
+    pub(super) fn install(hwnd:isize,app:AppHandle)->Result<(),String>{
+        let reference=Box::into_raw(Box::new(app));
+        unsafe {
+            if SetWindowSubclass(hwnd,Some(receive),SUBCLASS,reference as usize)==0 {
+                drop(Box::from_raw(reference));
+                return Err("ATLAS_WORK_NAVIGATION_WINDOW_UNAVAILABLE".into());
+            }
+            if SetPropW(hwnd,property().as_ptr(),1)==0 {
+                RemoveWindowSubclass(hwnd,Some(receive),SUBCLASS);
+                drop(Box::from_raw(reference));
+                return Err("ATLAS_WORK_NAVIGATION_WINDOW_UNAVAILABLE".into());
+            }
+        }
+        Ok(())
+    }
+    pub(super) fn take()->Result<Option<Value>,String>{
+        Ok(PENDING.lock().map_err(|_|"ATLAS_WORK_NAVIGATION_UNAVAILABLE")?.take())
+    }
+    // The caller supplies only a window and PID already verified by U04.
+    // Recheck the OS window owner and the capability immediately before
+    // sending. No app version allowlist and no arbitrary HWND from React.
+    pub(crate) fn send(hwnd:isize,pid:u32,work:&Value)->&'static str{
+        let Ok(bytes)=serde_json::to_vec(work) else{return "REQUEST_INVALID"};
+        if parse_window_work_ref(&bytes).is_err(){return "REQUEST_INVALID";}
+        let mut actual=0u32;
+        unsafe {
+            if GetWindowThreadProcessId(hwnd,&mut actual)==0||actual!=pid{
+                return "WINDOW_NOT_FOUND";
+            }
+            if GetPropW(hwnd,property().as_ptr())!=1{return "NOT_SUPPORTED";}
+            let payload=CopyData{kind:DATA_KIND,len:bytes.len() as u32,
+                data:bytes.as_ptr() as *mut c_void};
+            let mut result=0usize;
+            let delivered=SendMessageTimeoutW(hwnd,WM_COPYDATA,0,
+                (&payload as *const CopyData) as isize,0x0002|0x0020,1000,&mut result);
+            if delivered==0{return "REQUEST_UNCONFIRMED";}
+            if result!=1{return "REQUEST_NOT_QUEUED";}
+        }
+        "REQUEST_QUEUED"
+    }
+}
+#[tauri::command]
+fn atlas_take_work_ref()->Result<Option<Value>,String>{
+    #[cfg(windows)]
+    {work_navigation_windows::take()}
+    #[cfg(not(windows))]
+    {Ok(None)}
+}
 #[cfg(test)]
 mod launch_work_tests {
     use super::*;
+    #[test]
+    fn window_reference_contains_only_exact_navigation_fields(){
+        let input=serde_json::json!({"projectId":"p","workId":"w","revision":"42"});
+        assert_eq!(parse_window_work_ref(&serde_json::to_vec(&input).unwrap()).unwrap(),input);
+        for invalid in [
+            serde_json::json!({"projectId":"p","workId":"w","revision":42}),
+            serde_json::json!({"projectId":"p","workId":"w","revision":"042"}),
+            serde_json::json!({"projectId":"p","workId":"w","revision":"42","action":"save"}),
+            serde_json::json!({"projectId":"p","workId":"w\n","revision":"42"}),
+            serde_json::json!({"projectId":"p","revision":"42"})
+        ]{
+            assert!(parse_window_work_ref(&serde_json::to_vec(&invalid).unwrap()).is_err());
+        }
+        assert!(parse_window_work_ref(&vec![b'a';2049]).is_err());
+    }
     #[test]
     fn startup_work_arguments_are_exact_and_optional(){
         let args=|values:&[&str]|values.iter().map(|s|s.to_string()).collect::<Vec<_>>();
@@ -1122,10 +1263,21 @@ mod launch_work_tests {
 pub fn run(){
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .setup(|app|{
+            #[cfg(windows)]
+            if let Some(window)=app.get_webview_window("main"){
+                // Navigation support is optional. A failure does not prevent
+                // Atlas starting or using its existing manual WorkRef route.
+                if let Ok(hwnd)=window.hwnd(){
+                    let _=work_navigation_windows::install(hwnd.0 as isize,app.handle().clone());
+                }
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             atlas_open,atlas_commit,atlas_export_json,atlas_select_import,
             atlas_export_iwxa,atlas_select_iwxa,atlas_restore_previous,
-            atlas_list_history,atlas_restore_history,atlas_launch_work_ref
+            atlas_list_history,atlas_restore_history,atlas_launch_work_ref,atlas_take_work_ref
         ])
         .run(tauri::generate_context!())
         .expect("IWXA Atlas desktop window could not be started");

@@ -2,6 +2,7 @@ import React,{useEffect,useMemo,useRef,useState} from "react";
 import atlasPackage from "../package.json";
 import {invoke as nativeInvoke,isTauri} from "@tauri-apps/api/core";
 import {getCurrentWindow} from "@tauri-apps/api/window";
+import {listen} from "@tauri-apps/api/event";
 import {empty,deserialize,serialize,editItem,removeStage,removeItem,disconnect,
  upsertCalendarDraft,removeCalendarDraft,resolveCalendarDraftMissingWorkRefs,
  createWorkCalendar,reviseWorkCalendar,removeProject as dropProject} from "../../src/core.mjs";
@@ -1397,6 +1398,26 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   void invoke<unknown>("atlas_launch_work_ref").then(raw=>{
    if(raw!==null&&raw!==undefined)void openSavedWorkReference(raw);
   }).catch(issue);
+ },[native,embedded,ready]);
+ // Already open Atlas: the Windows window message queues only a WorkRef.
+ // Use the latest original saved-head navigation handler, never a stale
+ // React closure or a native write. Drain once after subscription so an
+ // early native notification cannot disappear during renderer startup.
+ const currentWorkNavigation=useRef(openSavedWorkReference);
+ currentWorkNavigation.current=openSavedWorkReference;
+ useEffect(()=>{
+  if(!native||embedded||!ready)return;
+  let active=true,release:(()=>void)|undefined;
+  const drain=()=>{
+   void nativeInvoke<unknown>("atlas_take_work_ref").then(raw=>{
+    if(active&&raw!==null&&raw!==undefined)void currentWorkNavigation.current(raw);
+   }).catch(e=>{if(active)issue(e);});
+  };
+  void listen("atlas-work-reference-available",drain).then(unlisten=>{
+   if(!active){unlisten();return;}
+   release=unlisten;drain();
+  }).catch(e=>{if(active)issue(e);});
+  return ()=>{active=false;release?.();};
  },[native,embedded,ready]);
  // Back/forward preserve UI navigation but never bypass a pending editor.
  useEffect(()=>{
