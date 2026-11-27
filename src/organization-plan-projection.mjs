@@ -4,6 +4,7 @@
 import {validate} from './core.mjs';
 import {portfolioSchedule} from './portfolio-schedule.mjs';
 import {projectWorkPlanReadiness} from './work-plan-readiness.mjs';
+import {atlasT3ProjectResultLinks} from './atlas-t3-native-recipient.mjs';
 
 /**
  * Selected project only. Use the original calendar-aware portfolio forecast
@@ -21,6 +22,17 @@ export function organizationPlanProjection(snapshot,projectId){
  const readiness=projectWorkPlanReadiness(snapshot,projectId,{portfolio});
  const works=new Map(project.items.map(w=>[w.id,w]));
  const resources=new Map((snapshot.resources??[]).map(r=>[r.id,r]));
+ const resultLinks=new Map();
+ for(const link of atlasT3ProjectResultLinks(project)){
+  if(!resultLinks.has(link.workId))resultLinks.set(link.workId,[]);
+  // Center's planning projection contains references only, never the
+  // original selected Result text or a claim of current authorization.
+  resultLinks.get(link.workId).push({taskId:link.taskId,resultId:link.resultId,
+   decisionId:link.decisionId,sourceRevision:link.sourceRevision,
+   receivedAt:link.receivedAt,signedFileMode:link.signedFileMode,
+   hasContent:link.portableSelectedSummary,
+   targetLinks:link.targetLinks.map(t=>({id:t.id,title:t.title,observationCount:t.observationCount}))});
+ }
  return {
   source:'atlas.project/1',
   projectId,
@@ -37,6 +49,7 @@ export function organizationPlanProjection(snapshot,projectId){
    const resource=resources.get(work.resourceId);
    return {...row,
     assignee:work.assignee??'',
+    resultLinks:resultLinks.get(row.id)??[],
     resource:resource?{id:resource.id,label:resource.label,
      allocationPct:work.allocationPct??100}:null};
   }),

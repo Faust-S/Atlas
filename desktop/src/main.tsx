@@ -52,7 +52,7 @@ import {projectHistoryRows} from "./history-view.mjs";
 import {sortWorkRows,firstSortedMatchingWorkId,deadlineFocusRows,filterWorkRowsByObservation} from "./work-sorting.mjs";
 import {createAtlasSavedRef,resolveAtlasWorkNavigation} from "../../src/project-host-port.mjs";
 import {atlasT3DecisionSummary,atlasT3RecordedWorkLinks,
- atlasT3PortableResultText,verifiedAtlasSignedFilePreview}
+ atlasT3PortableResultText,atlasT3ProjectResultLinks,verifiedAtlasSignedFilePreview}
  from "../../src/atlas-t3-native-recipient.mjs";
 import {findConfirmedAtlasT3Decision} from "../../src/atlas-t3-confirmed-projection.mjs";
 import {invokeAtlasHost,type AtlasEmbeddedHost,
@@ -544,6 +544,9 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    }:null;
   })():null;
  const t3WorkLinks=useMemo(()=>atlasT3RecordedWorkLinks(project),[project]);
+ const t3ProjectResults=useMemo(()=>atlasT3ProjectResultLinks(project),[project]);
+ const [t3ResultLimit,setT3ResultLimit]=useState(20);
+ useEffect(()=>setT3ResultLimit(20),[project?.id]);
  const recentWork=recentWorkId?project?.items.find((item:any)=>item.id===recentWorkId):null;
  const recentStage=recentWork?.stageId?
   project?.stages.find((stage:any)=>stage.id===recentWork.stageId):null;
@@ -3473,6 +3476,23 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     {tab==="reality"&&<section className="surface"><div className="section-heading"><div><h2>Что известно о результате</h2>
      <p>Посмотрите, что подтверждено записями, какие сведения устарели и что ещё нужно проверить.</p></div>
      <div className="button-row"><Action onClick={()=>openEditor("target")}>＋ Требование</Action><Action onClick={()=>openEditor("finding")} disabled={!project.targets?.length}>＋ Наблюдение</Action></div></div>
+     {t3ProjectResults.length>0&&<div className="surface" aria-label="Полученные результаты работ">
+      <div className="section-heading"><div><h3>Полученные результаты работ ({t3ProjectResults.length})</h3>
+       <p>Сохранённые связи T3. Запишите фактическую оценку по конкретному требованию. Получение Result само по себе не завершает работу и не изменяет даты.</p></div></div>
+      {t3ProjectResults.slice(-t3ResultLimit).reverse().map(link=><details className="atlas-technical-details" key={link.decisionId}>
+       <summary>{link.workTitle} · Result {link.resultId}</summary>
+       <p className="minor">Исходная редакция плана: {link.sourceRevision}. Task: {link.taskId}.</p>
+       {link.selectedText!==null?<p style={{whiteSpace:"pre-wrap",overflowWrap:"anywhere"}}>{link.selectedText}</p>:<p className="minor">Сохранена только ссылка на исходный Result.</p>}
+       <p className="minor">Локальная запись не подтверждает текущие полномочия T3.{link.signedFileMode?" Событие Kernel отправителя не проверялось.":""}</p>
+       {link.targetLinks.length>0?link.targetLinks.map(target=><div className="attention-row" key={target.id}>
+        <div><strong>{target.title}</strong><small>{target.observationCount?"Записано наблюдений: "+target.observationCount:"Факт по этому Result ещё не записан"}</small></div>
+        <Action disabled={busy||!!editor}
+         onClick={()=>openEditor("finding-result:"+[link.workId,target.id,link.decisionId].map(encodeURIComponent).join(":"))}>Зафиксировать факт</Action>
+       </div>):<div className="button-row"><small>Работа не связана с ожидаемым результатом.</small>
+        <Action disabled={busy||!!editor} onClick={()=>openEditor("work:"+link.workId)}>Указать требование</Action></div>}
+      </details>)}
+      {t3ProjectResults.length>t3ResultLimit&&<Action onClick={()=>setT3ResultLimit(n=>n+20)}>Показать ещё результаты</Action>}
+     </div>}
      <div className="table-scroll"><table><thead><tr><th>Ожидаемый результат</th><th>Что известно</th><th>Состояние источника</th><th></th></tr></thead>
       <tbody>{(reality?.rows||[]).map((r:any)=><tr key={r.id}><td><strong><button type="button" className="text-link" onClick={()=>{
         if(!requireClosedForm())return;

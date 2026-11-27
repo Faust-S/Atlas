@@ -125,11 +125,43 @@ export function atlasT3RecordedWorkLinks(project){
   links.get(row.workId).push(Object.freeze({
    taskId:row.taskId,resultId:row.resultId,decisionId:decision.id,
    operationId:row.operationId,sourceObjectRef:row.sourceObjectRef,
+   sourceRevision:String(row.sourceRevision),receivedAt:decision.at,
    portableSelectedSummary:row.portableSelectedSummary===true,
    signedFileMode:row.signedFileMode===true,
   }));
  }
  return links;
+}
+// Existing Decision and finding references are the only persisted links.
+// These are historical records, not proof of a current T3 grant or completion.
+export function atlasT3ProjectResultLinks(project){
+ if(!project||!Array.isArray(project.items)||!Array.isArray(project.decisions))return [];
+ const byWork=atlasT3RecordedWorkLinks(project);
+ const targets=new Map((project.targets??[]).map(target=>[target.id,target]));
+ const decisions=new Map(project.decisions.map(d=>[d.id,d]));
+ const counts=new Map(),operationCounts=new Map();
+ for(const rows of byWork.values())for(const link of rows){
+  operationCounts.set(link.operationId,(operationCounts.get(link.operationId)??0)+1);
+ }
+ for(const finding of project.findings??[]){
+  if(typeof finding.reference!=="string"||!finding.reference.startsWith("atlas:decision:"))continue;
+  const key=JSON.stringify([finding.workId,finding.targetId,finding.reference]);
+  counts.set(key,(counts.get(key)??0)+1);
+ }
+ const out=[];
+ for(const work of project.items)for(const link of byWork.get(work.id)??[]){
+  if(!/^atlas:t3:[a-f0-9]{64}$/.test(link.operationId)||
+     !ID.test(link.decisionId??"")||operationCounts.get(link.operationId)!==1)continue;
+  const reference="atlas:decision:"+link.decisionId;
+  const decision=decisions.get(link.decisionId);
+  const targetLinks=(work.targetIds??[]).filter(id=>targets.has(id)).map(id=>({
+   id,title:targets.get(id).title,
+   observationCount:counts.get(JSON.stringify([work.id,id,reference]))??0
+  }));
+  out.push({...link,workId:work.id,workTitle:work.title,reference,targetLinks,
+   selectedText:atlasT3PortableResultText(decision?.text)});
+ }
+ return out;
 }
 async function hashOperation(ref,accepted){
  const input=JSON.stringify([ref.workspace_id,ref.object_id,ref.schema_id,
@@ -482,6 +514,7 @@ export function createAtlasT3SignedFileRecipient({
     row.selectedAcceptedSummary!==confirmed.portable.selectedAcceptedSummary||
     row.selectedSummarySha256!==confirmed.portable.selectedSummarySha256||
     row.originalKernelEventVerified!==false||
+    !saved.snapshot.projects.find(p=>p.id===w.projectId)?.items.some(item=>item.id===w.workId)||
     !(saved.snapshot.revision>Number(w.revision)))
    fail("ATLAS_T3_SIGNED_FILE_PERSISTED_PROOF_CHANGED");
   await permitted(confirmed,"atlas.work.result.readback");

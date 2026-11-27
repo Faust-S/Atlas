@@ -10,6 +10,7 @@ import {setPlanDates,setPlanWork,addPlanWork,checkPlanAmendment,addResourcePlanC
 import {addPlanningResource,editPlanningResource,resourceChoiceOptions} from "./resource-planning.mjs";
 import {repoName,ownerName,branchName} from "./github-public.mjs";
 import {selectedSourceFolder} from "./project-organization.mjs";
+import {atlasT3ProjectResultLinks} from "./atlas-t3-native-recipient.mjs";
 
 // One set of user-facing project type names for the form and navigation.
 export const PROJECT_TYPE_LABELS=Object.freeze({
@@ -122,15 +123,20 @@ const sourceOptions=p=>{
 };
 // An optional work-specific editor records the origin in the existing ledger.
 function findingWorkContext(project,action){
- if(!action.startsWith("finding-work:"))return null;
- const pieces=action.slice("finding-work:".length).split(":");
- if(pieces.length!==2||pieces.some(value=>!value))throw Error("Неверная ссылка на работу и требование");
- const [workId,targetId]=pieces.map(decodeURIComponent);
+ const fromResult=action.startsWith("finding-result:");
+ if(!fromResult&&!action.startsWith("finding-work:"))return null;
+ const pieces=action.slice((fromResult?"finding-result:":"finding-work:").length).split(":");
+ if(pieces.length!==(fromResult?3:2)||pieces.some(value=>!value))
+  throw Error("Неверная ссылка на работу и требование");
+ const [workId,targetId,decisionId]=pieces.map(decodeURIComponent);
  const work=project.items.find(item=>item.id===workId);
  if(!work||!(work.targetIds||[]).includes(targetId)||
     !(project.targets||[]).some(target=>target.id===targetId))
   throw Error("Работа не связана с указанным требованием");
- return {workId,targetId,work};
+ const resultLink=fromResult?atlasT3ProjectResultLinks(project).find(row=>
+  row.workId===workId&&row.decisionId===decisionId&&row.targetLinks.some(t=>t.id===targetId)):null;
+ if(fromResult&&!resultLink)throw Error("Исходная запись Result не найдена для этой работы");
+ return {workId,targetId,work,resultLink};
 }
 export function editorSpec(project,action,snapshot=null){
  if(action==="resource-new"||action.startsWith("resource-edit:")){
@@ -375,19 +381,22 @@ export function editorSpec(project,action,snapshot=null){
     field("note","Что именно перепроверено на этой ревизии?","textarea","",true)
    ]};
  }
- if(action==="finding"||action.startsWith("finding-target:")||action.startsWith("finding-work:")){
+ if(action==="finding"||action.startsWith("finding-target:")||action.startsWith("finding-work:")||action.startsWith("finding-result:")){
   const context=findingWorkContext(project,action);
   const targets=context?[option(context.targetId,project.targets.find(t=>t.id===context.targetId).title)]:targetOptions(project);
   const selected=context?.targetId||(action.startsWith("finding-target:")?action.slice("finding-target:".length):targets[0]?.value);
-  return {title:"Фактическое состояние — заявление",
-   hint:context?"Наблюдение по работе «"+context.work.title+"». Связь с работой сохранится в истории. Это заявление, а не независимая приёмка.":
+  const resultLink=context?.resultLink;
+  return {title:resultLink?"Факт по полученному Result":"Фактическое состояние — заявление",
+   hint:resultLink?"Работа «"+context.work.title+"», Result "+resultLink.resultId+
+    ". Ссылка на сохранённое решение Atlas будет записана автоматически. Оцените содержание самостоятельно: факт остаётся заявлением, а не новой подписанной приёмкой T3.":
+    context?"Наблюдение по работе «"+context.work.title+"». Связь с работой сохранится в истории. Это заявление, а не независимая приёмка.":
     "Это запись сведений, а не независимая приёмка. Для подтверждения выберите источник и версию.",
    fields:[choice("targetId","К какому требованию относится",targets,selected),
-    choice("result","Что известно",[option("present","Реализовано (заявлено)"),option("partial","Частично"),option("absent","Отсутствует")],"partial"),
+    choice("result","Что известно",[...(resultLink?[option("","Выберите оценку")]:[]),option("present","Реализовано (заявлено)"),option("partial","Частично"),option("absent","Отсутствует")],resultLink?"":"partial"),
     choice("level","Уровень заявления",[option("implementation","Реализация"),option("test","Тестирование"),option("acceptance","Приёмка")],"implementation"),
-    choice("sourceRef","Внешний источник и ветка",sourceOptions(project),"",false),
-    field("reference","Ссылка на документ или проверку","text","",false),
-    field("note","Что именно наблюдалось","textarea","",false)]};
+    ...(resultLink?[]:[choice("sourceRef","Внешний источник и ветка",sourceOptions(project),"",false),
+      field("reference","Ссылка на документ или проверку","text","",false)]),
+    field("note","Что именно наблюдалось","textarea","",Boolean(resultLink))]};
  }
  if(action.startsWith("respond:")){
   const key=decodeURIComponent(action.slice(8));
@@ -626,10 +635,19 @@ export function applyEditor(snapshot,projectId,action,input){
    reference:get("reference"),note:get("note"),reviewOfFindingId:candidate.claim.id
   }).state};
  }
- if(action==="finding"||action.startsWith("finding-target:")||action.startsWith("finding-work:")){
+ if(action==="finding"||action.startsWith("finding-target:")||action.startsWith("finding-work:")||action.startsWith("finding-result:")){
   const context=findingWorkContext(p,action);
   if(context&&get("targetId")!==context.targetId)
    throw Error("Нельзя изменить требование для наблюдения по конкретной работе");
+  if(context?.resultLink){
+   // The selected existing Decision fixes the origin; never accept a
+   // different work, target or source supplied by a stale/edited form.
+   if(get("sourceRef")||get("reference")||!get("note"))
+    throw Error("Укажите собственную оценку выбранного Result без подмены источника");
+   return {state:recordFinding(snapshot,projectId,{targetId:context.targetId,
+    result:get("result"),level:get("level"),reference:context.resultLink.reference,
+    note:get("note"),workId:context.workId}).state};
+  }
   const sourceRef=get("sourceRef");
   const marker=sourceRef.indexOf("::");
   const sourceId=marker>=0?sourceRef.slice(0,marker):null;

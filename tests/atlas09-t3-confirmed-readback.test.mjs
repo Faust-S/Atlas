@@ -5,6 +5,11 @@ import {empty,createProject,createItem,createDecision,serialize,deserialize}
  from "../src/core.mjs";
 import {findConfirmedAtlasT3Decision}
  from "../src/atlas-t3-confirmed-projection.mjs";
+import {atlasT3ProjectResultLinks} from "../src/atlas-t3-native-recipient.mjs";
+import {addTarget,compareProject} from "../src/trace.mjs";
+import {editItem} from "../src/core.mjs";
+import {editorSpec,applyEditor} from "../src/editor.mjs";
+import {organizationPlanProjection} from "../src/organization-plan-projection.mjs";
 import {readExternalAtlasUpdate} from "../desktop/src/native-save.mjs";
 
 const OP="atlas:t3:"+"d".repeat(64);
@@ -105,4 +110,48 @@ test("Both original D6 routes update clean native UI only after matching exact D
  assert.ok(ui.includes("Не повторяйте применение"));
  assert.ok(ui.includes("setError(\"Обновление Atlas: \""));
  assert.ok(ui.includes("setError(\"Восстановление отображения: \""));
+});
+
+test("Saved Result is available in plan/fact, and a separate human observation keeps the exact Decision",()=>{
+ const f=fixture();
+ const t=addTarget(f.snapshot,f.p.id,{title:"Delivery",desired:"Audited output"});
+ const unrelated=addTarget(t.state,f.p.id,{title:"Unrelated",desired:"Different outcome"});
+ let state=editItem(unrelated.state,f.p.id,f.w.id,{targetIds:[t.id]});
+ const before=serialize(state);
+ const rows=atlasT3ProjectResultLinks(state.projects[0]);
+ assert.equal(rows.length,1);
+ const row=rows[0];
+ assert.equal(row.workId,f.w.id);
+ assert.equal(row.reference,f.receipt.resultRef);
+ assert.deepEqual(row.targetLinks,[{id:t.id,title:"Delivery",observationCount:0}]);
+ assert.equal(compareProject(state.projects[0]).rows.find(x=>x.id===t.id).assessment,"unknown");
+ const action="finding-result:"+[f.w.id,t.id,row.decisionId].map(encodeURIComponent).join(":");
+ const spec=editorSpec(state.projects[0],action,state);
+ assert.equal(spec.fields.find(x=>x.name==="result").value,"");
+ assert.equal(spec.fields.find(x=>x.name==="note").required,true);
+ assert.equal(serialize(state),before);
+ const form=new FormData();
+ form.set("targetId",t.id);form.set("result","partial");form.set("level","implementation");
+ form.set("note","Delivery report covers the first phase only");
+ const after=applyEditor(state,f.p.id,action,form).state;
+ const project=after.projects[0],finding=project.findings.at(-1);
+ assert.equal(finding.reference,row.reference);
+ assert.equal(finding.workId,f.w.id);
+ assert.equal(finding.targetId,t.id);
+ assert.equal(finding.origin,"manual");
+ assert.deepEqual(project.items,state.projects[0].items);
+ assert.deepEqual(project.decisions,state.projects[0].decisions);
+ assert.equal(atlasT3ProjectResultLinks(project)[0].targetLinks[0].observationCount,1);
+ const plan=organizationPlanProjection(after,f.p.id);
+ assert.equal(plan.works.find(w=>w.id===f.w.id).resultLinks[0].targetLinks[0].observationCount,1);
+ assert.equal(Object.hasOwn(plan.works.find(w=>w.id===f.w.id).resultLinks[0],"selectedText"),false);
+ assert.deepEqual(plan.works.find(w=>w.id===f.other.id).resultLinks,[]);
+ form.set("targetId",unrelated.id);
+ assert.throws(()=>applyEditor(state,f.p.id,action,form),/Нельзя изменить требование/);
+ form.set("targetId",t.id);form.set("reference","atlas:decision:foreign");
+ assert.throws(()=>applyEditor(state,f.p.id,action,form),/без подмены источника/);
+ assert.throws(()=>editorSpec(state.projects[0],"finding-result:"+[f.other.id,t.id,row.decisionId].map(encodeURIComponent).join(":"),state),/Работа не связана/);
+ const forged=structuredClone(state);
+ forged.projects[0].decisions.push({...f.decision,id:"duplicate-decision"});
+ assert.deepEqual(atlasT3ProjectResultLinks(forged.projects[0]),[]);
 });
