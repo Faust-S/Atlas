@@ -3235,7 +3235,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
         {(t3WorkLinks.get(w.id)||[]).slice(-2).map((link:any)=>
          <small key={link.decisionId} className="atlas-work-evidence-note">
           {link.portableSelectedSummary
-           ?<>{link.sourceKind==="ADMIN_APPLIED_RESULT"?"Корпоративный Result":"Agent Result"} {link.resultId}. Выбранный текст сохранён в Atlas; доступ к источнику проверяется в T3.</>
+           ?<>{link.sourceKind==="ADMIN_APPLIED_RESULT"||link.sourceKind==="ADMIN_WORKSPACE_RESULT"?"Корпоративный Result":"Agent Result"} {link.resultId}. Выбранный текст сохранён в Atlas; доступ к источнику проверяется в T3.</>
            :<>Agent Result {link.resultId}. Сохранена ссылка; доступ проверяется в T3.</>}
          </small>)}
         {(t3WorkLinks.get(w.id)||[]).length>2&&<small className="atlas-work-evidence-note">
@@ -3951,7 +3951,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      aria-modal="true" aria-labelledby="atlas-t3-signed-result-title">
      <div className="atlas-import-body">
       <h2 id="atlas-t3-signed-result-title">Принять подписанный Result</h2>
-      <p>Источник: {signedResultPreview.sourceKind==="ADMIN_APPLIED_RESULT"?"Admin Center, принятый корпоративный Result":"Personal Agent"}.</p>
+      <p>Источник: {signedResultPreview.sourceKind==="ADMIN_WORKSPACE_RESULT"?"Admin Center, результат из корпоративной Workspace":signedResultPreview.sourceKind==="ADMIN_APPLIED_RESULT"?"Admin Center, принятый корпоративный Result":"Personal Agent"}.</p>
       <p>Оригинальный T3 проверил подпись .iwxa, получателя, действующие полномочия и точный текст. Отдельно подтвердите запись в проект Atlas.</p>
       <p className="minor">Проект: {data.projects.find((p:any)=>p.id===signedResultPreview.workRef.projectId)?.name||signedResultPreview.workRef.projectId}.
        {" "}Работа: {data.projects.find((p:any)=>p.id===signedResultPreview.workRef.projectId)?.items.find((w:any)=>w.id===signedResultPreview.workRef.workId)?.title||signedResultPreview.workRef.workId}.
