@@ -9,6 +9,7 @@ const sameRef=(a,b)=>!!a&&!!b&&["workspace_id","object_id","schema_id","revision
  .every(k=>a[k]===b[k]);
 const sameWork=(a,b)=>!!a&&!!b&&a.projectId===b.projectId&&a.workId===b.workId&&
  String(a.revision)===String(b.revision);
+/** @param {{isActive?: () => boolean}} [options] */
 export async function openStandaloneAtlasSignedFileRoute({isActive=()=>true}={}){
  if(!isTauri()||isActive()!==true)return null;
  const cap=await invoke("atlas_t3_capabilities");
