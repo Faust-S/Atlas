@@ -5,7 +5,8 @@ import assert from "node:assert/strict";
 import {createHash} from "node:crypto";
 import {empty,createProject,createItem,validate} from "../src/core.mjs";
 import {createAtlasT3SignedFileRecipient,createAtlasT3NativeRecipient,
- atlasT3DecisionSummary,atlasT3PortableResultText,verifiedAtlasSignedFilePreview}
+ atlasT3DecisionSummary,atlasT3PortableResultText,verifiedAtlasSignedFilePreview,
+ recordedCorporateAtlasResult,atlasT3ProjectResultLinks}
  from "../src/atlas-t3-native-recipient.mjs";
 
 const sha=text=>createHash("sha256").update(text,"utf8").digest("hex");
@@ -272,6 +273,31 @@ test("corporate D3 signed Result uses the existing U05 Decision and cold readbac
  assert.equal(data.appliedEventId,f.original.appliedEventId);
  assert.equal(data.sourceOperationId,f.original.operationId);
  assert.equal(data.originalKernelEventVerified,false);
+ const source={
+  organizationId:f.original.organizationId,workspaceId:f.original.workspaceId,
+  taskId:f.original.taskId,taskRevisionId:f.original.signedTaskRevisionId,
+  resultRevisionId:f.original.resultId,acceptanceId:f.original.acceptanceId,
+  workRef:f.original.workRef
+ };
+ const snapshot=f.read();
+ assert.deepEqual(recordedCorporateAtlasResult(snapshot,source),{
+  status:"RECORDED",revision:String(snapshot.revision),decisionId:row.id
+ });
+ for(const change of [
+  {organizationId:"org:other"},{workspaceId:"ws:other"},
+  {taskId:"TASK:other"},{taskRevisionId:sha("other Task revision")},
+  {resultRevisionId:sha("other Result")},{acceptanceId:sha("other acceptance")},
+  {workRef:{...source.workRef,revision:"0"}}
+ ]){
+  assert.equal(recordedCorporateAtlasResult(snapshot,{...source,...change}).status,"NOT_RECORDED");
+ }
+ const duplicate=structuredClone(snapshot);
+ duplicate.projects[0].decisions.push({...row,id:"duplicate:decision"});
+ assert.equal(recordedCorporateAtlasResult(duplicate,source).status,"AMBIGUOUS");
+ const project=snapshot.projects[0];
+ assert.equal(atlasT3ProjectResultLinks(project,{corporateScope:source}).length,1);
+ assert.equal(atlasT3ProjectResultLinks(project,{corporateScope:{...source,organizationId:"org:other"}}).length,0);
+ assert.equal(atlasT3ProjectResultLinks(project,{corporateScope:{...source,workspaceId:"ws:other"}}).length,0);
  assert.equal((await f.make().readback(preview.operationId)).state,"SIGNED_FILE_PERSISTED");
  await f.make().receiveArchive(reviewed(preview,f.actual));
  assert.equal(f.writes(),1);
