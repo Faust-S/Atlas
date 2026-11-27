@@ -12,8 +12,9 @@ import {atlasT3ProjectResultLinks} from './atlas-t3-native-recipient.mjs';
  * The return value is plain, detached data; no persisted or mutable plan.
  * @param {any} snapshot
  * @param {string} projectId
+ * @param {{corporateScope?:{organizationId:string,workspaceId:string|null}|null}} [options]
  */
-export function organizationPlanProjection(snapshot,projectId){
+export function organizationPlanProjection(snapshot,projectId,{corporateScope=null}={}){
  validate(snapshot);
  const project=snapshot.projects.find(p=>p.id===projectId);
  if(!project)throw Error('ATLAS_PROJECT_NOT_FOUND');
@@ -23,7 +24,7 @@ export function organizationPlanProjection(snapshot,projectId){
  const works=new Map(project.items.map(w=>[w.id,w]));
  const resources=new Map((snapshot.resources??[]).map(r=>[r.id,r]));
  const resultLinks=new Map();
- for(const link of atlasT3ProjectResultLinks(project)){
+ for(const link of atlasT3ProjectResultLinks(project,{corporateScope})){
   if(!resultLinks.has(link.workId))resultLinks.set(link.workId,[]);
   // Center's planning projection contains references only, never the
   // original selected Result text or a claim of current authorization.
