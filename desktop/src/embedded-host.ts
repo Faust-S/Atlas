@@ -63,6 +63,9 @@ export interface AtlasT3SignedFilePreview {
  archiveSha256:string;selectedSummarySha256:string;
  selectedAcceptedSummary:string;
  originalKernelEventVerified:false;alreadyReceived:boolean;
+ // Optional standalone corporate history capability. Local only.
+ reviewedGeneration?:string;currentRevision?:string;
+ issuedProjectName?:string;issuedWorkTitle?:string;
 }
 export interface AtlasT3SignedFileReceipt {
  state:"SIGNED_FILE_COMMITTED"|"SIGNED_FILE_PERSISTED";
@@ -74,7 +77,7 @@ export interface AtlasT3SignedFileRoute {
   Promise<AtlasT3SignedFilePreview>;
  receiveSignedFile:(input:{archive:Uint8Array;recipientId:"iwxa.atlas";
   operationId:string;archiveSha256:string;selectedSummarySha256:string;
-  confirmed:true})=>Promise<void>;
+  reviewedGeneration?:string;confirmed:true})=>Promise<void>;
  readbackSignedFile:(operationId:string)=>
   Promise<AtlasT3SignedFileReceipt|null>;
 }

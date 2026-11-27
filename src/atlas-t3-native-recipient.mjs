@@ -483,11 +483,14 @@ export function createAtlasT3NativeRecipient({
 export function createAtlasT3SignedFileRecipient({
  readSaved,commitSaved,inspectOriginalSignedFile,
  readVerifiedSignedArchive,verifyAtlasWrite,isHostActive,
+ readSavedRevision=null,
 }={}){
  if([readSaved,commitSaved,inspectOriginalSignedFile,
    readVerifiedSignedArchive,verifyAtlasWrite,isHostActive]
      .some(fn=>typeof fn!=="function"))
   fail("ATLAS_T3_ORIGINAL_SIGNED_FILE_OWNER_REQUIRED");
+ if(readSavedRevision!==null&&typeof readSavedRevision!=="function")
+  fail("ATLAS_T3_ORIGINAL_HISTORY_PORT_INVALID");
  const recipientId="iwxa.atlas";
  const active=()=>{if(isHostActive()!==true)
   fail("ATLAS_T3_SIGNED_FILE_HOST_DISPOSED");};
@@ -616,18 +619,59 @@ export function createAtlasT3SignedFileRecipient({
    resultRef:"atlas:decision:"+entry.decisionId,
    originalKernelEventVerified:false};
  }
+ // Accept corporate evidence for a historical issued WorkRef only through
+ // the original retained U05 edition, tied to the exact current generation.
+ // Older embedded/Agent routes keep their existing exact-edition behavior.
+ async function reviewedWorkEdition(saved,state){
+  const w=state.accepted.work,current=saved.snapshot;
+  const project=current.projects.find(p=>p.id===w.projectId);
+  if(!project?.items.some(item=>item.id===w.workId))
+   deny("ATLAS_T3_WORK_NOT_FOUND");
+  const historyEnabled=state.source.sourceKind==="ADMIN_APPLIED_RESULT"&&
+   typeof readSavedRevision==="function";
+  if(current.revision<Number(w.revision)||
+     (!historyEnabled&&String(current.revision)!==w.revision))
+   deny("ATLAS_T3_SOURCE_REVISION_CHANGED");
+  if(!historyEnabled)return {};
+  let issued=current;
+  if(String(current.revision)!==w.revision){
+   let original;
+   try{
+    original=await readSavedRevision({
+     expectedGeneration:saved.generation,revision:Number(w.revision)
+    });
+   }catch(error){
+    const code=String(error?.code??error?.message??error);
+    if(code.includes("ATLAS_HISTORY_HEAD_CHANGED"))
+     deny("ATLAS_T3_REVIEWED_PLAN_CHANGED");
+    throw error;
+   }
+   active();
+   if(original===null)deny("ATLAS_T3_SOURCE_EDITION_UNAVAILABLE");
+   if(!original||typeof original.generation!=="string"||!original.generation||
+      original.generation==="none"||original.generation===saved.generation||
+      original.needsConfirmation!==false||original.restoredFromBackup!==false)
+    fail("ATLAS_T3_SOURCE_EDITION_INVALID");
+   issued=original.snapshot;validate(issued);
+   if(String(issued.revision)!==w.revision)
+    fail("ATLAS_T3_SOURCE_EDITION_INVALID");
+  }
+  const issuedProject=issued.projects.find(p=>p.id===w.projectId);
+  const issuedWork=issuedProject?.items.find(item=>item.id===w.workId);
+  if(!issuedWork||issuedProject.createdAt!==project.createdAt)
+   deny("ATLAS_T3_SOURCE_WORK_NOT_FOUND");
+  return {reviewedGeneration:saved.generation,
+   currentRevision:String(current.revision),
+   issuedProjectName:issuedProject.name,issuedWorkTitle:issuedWork.title};
+ }
  async function inspectArchive({archive,recipientId:to}={}){
   if(to!==recipientId)deny("ATLAS_T3_RECIPIENT_MISMATCH");
   const state=await inspectOriginal(archive),saved=await load();
   const existing=find(saved.snapshot,state.op);
+  let edition={};
   if(existing)await verifyExisting(existing,saved,state);
   else{
-   const w=state.accepted.work;
-   if(String(saved.snapshot.revision)!==w.revision)
-    deny("ATLAS_T3_SOURCE_REVISION_CHANGED");
-   const project=saved.snapshot.projects.find(p=>p.id===w.projectId);
-   if(!project?.items.some(item=>item.id===w.workId))
-    deny("ATLAS_T3_WORK_NOT_FOUND");
+   edition=await reviewedWorkEdition(saved,state);
    await permitted(state,"atlas.work.result.preview");
   }
   // Preview MUST expose the exact original signed selected text for human
@@ -637,10 +681,10 @@ export function createAtlasT3SignedFileRecipient({
    archiveSha256:state.accepted.archiveSha256,
    selectedAcceptedSummary:state.portable.selectedAcceptedSummary,
    selectedSummarySha256:state.portable.selectedSummarySha256,
-   originalKernelEventVerified:false,alreadyReceived:Boolean(existing)};
+   originalKernelEventVerified:false,alreadyReceived:Boolean(existing),...edition};
  }
  async function receiveArchive({archive,recipientId:to,operationId,
-   confirmed=false,archiveSha256,selectedSummarySha256}={}){
+   confirmed=false,archiveSha256,selectedSummarySha256,reviewedGeneration=null}={}){
   active();
   if(to!==recipientId)deny("ATLAS_T3_RECIPIENT_MISMATCH");
   if(confirmed!==true)deny("ATLAS_T3_SIGNED_FILE_HUMAN_REVIEW_REQUIRED");
@@ -658,11 +702,12 @@ export function createAtlasT3SignedFileRecipient({
    return; // Exactly one original native CAS; no resend after lost ACK.
   }
   const w=state.accepted.work;
-  if(String(before.snapshot.revision)!==w.revision)
-   deny("ATLAS_T3_SOURCE_REVISION_CHANGED");
-  const project=before.snapshot.projects.find(p=>p.id===w.projectId);
-  if(!project?.items.some(item=>item.id===w.workId))
-   deny("ATLAS_T3_WORK_NOT_FOUND");
+  // Consent must cover the exact head shown in the preview. A later plan
+  // save requires fresh review, never automatic replay or a stale write.
+  if(state.source.sourceKind==="ADMIN_APPLIED_RESULT"&&
+     typeof readSavedRevision==="function"&&reviewedGeneration!==before.generation)
+   deny("ATLAS_T3_REVIEWED_PLAN_CHANGED");
+  await reviewedWorkEdition(before,state);
   const record={
    schema:"T3_RESULT_LINK/1",operationId:state.op,
    signedFileMode:true,originalKernelEventVerified:false,
@@ -723,6 +768,20 @@ export async function verifiedAtlasSignedFilePreview(row){
   selectedSummarySha256:row.selectedSummarySha256
  });
  await verifySummaryDigest(selected);
+ const editionFields=["reviewedGeneration","currentRevision","issuedProjectName","issuedWorkTitle"];
+ let edition={};
+ if(editionFields.some(key=>Object.hasOwn(row,key))){
+  if(row.sourceKind!=="ADMIN_APPLIED_RESULT"||row.alreadyReceived||
+     !ID.test(row.reviewedGeneration??"")||
+     typeof row.currentRevision!=="string"||
+     !/^(0|[1-9][0-9]*)$/.test(row.currentRevision)||
+     !Number.isSafeInteger(Number(row.currentRevision))||
+     Number(row.currentRevision)<Number(work.revision)||
+     typeof row.issuedProjectName!=="string"||!row.issuedProjectName.trim()||
+     typeof row.issuedWorkTitle!=="string"||!row.issuedWorkTitle.trim())
+   fail("ATLAS_T3_SIGNED_PREVIEW_INVALID");
+  edition=Object.fromEntries(editionFields.map(key=>[key,row[key]]));
+ }
  return Object.freeze({
   status:"SIGNED_FILE_READY",recipientId:"iwxa.atlas",
   operationId:row.operationId,workRef:work,
@@ -730,7 +789,7 @@ export async function verifiedAtlasSignedFilePreview(row){
   archiveSha256:row.archiveSha256,
   selectedAcceptedSummary:selected.selectedAcceptedSummary,
   selectedSummarySha256:selected.selectedSummarySha256,
-  originalKernelEventVerified:false,alreadyReceived:row.alreadyReceived
+  originalKernelEventVerified:false,alreadyReceived:row.alreadyReceived,...edition
  });
 }
 

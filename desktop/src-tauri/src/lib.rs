@@ -421,6 +421,13 @@ fn read_revision_readonly(root:&Path,expected_generation:&str,revision:u64)
     }
     Ok(found)
 }
+// The standalone signed Result recipient uses the same original read-only
+// U05 history reader. No caller-provided file path and no restore.
+#[tauri::command]
+fn atlas_read_revision(app:AppHandle,expected_generation:String,revision:u64)
+    ->Result<Option<OpenResult>,String>{
+    read_revision_readonly(&path_for(&app)?,&expected_generation,revision)
+}
 fn load_root(root:&Path)->Result<OpenResult,String>{
     match current(root) {
         Ok(Some(m))=>match decode(&root,&m){
@@ -1482,7 +1489,7 @@ pub fn run(){
             atlas_open,atlas_commit,atlas_export_json,atlas_select_import,
             atlas_export_iwxa,atlas_select_iwxa,atlas_restore_previous,
             atlas_list_history,atlas_restore_history,atlas_launch_work_ref,atlas_take_work_ref,
-            atlas_t3_capabilities,atlas_t3_inspect,atlas_t3_readback
+            atlas_read_revision,atlas_t3_capabilities,atlas_t3_inspect,atlas_t3_readback
         ])
         .run(tauri::generate_context!())
         .expect("IWXA Atlas desktop window could not be started");

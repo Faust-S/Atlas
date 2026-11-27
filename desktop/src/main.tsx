@@ -1018,8 +1018,11 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     throw Error("Портфель изменился при выборе подписанного Result. Перечитайте сохранённую редакцию.");
    const p=started.projects.find((item:any)=>item.id===preview.workRef.projectId);
    if(!p||!p.items.some((item:any)=>item.id===preview.workRef.workId)||
-      (!preview.alreadyReceived&&String(started.revision)!==preview.workRef.revision))
-    throw Error("T3 подписал Result для другой редакции проекта. Обновите Atlas перед приёмом.");
+      (!preview.alreadyReceived&&
+       (preview.reviewedGeneration!==undefined?
+        preview.reviewedGeneration!==expectedGeneration||preview.currentRevision!==String(started.revision):
+        String(started.revision)!==preview.workRef.revision)))
+    throw Error("Исходная работа или проверенная редакция плана не подтверждена. Перечитайте Atlas перед приёмом.");
    // The original U05 CAS advances Atlas revision after first receipt.
    // A cold readback of the SAME already-received signed Result must remain
    // possible even when the signed WorkRef predates that native commit.
@@ -1038,6 +1041,12 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     issue(Error("Право передачи результата не действует. Проверьте его в Admin Center этой организации."));
    else if(code.includes("T3_ATLAS_LOCAL_AUTHORITY_CHANGED"))
     issue(Error("Полномочия изменились во время проверки. Выберите файл снова."));
+   else if(code.includes("ATLAS_T3_SOURCE_EDITION_UNAVAILABLE")||
+           code.includes("ATLAS_T3_SOURCE_EDITION_INVALID")||
+           code.includes("ATLAS_HISTORY_EDITION_"))
+    issue(Error("Исходная сохранённая редакция Atlas недоступна или повреждена. Получение Result не выполнено."));
+   else if(code.includes("ATLAS_T3_SOURCE_WORK_NOT_FOUND")||code.includes("ATLAS_T3_WORK_NOT_FOUND"))
+    issue(Error("Исходная работа не найдена в сохранённых редакциях Atlas. Другая работа не будет выбрана автоматически."));
    else issue(e);
   }finally{busyRef.current=false;setBusy(false)}
  };
@@ -1089,11 +1098,17 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    await apply({
     archive:p.archive,recipientId:"iwxa.atlas",
     operationId:p.operationId,archiveSha256:p.archiveSha256,
-    selectedSummarySha256:p.selectedSummarySha256,confirmed:true
+    selectedSummarySha256:p.selectedSummarySha256,
+    ...(p.reviewedGeneration!==undefined?{reviewedGeneration:p.reviewedGeneration}:{}),
+    confirmed:true
    });
    await verifyReceivedSignedResult(p);
   }catch(e){
-   if(!showOriginalT3Denial(e)){
+   if((e as {code?:string;outcome?:string})?.code==="ATLAS_T3_REVIEWED_PLAN_CHANGED"&&
+      (e as {outcome?:string})?.outcome==="DENIED"){
+    setSignedResultPreview(null);
+    issue(Error("План изменился после просмотра. Записи не было. Откройте актуальную редакцию и выберите Result заново."));
+   }else if(!showOriginalT3Denial(e)){
     // The original U05 CAS may have committed before its reply was lost.
     // NEVER redispatch the same signed Result from this error handler.
     setError("Получение Result не подтверждено. Повторно применять нельзя. "+
@@ -3940,7 +3955,15 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       <p>Оригинальный T3 проверил подпись .iwxa, получателя, действующие полномочия и точный текст. Отдельно подтвердите запись в проект Atlas.</p>
       <p className="minor">Проект: {data.projects.find((p:any)=>p.id===signedResultPreview.workRef.projectId)?.name||signedResultPreview.workRef.projectId}.
        {" "}Работа: {data.projects.find((p:any)=>p.id===signedResultPreview.workRef.projectId)?.items.find((w:any)=>w.id===signedResultPreview.workRef.workId)?.title||signedResultPreview.workRef.workId}.
-       {" "}Редакция: {signedResultPreview.workRef.revision}.</p>
+       {" "}Редакция при выдаче: {signedResultPreview.workRef.revision}.</p>
+      {signedResultPreview.currentRevision!==undefined&&
+       signedResultPreview.currentRevision!==signedResultPreview.workRef.revision&&
+       <div className="notice warning" role="status">
+        <strong>План изменился с момента выдачи поручения.</strong>
+        <p>Исходная работа: {signedResultPreview.issuedProjectName} / {signedResultPreview.issuedWorkTitle}.
+         {" "}Текущая редакция: {signedResultPreview.currentRevision}.</p>
+        <p>Запись сохранит результат прежнего поручения в этой же работе. Текущий план и фактические даты не меняются.</p>
+       </div>}
       <label className="atlas-ref-label">Выбранный подписанный текст Result
        <textarea className="atlas-ref-text" rows={6} readOnly
         aria-label="Оригинальный подписанный текст Result"

@@ -26,6 +26,8 @@ export async function openStandaloneAtlasSignedFileRoute({isActive=()=>true}={})
  const recipient=await createInstalledAtlasT3SignedFileRecipient({
   originalSignedRecipient,
   hostLifecycle:{isActive:active},
+  // Original native history, with a current-head generation check.
+  readSavedRevision:input=>invoke("atlas_read_revision",input),
   atlasAuthority:{
    // Native standalone Atlas already owns its local U05 read/write. The
    // additional T3 publication right is independently checked below.

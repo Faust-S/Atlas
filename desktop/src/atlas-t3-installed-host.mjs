@@ -262,7 +262,7 @@ export async function createInstalledAtlasT3NativeRecipient({
  * This native composition never creates signer, grant, Exchange or Store.
  */
 export async function createInstalledAtlasT3SignedFileRecipient({
- originalSignedRecipient,atlasAuthority,hostLifecycle,
+ originalSignedRecipient,atlasAuthority,hostLifecycle,readSavedRevision=null,
 }={}){
  if(!isTauri())die("ATLAS_T3_INSTALLED_ATLAS_TAURI_REQUIRED");
  for(const [owner,methods] of [
@@ -291,6 +291,9 @@ export async function createInstalledAtlasT3SignedFileRecipient({
  active();
  return createAtlasT3SignedFileRecipient({
   readSaved:store.readSaved,commitSaved:store.commitSaved,
+  readSavedRevision:typeof readSavedRevision==="function"?async input=>{
+   active();const result=await readSavedRevision(input);active();return result;
+  }:null,
   inspectOriginalSignedFile:bytes=>
    originalSignedRecipient.quarantineSignedArchive(bytes),
   readVerifiedSignedArchive:sha256=>
