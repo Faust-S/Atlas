@@ -73,6 +73,35 @@ const originalAccepted=(row,ref)=>{
  const archiveSha256=sha(row.archiveSha256,"ATLAS_T3_ARCHIVE_DIGEST_REQUIRED");
  return {work,taskId,resultId,acceptedDigest,archiveSha256};
 };
+// Both original source profiles use the same signed-file recipient,
+// native U05 Decision and readback. Historic Agent decisions have no
+// sourceKind; do not migrate them or reject their previously valid shape.
+const corporateFields=["organizationId","workspaceId","executorId","managerId",
+ "acceptanceId","applicationEffectKey","appliedEventId","atlasGrantId",
+ "signedTaskRevisionId","signedTaskPackageSha256"];
+function signedSource(row,ref,operationId){
+ if(/^agent:t3:atlas:[a-f0-9]{64}$/.test(operationId??"")){
+  if(row.sourceKind!==undefined&&row.sourceKind!=="AGENT_ACCEPTED_RESULT")
+   fail("ATLAS_T3_SIGNED_SOURCE_KIND_INVALID");
+  if(corporateFields.some(k=>Object.hasOwn(row,k)&&
+    !["signedTaskRevisionId","signedTaskPackageSha256"].includes(k)))
+   fail("ATLAS_T3_SIGNED_SOURCE_KIND_INVALID");
+  return {sourceKind:"AGENT_ACCEPTED_RESULT"};
+ }
+ if(!/^admin:t3:atlas:[a-f0-9]{64}$/.test(operationId??"")||
+    row.sourceKind!=="ADMIN_APPLIED_RESULT"||
+    !["organizationId","workspaceId","executorId","managerId","appliedEventId","atlasGrantId"]
+     .every(k=>typeof row[k]==="string"&&ID.test(row[k]))||
+    !["acceptanceId","applicationEffectKey","signedTaskRevisionId","signedTaskPackageSha256","resultId"]
+     .every(k=>typeof row[k]==="string"&&SHA.test(row[k]))||
+    ref.schema_id!=="iwxa.admin.applied-results"||
+    ref.object_id!=="result:applied:"+row.applicationEffectKey||ref.revision!==1||
+    row.acceptedDigest!==row.selectedSummarySha256)
+  fail("ATLAS_T3_SIGNED_CORPORATE_PROVENANCE_INVALID");
+ return {sourceKind:"ADMIN_APPLIED_RESULT",
+  ...Object.fromEntries(corporateFields.map(k=>[k,row[k]]))};
+}
+const sameSignedSource=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const decisionRecord=(d)=>{
  if(typeof d?.text!=="string"||!d.text.startsWith(PREFIX))return null;
  try{
@@ -84,6 +113,7 @@ const decisionRecord=(d)=>{
      !SHA.test(row.archiveSha256)||!SHA.test(row.acceptedDigest))return null;
   const ref=objectRef(row.sourceObjectRef);
   portableSummary(row);
+  if(row.signedFileMode===true)signedSource(row,ref,row.sourceOperationId);
   return {...row,sourceObjectRef:ref};
  }catch{return null;}
 };
@@ -94,7 +124,9 @@ export function atlasT3DecisionSummary(text){
  if(typeof text!=="string"||!text.startsWith(PREFIX))return null;
  const record=decisionRecord({text});
  if(!record)return "Повреждена запись связи Atlas с T3. Требуется проверка.";
- return "Связь с результатом Agent: работа "+record.workId+
+ return (record.sourceKind==="ADMIN_APPLIED_RESULT"
+  ?"Связь с корпоративным результатом Admin Center: работа "
+  :"Связь с результатом Agent: работа ")+record.workId+
   ", Task "+record.taskId+", Result "+record.resultId+
   (record.signedFileMode===true
     ?". В Atlas сохранён текст, помеченный как полученный из подписанного файла. "+
@@ -128,6 +160,7 @@ export function atlasT3RecordedWorkLinks(project){
    sourceRevision:String(row.sourceRevision),receivedAt:decision.at,
    portableSelectedSummary:row.portableSelectedSummary===true,
    signedFileMode:row.signedFileMode===true,
+   sourceKind:row.sourceKind==="ADMIN_APPLIED_RESULT"?"ADMIN_APPLIED_RESULT":"AGENT_ACCEPTED_RESULT",
   }));
  }
  return links;
@@ -422,10 +455,10 @@ export function createAtlasT3SignedFileRecipient({
      row.originalManifestVerified!==true||row.recipientGrantVerified!==true||
      row.originalKernelEventVerified!==false||
      row.disclosureScope!=="ORIGINAL_RESULT_ONLY"||
-     row.portableSelectedSummary!==true||
-     !/^agent:t3:atlas:[a-f0-9]{64}$/.test(row.operationId??""))
+     row.portableSelectedSummary!==true)
    fail("ATLAS_T3_ORIGINAL_SIGNED_FILE_VERIFICATION_REQUIRED");
   const ref=objectRef(row.sourceObjectRef),work=workRef(row.workRef);
+  const source=signedSource(row,ref,row.operationId);
   const portable=portableSummary(row);
   if(!portable)fail("ATLAS_T3_ORIGINAL_SIGNED_FILE_CONTENT_REQUIRED");
   await verifySummaryDigest(portable);active();
@@ -437,12 +470,13 @@ export function createAtlasT3SignedFileRecipient({
   };
   const originalProofKeyId=id(row.proofKeyId,"ATLAS_T3_SIGNED_KEY_REQUIRED");
   const op=await hashOperation(ref,accepted);active();
-  return {ref,accepted,op,portable,
+  return {ref,accepted,op,portable,source,
    sourceOperationId:row.operationId,originalProofKeyId};
  }
  const identical=(a,b)=>a.op===b.op&&
   a.sourceOperationId===b.sourceOperationId&&
   a.originalProofKeyId===b.originalProofKeyId&&
+  sameSignedSource(a.source,b.source)&&
   a.portable.selectedAcceptedSummary===b.portable.selectedAcceptedSummary&&
   a.portable.selectedSummarySha256===b.portable.selectedSummarySha256;
  async function inspectOriginal(archive){
@@ -503,6 +537,7 @@ export function createAtlasT3SignedFileRecipient({
   if(row.operationId!==confirmed.op||
     row.sourceOperationId!==confirmed.sourceOperationId||
     row.originalProofKeyId!==confirmed.originalProofKeyId||
+    !sameSignedSource(signedSource(row,row.sourceObjectRef,row.sourceOperationId),confirmed.source)||
     !sameRef(row.sourceObjectRef,confirmed.ref)||
     row.projectId!==w.projectId||row.workId!==w.workId||
     String(row.sourceRevision)!==w.revision||
@@ -547,7 +582,7 @@ export function createAtlasT3SignedFileRecipient({
   // Preview MUST expose the exact original signed selected text for human
   // review; a digest alone cannot support meaningful recipient consent.
   return {status:"SIGNED_FILE_READY",recipientId,operationId:state.op,
-   workRef:state.accepted.work,
+   sourceKind:state.source.sourceKind,workRef:state.accepted.work,
    archiveSha256:state.accepted.archiveSha256,
    selectedAcceptedSummary:state.portable.selectedAcceptedSummary,
    selectedSummarySha256:state.portable.selectedSummarySha256,
@@ -582,6 +617,7 @@ export function createAtlasT3SignedFileRecipient({
    signedFileMode:true,originalKernelEventVerified:false,
    sourceOperationId:state.sourceOperationId,
    originalProofKeyId:state.originalProofKeyId,
+   ...state.source,
    projectId:w.projectId,workId:w.workId,sourceRevision:w.revision,
    sourceObjectRef:state.ref,taskId:state.accepted.taskId,
    resultId:state.accepted.resultId,
@@ -626,6 +662,8 @@ export async function verifiedAtlasSignedFilePreview(row){
     !/^atlas:t3:[a-f0-9]{64}$/.test(row.operationId??"")||
     row.originalKernelEventVerified!==false||
     typeof row.alreadyReceived!=="boolean"||
+    (row.sourceKind!==undefined&&
+      !["AGENT_ACCEPTED_RESULT","ADMIN_APPLIED_RESULT"].includes(row.sourceKind))||
     !SHA.test(row.archiveSha256??""))
   fail("ATLAS_T3_SIGNED_PREVIEW_INVALID");
  const work=workRef(row.workRef),selected=portableSummary({
@@ -637,6 +675,7 @@ export async function verifiedAtlasSignedFilePreview(row){
  return Object.freeze({
   status:"SIGNED_FILE_READY",recipientId:"iwxa.atlas",
   operationId:row.operationId,workRef:work,
+  sourceKind:row.sourceKind??"AGENT_ACCEPTED_RESULT",
   archiveSha256:row.archiveSha256,
   selectedAcceptedSummary:selected.selectedAcceptedSummary,
   selectedSummarySha256:selected.selectedSummarySha256,

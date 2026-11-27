@@ -3885,6 +3885,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      aria-modal="true" aria-labelledby="atlas-t3-signed-result-title">
      <div className="atlas-import-body">
       <h2 id="atlas-t3-signed-result-title">Принять подписанный Result</h2>
+      <p>Источник: {signedResultPreview.sourceKind==="ADMIN_APPLIED_RESULT"?"Admin Center, принятый корпоративный Result":"Personal Agent"}.</p>
       <p>Оригинальный T3 проверил подпись .iwxa, получателя, действующие полномочия и точный текст. Отдельно подтвердите запись в проект Atlas.</p>
       <p className="minor">Проект: {data.projects.find((p:any)=>p.id===signedResultPreview.workRef.projectId)?.name||signedResultPreview.workRef.projectId}.
        {" "}Работа: {data.projects.find((p:any)=>p.id===signedResultPreview.workRef.projectId)?.items.find((w:any)=>w.id===signedResultPreview.workRef.workId)?.title||signedResultPreview.workRef.workId}.

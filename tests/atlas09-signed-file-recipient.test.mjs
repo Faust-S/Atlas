@@ -239,3 +239,56 @@ test("a signed file cannot be promoted to original Kernel native receipt",async(
   {code:"ATLAS_T3_SIGNED_FILE_NOT_KERNEL_RECEIPT"});
  assert.equal(f.writes(),1);
 });
+
+function corporateFixture(options={}){
+ const f=fixture(options);
+ const effect=sha("original D3 effect");
+ Object.assign(f.original,{
+  sourceKind:"ADMIN_APPLIED_RESULT",
+  operationId:"admin:t3:atlas:"+sha("corporate publication"),
+  organizationId:"org:original",workspaceId:"ws:original",
+  executorId:"person:worker",managerId:"person:manager",
+  acceptanceId:sha("D3 acceptance"),applicationEffectKey:effect,
+  appliedEventId:"event:original",atlasGrantId:"grant:atlas-data",
+  signedTaskRevisionId:sha("Task revision"),
+  signedTaskPackageSha256:sha("Task carrier"),
+  resultId:sha("Result revision"),acceptedDigest:sha(text),
+  sourceObjectRef:{workspace_id:"ws:private-receipts",
+   object_id:"result:applied:"+effect,schema_id:"iwxa.admin.applied-results",revision:1}
+ });
+ return f;
+}
+test("corporate D3 signed Result uses the existing U05 Decision and cold readback",async()=>{
+ const f=corporateFixture({lostAck:true}),owner=f.make();
+ const preview=await owner.inspectArchive({archive:f.actual,recipientId:"iwxa.atlas"});
+ assert.equal(preview.sourceKind,"ADMIN_APPLIED_RESULT");
+ assert.equal((await verifiedAtlasSignedFilePreview(preview)).sourceKind,"ADMIN_APPLIED_RESULT");
+ await owner.receiveArchive(reviewed(preview,f.actual));
+ const row=f.read().projects[0].decisions.at(-1);
+ assert.match(atlasT3DecisionSummary(row.text),/Admin Center/);
+ assert.equal(atlasT3PortableResultText(row.text),text);
+ const data=JSON.parse(row.text.slice("T3_RESULT_LINK/1 ".length));
+ assert.equal(data.acceptanceId,f.original.acceptanceId);
+ assert.equal(data.appliedEventId,f.original.appliedEventId);
+ assert.equal(data.sourceOperationId,f.original.operationId);
+ assert.equal(data.originalKernelEventVerified,false);
+ assert.equal((await f.make().readback(preview.operationId)).state,"SIGNED_FILE_PERSISTED");
+ await f.make().receiveArchive(reviewed(preview,f.actual));
+ assert.equal(f.writes(),1);
+ f.original.appliedEventId="event:changed";
+ await assert.rejects(f.make().readback(preview.operationId),
+  {code:"ATLAS_T3_SIGNED_FILE_PERSISTED_PROOF_CHANGED"});
+});
+test("corporate profile cannot substitute another content hash or applied reference",async()=>{
+ for(const change of [
+  {sourceKind:"AGENT_ACCEPTED_RESULT"},
+  {acceptedDigest:sha("different content")},
+  {applicationEffectKey:sha("unrelated effect")},
+  {acceptanceId:"not-a-signed-revision"},
+ ]){
+  const f=corporateFixture();Object.assign(f.original,change);
+  await assert.rejects(f.make().inspectArchive({archive:f.actual,recipientId:"iwxa.atlas"}),
+   {code:"ATLAS_T3_SIGNED_CORPORATE_PROVENANCE_INVALID"});
+  assert.equal(f.writes(),0);
+ }
+});
