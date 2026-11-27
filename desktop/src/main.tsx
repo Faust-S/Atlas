@@ -549,7 +549,25 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const t3WorkLinks=useMemo(()=>atlasT3RecordedWorkLinks(project),[project]);
  const t3ProjectResults=useMemo(()=>atlasT3ProjectResultLinks(project),[project]);
  const [t3ResultLimit,setT3ResultLimit]=useState(20);
+ const [t3ResultJump,setT3ResultJump]=useState<{projectId:string;decisionId:string}|null>(null);
+ const t3ResultCardRef=useRef<HTMLDetailsElement|null>(null);
  useEffect(()=>setT3ResultLimit(20),[project?.id]);
+ // Open the exact confirmed native Decision in the existing Plan / Fact
+ // view. A historical receipt may be outside the first displayed page.
+ // No work status, dates or requirements are edited by this navigation.
+ useEffect(()=>{
+  if(!t3ResultJump||!ready||active!==t3ResultJump.projectId||tab!=="reality")return;
+  const index=t3ProjectResults.findIndex(link=>link.decisionId===t3ResultJump.decisionId);
+  if(index<0){setT3ResultJump(null);return;}
+  const required=t3ProjectResults.length-index;
+  if(required>t3ResultLimit){setT3ResultLimit(required);return;}
+  const card=t3ResultCardRef.current;
+  if(!card)return;
+  card.open=true;
+  card.scrollIntoView({block:"center",behavior:"auto"});
+  card.querySelector<HTMLElement>("summary")?.focus({preventScroll:true});
+  setT3ResultJump(null);
+ },[t3ResultJump,ready,active,tab,t3ProjectResults,t3ResultLimit]);
  const recentWork=recentWorkId?project?.items.find((item:any)=>item.id===recentWorkId):null;
  const recentStage=recentWork?.stageId?
   project?.stages.find((stage:any)=>stage.id===recentWork.stageId):null;
@@ -1037,11 +1055,18 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      typeof receipt.resultRef!=="string"||
      !receipt.resultRef.startsWith("atlas:decision:"))
    throw Error("ATLAS_T3_SIGNED_RECEIPT_NOT_CONFIRMED");
-  await displayConfirmedAtlasResult({
+  const confirmed=await displayConfirmedAtlasResult({
    projectId:p.workRef.projectId,workId:p.workRef.workId,
    operationId:p.operationId,resultRef:receipt.resultRef
   });
   setSignedResultPreview(null);setError("");
+  if(!embedded){
+   // Navigate only after both original T3 receipt and actual U05 Decision
+   // are confirmed. The user's selected signed result stays in view.
+   selectProject(confirmed.link.projectId,true);
+   setTab("reality");
+   setT3ResultJump({projectId:confirmed.link.projectId,decisionId:confirmed.link.decisionId});
+  }
   setMessage("Выбранный подписанный Result сохранён в Atlas и заново прочитан из его нативного Store. "+
    "T3 подтвердил оригинальную подпись и полномочия получателя. "+
    "Событие Kernel отправителя на этом компьютере не проверялось.");
@@ -1375,7 +1400,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   setSourceJump(null);setMapSearchReturn(null);setGraphJump(null);setWorkReturnId(null);
   setRecentWorkId(null);setRecentPlanBefore(null);setWorkImpactOnly(false);setWorkCriticalOnly(false);
   setPreviewWorkRequest(null);
-  setShowProjectRelations(false);setRelationLimit(12);setRequirementJump(null);setChangeJump(null);
+  setShowProjectRelations(false);setRelationLimit(12);setRequirementJump(null);setChangeJump(null);setT3ResultJump(null);
   if(!afterSubmit)setMessage("");
   setWorkDependencyFilter("all");setWorkDeadlineFilter("all");setWorkFilter("all");setWorkTargetFilter("all");setWorkObservationFilter("all");setWorkHistoryLimits({});setWorkQuery("");setWorkSort("title");setWorkLimit(200);setRealityLimit(8);
   setHistoryQuery("");setHistoryType("all");setHistoryLimit(120);setRecheckLimit(25);
@@ -2034,6 +2059,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  };
  const view=(tabId:Tab)=>{
   if(!requireClosedForm())return;
+  setT3ResultJump(null);
   resetWorkspaceScroll();
   // Returning from a linked source restores the selected work's search
   // context. Ordinary tab changes leave no retained search.
@@ -3503,7 +3529,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
      {t3ProjectResults.length>0&&<div className="surface" aria-label="Полученные результаты работ">
       <div className="section-heading"><div><h3>Полученные результаты работ ({t3ProjectResults.length})</h3>
        <p>Сохранённые связи T3. Запишите фактическую оценку по конкретному требованию. Получение Result само по себе не завершает работу и не изменяет даты.</p></div></div>
-      {t3ProjectResults.slice(-t3ResultLimit).reverse().map(link=><details className="atlas-technical-details" key={link.decisionId}>
+      {t3ProjectResults.slice(-t3ResultLimit).reverse().map(link=><details className="atlas-technical-details" key={link.decisionId}
+       ref={t3ResultJump?.projectId===project.id&&t3ResultJump.decisionId===link.decisionId?t3ResultCardRef:undefined}>
        <summary>{link.workTitle} · Result {link.resultId}</summary>
        <p className="minor">Исходная редакция плана: {link.sourceRevision}. Task: {link.taskId}.</p>
        {link.selectedText!==null?<p style={{whiteSpace:"pre-wrap",overflowWrap:"anywhere"}}>{link.selectedText}</p>:<p className="minor">Сохранена только ссылка на исходный Result.</p>}
