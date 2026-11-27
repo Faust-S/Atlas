@@ -119,3 +119,40 @@ test("installed import confirmation is keyboard reachable and exposes failures i
  assert.match(driver,/ATLAS_IMPORT_CONFIRMED_DRAFT_READY_PASS/);
  assert.equal((driver.match(/confirm_import_draft\(\)/g)||[]).length,4);
 });
+
+// Add-only archive route: no replacement of the existing Atlas owner head.
+test('independent .iwxa projects can be appended without replacing existing Work or references',async()=>{
+ const {prepareAddedSnapshot}=await import('../desktop/src/import-snapshot.mjs');
+ const {empty,createProject,createItem,serialize}=await import('../src/core.mjs');
+ const old=createProject(empty(),{name:'Existing project',type:'business'});
+ const oldWork=createItem(old.state,old.id,{title:'Existing Work'});
+ const fresh=createProject(empty(),{name:'Center preparation',type:'business'});
+ const freshWork=createItem(fresh.state,fresh.id,{title:'Prepared Work'});
+ const original=serialize(oldWork.state),incoming=serialize(freshWork.state);
+ const result=prepareAddedSnapshot(oldWork.state,freshWork.state,'2026-11-27T12:00:00.000Z');
+ assert.equal(result.addedProjects,1);
+ assert.equal(result.addedWorks,1);
+ assert.equal(result.snapshot.revision,Math.max(oldWork.state.revision,freshWork.state.revision)+1);
+ assert.deepEqual(result.snapshot.projects[0],oldWork.state.projects[0]);
+ assert.deepEqual(result.snapshot.projects[1],freshWork.state.projects[0]);
+ assert.equal(serialize(oldWork.state),original);
+ assert.equal(serialize(freshWork.state),incoming);
+ assert.throws(()=>prepareAddedSnapshot(result.snapshot,freshWork.state),/уже существуют/);
+});
+test('append preserves distinct resource and calendar definitions and rejects conflicting IDs',async()=>{
+ const {prepareAddedSnapshot}=await import('../desktop/src/import-snapshot.mjs');
+ const {empty,createProject,createItem,createWorkCalendar}=await import('../src/core.mjs');
+ const {addPlanningResource}=await import('../src/resource-planning.mjs');
+ const a=createProject(empty(),{name:'A',type:'business'});
+ const ra=addPlanningResource(a.state,{label:'Crane A',capacityPct:100});
+ const b=createProject(empty(),{name:'B',type:'business'});
+ const rb=addPlanningResource(b.state,{label:'Crane B',capacityPct:100});
+ const wb=createItem(rb.state,b.id,{title:'Build',resourceId:rb.id});
+ const merged=prepareAddedSnapshot(ra.state,wb.state).snapshot;
+ assert.deepEqual(merged.resources.map(r=>r.id),[ra.id,rb.id]);
+ assert.equal(merged.projects[1].items[0].resourceId,rb.id);
+ const conflict=structuredClone(wb.state);
+ conflict.resources[0].id=ra.id;conflict.projects[0].items[0].resourceId=ra.id;
+ assert.throws(()=>prepareAddedSnapshot(ra.state,conflict),/Несовместимое определение/);
+ assert.throws(()=>prepareAddedSnapshot(ra.state,{...wb.state,unrecognizedRoot:true}),/нельзя безопасно объединить/);
+});

@@ -44,7 +44,7 @@ import {planAmendmentKey} from "../../src/core.mjs";
 import {projectSourcePlanWorkContext,projectWorkTableSearch} from "../../src/project-organization.mjs";
 import {repoName} from "../../src/github-public.mjs";
 import {applyPublicProjectPreview} from "../../src/project-onboarding.mjs";
-import {prepareImportedSnapshot} from "./import-snapshot.mjs";
+import {prepareImportedSnapshot,prepareAddedSnapshot} from "./import-snapshot.mjs";
 import {buildIwxaPortfolio,readIwxaPortfolio,toBase64,fromBase64} from "./iwxa-portfolio.mjs";
 import {commitWithReadback,readSavedSnapshotForReference,readExternalAtlasUpdate} from "./native-save.mjs";
 import {projectHistoryRows} from "./history-view.mjs";
@@ -65,7 +65,8 @@ const workDurationLabel=(work:{estimateDays?:number;durationUnit?:string})=>
  String(work.estimateDays??1)+(work.durationUnit==="working_days"?" раб. дн.":" кал. дн.");
 type Atlas = any;
 type HistoryEntry = {generation:string;revision:number;projects:number};
-type ImportPreview = {snapshot:Atlas;originalRevision:number;expectedGeneration:string;startedWith:Atlas;summary:any;format:"json"|"iwxa"};
+type ImportPreview = {snapshot:Atlas;originalRevision:number;expectedGeneration:string;startedWith:Atlas;summary:any;format:"json"|"iwxa";
+ addition?:ReturnType<typeof prepareAddedSnapshot>|null;additionError?:string};
 type OpenResult = {generation:string;snapshot:Atlas;restoredFromBackup:boolean;needsConfirmation:boolean};
 type Field = {name:string;label:string;value?:string;required?:boolean;type:string;searchable?:boolean;options?:{value:string;label:string}[]};
 type Editor = {action:string;spec:{title:string;hint?:string;fields:Field[]};
@@ -1711,8 +1712,11 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     throw Error("Сохранённый портфель изменился. Откройте актуальную редакцию.");
    const {snapshot:next,originalRevision,summary}=prepareImportedSnapshot(
     startedWith,imported.snapshot,undefined,"iwxa.atlas.portfolio/1.0.0");
+   let addition:ReturnType<typeof prepareAddedSnapshot>|null=null,additionError="";
+   try{addition=prepareAddedSnapshot(startedWith,imported.snapshot);}
+   catch(e){additionError=e instanceof Error?e.message:String(e);}
    setPendingImport({snapshot:next,originalRevision,summary,startedWith,expectedGeneration,
-    format:"iwxa"});
+    format:"iwxa",addition,additionError});
    setMessage("");setError("");
   }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
  };
@@ -1737,9 +1741,10 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    setMessage("");setError("");
   }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
  };
- const applyPendingImport=async()=>{
+ const applyPendingImport=async(mode:"replace"|"add"="replace")=>{
   const candidate=pendingImport;
   if(!candidate)return;
+  if(mode==="add"&&!candidate.addition)return;
   if(busyRef.current||dirtyRef.current||editorOpenRef.current){
    issue(Error("Импорт пока нельзя применить: завершите текущее действие или закройте открытую форму."));
    return;
@@ -1753,8 +1758,13 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    if(latestSnapshot.current!==candidate.startedWith||dirtyRef.current||editorOpenRef.current)
     throw Error("Черновик изменился после предпросмотра. Импорт не применён.");
    setPendingImport(null);
-   mutate(candidate.snapshot,"Импортированная редакция "+candidate.originalRevision+
-    " применена к черновику. Для записи на диск нажмите «Сохранить».");
+   if(mode==="add"&&candidate.addition){
+    mutate(candidate.addition.snapshot,"Добавлено проектов: "+candidate.addition.addedProjects+
+     ". Прежние проекты сохранены в черновике. Для записи на диск нажмите «Сохранить».");
+   }else{
+    mutate(candidate.snapshot,"Импортированная редакция "+candidate.originalRevision+
+     " применена к черновику. Для записи на диск нажмите «Сохранить».");
+   }
    selectProject(null,true);
   }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
  };
@@ -3811,10 +3821,10 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     <section className="atlas-close-dialog atlas-import-dialog" role="dialog" aria-modal="true" aria-labelledby="atlas-import-preview-title">
      <div className="atlas-import-body">
       <h2 id="atlas-import-preview-title">{pendingImport.format==="iwxa"?"Открыть архив .iwxa":"Открыть резервную копию JSON"}</h2>
-     <p>Проверьте содержимое копии. При подтверждении она заменит текущие проекты, но пока ничего не изменено.</p>
+     <p>Проверьте содержимое копии. При замене портфеля она заменит текущие проекты, но пока ничего не изменено.</p>
      {pendingImport.format==="iwxa"&&<p className="minor">Этот архив можно восстановить в Atlas. В совместимом Admin Center он доступен как копия для просмотра, без синхронизации и передачи прав.</p>}
      <p className="minor">Редакция архива: {pendingImport.originalRevision}. Подтверждение изменит только черновик.</p>
-     <div className="table-scroll"><table><thead><tr><th>Показатель</th><th>Сейчас</th><th>После импорта</th></tr></thead><tbody>
+     <div className="table-scroll"><table><thead><tr><th>Показатель</th><th>Сейчас</th><th>В архиве</th></tr></thead><tbody>
       {([["projects","Проекты"],["works","Работы"],["findings","Факты"],["decisions","Решения"],["changes","Предложения"],["sources","Источники"],["links","Связи проектов"]] as const).map(([key,label])=>
        <tr key={key}><td>{label}</td><td>{pendingImport.summary.current[key]}</td><td>{pendingImport.summary.incoming[key]}</td></tr>)}
      </tbody></table></div>
@@ -3831,11 +3841,18 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       Внимание: архив пуст. После сохранения все текущие проекты исчезнут из активного портфеля.
      </p>}
      <p className="minor">Предыдущие данные останутся в истории сохранений после того, как вы сохраните импортированный портфель.</p>
+     {pendingImport.format==="iwxa"&&<section aria-label="Добавление проектов без замены">
+      {pendingImport.addition?
+       <p><strong>Можно добавить проекты без замены:</strong> {pendingImport.addition.addedProjects} проектов,
+        {" "}{pendingImport.addition.addedWorks} работ. Все текущие проекты останутся, всего будет {pendingImport.addition.snapshot.projects.length}.</p>:
+       <p className="minor">Добавление без замены недоступно: {pendingImport.additionError}</p>}
+     </section>}
      {error&&<p className="alert error" role="alert">Не удалось подтвердить импорт: {error}</p>}
      </div>
      <div className="button-row atlas-import-actions">
       <Action autoFocus disabled={busy} onClick={()=>setPendingImport(null)}>Отменить импорт</Action>
-      <Action primary disabled={busy} onClick={()=>void applyPendingImport()}>Заменить портфель в черновике</Action>
+      {pendingImport.addition&&<Action primary disabled={busy} onClick={()=>void applyPendingImport("add")}>Добавить проекты в черновик</Action>}
+      <Action primary={!pendingImport.addition} disabled={busy} onClick={()=>void applyPendingImport("replace")}>Заменить портфель в черновике</Action>
      </div>
     </section>
    </div>}

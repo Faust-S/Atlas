@@ -42,3 +42,61 @@ export function prepareImportedSnapshot(current,raw,importedAt=new Date().toISOS
  deserialize(JSON.stringify(snapshot));
  return {snapshot,originalRevision,summary:importImpact(base,incoming)};
 }
+
+
+// Add an independent portfolio without replacing the current owner data.
+// Only root fields whose meaning Atlas knows can be merged. Identifiers
+// remain canonical; conflicting definitions are never overwritten.
+const canonical=value=>Array.isArray(value)?value.map(canonical):
+ value&&typeof value==="object"?Object.fromEntries(
+  Object.keys(value).sort().map(key=>[key,canonical(value[key])])):value;
+function mergeDefinitions(current,incoming,key,label){
+ const rows=structuredClone(current),byKey=new Map(rows.map(row=>[key(row),row]));
+ for(const row of incoming){
+  const id=key(row),existing=byKey.get(id);
+  if(existing){
+   if(JSON.stringify(canonical(existing))!==JSON.stringify(canonical(row)))
+    throw Error("Несовместимое определение: "+label+" "+id);
+  }else{
+   const copy=structuredClone(row);rows.push(copy);byKey.set(id,copy);
+  }
+ }
+ return rows;
+}
+/** Add-only path for a verified, independent .iwxa portfolio. Original
+ * projects, IDs, dependencies, resources and calendar revisions are kept.
+ * The existing native Save remains the only way to persist the result. */
+export function prepareAddedSnapshot(current,raw,importedAt=new Date().toISOString()){
+ const base=deserialize(JSON.stringify(current));
+ const incoming=deserialize(JSON.stringify(raw));
+ const known=new Set(["schema","revision","projects","portfolioLinks","resources","calendarLibrary","importProvenance"]);
+ if(Object.keys(incoming).some(key=>!known.has(key)))
+  throw Error("В архиве есть дополнительные сведения, которые нельзя безопасно объединить.");
+ if(!incoming.projects.length)throw Error("В архиве нет проектов для добавления.");
+ const ids=new Set(base.projects.map(project=>project.id));
+ const conflicts=incoming.projects.filter(project=>ids.has(project.id));
+ if(conflicts.length)
+  throw Error("Проекты с такими идентификаторами уже существуют: "+conflicts.slice(0,3).map(p=>p.name).join(", ")+". Изменять их нужно в действующем Atlas.");
+ const nextRevision=Math.max(base.revision,incoming.revision)+1;
+ if(!Number.isSafeInteger(nextRevision))
+  throw Error("Исчерпан допустимый номер редакции портфеля");
+ const snapshot=structuredClone(base);
+ snapshot.projects.push(...structuredClone(incoming.projects));
+ if(base.resources!==undefined||incoming.resources!==undefined)
+  snapshot.resources=mergeDefinitions(base.resources??[],incoming.resources??[],row=>row.id,"ресурс");
+ if(base.calendarLibrary!==undefined||incoming.calendarLibrary!==undefined)
+  snapshot.calendarLibrary=mergeDefinitions(base.calendarLibrary??[],incoming.calendarLibrary??[],
+   row=>JSON.stringify([row.id,row.version]),"календарь");
+ if(base.portfolioLinks!==undefined||incoming.portfolioLinks!==undefined)
+  snapshot.portfolioLinks=mergeDefinitions(base.portfolioLinks??[],incoming.portfolioLinks??[],row=>row.id,"связь проектов");
+ snapshot.revision=nextRevision;
+ snapshot.importProvenance={source:"iwxa.atlas.portfolio/1.0.0",originalRevision:incoming.revision,
+  importedAt,mode:"add",
+  ...(base.importProvenance===undefined?{}:{previous:base.importProvenance}),
+  ...(incoming.importProvenance===undefined?{}:{incoming:incoming.importProvenance})};
+ // Reuse the full Atlas validator, including calendars, resources, Work
+ // and cross-project dependencies. No partial candidate reaches the editor.
+ deserialize(JSON.stringify(snapshot));
+ return {snapshot,originalRevision:incoming.revision,addedProjects:incoming.projects.length,
+  addedWorks:incoming.projects.reduce((n,p)=>n+p.items.length,0)};
+}
