@@ -117,6 +117,50 @@ const decisionRecord=(d)=>{
   return {...row,sourceObjectRef:ref};
  }catch{return null;}
 };
+// Historical native readback for Center's exact accepted Result. This is
+// a saved link, not an original signature, current grant or delivery proof.
+// Compare the signed corporate provenance, not titles or adjacent results.
+export function recordedCorporateAtlasResult(snapshot,source){
+ const work=source?.workRef;
+ if(!source||!work||!ID.test(source.organizationId??"")||
+    !ID.test(source.workspaceId??"")||!ID.test(source.taskId??"")||
+    !SHA.test(source.taskRevisionId??"")||!SHA.test(source.resultRevisionId??"")||
+    !SHA.test(source.acceptanceId??"")||!ID.test(work.projectId??"")||
+    !ID.test(work.workId??"")||typeof work.revision!=="string"||
+    !/^(0|[1-9][0-9]*)$/.test(work.revision)||
+    !Number.isSafeInteger(Number(work.revision)))
+  fail("ATLAS_T3_CORPORATE_RESULT_REFERENCE_INVALID");
+ const revision=String(snapshot.revision);
+ const project=snapshot.projects.find(p=>p.id===work.projectId);
+ if(!project?.items.some(item=>item.id===work.workId))
+  return {status:"WORK_MISSING",revision};
+ const matches=[];
+ for(const decision of project.decisions){
+  const row=decisionRecord(decision);
+  if(!row||row.sourceKind!=="ADMIN_APPLIED_RESULT"||row.signedFileMode!==true||
+     row.originalKernelEventVerified!==false||
+     row.projectId!==work.projectId||row.workId!==work.workId||
+     String(row.sourceRevision)!==work.revision||
+     row.organizationId!==source.organizationId||row.workspaceId!==source.workspaceId||
+     row.taskId!==source.taskId||row.signedTaskRevisionId!==source.taskRevisionId||
+     row.resultId!==source.resultRevisionId||row.acceptanceId!==source.acceptanceId)continue;
+  if(!/^atlas:t3:[a-f0-9]{64}$/.test(row.operationId)||
+     !ID.test(decision.id??"")||!(snapshot.revision>Number(work.revision)))
+   return {status:"AMBIGUOUS",revision};
+  matches.push({row,decisionId:decision.id});
+ }
+ if(matches.length>1)return {status:"AMBIGUOUS",revision};
+ if(!matches.length)return {status:"NOT_RECORDED",revision};
+ const entry=matches[0];
+ // Do not present one apparently valid record when another saved Decision
+ // carries its operation ID (even in a different project).
+ let count=0;
+ for(const p of snapshot.projects)for(const d of p.decisions){
+  if(decisionRecord(d)?.operationId===entry.row.operationId)count++;
+ }
+ if(count!==1)return {status:"AMBIGUOUS",revision};
+ return {status:"RECORDED",revision,decisionId:entry.decisionId};
+}
 // Pure UI projection only: a stored Atlas Decision is not proof that the
 // current Agent/Exchange permission remains valid. Verification occurs only
 // via the original T3/Atlas Host ports at receipt/readback time.
@@ -167,7 +211,7 @@ export function atlasT3RecordedWorkLinks(project){
 }
 // Existing Decision and finding references are the only persisted links.
 // These are historical records, not proof of a current T3 grant or completion.
-export function atlasT3ProjectResultLinks(project){
+export function atlasT3ProjectResultLinks(project,{corporateScope=null}={}){
  if(!project||!Array.isArray(project.items)||!Array.isArray(project.decisions))return [];
  const byWork=atlasT3RecordedWorkLinks(project);
  const targets=new Map((project.targets??[]).map(target=>[target.id,target]));
@@ -187,6 +231,11 @@ export function atlasT3ProjectResultLinks(project){
      !ID.test(link.decisionId??"")||operationCounts.get(link.operationId)!==1)continue;
   const reference="atlas:decision:"+link.decisionId;
   const decision=decisions.get(link.decisionId);
+  if(link.sourceKind==="ADMIN_APPLIED_RESULT"&&corporateScope!==null){
+   const row=decisionRecord(decision);
+   if(!row||row.organizationId!==corporateScope.organizationId||
+      row.workspaceId!==corporateScope.workspaceId)continue;
+  }
   const targetLinks=(work.targetIds??[]).filter(id=>targets.has(id)).map(id=>({
    id,title:targets.get(id).title,
    observationCount:counts.get(JSON.stringify([work.id,id,reference]))??0
