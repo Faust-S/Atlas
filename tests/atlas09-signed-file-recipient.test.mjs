@@ -270,6 +270,17 @@ function corporateFixture(options={}){
  });
  return f;
 }
+function workspaceFixture(options={}){
+ const f=corporateFixture(options),o=f.original;
+ delete o.acceptanceId;delete o.applicationEffectKey;delete o.appliedEventId;
+ Object.assign(o,{sourceKind:"ADMIN_WORKSPACE_RESULT",
+  operationId:"admin:t3:atlas:"+sha("Workspace publication"),
+  resultId:"result:workspace",taskObjectId:"company:work:"+sha("Task record"),
+  taskEventId:"event:task",resultEventId:"event:result",
+  sourceObjectRef:{workspace_id:o.workspaceId,object_id:"company:work:"+sha("Result record"),
+   schema_id:"iwxa.t3.company-work-record",revision:1}});
+ return f;
+}
 test("corporate D3 signed Result uses the existing U05 Decision and cold readback",async()=>{
  const f=corporateFixture({lostAck:true}),owner=f.make();
  const preview=await owner.inspectArchive({archive:f.actual,recipientId:"iwxa.atlas"});
@@ -317,7 +328,8 @@ test("corporate D3 signed Result uses the existing U05 Decision and cold readbac
   {code:"ATLAS_T3_SIGNED_FILE_PERSISTED_PROOF_CHANGED"});
 });
 test("corporate historical Result remains usable after unrelated plan saves; confirmation binds current head",async()=>{
- const f=corporateFixture({historyEnabled:true}),owner=f.make(),ref=f.original.workRef;
+ for(const f of [corporateFixture({historyEnabled:true}),workspaceFixture({historyEnabled:true})]){
+ const owner=f.make(),ref=f.original.workRef;
  const issueRevision=Number(ref.revision);
  // A later unrelated project must not invalidate completed work.
  f.advance(createProject(f.read(),{name:"Other current project"}).state);
@@ -345,6 +357,16 @@ test("corporate historical Result remains usable after unrelated plan saves; con
  assert.equal(cold.alreadyReceived,true);
  await f.make().receiveArchive(reviewed(fresh,f.actual));
  assert.equal(f.writes(),1);
+ assert.equal(row.sourceKind,f.original.sourceKind);
+ if(f.original.sourceKind==="ADMIN_WORKSPACE_RESULT"){
+  assert.equal(row.acceptanceId,undefined);
+  assert.equal(row.resultEventId,f.original.resultEventId);
+  assert.equal(atlasT3ProjectResultLinks(f.read().projects[0],{corporateScope:{
+    organizationId:f.original.organizationId,workspaceId:f.original.workspaceId}}).length,1);
+  assert.equal(atlasT3ProjectResultLinks(f.read().projects[0],{corporateScope:{
+    organizationId:"org:other",workspaceId:f.original.workspaceId}}).length,0);
+ }
+ }
 });
 test("corporate historical receipt refuses unavailable history, wrong issued work and future revision",async()=>{
  const cases=[
