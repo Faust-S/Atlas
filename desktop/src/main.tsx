@@ -1400,7 +1400,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   setSourceJump(null);setMapSearchReturn(null);setGraphJump(null);setWorkReturnId(null);
   setRecentWorkId(null);setRecentPlanBefore(null);setWorkImpactOnly(false);setWorkCriticalOnly(false);
   setPreviewWorkRequest(null);
-  setShowProjectRelations(false);setRelationLimit(12);setRequirementJump(null);setChangeJump(null);setT3ResultJump(null);
+  setShowProjectRelations(false);setRelationLimit(12);setRequirementJump(null);setChangeJump(null);setT3ResultJump(null);setT3ResultLimit(20);
   if(!afterSubmit)setMessage("");
   setWorkDependencyFilter("all");setWorkDeadlineFilter("all");setWorkFilter("all");setWorkTargetFilter("all");setWorkObservationFilter("all");setWorkHistoryLimits({});setWorkQuery("");setWorkSort("title");setWorkLimit(200);setRealityLimit(8);
   setHistoryQuery("");setHistoryType("all");setHistoryLimit(120);setRecheckLimit(25);
