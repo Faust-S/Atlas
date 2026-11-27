@@ -1390,7 +1390,8 @@ fn atlas_t3_consumer_call(app:&AppHandle,action:&str,file:Option<&str>)->Result<
     }
     let row=&value["result"];
     if row["status"]!="ORIGINAL_SIGNED_SELECTED_RESULT_VERIFIED"||
-       row["recipientId"]!="iwxa.atlas"||row["sourceKind"]!="ADMIN_APPLIED_RESULT"||
+       row["recipientId"]!="iwxa.atlas"||
+       !matches!(row["sourceKind"].as_str(),Some("ADMIN_APPLIED_RESULT"|"ADMIN_WORKSPACE_RESULT"))||
        row["signatureVerified"]!=true||row["archiveBytesVerified"]!=true||
        row["originalManifestVerified"]!=true||row["recipientGrantVerified"]!=true||
        row["originalKernelEventVerified"]!=false{
