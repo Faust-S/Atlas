@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {empty,createProject,editProject,createItem,connect,editItem,serialize} from '../src/core.mjs';
 import {addPlanningResource} from '../src/resource-planning.mjs';
 import {portfolioSchedule} from '../src/portfolio-schedule.mjs';
-import {organizationPlanProjection} from '../src/organization-plan-projection.mjs';
+import {organizationPlanProjection,organizationWorkEditionComparison} from '../src/organization-plan-projection.mjs';
 
 test('Organization receives exact Atlas planning facts and unchanged Work references',()=>{
  const project=createProject(empty(),{name:'Монтаж',type:'engineering'});
@@ -42,4 +42,43 @@ test('Planning resource conflict is visible without claiming personnel or execut
  assert.match(view.note,/принятие результата/);
  assert.equal('authorization' in view,false);
  assert.equal('task' in view,false);
+});
+
+test('original issued work edition versus current plan, dependencies and recorded actuals',()=>{
+ const p=createProject(empty(),{name:'Монтаж',type:'engineering'});
+ const dated=editProject(p.state,p.id,{startDate:'2026-11-23',status:'active'});
+ const a=createItem(dated,p.id,{title:'Подготовка'});
+ const b=createItem(a.state,p.id,{title:'Монтаж'});
+ const original=editItem(connect(b.state,p.id,a.id,b.id),p.id,b.id,
+  {estimateDays:2,dueDate:'2026-11-27'});
+ const current=editItem(editItem(original,p.id,a.id,{estimateDays:4}),p.id,b.id,
+  {estimateDays:3,state:'in_progress',actualStartDate:'2026-11-26'});
+ const ref={projectId:p.id,workId:b.id,revision:String(original.revision)};
+ const prior=serialize(original),now=serialize(current);
+ const compared=organizationWorkEditionComparison(current,original,ref);
+ assert.equal(compared.original.work.estimateDays,2);
+ assert.equal(compared.current.work.estimateDays,3);
+ assert.equal(compared.original.work.actualStart,null);
+ assert.equal(compared.current.work.actualStart,'2026-11-26');
+ assert.equal(compared.current.work.actualFinish,null);
+ assert.equal(compared.original.work.plannedFinish,
+  organizationPlanProjection(original,p.id).works.find(w=>w.id===b.id).finishDate);
+ assert.equal(compared.current.work.plannedFinish,
+  organizationPlanProjection(current,p.id).works.find(w=>w.id===b.id).finishDate);
+ assert.deepEqual(compared.current.work.predecessors,[a.id]);
+ assert.ok(compared.changedFields.includes('estimateDays'));
+ assert.ok(compared.changedFields.includes('plannedFinish'));
+ assert.ok(compared.changedFields.includes('actualStart'));
+ assert.equal(compared.sourceRevision,String(original.revision));
+ assert.equal(serialize(original),prior);assert.equal(serialize(current),now);
+ const missing=organizationWorkEditionComparison(current,null,ref);
+ assert.equal(missing.originalStatus,'NOT_RETAINED');
+ assert.equal(missing.original,null);
+ assert.deepEqual(missing.changedFields,[]);
+ assert.throws(()=>organizationWorkEditionComparison(current,current,ref),/ATLAS_HISTORY_EDITION_MISMATCH/);
+ const same=organizationWorkEditionComparison(original,original,ref);
+ assert.deepEqual(same.changedFields,[]);
+ const absent=organizationWorkEditionComparison(empty(),original,ref);
+ assert.equal(absent.current.status,'PROJECT_MISSING');
+ assert.equal(absent.current.work,null);
 });
