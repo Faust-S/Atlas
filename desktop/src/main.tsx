@@ -3545,7 +3545,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
       <div className="section-heading"><div><h3>Полученные результаты работ ({t3ProjectResults.length})</h3>
        <p>Сохранённые связи T3. Запишите фактическую оценку по конкретному требованию. Получение Result само по себе не завершает работу и не изменяет даты.</p></div></div>
       {t3ProjectResults.slice(-t3ResultLimit).reverse().map(link=><details className="atlas-technical-details" key={link.decisionId}
-       ref={t3ResultJump?.projectId===project.id&&t3ResultJump.decisionId===link.decisionId?t3ResultCardRef:undefined}>
+       ref={t3ResultJump!==null&&t3ResultJump.projectId===project.id&&t3ResultJump.decisionId===link.decisionId?t3ResultCardRef:undefined}>
        <summary>{link.workTitle} · Result {link.resultId}</summary>
        <p className="minor">Исходная редакция плана: {link.sourceRevision}. Task: {link.taskId}.</p>
        {link.selectedText!==null?<p style={{whiteSpace:"pre-wrap",overflowWrap:"anywhere"}}>{link.selectedText}</p>:<p className="minor">Сохранена только ссылка на исходный Result.</p>}
