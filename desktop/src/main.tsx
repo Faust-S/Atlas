@@ -75,6 +75,7 @@ type Editor = {action:string;spec:{title:string;hint?:string;fields:Field[]};
  resourceProposal?:ReturnType<typeof prepareResourceEditorChoice>;
  sequenceProposal?:ReturnType<typeof prepareResourceSequenceChoice>};
 type SavedRefPreview = {label:string;json:string;revision:string;generation:string};
+type LocalResultHandoff={handoffId:string;archiveSha256:string};
 type Tab = "overview"|"work"|"board"|"timeline"|"graph"|"reality"|"changes"|"resources"|"history"|"sources";
 const tabs:{key:Tab;title:string}[]=[
  {key:"overview",title:"Обзор"},{key:"work",title:"Таблица"},{key:"board",title:"Доска"},
@@ -503,6 +504,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const [savedRefPreview,setSavedRefPreview]=useState<SavedRefPreview|null>(null);
  const [workLinkText,setWorkLinkText]=useState("");
  const launchWorkRequested=useRef(false);
+ const [localResultHandoffs,setLocalResultHandoffs]=useState<LocalResultHandoff[]>([]);
  const [t3AgentTask,setT3AgentTask]=useState<{projectId:string;workId:string;taskId:string}|null>(null);
  const savedRefOpenRef=useRef(false);savedRefOpenRef.current=savedRefPreview!==null;
  const savedVersionsOpenRef=useRef(false);savedVersionsOpenRef.current=savedVersions!==null;
@@ -1050,6 +1052,28 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    else issue(e);
   }finally{busyRef.current=false;setBusy(false)}
  };
+ // The existing native navigation channel can carry the locator of a
+ // disposable original signed .iwxa file. It never authorizes applying it.
+ const readLocalResultHandoff=async()=>{
+  const selected=localResultHandoffs[0];
+  if(!selected||!native||embedded||!ready||!signedFileOwnerAvailable||!persisted||
+     busyRef.current||dirtyRef.current||editorOpenRef.current||
+     signedResultOpenRef.current||pendingImportOpenRef.current||
+     savedVersionsOpenRef.current||savedRefOpenRef.current)return;
+  let file:File|null=null;
+  busyRef.current=true;setBusy(true);
+  try{
+   const encoded=await nativeInvoke<string>("atlas_read_local_signed_result",selected);
+   const bytes=fromBase64(encoded);
+   file=new File([new Uint8Array(bytes).buffer],"Result.iwxa",{type:"application/octet-stream"});
+   setLocalResultHandoffs(old=>old.filter(row=>row.handoffId!==selected.handoffId));
+  }catch(e){
+   issue(Error("Переданный файл не удалось прочитать. "+deepFreezeError(e)+
+    ". Можно открыть исходный Result повторно из Center или сохранить .iwxa отдельно."));
+   setLocalResultHandoffs(old=>old.filter(row=>row.handoffId!==selected.handoffId));
+  }finally{busyRef.current=false;setBusy(false);}
+  if(file)await inspectSignedResultFile(file);
+ };
  // Only original Reconciliation and current Atlas authorization can verify
  // a received file. A persisted Decision alone is NEVER the current grant.
  const verifyReceivedSignedResult=async(p:AtlasT3SignedFilePreview)=>{
@@ -1459,19 +1483,34 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    issue(Error(labels[code]??code));
   }finally{busyRef.current=false;setBusy(false)}
  };
+ const openNativeNavigation=async(raw:unknown)=>{
+  if(raw&&typeof raw==="object"&&"handoffId" in raw){
+   const request=raw as Partial<LocalResultHandoff>;
+   if(typeof request.handoffId!=="string"||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(request.handoffId)||
+      typeof request.archiveSha256!=="string"||!/^[0-9a-f]{64}$/.test(request.archiveSha256)){
+    issue(Error("Недействительная ссылка на переданный Result."));return;
+   }
+   const selected:LocalResultHandoff={handoffId:request.handoffId,archiveSha256:request.archiveSha256};
+   setLocalResultHandoffs(old=>old.some(row=>row.handoffId===selected.handoffId)?old:
+    [...old,selected]);
+   return;
+  }
+  await openSavedWorkReference(raw);
+ };
  useEffect(()=>{
   if(!native||embedded||!ready||launchWorkRequested.current)return;
   launchWorkRequested.current=true;
   void invoke<unknown>("atlas_launch_work_ref").then(raw=>{
-   if(raw!==null&&raw!==undefined)void openSavedWorkReference(raw);
+   if(raw!==null&&raw!==undefined)void openNativeNavigation(raw);
   }).catch(issue);
  },[native,embedded,ready]);
- // Already open Atlas: the Windows window message queues only a WorkRef.
+ // Already open Atlas: the existing native channel queues WorkRef or signed file locator.
  // Use the latest original saved-head navigation handler, never a stale
  // React closure or a native write. Drain once after subscription so an
  // early native notification cannot disappear during renderer startup.
- const currentWorkNavigation=useRef(openSavedWorkReference);
- currentWorkNavigation.current=openSavedWorkReference;
+ const currentWorkNavigation=useRef(openNativeNavigation);
+ currentWorkNavigation.current=openNativeNavigation;
  useEffect(()=>{
   if(!native||embedded||!ready)return;
   let active=true,release:(()=>void)|undefined;
@@ -2441,6 +2480,16 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    </header>
    {error&&<div className="alert error" role="alert">{error}<button onClick={()=>setError("")} aria-label="Закрыть сообщение">×</button></div>}
    {message&&<div className="alert notice" role="status">{message}<button onClick={()=>setMessage("")} aria-label="Закрыть сообщение">×</button></div>}
+   {!embedded&&localResultHandoffs.length>0&&<div className="alert notice" role="status">
+    <div><strong>Result передан из Center{localResultHandoffs.length>1?` (${localResultHandoffs.length})`:""}.</strong>
+     <p className="minor">{!signedFileOwnerAvailable?"Оригинальный получатель T3 пока недоступен. Сохранение не выполнено.":
+       !persisted||dirty||editor?"Сохраните портфель и закройте открытые формы, чтобы проверить Result.":
+       "Откройте подписанный файл для проверки и обычного подтверждения в Atlas."}</p>
+     <Action primary disabled={!signedFileOwnerAvailable||!persisted||busy||dirty||Boolean(editor)||
+       Boolean(signedResultPreview)||pendingImport!==null||savedVersions!==null||savedRefPreview!==null}
+       onClick={()=>void readLocalResultHandoff()}>Открыть переданный Result</Action>
+    </div>
+   </div>}
    {settingsOpen&&!embedded?<AtlasSettings key={settingsSection} initialSection={settingsSection}
     version={atlasPackage.version}
     projectCount={data.projects.length}
