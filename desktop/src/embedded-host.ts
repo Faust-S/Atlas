@@ -56,7 +56,7 @@ export interface AtlasT3RecoveryRoute {
  */
 export interface AtlasT3SignedFilePreview {
  status:"SIGNED_FILE_READY";
- sourceKind?:"AGENT_ACCEPTED_RESULT"|"ADMIN_APPLIED_RESULT";
+ sourceKind?:"AGENT_ACCEPTED_RESULT"|"ADMIN_APPLIED_RESULT"|"ADMIN_WORKSPACE_RESULT";
  recipientId:"iwxa.atlas";
  operationId:string;
  workRef:{projectId:string;workId:string;revision:string};
