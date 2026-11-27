@@ -3,7 +3,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {createHash} from "node:crypto";
-import {empty,createProject,createItem,validate} from "../src/core.mjs";
+import {empty,createProject,createItem,editItem,validate} from "../src/core.mjs";
 import {createAtlasT3SignedFileRecipient,createAtlasT3NativeRecipient,
  atlasT3DecisionSummary,atlasT3PortableResultText,verifiedAtlasSignedFilePreview,
  recordedCorporateAtlasResult,atlasT3ProjectResultLinks}
@@ -14,7 +14,7 @@ const text="Original Human-accepted selected Result, portable in one signed file
 const ref=Object.freeze({workspace_id:"ws:original",object_id:"result:original",
  schema_id:"iwxa.agent.accepted-result",revision:1});
 function fixture({weakSignature=false,badDigest=false,missingStoredArchive=false,
- lostAck=false,rejectBeforeWrite=false,revokeAfterWrite=false}={}){
+ lostAck=false,rejectBeforeWrite=false,revokeAfterWrite=false,historyEnabled=false}={}){
  let snapshot=empty(),generation="u05:initial",writes=0,attempts=0,authorized=true;
  const project=createProject(snapshot,{name:"Independent Atlas signed-file receipt"});
  snapshot=project.state;
@@ -35,7 +35,17 @@ function fixture({weakSignature=false,badDigest=false,missingStoredArchive=false
   selectedSummarySha256:badDigest?"0".repeat(64):sha(text)
  };
  const actual=Buffer.from("opaque ORIGINAL signed .iwxa read by original T3");
+ const history=new Map();
+ const retain=()=>history.set(snapshot.revision,{generation,snapshot:structuredClone(snapshot),
+  needsConfirmation:false,restoredFromBackup:false});
+ retain();
+ let editions=0;
+ const advance=next=>{retain();validate(next);snapshot=structuredClone(next);generation="u05:plan:"+(++editions);};
  const make=()=>createAtlasT3SignedFileRecipient({
+  ...(historyEnabled?{readSavedRevision:async({expectedGeneration,revision})=>{
+   if(expectedGeneration!==generation)throw Error("ATLAS_HISTORY_HEAD_CHANGED");
+   return structuredClone(history.get(revision)??null);
+  }}:{}),
   isHostActive:()=>true,
   readSaved:async()=>({generation,snapshot:structuredClone(snapshot),
    needs_confirmation:false}),
@@ -43,7 +53,7 @@ function fixture({weakSignature=false,badDigest=false,missingStoredArchive=false
    attempts++;
    assert.equal(expected,generation,"Only original Atlas generation CAS");
    if(rejectBeforeWrite)throw Error("NATIVE_COMMIT_ACK_LOST_BEFORE_WRITE");
-   validate(next);snapshot=structuredClone(next);generation="u05:"+(++writes);
+   retain();validate(next);snapshot=structuredClone(next);generation="u05:"+(++writes);
    if(revokeAfterWrite)authorized=false;
    if(lostAck)throw Error("NATIVE_COMMIT_ACK_LOST");
    return {generation,revision:next.revision};
@@ -62,7 +72,7 @@ function fixture({weakSignature=false,badDigest=false,missingStoredArchive=false
    workId:workRef.workId,revision:workRef.revision
   })
  });
- return {make,actual,original,read:()=>snapshot,
+ return {make,actual,original,read:()=>snapshot,advance,history,
   writes:()=>writes,attempts:()=>attempts,revoke:()=>{authorized=false;}};
 }
 
@@ -70,6 +80,7 @@ const reviewed=(plan,archive)=>({
  archive,recipientId:"iwxa.atlas",operationId:plan.operationId,
  confirmed:true,archiveSha256:plan.archiveSha256,
  selectedSummarySha256:plan.selectedSummarySha256,
+ ...(plan.reviewedGeneration===undefined?{}:{reviewedGeneration:plan.reviewedGeneration}),
 });
 
 test("one native U05 CAS survives two cold independent signed-file readbacks",async()=>{
@@ -304,6 +315,59 @@ test("corporate D3 signed Result uses the existing U05 Decision and cold readbac
  f.original.appliedEventId="event:changed";
  await assert.rejects(f.make().readback(preview.operationId),
   {code:"ATLAS_T3_SIGNED_FILE_PERSISTED_PROOF_CHANGED"});
+});
+test("corporate historical Result remains usable after unrelated plan saves; confirmation binds current head",async()=>{
+ const f=corporateFixture({historyEnabled:true}),owner=f.make(),ref=f.original.workRef;
+ const issueRevision=Number(ref.revision);
+ // A later unrelated project must not invalidate completed work.
+ f.advance(createProject(f.read(),{name:"Other current project"}).state);
+ const old=await owner.inspectArchive({archive:f.actual,recipientId:"iwxa.atlas"});
+ assert.equal(old.currentRevision,String(f.read().revision));
+ assert.equal(old.workRef.revision,String(issueRevision));
+ assert.equal(old.issuedWorkTitle,"Receive original result");
+ assert.equal((await verifiedAtlasSignedFilePreview(old)).reviewedGeneration,old.reviewedGeneration);
+ // A change to this work is shown as the new current plan; original result
+ // still concerns the retained issued work. Consent must be collected again.
+ f.advance(editItem(f.read(),ref.projectId,ref.workId,{title:"Current renamed work",estimateDays:4}));
+ await assert.rejects(owner.receiveArchive(reviewed(old,f.actual)),{code:"ATLAS_T3_REVIEWED_PLAN_CHANGED"});
+ assert.equal(f.attempts(),0);
+ const fresh=await owner.inspectArchive({archive:f.actual,recipientId:"iwxa.atlas"});
+ const before=structuredClone(f.read());
+ await owner.receiveArchive(reviewed(fresh,f.actual));
+ assert.equal(f.writes(),1);
+ assert.equal(f.read().revision,before.revision+1);
+ assert.deepEqual(f.read().projects[0].items,before.projects[0].items);
+ assert.deepEqual(f.read().projects[1],before.projects[1]);
+ const row=JSON.parse(f.read().projects[0].decisions.at(-1).text.slice("T3_RESULT_LINK/1 ".length));
+ assert.equal(row.sourceRevision,ref.revision);
+ assert.equal((await f.make().readback(fresh.operationId)).state,"SIGNED_FILE_PERSISTED");
+ const cold=await f.make().inspectArchive({archive:f.actual,recipientId:"iwxa.atlas"});
+ assert.equal(cold.alreadyReceived,true);
+ await f.make().receiveArchive(reviewed(fresh,f.actual));
+ assert.equal(f.writes(),1);
+});
+test("corporate historical receipt refuses unavailable history, wrong issued work and future revision",async()=>{
+ const cases=[
+  ["ATLAS_T3_SOURCE_EDITION_UNAVAILABLE",f=>f.history.delete(Number(f.original.workRef.revision))],
+  ["ATLAS_T3_SOURCE_EDITION_INVALID",f=>f.history.get(Number(f.original.workRef.revision)).needsConfirmation=true],
+  ["ATLAS_T3_SOURCE_WORK_NOT_FOUND",f=>{const h=f.history.get(Number(f.original.workRef.revision));h.snapshot.projects[0].items=[];}],
+  ["ATLAS_T3_SOURCE_REVISION_CHANGED",f=>{f.original.workRef.revision=String(f.read().revision+1);}],
+  ["ATLAS_T3_WORK_NOT_FOUND",f=>{const next=structuredClone(f.read());next.projects[0].items=[];next.revision++;f.advance(next);}]
+ ];
+ for(const [code,change] of cases){
+  const f=corporateFixture({historyEnabled:true});
+  f.advance(createProject(f.read(),{name:"Unrelated saved plan"}).state);
+  change(f);
+  await assert.rejects(f.make().inspectArchive({archive:f.actual,recipientId:"iwxa.atlas"}),{code});
+  assert.equal(f.attempts(),0);
+ }
+ // The older Agent and unextended embedded ports keep exact-edition checks.
+ for(const f of [fixture({historyEnabled:true}),corporateFixture()]){
+  f.advance(createProject(f.read(),{name:"Other plan"}).state);
+  await assert.rejects(f.make().inspectArchive({archive:f.actual,recipientId:"iwxa.atlas"}),
+   {code:"ATLAS_T3_SOURCE_REVISION_CHANGED"});
+  assert.equal(f.attempts(),0);
+ }
 });
 test("corporate profile cannot substitute another content hash or applied reference",async()=>{
  for(const change of [
