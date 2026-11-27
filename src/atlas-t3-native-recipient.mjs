@@ -211,6 +211,8 @@ export function atlasT3RecordedWorkLinks(project){
 }
 // Existing Decision and finding references are the only persisted links.
 // These are historical records, not proof of a current T3 grant or completion.
+/** @param {any} project
+ * @param {{corporateScope?:{organizationId:string,workspaceId:string|null}|null}} [options] */
 export function atlasT3ProjectResultLinks(project,{corporateScope=null}={}){
  if(!project||!Array.isArray(project.items)||!Array.isArray(project.decisions))return [];
  const byWork=atlasT3RecordedWorkLinks(project);
