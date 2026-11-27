@@ -1013,13 +1013,57 @@ mod persistence_tests{
         assert_eq!(fs::read(root.0.join("head.json")).unwrap(),b"{broken");
     }
 }
+// Optional local launch argument for the existing WorkRef. It carries no
+// grant and never changes the native Store. Atlas validates its own saved
+// snapshot before navigating. Older consumers may simply launch the GUI.
+fn launch_work_ref(args:&[String])->Result<Option<Value>,String>{
+    if args.first().map(String::as_str)!=Some("--iwxa-open-work"){
+        return Ok(None);
+    }
+    let valid_id=|s:&str| !s.is_empty()&&s.len()<=256&&!s.chars().any(char::is_control);
+    if args.len()!=4 || !valid_id(&args[1]) || !valid_id(&args[2]){
+        return Err("ATLAS_WORK_REFERENCE_INVALID".into());
+    }
+    let revision=&args[3];
+    if revision.is_empty()||!revision.bytes().all(|b|b.is_ascii_digit())||
+        (revision.len()>1&&revision.starts_with('0'))||
+        !revision.parse::<u64>().is_ok_and(|n|n<=9_007_199_254_740_991){
+        return Err("ATLAS_WORK_REFERENCE_INVALID".into());
+    }
+    Ok(Some(serde_json::json!({"projectId":args[1],"workId":args[2],"revision":revision})))
+}
+#[tauri::command]
+fn atlas_launch_work_ref()->Result<Option<Value>,String>{
+    let args=std::env::args_os().skip(1).map(|arg|arg.into_string()
+        .map_err(|_|"ATLAS_WORK_REFERENCE_INVALID".to_string()))
+        .collect::<Result<Vec<_>,_>>()?;
+    launch_work_ref(&args)
+}
+#[cfg(test)]
+mod launch_work_tests {
+    use super::*;
+    #[test]
+    fn startup_work_arguments_are_exact_and_optional(){
+        let args=|values:&[&str]|values.iter().map(|s|s.to_string()).collect::<Vec<_>>();
+        assert_eq!(launch_work_ref(&[]).unwrap(),None);
+        assert_eq!(launch_work_ref(&args(&["--other"])).unwrap(),None);
+        let result=launch_work_ref(&args(&["--iwxa-open-work","p","w","42"])).unwrap().unwrap();
+        assert_eq!(result,serde_json::json!({"projectId":"p","workId":"w","revision":"42"}));
+        for bad in [args(&["--iwxa-open-work","p","w","042"]),
+            args(&["--iwxa-open-work","p","w","9007199254740992"]),
+            args(&["--iwxa-open-work","p","w","42","extra"]),
+            args(&["--iwxa-open-work","p"])]{
+            assert!(launch_work_ref(&bad).is_err());
+        }
+    }
+}
 pub fn run(){
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             atlas_open,atlas_commit,atlas_export_json,atlas_select_import,
             atlas_export_iwxa,atlas_select_iwxa,atlas_restore_previous,
-            atlas_list_history,atlas_restore_history
+            atlas_list_history,atlas_restore_history,atlas_launch_work_ref
         ])
         .run(tauri::generate_context!())
         .expect("IWXA Atlas desktop window could not be started");

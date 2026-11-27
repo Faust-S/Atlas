@@ -41,6 +41,25 @@ export function createAtlasSavedRef(snapshot,{projectId,workId}={},{
  if(!p.items.some(item=>item.id===wid))failure("ATLAS_WORK_NOT_FOUND");
  return Object.freeze({projectId:id,workId:wid,revision});
 }
+// Resolve the existing saved WorkRef for navigation only. Never substitute a
+// work with the same title or refresh a stale revision implicitly.
+export function resolveAtlasWorkNavigation(snapshot,raw){
+ let value=raw;
+ if(typeof raw==="string"){
+  if(raw.length>2048)failure("ATLAS_WORK_REFERENCE_INVALID");
+  try{value=JSON.parse(raw);}catch{failure("ATLAS_WORK_REFERENCE_INVALID");}
+ }
+ if(!value||typeof value!=="object"||Array.isArray(value)||
+    Object.keys(value).length!==3||
+    !Object.keys(value).every(k=>["projectId","workId","revision"].includes(k))||
+    typeof value.revision!=="string")failure("ATLAS_WORK_REFERENCE_INVALID");
+ const ref=normalizeRef(value,true);
+ const actual=createAtlasSavedRef(snapshot,ref,{persisted:true,dirty:false});
+ if(actual.revision!==ref.revision)failure("ATLAS_SOURCE_REVISION_CHANGED");
+ const project=projectFrom(snapshot,actual.projectId);
+ const work=project.items.find(item=>item.id===actual.workId);
+ return Object.freeze({ref:actual,projectName:project.name,workTitle:work.title});
+}
 // Authorization is always delegated to the actual host. It is not a grant.
 export function createAtlasProjectReadPort({openSnapshot,authorize}={}){
  if(typeof openSnapshot!=="function"||typeof authorize!=="function")failure("ATLAS_HOST_BOUNDARY_REQUIRED");

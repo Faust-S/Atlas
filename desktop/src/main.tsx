@@ -49,7 +49,7 @@ import {buildIwxaPortfolio,readIwxaPortfolio,toBase64,fromBase64} from "./iwxa-p
 import {commitWithReadback,readSavedSnapshotForReference,readExternalAtlasUpdate} from "./native-save.mjs";
 import {projectHistoryRows} from "./history-view.mjs";
 import {sortWorkRows,firstSortedMatchingWorkId,deadlineFocusRows,filterWorkRowsByObservation} from "./work-sorting.mjs";
-import {createAtlasSavedRef} from "../../src/project-host-port.mjs";
+import {createAtlasSavedRef,resolveAtlasWorkNavigation} from "../../src/project-host-port.mjs";
 import {atlasT3DecisionSummary,atlasT3RecordedWorkLinks,
  atlasT3PortableResultText,verifiedAtlasSignedFilePreview}
  from "../../src/atlas-t3-native-recipient.mjs";
@@ -499,6 +499,8 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
  const [signedFileDispatchAttempted,setSignedFileDispatchAttempted]=useState(false);
  const signedFileDispatchAttemptedRef=useRef(false);
  const [savedRefPreview,setSavedRefPreview]=useState<SavedRefPreview|null>(null);
+ const [workLinkText,setWorkLinkText]=useState("");
+ const launchWorkRequested=useRef(false);
  const [t3AgentTask,setT3AgentTask]=useState<{projectId:string;workId:string;taskId:string}|null>(null);
  const savedRefOpenRef=useRef(false);savedRefOpenRef.current=savedRefPreview!==null;
  const savedVersionsOpenRef=useRef(false);savedVersionsOpenRef.current=savedVersions!==null;
@@ -1350,6 +1352,52 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
   setWorkDependencyFilter("all");setWorkDeadlineFilter("all");setWorkFilter("all");setWorkTargetFilter("all");setWorkObservationFilter("all");setWorkHistoryLimits({});setWorkQuery("");setWorkSort("title");setWorkLimit(200);setRealityLimit(8);
   setHistoryQuery("");setHistoryType("all");setHistoryLimit(120);setRecheckLimit(25);
  };
+ // Both a native launch argument and a pasted existing WorkRef use the same
+ // saved-head check. This is navigation, never a write or permission grant.
+ const openSavedWorkReference=async(raw:unknown)=>{
+  if(!native||embedded||!ready||!persisted||busyRef.current||
+    dirtyRef.current||editorOpenRef.current||pendingImportOpenRef.current||
+    savedVersionsOpenRef.current||savedRefOpenRef.current||signedResultOpenRef.current){
+   issue(Error("Сначала сохраните портфель и закройте открытые формы."));return;
+  }
+  const started=latestSnapshot.current,expectedGeneration=generation;
+  busyRef.current=true;setBusy(true);
+  try{
+   const checked=await readSavedSnapshotForReference({
+    invoke,expectedGeneration,snapshot:started,signature:snapshotText,
+    readValidated:(value:Atlas)=>deserialize(JSON.stringify(value))
+   });
+   if(latestSnapshot.current!==started||dirtyRef.current||editorOpenRef.current||
+      pendingImportOpenRef.current||savedVersionsOpenRef.current||savedRefOpenRef.current||
+      signedResultOpenRef.current)
+    throw Error("Портфель изменился во время открытия ссылки.");
+   const selection=resolveAtlasWorkNavigation(checked,raw);
+   selectProject(selection.ref.projectId,true);
+   setTab("work");setWorkReturnId(selection.ref.workId);
+   setPreviewWorkRequest(previous=>({id:selection.ref.workId,serial:(previous?.serial??0)+1}));
+   setInspector(true);
+   if(window.innerWidth<1150)setNavPanelOpen(false);
+   fileMenuRef.current?.removeAttribute("open");setWorkLinkText("");
+   setError("");setMessage("Открыта сохранённая работа: "+selection.workTitle);
+  }catch(e){
+   const code=e instanceof Error?(e as Error&{code?:string}).code??e.message:String(e);
+   const labels:Record<string,string>={
+    ATLAS_SOURCE_REVISION_CHANGED:"Редакция по ссылке устарела. Перечитайте план и выберите актуальную ссылку.",
+    ATLAS_PROJECT_NOT_FOUND:"Проект по ссылке не найден.",
+    ATLAS_WORK_NOT_FOUND:"Работа по ссылке не найдена.",
+    ATLAS_WORK_REFERENCE_INVALID:"Вставьте точную ссылку на работу Atlas.",
+    ATLAS_REF_INVALID:"Вставьте точную ссылку на работу Atlas."
+   };
+   issue(Error(labels[code]??code));
+  }finally{busyRef.current=false;setBusy(false)}
+ };
+ useEffect(()=>{
+  if(!native||embedded||!ready||launchWorkRequested.current)return;
+  launchWorkRequested.current=true;
+  void invoke<unknown>("atlas_launch_work_ref").then(raw=>{
+   if(raw!==null&&raw!==undefined)void openSavedWorkReference(raw);
+  }).catch(issue);
+ },[native,embedded,ready]);
  // Back/forward preserve UI navigation but never bypass a pending editor.
  useEffect(()=>{
   if(embedded)return;
@@ -2278,6 +2326,17 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
         disabled={busy||dirty||!!editor||pendingImport!==null||signedResultPreview!==null||!persisted}
         title="Только оригинальный T3 и действующие полномочия получателя">
         Принять подписанный Result .iwxa</Action>}
+       {!embedded&&<form onSubmit={event=>{event.preventDefault();void openSavedWorkReference(workLinkText);}}>
+        <label>Ссылка на работу Atlas
+         <textarea rows={3} value={workLinkText} maxLength={2048}
+          aria-label="Ссылка на работу Atlas"
+          placeholder='{"projectId":"…","workId":"…","revision":"…"}'
+          onChange={event=>setWorkLinkText(event.target.value)}/>
+        </label>
+        <button type="submit" className="action-button" disabled={busy||dirty||!!editor||!persisted||!workLinkText.trim()}>
+         Открыть работу по ссылке
+        </button>
+       </form>}
        <Action onClick={()=>{fileMenuRef.current?.removeAttribute("open");void showNativeHistory()}}
         disabled={busy||dirty||!!editor||!persisted||savedVersions!==null}>История сохранений</Action>
        <p className="atlas-file-menu-note">{signedFileOwnerAvailable
