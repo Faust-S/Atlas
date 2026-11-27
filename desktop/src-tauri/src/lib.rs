@@ -1114,7 +1114,22 @@ fn atlas_launch_work_ref()->Result<Option<Value>,String>{
     let args=std::env::args_os().skip(1).map(|arg|arg.into_string()
         .map_err(|_|"ATLAS_WORK_REFERENCE_INVALID".to_string()))
         .collect::<Result<Vec<_>,_>>()?;
+    if args.first().map(String::as_str)==Some("--iwxa-open-result"){
+        if args.len()!=3{return Err("ATLAS_RESULT_HANDOFF_INVALID".into());}
+        return Ok(Some(result_handoff_ref(&args[1],&args[2])?));
+    }
     launch_work_ref(&args)
+}
+// A direct handoff uses a transient copy of the SAME original signed
+// .iwxa carrier, not a new Result transport, data model or write authority.
+// Neither a filesystem path nor Result content enters the window message.
+fn result_handoff_ref(handoff_id:&str,archive_sha256:&str)->Result<Value,String>{
+    if !Uuid::parse_str(handoff_id).is_ok_and(|id|id.to_string()==handoff_id)||
+       archive_sha256.len()!=64||!archive_sha256.bytes().all(|b|
+         b.is_ascii_digit()||(b'a'..=b'f').contains(&b)){
+        return Err("ATLAS_RESULT_HANDOFF_INVALID".into());
+    }
+    Ok(serde_json::json!({"handoffId":handoff_id,"archiveSha256":archive_sha256}))
 }
 // A local Windows navigation request carries ONLY an existing WorkRef.
 // It is not a permission, project write, Exchange carrier or network service.
@@ -1130,10 +1145,21 @@ fn parse_window_work_ref(bytes:&[u8])->Result<Value,String>{
         obj.get("revision").and_then(Value::as_str).ok_or("ATLAS_WORK_REFERENCE_INVALID")?.into()];
     launch_work_ref(&args)?.ok_or("ATLAS_WORK_REFERENCE_INVALID".into())
 }
+fn parse_window_navigation_ref(bytes:&[u8])->Result<Value,String>{
+    if bytes.is_empty()||bytes.len()>2048{return Err("ATLAS_WORK_REFERENCE_INVALID".into());}
+    let raw:Value=serde_json::from_slice(bytes).map_err(|_|"ATLAS_WORK_REFERENCE_INVALID")?;
+    if let Some(obj)=raw.as_object(){
+        if obj.len()==2&&obj.contains_key("handoffId")&&obj.contains_key("archiveSha256"){
+            return result_handoff_ref(raw["handoffId"].as_str().ok_or("ATLAS_RESULT_HANDOFF_INVALID")?,
+                raw["archiveSha256"].as_str().ok_or("ATLAS_RESULT_HANDOFF_INVALID")?);
+        }
+    }
+    parse_window_work_ref(bytes)
+}
 
 #[cfg(windows)]
 mod work_navigation_windows {
-    use super::{parse_window_work_ref,Value};
+    use super::{parse_window_navigation_ref,Value};
     use std::{ffi::c_void,sync::Mutex};
     use tauri::{AppHandle,Emitter};
 
@@ -1174,7 +1200,7 @@ mod work_navigation_windows {
             if data.kind==DATA_KIND {
                 if data.data.is_null()||data.len==0||data.len>2048{return 0;}
                 let bytes=std::slice::from_raw_parts(data.data.cast::<u8>(),data.len as usize);
-                let Ok(work)=parse_window_work_ref(bytes) else{return 0};
+                let Ok(work)=parse_window_navigation_ref(bytes) else{return 0};
                 let Ok(mut pending)=PENDING.lock() else{return 0};
                 if pending.is_some(){return 0;}
                 *pending=Some(work);
@@ -1217,7 +1243,7 @@ mod work_navigation_windows {
     // sending. No app version allowlist and no arbitrary HWND from React.
     pub(crate) fn send(hwnd:isize,pid:u32,work:&Value)->&'static str{
         let Ok(bytes)=serde_json::to_vec(work) else{return "REQUEST_INVALID"};
-        if parse_window_work_ref(&bytes).is_err(){return "REQUEST_INVALID";}
+        if parse_window_navigation_ref(&bytes).is_err(){return "REQUEST_INVALID";}
         let mut actual=0u32;
         unsafe {
             if GetWindowThreadProcessId(hwnd,&mut actual)==0||actual!=pid{
@@ -1400,6 +1426,42 @@ fn atlas_t3_consumer_call(app:&AppHandle,action:&str,file:Option<&str>)->Result<
     Ok(row.clone())
 }
 
+// Read only the explicit local handoff selected by the user. The file is
+// resolved relative to the original Setup Core data location, not from
+// WebView-supplied paths. All signature/authority checks still occur in
+// the unchanged installed T3 Consumer and ordinary Atlas preview.
+#[tauri::command]
+async fn atlas_read_local_signed_result(app:AppHandle,handoff_id:String,archive_sha256:String)->Result<String,String>{
+    result_handoff_ref(&handoff_id,&archive_sha256)?;
+    #[cfg(windows)]
+    {
+        return tauri::async_runtime::spawn_blocking(move||{
+            let (_,organizations)=atlas_t3_local_roots(&app)?;
+            let root=organizations.parent().and_then(Path::parent)
+                .ok_or("ATLAS_T3_DATA_ROOT_UNAVAILABLE")?.join("atlas-handoff");
+            let path=root.join(format!("{}.iwxa",handoff_id));
+            let meta=fs::symlink_metadata(&path).map_err(|_|"ATLAS_RESULT_HANDOFF_UNAVAILABLE")?;
+            if !meta.is_file()||meta.file_type().is_symlink()||
+               meta.len()<22||meta.len()>MAX_IWXA_BYTES as u64{
+                return Err("ATLAS_RESULT_HANDOFF_INVALID".into());
+            }
+            let mut bytes=Vec::with_capacity(meta.len() as usize);
+            File::open(&path).map_err(|_|"ATLAS_RESULT_HANDOFF_UNAVAILABLE")?
+                .take(MAX_IWXA_BYTES as u64+1).read_to_end(&mut bytes)
+                .map_err(|_|"ATLAS_RESULT_HANDOFF_UNAVAILABLE")?;
+            if bytes.len() as u64!=meta.len()||checksum(&bytes)!=archive_sha256{
+                return Err("ATLAS_RESULT_HANDOFF_CHANGED".into());
+            }
+            // Consume only the disposable transport copy. The original
+            // publication remains in T3 and can be explicitly reopened.
+            let _=fs::remove_file(&path);
+            Ok(BASE64.encode(bytes))
+        }).await.map_err(|_|"ATLAS_T3_NATIVE_WORKER_FAILED".to_owned())?;
+    }
+    #[cfg(not(windows))]
+    {let _=app;Err("ATLAS_T3_NATIVE_WINDOWS_REQUIRED".into())}
+}
+
 #[tauri::command]
 async fn atlas_t3_capabilities(app:AppHandle)->Result<Value,String>{
     #[cfg(windows)]
@@ -1490,7 +1552,8 @@ pub fn run(){
             atlas_open,atlas_commit,atlas_export_json,atlas_select_import,
             atlas_export_iwxa,atlas_select_iwxa,atlas_restore_previous,
             atlas_list_history,atlas_restore_history,atlas_launch_work_ref,atlas_take_work_ref,
-            atlas_read_revision,atlas_t3_capabilities,atlas_t3_inspect,atlas_t3_readback
+            atlas_read_revision,atlas_t3_capabilities,atlas_t3_inspect,atlas_t3_readback,
+            atlas_read_local_signed_result
         ])
         .run(tauri::generate_context!())
         .expect("IWXA Atlas desktop window could not be started");
