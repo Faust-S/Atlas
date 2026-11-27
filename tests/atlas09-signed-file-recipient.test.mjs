@@ -361,6 +361,28 @@ test("corporate historical Result remains usable after unrelated plan saves; con
  if(f.original.sourceKind==="ADMIN_WORKSPACE_RESULT"){
   assert.equal(row.acceptanceId,undefined);
   assert.equal(row.resultEventId,f.original.resultEventId);
+  const snapshot=f.read(),decision=snapshot.projects[0].decisions.at(-1);
+  const source={sourceKind:"ADMIN_WORKSPACE_RESULT",
+   organizationId:f.original.organizationId,workspaceId:f.original.workspaceId,
+   taskId:f.original.taskId,taskRevisionId:f.original.signedTaskRevisionId,
+   taskPackageSha256:f.original.signedTaskPackageSha256,
+   resultId:f.original.resultId,taskObjectId:f.original.taskObjectId,
+   taskEventId:f.original.taskEventId,resultObjectId:f.original.sourceObjectRef.object_id,
+   resultEventId:f.original.resultEventId,sourceOperationId:f.original.operationId,
+   archiveSha256:f.original.archiveSha256,resultSha256:f.original.acceptedDigest,
+   selectedText:text,workRef:ref};
+  assert.deepEqual(recordedCorporateAtlasResult(snapshot,source),{
+   status:"RECORDED",revision:String(snapshot.revision),decisionId:decision.id});
+  assert.equal(recordedCorporateAtlasResult(before,source).status,"NOT_RECORDED");
+  for(const change of [{organizationId:"org:other"},{workspaceId:"ws:other"},
+    {taskPackageSha256:sha("other Task")},{resultEventId:"event:other"},
+    {resultObjectId:"company:work:"+sha("other record")},{archiveSha256:sha("other carrier")},
+    {sourceOperationId:"admin:t3:atlas:"+sha("other publication")},{selectedText:"Changed text"}]){
+   assert.equal(recordedCorporateAtlasResult(snapshot,{...source,...change}).status,"NOT_RECORDED");
+  }
+  const duplicate=structuredClone(snapshot);
+  duplicate.projects[0].decisions.push({...decision,id:"decision:duplicate"});
+  assert.equal(recordedCorporateAtlasResult(duplicate,source).status,"AMBIGUOUS");
   assert.equal(atlasT3ProjectResultLinks(f.read().projects[0],{corporateScope:{
     organizationId:f.original.organizationId,workspaceId:f.original.workspaceId}}).length,1);
   assert.equal(atlasT3ProjectResultLinks(f.read().projects[0],{corporateScope:{
