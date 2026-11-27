@@ -73,12 +73,17 @@ const originalAccepted=(row,ref)=>{
  const archiveSha256=sha(row.archiveSha256,"ATLAS_T3_ARCHIVE_DIGEST_REQUIRED");
  return {work,taskId,resultId,acceptedDigest,archiveSha256};
 };
-// Both original source profiles use the same signed-file recipient,
+// All original source profiles use the same signed-file recipient,
 // native U05 Decision and readback. Historic Agent decisions have no
 // sourceKind; do not migrate them or reject their previously valid shape.
-const corporateFields=["organizationId","workspaceId","executorId","managerId",
- "acceptanceId","applicationEffectKey","appliedEventId","atlasGrantId",
- "signedTaskRevisionId","signedTaskPackageSha256"];
+const corporateIdentity=["organizationId","workspaceId","executorId","managerId",
+ "atlasGrantId","signedTaskRevisionId","signedTaskPackageSha256"];
+const appliedOnly=["acceptanceId","applicationEffectKey","appliedEventId"];
+const workspaceOnly=["taskObjectId","taskEventId","resultEventId"];
+const appliedFields=[...corporateIdentity,...appliedOnly];
+const workspaceFields=[...corporateIdentity,...workspaceOnly];
+const corporateFields=[...corporateIdentity,...appliedOnly,...workspaceOnly];
+const corporateResult=kind=>["ADMIN_APPLIED_RESULT","ADMIN_WORKSPACE_RESULT"].includes(kind);
 function signedSource(row,ref,operationId){
  if(/^agent:t3:atlas:[a-f0-9]{64}$/.test(operationId??"")){
   if(row.sourceKind!==undefined&&row.sourceKind!=="AGENT_ACCEPTED_RESULT")
@@ -88,8 +93,24 @@ function signedSource(row,ref,operationId){
    fail("ATLAS_T3_SIGNED_SOURCE_KIND_INVALID");
   return {sourceKind:"AGENT_ACCEPTED_RESULT"};
  }
+ if(row.sourceKind==="ADMIN_WORKSPACE_RESULT"){
+  if(!/^admin:t3:atlas:[a-f0-9]{64}$/.test(operationId??"")||
+    !["organizationId","workspaceId","executorId","managerId","atlasGrantId",
+      "taskEventId","resultEventId","resultId","taskId"].every(k=>typeof row[k]==="string"&&ID.test(row[k]))||
+    !["signedTaskRevisionId","signedTaskPackageSha256"].every(k=>typeof row[k]==="string"&&SHA.test(row[k]))||
+    !/^company:work:[a-f0-9]{64}$/.test(row.taskObjectId??"")||
+    ref.workspace_id!==row.workspaceId||ref.schema_id!=="iwxa.t3.company-work-record"||
+    !/^company:work:[a-f0-9]{64}$/.test(ref.object_id)||ref.revision!==1||
+    row.taskObjectId===ref.object_id||row.taskEventId===row.resultEventId||
+    appliedOnly.some(k=>Object.hasOwn(row,k))||
+    row.acceptedDigest!==row.selectedSummarySha256)
+   fail("ATLAS_T3_SIGNED_CORPORATE_PROVENANCE_INVALID");
+  return {sourceKind:"ADMIN_WORKSPACE_RESULT",
+   ...Object.fromEntries(workspaceFields.map(k=>[k,row[k]]))};
+ }
  if(!/^admin:t3:atlas:[a-f0-9]{64}$/.test(operationId??"")||
     row.sourceKind!=="ADMIN_APPLIED_RESULT"||
+    workspaceOnly.some(k=>Object.hasOwn(row,k))||
     !["organizationId","workspaceId","executorId","managerId","appliedEventId","atlasGrantId"]
      .every(k=>typeof row[k]==="string"&&ID.test(row[k]))||
     !["acceptanceId","applicationEffectKey","signedTaskRevisionId","signedTaskPackageSha256","resultId"]
@@ -99,7 +120,7 @@ function signedSource(row,ref,operationId){
     row.acceptedDigest!==row.selectedSummarySha256)
   fail("ATLAS_T3_SIGNED_CORPORATE_PROVENANCE_INVALID");
  return {sourceKind:"ADMIN_APPLIED_RESULT",
-  ...Object.fromEntries(corporateFields.map(k=>[k,row[k]]))};
+  ...Object.fromEntries(appliedFields.map(k=>[k,row[k]]))};
 }
 const sameSignedSource=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const decisionRecord=(d)=>{
@@ -168,7 +189,7 @@ export function atlasT3DecisionSummary(text){
  if(typeof text!=="string"||!text.startsWith(PREFIX))return null;
  const record=decisionRecord({text});
  if(!record)return "Повреждена запись связи Atlas с T3. Требуется проверка.";
- return (record.sourceKind==="ADMIN_APPLIED_RESULT"
+ return (corporateResult(record.sourceKind)
   ?"Связь с корпоративным результатом Admin Center: работа "
   :"Связь с результатом Agent: работа ")+record.workId+
   ", Task "+record.taskId+", Result "+record.resultId+
@@ -204,7 +225,7 @@ export function atlasT3RecordedWorkLinks(project){
    sourceRevision:String(row.sourceRevision),receivedAt:decision.at,
    portableSelectedSummary:row.portableSelectedSummary===true,
    signedFileMode:row.signedFileMode===true,
-   sourceKind:row.sourceKind==="ADMIN_APPLIED_RESULT"?"ADMIN_APPLIED_RESULT":"AGENT_ACCEPTED_RESULT",
+   sourceKind:corporateResult(row.sourceKind)?row.sourceKind:"AGENT_ACCEPTED_RESULT",
   }));
  }
  return links;
@@ -233,7 +254,7 @@ export function atlasT3ProjectResultLinks(project,{corporateScope=null}={}){
      !ID.test(link.decisionId??"")||operationCounts.get(link.operationId)!==1)continue;
   const reference="atlas:decision:"+link.decisionId;
   const decision=decisions.get(link.decisionId);
-  if(link.sourceKind==="ADMIN_APPLIED_RESULT"&&corporateScope!==null){
+  if(corporateResult(link.sourceKind)&&corporateScope!==null){
    const row=decisionRecord(decision);
    if(!row||row.organizationId!==corporateScope.organizationId||
       row.workspaceId!==corporateScope.workspaceId)continue;
@@ -627,7 +648,7 @@ export function createAtlasT3SignedFileRecipient({
   const project=current.projects.find(p=>p.id===w.projectId);
   if(!project?.items.some(item=>item.id===w.workId))
    deny("ATLAS_T3_WORK_NOT_FOUND");
-  const historyEnabled=state.source.sourceKind==="ADMIN_APPLIED_RESULT"&&
+  const historyEnabled=corporateResult(state.source.sourceKind)&&
    typeof readSavedRevision==="function";
   if(current.revision<Number(w.revision)||
      (!historyEnabled&&String(current.revision)!==w.revision))
@@ -704,7 +725,7 @@ export function createAtlasT3SignedFileRecipient({
   const w=state.accepted.work;
   // Consent must cover the exact head shown in the preview. A later plan
   // save requires fresh review, never automatic replay or a stale write.
-  if(state.source.sourceKind==="ADMIN_APPLIED_RESULT"&&
+  if(corporateResult(state.source.sourceKind)&&
      typeof readSavedRevision==="function"&&reviewedGeneration!==before.generation)
    deny("ATLAS_T3_REVIEWED_PLAN_CHANGED");
   await reviewedWorkEdition(before,state);
@@ -759,7 +780,7 @@ export async function verifiedAtlasSignedFilePreview(row){
     row.originalKernelEventVerified!==false||
     typeof row.alreadyReceived!=="boolean"||
     (row.sourceKind!==undefined&&
-      !["AGENT_ACCEPTED_RESULT","ADMIN_APPLIED_RESULT"].includes(row.sourceKind))||
+      !(row.sourceKind==="AGENT_ACCEPTED_RESULT"||corporateResult(row.sourceKind)))||
     !SHA.test(row.archiveSha256??""))
   fail("ATLAS_T3_SIGNED_PREVIEW_INVALID");
  const work=workRef(row.workRef),selected=portableSummary({
@@ -771,7 +792,7 @@ export async function verifiedAtlasSignedFilePreview(row){
  const editionFields=["reviewedGeneration","currentRevision","issuedProjectName","issuedWorkTitle"];
  let edition={};
  if(editionFields.some(key=>Object.hasOwn(row,key))){
-  if(row.sourceKind!=="ADMIN_APPLIED_RESULT"||row.alreadyReceived||
+  if(!corporateResult(row.sourceKind)||row.alreadyReceived||
      !ID.test(row.reviewedGeneration??"")||
      typeof row.currentRevision!=="string"||
      !/^(0|[1-9][0-9]*)$/.test(row.currentRevision)||
