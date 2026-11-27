@@ -1427,9 +1427,10 @@ async fn atlas_t3_inspect(app:AppHandle,archive_base64:String)->Result<Value,Str
             fs::create_dir_all(&scratch).map_err(|_|"ATLAS_T3_TEMPORARY_DIRECTORY_FAILED")?;
             struct Scratch(PathBuf);
             impl Drop for Scratch{fn drop(&mut self){let _=fs::remove_file(&self.0);}}
-            let path=Scratch(scratch.join(format!("{}.iwxa",Uuid::new_v4())));
-            let mut file=OpenOptions::new().create_new(true).write(true).open(&path.0)
+            let selected=scratch.join(format!("{}.iwxa",Uuid::new_v4()));
+            let mut file=OpenOptions::new().create_new(true).write(true).open(&selected)
                 .map_err(|_|"ATLAS_T3_TEMPORARY_FILE_FAILED")?;
+            let path=Scratch(selected);
             file.write_all(&bytes).and_then(|_|file.sync_all()).map_err(|_|"ATLAS_T3_TEMPORARY_FILE_FAILED")?;
             drop(file);
             let selected=path.0.to_str().ok_or("ATLAS_T3_TEMPORARY_FILE_PATH_INVALID")?;

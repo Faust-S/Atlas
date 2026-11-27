@@ -1012,7 +1012,16 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
    setSignedFileDispatchAttempted(false);
    setSignedResultPreview({...preview,archive});
    setMessage("");setError("");
-  }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
+  }catch(e){
+   const code=deepFreezeError(e);
+   if(code.includes("T3_ATLAS_LOCAL_AUTHORITY_NOT_CONNECTED"))
+    issue(Error("В Admin Center этой организации сначала разрешите передачу в Atlas и сохраните подписанный Result. Обе программы должны быть установлены под одной учётной записью Windows."));
+   else if(code.includes("T3_ATLAS_LOCAL_SOURCE_GRANT_NOT_ACTIVE"))
+    issue(Error("Право передачи результата не действует. Проверьте его в Admin Center этой организации."));
+   else if(code.includes("T3_ATLAS_LOCAL_AUTHORITY_CHANGED"))
+    issue(Error("Полномочия изменились во время проверки. Выберите файл снова."));
+   else issue(e);
+  }finally{busyRef.current=false;setBusy(false)}
  };
  // Only original Reconciliation and current Atlas authorization can verify
  // a received file. A persisted Decision alone is NEVER the current grant.
@@ -1288,7 +1297,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
     if(active&&!checked.projects.some((p:any)=>p.id===active))setActive(null);
     setRecentWorkId(null);setRecentPlanBefore(null);
     workNavigationContext.current=null;
-    setMessage("Перечитана новая сохранённая редакция Atlas. Ссылки на Agent Result показаны у работ; права проверяются отдельно через T3.");
+    setMessage("Перечитана новая сохранённая редакция Atlas. Ссылки на Result показаны у работ; права проверяются отдельно через T3.");
    }
    setError("");
   }catch(e){issue(e)}finally{busyRef.current=false;setBusy(false)}
@@ -3629,7 +3638,7 @@ export function AtlasWorkspace({host}:{host?:AtlasEmbeddedHost}){
        <details className="atlas-technical-details">
         <summary>Исходная запись связи T3</summary>
         <code>{entry.text}</code>
-        <p className="minor">Связь с Agent Result не предоставляет прав доступа.
+        <p className="minor">Связь с Result не предоставляет прав доступа.
          Актуальность источника и подписанные полномочия проверяются оригинальным T3.</p>
        </details>}
       {entry.revision&&<details className="atlas-technical-details"><summary>Версия источника</summary><code>{entry.revision}</code></details>}
