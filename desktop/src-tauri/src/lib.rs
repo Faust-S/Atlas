@@ -477,10 +477,18 @@ fn atlas_export_json(app:AppHandle, expected_generation:String)->Result<String,S
 fn atlas_export_iwxa(
     app: AppHandle, expected_generation: String, archive_base64: String
 )->Result<Option<String>,String>{
+    export_iwxa_from_root(&app,&path_for(&app)?,&expected_generation,&archive_base64)
+}
+// The same owner implementation also exports a Center-owned preparation
+// root. The caller resolves its own native scope; the picker and generation
+// check remain here. No caller can change the Atlas plan through export.
+fn export_iwxa_from_root(
+    app:&AppHandle,root:&Path,expected_generation:&str,archive_base64:&str
+)->Result<Option<String>,String>{
     if archive_base64.len() > (MAX_IWXA_BYTES / 3 + 1) * 4 + 4 {
         return Err("Архив IWXA слишком большой (максимум 32 МБ)".into());
     }
-    let bytes=BASE64.decode(&archive_base64).map_err(|_|"Некорректные данные архива IWXA")?;
+    let bytes=BASE64.decode(archive_base64).map_err(|_|"Некорректные данные архива IWXA")?;
     if bytes.len() < 22 || bytes.len() > MAX_IWXA_BYTES || !bytes.starts_with(b"PK\x03\x04") {
         return Err("Некорректный контейнер IWXA".into());
     }
@@ -494,14 +502,13 @@ fn atlas_export_iwxa(
     if selected.extension().and_then(|x|x.to_str()).map(|x|x.to_ascii_lowercase())
       !=Some("iwxa".into()) {return Err("Разрешён только файл .iwxa".into());}
     // The picker may stay open while another window saves a newer generation.
-    let root=path_for(&app)?;
     {
-        let _guard=lock(&root)?;
-        let head=current(&root)?.ok_or("Сначала сохраните портфель")?;
+        let _guard=lock(root)?;
+        let head=current(root)?.ok_or("Сначала сохраните портфель")?;
         if head.generation!=expected_generation{
             return Err("Портфель на диске изменился. Экспорт отменён.".into());
         }
-        decode(&root,&head)?;
+        decode(root,&head)?;
     }
     write_export_atomic(&selected,&bytes)?;
     Ok(Some(format!("Архив IWXA сохранён: {}",selected.display())))
