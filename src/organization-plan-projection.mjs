@@ -43,3 +43,51 @@ export function organizationPlanProjection(snapshot,projectId){
   note:readiness.note
  };
 }
+
+// Compare the original saved plan with a later observed plan, using exactly
+// the same Atlas scheduling engine in both editions. Actual dates are only
+// the dates recorded in Atlas, never inferred from a received Result.
+/** @param {any} current
+ * @param {any|null} original
+ * @param {{projectId:string,workId:string,revision:string}} ref */
+export function organizationWorkEditionComparison(current,original,ref){
+ validate(current);
+ if(!ref||typeof ref.projectId!=='string'||!ref.projectId||
+    typeof ref.workId!=='string'||!ref.workId||
+    typeof ref.revision!=='string'||!/^(0|[1-9][0-9]*)$/.test(ref.revision)||
+    !Number.isSafeInteger(Number(ref.revision)))throw Error('ATLAS_WORK_REFERENCE_INVALID');
+ if(original!==null){
+   validate(original);
+   if(String(original.revision)!==ref.revision)
+     throw Error('ATLAS_HISTORY_EDITION_MISMATCH');
+ }
+ function edition(snapshot){
+   if(!snapshot)return null;
+   const project=snapshot.projects.find(p=>p.id===ref.projectId);
+   const work=project?.items.find(w=>w.id===ref.workId);
+   const revision=String(snapshot.revision);
+   if(!project)return {revision,status:'PROJECT_MISSING',work:null};
+   if(!work)return {revision,status:'WORK_MISSING',work:null};
+   const plan=organizationPlanProjection(snapshot,project.id);
+   const row=plan.works.find(w=>w.id===ref.workId);
+   const predecessors=project.dependencies.filter(d=>d.to===work.id)
+     .map(d=>d.from).sort();
+   const successors=project.dependencies.filter(d=>d.from===work.id)
+     .map(d=>d.to).sort();
+   return {revision,status:'FOUND',work:{
+      title:work.title,state:work.state,priority:work.priority,
+      dueDate:work.dueDate??null,estimateDays:work.estimateDays??1,
+      plannedStart:row?.startDate??null,plannedFinish:row?.finishDate??null,
+      actualStart:work.actualStartDate??null,actualFinish:work.actualFinishDate??null,
+      assignee:work.assignee??'',resource:row?.resource??null,
+      predecessors,successors,projectedProjectFinish:plan.projectedFinish,
+      deadlineSlipDays:plan.deadlineSlipDays
+   }};
+ }
+ const before=edition(original),after=original===current?before:edition(current);
+ const old=before?.work,now=after?.work;
+ const changedFields=old&&now?Object.keys(old).filter(key=>
+   JSON.stringify(old[key])!==JSON.stringify(now[key])):[];
+ return {sourceRevision:ref.revision,original:before,current:after,
+   changedFields,originalStatus:before?.status??'NOT_RETAINED'};
+}

@@ -364,14 +364,54 @@ fn backup_open(root:&Path)->Result<OpenResult,String>{
 // Unlike lock(), this does not create directories, lock files, a manifest,
 // project blocks or any second store. The shared file lock coordinates with
 // Atlas Desktop's exclusive writer lock on the very same existing file.
-fn read_root_readonly(root: &Path) -> Result<OpenResult, String> {
+fn lock_readonly(root: &Path) -> Result<File, String> {
     if !root.join("head.json").is_file() {
         return Err("ATLAS_PUBLIC_SOURCE_NOT_FOUND".into());
     }
     let lock_file = File::open(root.join("atlas.lock"))
         .map_err(|_| "ATLAS_PUBLIC_LOCK_NOT_FOUND".to_string())?;
     FileExt::lock_shared(&lock_file).map_err(|e| err("Блокировка чтения Atlas", e))?;
+    Ok(lock_file)
+}
+fn read_root_readonly(root: &Path) -> Result<OpenResult, String> {
+    let _guard=lock_readonly(root)?;
     load_root(root)
+}
+// Read the exact historical owner edition without restoring or rewriting it.
+// Both the observed head and archived manifest are checked under one existing
+// shared lock. A caller cannot select a path, and a damaged matching archive
+// is not replaced by a neighbouring revision.
+fn read_revision_readonly(root:&Path,expected_generation:&str,revision:u64)
+    ->Result<Option<OpenResult>,String>{
+    if revision>9_007_199_254_740_991 || Uuid::parse_str(expected_generation).is_err(){
+        return Err("ATLAS_HISTORY_REQUEST_INVALID".into());
+    }
+    let _guard=lock_readonly(root)?;
+    let head=load_root(root)?;
+    if head.needs_confirmation{return Err("ATLAS_PUBLIC_RECOVERY_REQUIRED".into());}
+    if head.generation!=expected_generation{return Err("ATLAS_HISTORY_HEAD_CHANGED".into());}
+    let current_revision=head.snapshot.get("revision").and_then(Value::as_u64)
+        .ok_or("ATLAS_HISTORY_HEAD_INVALID")?;
+    if revision==current_revision{return Ok(Some(head));}
+    if revision>current_revision{return Ok(None);}
+    let prefix=format!("{:020}-",revision);
+    let mut found=None;
+    for path in backup_candidates(root)? {
+        let Some(name)=path.file_name().and_then(|name|name.to_str()) else{continue};
+        if !name.starts_with(&prefix){continue;}
+        let manifest=read_manifest(&path)
+            .map_err(|_|"ATLAS_HISTORY_EDITION_DAMAGED".to_string())?;
+        if manifest.revision!=revision ||
+            name!=format!("{:020}-{}.json",manifest.revision,manifest.generation) {
+            return Err("ATLAS_HISTORY_EDITION_DAMAGED".into());
+        }
+        if found.is_some(){return Err("ATLAS_HISTORY_EDITION_AMBIGUOUS".into());}
+        let snapshot=decode(root,&manifest)
+            .map_err(|_|"ATLAS_HISTORY_EDITION_DAMAGED".to_string())?;
+        found=Some(OpenResult{generation:manifest.generation,snapshot,
+            restored_from_backup:false,needs_confirmation:false});
+    }
+    Ok(found)
 }
 fn load_root(root:&Path)->Result<OpenResult,String>{
     match current(root) {
@@ -880,6 +920,28 @@ mod persistence_tests{
         assert_eq!(undone.snapshot["revision"],4);
         assert_eq!(undone.snapshot["projects"][0]["name"],"After import");
         assert_eq!(load_root(&root.0).unwrap().generation,undone.generation);
+    }
+    #[test]fn exact_history_read_is_non_mutating_and_bound_to_current_head(){
+        let root=scratch();
+        let first=commit_root(&root.0,"none",snapshot(1,&["Before"])).unwrap();
+        let second=commit_root(&root.0,&first.generation,snapshot(3,&["After"])).unwrap();
+        let head_path=root.0.join("head.json");
+        let before=fs::read(&head_path).unwrap();
+        let archive=backup_candidates(&root.0).unwrap().into_iter()
+            .find(|p|p.to_string_lossy().contains(&first.generation)).unwrap();
+        let archive_before=fs::read(&archive).unwrap();
+        let original=read_revision_readonly(&root.0,&second.generation,1).unwrap().unwrap();
+        assert_eq!(original.generation,first.generation);
+        assert_eq!(original.snapshot["projects"][0]["name"],"Before");
+        assert_eq!(read_revision_readonly(&root.0,&second.generation,3).unwrap().unwrap().generation,second.generation);
+        assert!(read_revision_readonly(&root.0,&second.generation,2).unwrap().is_none());
+        assert!(read_revision_readonly(&root.0,&second.generation,4).unwrap().is_none());
+        assert_eq!(read_revision_readonly(&root.0,&first.generation,1).err().unwrap(),"ATLAS_HISTORY_HEAD_CHANGED");
+        assert_eq!(fs::read(&head_path).unwrap(),before);
+        assert_eq!(fs::read(&archive).unwrap(),archive_before);
+        fs::write(&archive,b"corrupt").unwrap();
+        assert_eq!(read_revision_readonly(&root.0,&second.generation,1).err().unwrap(),"ATLAS_HISTORY_EDITION_DAMAGED");
+        assert_eq!(fs::read(&head_path).unwrap(),before);
     }
     #[test]fn damaged_archive_cannot_replace_healthy_portfolio(){
         let root=scratch();
